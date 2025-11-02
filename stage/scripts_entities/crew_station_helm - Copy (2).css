@@ -1,0 +1,1231 @@
+using System;
+using Game01.GameObjects;
+
+using KeyCommon.Simulation;
+
+using Keystone.Types;
+using Keystone.CSG;
+using KeyScript;
+using KeyScript.Interfaces;
+using KeyScript.Delegates;
+using KeyScript.Host;
+using KeyScript.Rules;
+using Settings;
+
+public class Helm : BaseScript
+{
+	private enum ManeuverState: int
+	{
+			None = 0,
+			Rotating_Accelerating,
+			Rotating_Decelerating,
+			Translating_Accelerating,
+			Translating_Decelerating,
+			Strafing_Left, // todo: do these need accelerating and decelerating states too?
+			Strafing_Right,
+			Maneuver
+	}
+
+	public static void Initialize(string scriptID)
+	{
+		string category = "Misc"; //"public properties";
+		// create the custom properties	
+		Settings.PropertySpec[] properties = new Settings.PropertySpec[11];
+		// name, type, category, default value
+		// name, type, category, description, default value, editor, converter
+		properties[0] = new PropertySpec("description", typeof(string).Name, category,(object)"helm");
+
+		properties[1] = new PropertySpec("operator", typeof(string).Name, category, (object)"computer");
+		properties[2] = new PropertySpec("engines", typeof(string[]).Name, category, null);
+		properties[3] = new PropertySpec("thrusters", typeof(string[]).Name, category, null);
+		
+		category = "private";
+		// should "state" be a type stack<int> and private category non serializble?  will that work?
+		System.Collections.Generic.Stack<int> tmp = new System.Collections.Generic.Stack<int>();
+		tmp.Push((int)ManeuverState.None);
+		properties[4] = new PropertySpec("state", typeof(System.Collections.Generic.Stack<int>).Name, category, tmp);
+		properties[5] = new PropertySpec("heading", typeof(Vector3d).Name, category, Vector3d.Zero()); // desired heading
+		properties[6] = new PropertySpec("quatheading", typeof(Quaternion).Name, category, new Quaternion());
+		
+		properties[7] = new PropertySpec("halfangle", typeof(double).Name, category, 0d);
+		properties[8] = new PropertySpec("direction", typeof(Vector3d).Name, category, Vector3d.Zero()); // rotation direction
+		properties[9] = new PropertySpec("halfdistance", typeof(double).Name, category, 0d);
+		properties[10] = new PropertySpec("destination", typeof(Vector3d).Name, category, Vector3d.Zero());
+		
+		
+		
+		// first just get heading working with no thrust towards target.  just initial thrust followed by thrust in opposite direction to zero out at desired heading.
+		
+		// ability to find all engines and thrusters including updating during refit if applicable
+		//	- how is this done?
+		//      - it would be incredibly expensive to query from Vehicle/Container and check every child's and decendant's "name."  Therefore they should probably be added both on Helm InitializeEntity() and when
+		// thrusters are added/removed at runtime.
+		
+		//  - this is the first requirement... find the engines. We could use a naming convention...
+		//  	- i think it has to be done via naming convention 
+		//      - or what if each engine had a "operator" property named "helm"?
+		
+		
+		// ability to adjust engine regulators (throttle) and burn time.
+		
+		// ability to zero out all angular forces and align with the stellar system plane
+		
+		// ability to just set a heading and acceleration and go in that direction
+		//	 this involves knowing which thrusters and engines to fire and their duration
+		//   There may not be a need for max thrust and deceleration.
+		
+		// waypoints (eg combat space patrol)
+		//	- vector3d and a double for velocity 
+		
+		// waypoints to avoid going through stars, worlds and moons
+		
+		// interceptTargetID
+		// interceptTargetVelocity
+		
+		// orbitTargetID
+		
+		// determine which engines/thrusters must follow 
+
+		
+		
+		// todo: the helm needs to know about all of the thrust producers. How?
+		//       we need to find them when a helm is placed on the Interior AND we need to update when engines are added or removed to Container.
+		//       todo: we don't need to know the orientation of the thruster,just the thrust vector which is a simple customproperty of the engine.  We also need to set the bool for "angular thrust".  easy.
+		
+		// todo: perhaps we register as a "listener" for producers of type ProductID
+		//       then we can determine the orientations and positions based on each axis center line
+		
+		// todo: i think all crew stations need to have "listener" capabilities in order to be able to control/operate components on the vehicle.  But this is a lot of overhead and all our "stations" would need to implement observer pattern.  For instance, "engineering" would need a list of all power producers.
+		
+		// https://gamedev.stackexchange.com/questions/189707/moving-ship-to-new-destination-when-already-having-a-velocity
+		
+		// add the properties to the entity's script object
+		EntityAPI.AddCustomProperties(scriptID, properties);
+				
+		// create a test rule using an inline delegate rule
+		//EntityAPI.AddRule (scriptID, "description", 
+		//	new SimpleRule("Name cannot be empty.", 
+		//	delegate {return ((string)properties[0].DefaultValue).Length != 0; }));
+		
+		EntityAPI.AddRule (scriptID, "description", new SimpleRule(1, Rule_Description));				
+	}
+	
+	public static void InitializeEntity(string entityID)
+	{
+		// ownerID is equivalent to the VehicleID
+		string ownerID = EntityAPI.GetOwnerID(entityID);
+		if (string.IsNullOrEmpty(ownerID)) return;
+		
+		// this assumes we know all the engine and thruster names. I don't think
+		// that is an unreasonable assumption, but it does mean we'd need different helm
+		// implementations for ships that have different engine configurations.
+		string[] engineIDs = new string[4]; 
+		engineIDs[0] = EntityAPI.FindDescendantByName (ownerID, "engineTopLeft");
+		engineIDs[1] = EntityAPI.FindDescendantByName (ownerID, "engineBottomLeft");
+		engineIDs[2] = EntityAPI.FindDescendantByName (ownerID, "engineTopRight");
+		engineIDs[3] = EntityAPI.FindDescendantByName (ownerID, "engineBottomRight");
+		
+		string[] thrusterIDs = new string[8];
+		thrusterIDs[0] = EntityAPI.FindDescendantByName (ownerID, "thrusterFwdLeft");
+		thrusterIDs[1] = EntityAPI.FindDescendantByName (ownerID, "thrusterAftLeft");
+		thrusterIDs[2] = EntityAPI.FindDescendantByName (ownerID, "thrusterFwdRight");
+		thrusterIDs[3] = EntityAPI.FindDescendantByName (ownerID, "thrusterAftRight");
+		thrusterIDs[4] = EntityAPI.FindDescendantByName (ownerID, "thrusterFwd1");
+		thrusterIDs[5] = EntityAPI.FindDescendantByName (ownerID, "thrusterFwd2");
+		thrusterIDs[6] = EntityAPI.FindDescendantByName (ownerID, "thrusterAft1");
+		thrusterIDs[7] = EntityAPI.FindDescendantByName (ownerID, "thrusterAft2");
+		
+		// todo: the exact thrust amount should be set in property grid during vehicle design
+		// todo: assigning thrust below is not working.  Frankly i shouldnt be assiging here anyway.
+		//       I should manually assign the thrust in the property grid and then save the prefab.
+		//       Helm should only modify throttle value between 0.0 and 1.0d
+		EntityAPI.SetPropertyValue(thrusterIDs[0], "thrust", 0.005d);//
+		EntityAPI.SetPropertyValue(thrusterIDs[1], "thrust", 0.005d);//
+		EntityAPI.SetPropertyValue(thrusterIDs[2], "thrust", 0.005d);//
+		EntityAPI.SetPropertyValue(thrusterIDs[3], "thrust", 0.005d);//
+		EntityAPI.SetPropertyValue(thrusterIDs[4], "thrust", 0.005d);//
+		EntityAPI.SetPropertyValue(thrusterIDs[5], "thrust", 0.005d);//
+		EntityAPI.SetPropertyValue(thrusterIDs[6], "thrust", 0.005d);//
+		EntityAPI.SetPropertyValue(thrusterIDs[7], "thrust", 0.005d);//
+		
+		EntityAPI.SetCustomPropertyValue (entityID, "engines", engineIDs);
+		EntityAPI.SetCustomPropertyValue (entityID, "thrusters", thrusterIDs);
+		
+	}
+	
+	#region Rules
+	
+	private static bool Rule_Description(string entityID, object[] args)
+	{
+		// we get the value from the args where we know for property rules the value is first and only argument
+		string description = (string)args[0];  
+		System.Diagnostics.Debug.WriteLine ("Running rule 'Rule_Description'.  Testing value '" + description + "'");
+		return !string.IsNullOrEmpty(description);
+	}
+	#endregion
+
+	public static object Register(string entityID, string parentID)
+	{
+		// make modifications 
+		// this method gets called when restoring components from saved xml and not just during initial asset placement.
+
+		return entityID;
+	}
+	
+	public static object UnRegister (string entityID, string parentID)
+	{
+
+		return entityID;
+
+	}
+	
+	
+	#region PlacementTool related
+	public static uint QueryPlacementBrushType () { return (uint)UserConstants.BRUSH_TYPE.BRUSH_SINGLE_DROP;}
+		
+	// todo: where do we return a bool indicating whether placement is valid?  I cant just hardcode
+	// within Interior validity checking reqts for all component types?
+	// a Validate function needs to be added to this script and for it to be called by the Interior during assetplacement and during
+	// restore from saved file.
+	
+	public static Vector3d[] QueryCellPlacement (string entityID, string interiorID, Vector3d position, byte cellRotation)
+	{
+		const double TO_DEGREES = 360d / 256d;
+		Vector3d scale, rotation;
+		scale.x = 1;
+		scale.y = 1;
+		scale.z = 1;
+		
+		
+		rotation.x = 0;
+		rotation.y = (double)(cellRotation * TO_DEGREES);
+		rotation.z = 0;
+				
+		// tile location is basically x, z pixel coordinate with y as floor level
+		// we need to convert this to a celledRegion relative coordinate which will give us
+		// a 3D position that represents the CENTER of that tile (not the top/left corner)
+		//position = EntityAPI.CellMap_GetTilePosition3D(interiorID, tileLocation);
+		Vector3d size = EntityAPI.CellMap_GetTileSize (interiorID);
+		
+		// assuming this generic component has it's Y position at floor (not centered in it's bbox)
+		// then we need to lower position.y we return to be on the floor of the cell.		
+		double floorHeight = position.y - (size.y * 0.5);
+		position.y = floorHeight;
+		
+		// return values and dont use EntityAPI to set, since it's a Query and not an Update
+		return new Vector3d[] {position, scale, rotation}; 
+	}
+	
+	#endregion
+
+	#region Build statistics
+	
+	public static void OnCustomPropertyChanged (string entityID, int index)
+	{
+		switch (index)
+		{
+			case 3: // heading
+			{
+				string vehicleID = EntityAPI.GetOwnerID(entityID);
+				if (string.IsNullOrEmpty(vehicleID)) return;
+			
+				Quaternion currentRotation = EntityAPI.GetRotationRegionSpace(vehicleID);
+				Vector3d currentHeading = currentRotation.GetEulerAngles(true);				
+				double currentYaw = currentHeading.y;
+				
+				double targetHeading = ((Vector3d)EntityAPI.GetCustomPropertyValue(entityID, "heading")).y;
+				Quaternion quatHeading = new Quaternion (Keystone.Utilities.MathHelper.DegreesToRadians(targetHeading),
+								Keystone.Utilities.MathHelper.DegreesToRadians(currentHeading.x), 
+								Keystone.Utilities.MathHelper.DegreesToRadians(currentHeading.z));
+				
+				quatHeading = Quaternion.Normalize(quatHeading);
+				
+				double distance;
+				Vector3d direction = GetDirection(targetHeading, currentYaw, out distance);
+				double halfDistance = distance * 0.5d;
+				System.Diagnostics.Debug.WriteLine("1st Half Distance =" + halfDistance.ToString());
+				//halfDistance = Difference (currentRotation, quatHeading) * 0.5d;
+				//System.Diagnostics.Debug.WriteLine("2nd Half Distance =" + halfDistance.ToString());
+				EntityAPI.SetCustomPropertyValue (entityID, "halfangle", halfDistance);
+				EntityAPI.SetCustomPropertyValue (entityID, "direction", direction);
+				EntityAPI.SetCustomPropertyValue (entityID, "quatheading", quatHeading);
+				
+				System.Diagnostics.Debug.WriteLine("Current heading =" + currentYaw.ToString());
+				System.Diagnostics.Debug.WriteLine("Target heading =" + targetHeading.ToString());
+				
+				
+				EntityAPI.SetCustomPropertyValue(entityID, "state", (int)ManeuverState.Rotating_Accelerating);		
+				break;
+			}
+			case 8: // translation destination
+			{
+				
+				// determine the heading based on the destination 
+				string vehicleID = EntityAPI.GetOwnerID(entityID);
+				if (string.IsNullOrEmpty(vehicleID)) return;
+				
+				Vector3d currentPosition = EntityAPI.GetPositionRegionSpace(vehicleID);
+				
+				Vector3d dir = EntityAPI.GetPositionRegionSpace(vehicleID) - (Vector3d)EntityAPI.GetCustomPropertyValue(entityID, "destination");
+			
+				double halfDist = dir.Length * 0.5d;
+				EntityAPI.SetCustomPropertyValue(entityID, "halfdistance", halfDist);
+				
+				dir = Vector3d.Normalize(dir);
+				double flipDistance = Keystone.Utilities.MathHelper.TimeToRotate(0d, 90d, 0.001);
+				flipDistance = dir.Length - flipDistance * EntityAPI.GetVelocity(entityID).Length;
+				Vector3d flipStartPosition = currentPosition + (dir * flipDistance );
+				EntityAPI.SetCustomPropertyValue(entityID, "flipstartposition", flipStartPosition);
+						
+				EntityAPI.SetCustomPropertyValue(entityID, "state", (int)ManeuverState.Translating_Accelerating);	
+				break;
+			}
+			default:
+				break;
+		}
+	}
+	#endregion
+
+	// https://spaceengine.org/flight/
+	public static void OnUpdate (string entityID, double elapsedSeconds)
+	{
+		string vehicleID = EntityAPI.GetOwnerID(entityID);
+		if (string.IsNullOrEmpty(vehicleID)) return;
+		
+		string[] engineIDs = (string[])EntityAPI.GetCustomPropertyValue(entityID, "engines");		
+		string[] thrusterIDs = (string[])EntityAPI.GetCustomPropertyValue(entityID, "thrusters");
+		
+		// todo: i think one of the problem with using a stack<int> for holding our manuever states
+		//       is that each maneuver state may have it's own heading and destination values so
+		//       we'd preferably want our maneuver stack to host a struct that contains 
+		//       things like destination heading, rotation direction, destination position, 
+		ManeuverState state = (ManeuverState)EntityAPI.GetCustomPropertyValue(entityID, "state");
+		
+		if (state == ManeuverState.None) 
+		{
+			ShutDown(entityID, vehicleID, thrusterIDs);
+			return;
+		}
+		
+		// todo: first lets just get rotation working.  We can use code similar to turret i think
+		//       and just modify the delta.  Even the deceleration can be done by just modifying the delta
+		//       We don't really need physics at all for this.  
+		
+		// todo: one of the problems with the physics based approach is that in one frame
+		//       we can overshoot the halfangle significantly.
+						
+		double angleEpsilon = 0.5d;
+		double hack =1.5d;
+					
+		// todo: are we already executing a maneuver or is there no maneuver or a new maneuver?
+		Quaternion currentRotation = EntityAPI.GetRotationRegionSpace(vehicleID);
+		Vector3d currentHeading = currentRotation.GetEulerAngles(true);
+		double currentYaw = currentHeading.y;
+		
+		double targetHeading = ((Vector3d)EntityAPI.GetCustomPropertyValue(entityID, "heading")).y;
+				
+		double currentAngleDistance; 
+		Vector3d currentDirection = GetDirection(targetHeading, currentYaw, out currentAngleDistance);
+		Vector3d direction = (Vector3d)EntityAPI.GetCustomPropertyValue (entityID, "direction");
+		
+		double halfAngle = (double)EntityAPI.GetCustomPropertyValue(entityID, "halfangle");
+		
+		//System.Diagnostics.Debug.WriteLine("Target heading =" + targetHeading.ToString());
+		//System.Diagnostics.Debug.WriteLine("Half Heading = " + halfAngle.ToString());
+		//System.Diagnostics.Debug.WriteLine("Current Yaw = " + currentYaw.ToString());
+		//System.Diagnostics.Debug.WriteLine("Direction = " + direction.y.ToString());
+		//System.Diagnostics.Debug.WriteLine("currentAngleDistance = " + currentAngleDistance.ToString());
+		
+		if (state == ManeuverState.Rotating_Accelerating)
+		{
+				
+			SetAngularThrust (vehicleID, thrusterIDs, true);
+
+			// todo: when using chase camera, it should always orient itself with the z-roll 
+			if (currentAngleDistance > halfAngle - hack) // accelerate rotation
+			{
+				if (direction.y == 1)
+					RotateClockwise(entityID, thrusterIDs, direction);
+				else 
+					RotateCounterClockwise(entityID, thrusterIDs, direction);
+				
+				if (currentAngleDistance <= angleEpsilon)
+				{
+					// For cases where acceleration over a very short distance is
+					// needed and below the angleEpsilon value.
+					ShutDown (entityID, vehicleID, thrusterIDs);
+				}			
+			
+				// https://gamedev.net/forums/topic/607169-slowly-rotate-to-angle/4840964/
+				//w = w_0 + at
+				//angle = angle_0 + w_0 * t + (1/2) * a * t^2
+				//w^2 = w_0 ^2 + 2 * a * (theta - theta_0) 
+				
+				// https://gamedev.stackexchange.com/questions/189727/rotating-quaternion-smoothly-with-acceleration-and-deceleration
+				
+			}
+			else
+			{
+				EntityAPI.SetCustomPropertyValue(entityID, "state", (int)ManeuverState.Rotating_Decelerating);
+			}
+		}
+		else if (state == ManeuverState.Rotating_Decelerating)
+		{
+			System.Diagnostics.Debug.WriteLine("Decelerating");
+			
+			SetAngularThrust (vehicleID, thrusterIDs, true);
+			
+			if (direction.y == 1)
+				RotateCounterClockwise(entityID, thrusterIDs, -direction);
+			else 
+				RotateClockwise(entityID, thrusterIDs, direction);
+			
+			
+			if (currentAngleDistance <= angleEpsilon)
+			{
+				ShutDown (entityID, vehicleID, thrusterIDs);
+				
+				Vector3d position = EntityAPI.GetPositionRegionSpace(vehicleID);
+				Vector3d destination = (Vector3d)EntityAPI.GetCustomPropertyValue (entityID, "destination");
+				if (position != destination)
+				{
+					EntityAPI.SetCustomPropertyValue(entityID, "state", (int)ManeuverState.Translating_Accelerating);
+				}
+			}	
+		}
+		else if (state == ManeuverState.Translating_Accelerating)
+		{
+			SetAngularThrust(vehicleID, thrusterIDs, false);
+			ShutDown (entityID, vehicleID, thrusterIDs);
+			
+			Vector3d position = EntityAPI.GetPositionRegionSpace(vehicleID);
+			Vector3d destination = (Vector3d)EntityAPI.GetCustomPropertyValue (entityID, "destination");
+			
+			//if (position == destination)
+			//{
+			//	ShutDown(entityID, vehicleID, engineIDs);
+			//	return;
+			//}
+		
+			// destination here is the point at which we will conduct flip maneuver
+			Translation_Accelerate(entityID, engineIDs, position, destination);
+			
+			Vector3d dir = position - destination;
+			
+			// CALCULATE NEXT POSITION GIVEN VELOCITY AND ELAPSEDSECCONDS and if we overshoot start flip maneuver
+			
+			// todo: we only need to flip if we're firing the main engines and not the rear maneuvering thrusters
+			// todo: we can calculate if the next frame based on vehicle.Velocity + vehicle.Acceleration + timeToRotate() will result in an overshoot and then start the flip.
+			
+			// todo: one of the main components to this acceleration state is that we are using the main egnines
+			//        and not the afk facing maneuvering thrusters 
+			
+			// i can calculate the time it takes to get to the halfway distance and then double it to find
+			// the length of the coast.  Actually, just half of the coast distance - halfway distance gives us
+			// the flipstartposition
+			Vector3d flipStartPosition = (Vector3d)EntityAPI.GetCustomPropertyValue(entityID, "flipstartposition");
+			
+			// todo: our "destination" could be set as the flipstartposition and then we transition to the
+			//       next state if our ultimate destination is not reached.
+
+			// todo: this state needs to not be used for maneuvering thruster acceleration, only for main engines
+			// todo: i think there is no way to completely avoid overshooting our flip maneuver point given
+			//       how fast the ship is moving.  This is why we need to target a coast point that takes into 
+			//       acccount the velocity per frame and the time it takes to perform the flip.
+			
+			// todo: we need to make sure we ShutDown() engines and zero out linear acceleration force
+			
+			// todo: should we make the flip_start and flip_end as additional states?
+			// todo: could maneuvers be stored in a stack<> where we push and pop states to achieve an overall maneuver
+			// Vector3d velocity = (Vector3d)EntityAPI.GetPropertyValue(vehicleID, "velocity");
+				
+			// // get the distance to the destination point. If distance > halfwayPointDistance keep going.
+			// // otherwise if we haven't flipped, start flip maneuver by setting state to .Rotating and orientation to
+			// // angle + 180.
+			
+			// // todo: we could make the target the halway point and then flip and then set
+			// //       
+			// // if its a negative value or 0, we need to flip 
+			// // if we've already flipped, continue until our distance to destination is within distanceEpsilon
+			// double Hz = 30d;
+			// double distanceEpsilon = velocity.Length * elapsedSeconds * Hz;
+			
+			// if (dir.Length <= distanceEpsilon)
+			// {
+				// // TODO: I think setting the "state" here is resulting in the change handler firing
+				// // and it shouldn't if the customproperty is changed from within the same script.
+				// EntityAPI.SetCustomPropertyValue(entityID, "state", (int)ManeuverState.None);
+				// EntityAPI.SetPropertyValue(vehicleID, "velocity", Vector3d.Zero());
+				// EntityAPI.SetCustomPropertyValue (engineIDs[0], "breaker", false);
+				// EntityAPI.SetCustomPropertyValue (engineIDs[1], "breaker", false);
+				// EntityAPI.SetCustomPropertyValue (engineIDs[2], "breaker", false);
+				// EntityAPI.SetCustomPropertyValue (engineIDs[3], "breaker", false);
+				// return;
+			// }
+						
+			// // todo: damage modifier and throttle should be grabbed from each engine?
+						
+			// EntityAPI.SetCustomPropertyValue (engineIDs[0], "breaker", true);
+			// EntityAPI.SetCustomPropertyValue (engineIDs[1], "breaker", true);
+			// EntityAPI.SetCustomPropertyValue (engineIDs[2], "breaker", true);
+			// EntityAPI.SetCustomPropertyValue (engineIDs[3], "breaker", true);
+			
+			// double engineCount = engineIDs.Length;
+			
+			
+			// // which engines do we need based on distance and thrust... main engines or aft facing thrusters?
+			// // todo: for now lets just not worry about the differences caused by having to rotate 
+			// // to decelerate on time.  just tur
+			
+			// // todo: set decelerating state - actually its just a rotation and then acceleration in the facing direction.
+			// //       otherwise acceleration and decleration should behave the same way.
+			// // first we must rotate 180 degrees.  we should cache the heading quaternion and then
+			// //       snap the vehicle's rotation to it then here grab it again and negate it and
+			// //       accelerate in the new direction until we reach our target position
+			
+		}
+		else if (state == ManeuverState.Translating_Decelerating)
+		{
+			SetAngularThrust(vehicleID, thrusterIDs, false);
+			
+			Vector3d position = EntityAPI.GetPositionRegionSpace(vehicleID);
+			Vector3d destination = (Vector3d)EntityAPI.GetCustomPropertyValue (entityID, "destination");
+			
+			if (position == destination)
+			{
+				ShutDown(entityID, vehicleID, engineIDs);
+				return;
+			}
+			
+			
+			// Vector3d dir = position - destination;
+			// EntityAPI.SetCustomPropertyValue (engineIDs[0], "breaker", true);
+			// EntityAPI.SetCustomPropertyValue (engineIDs[1], "breaker", true);
+			// EntityAPI.SetCustomPropertyValue (engineIDs[2], "breaker", true);
+			// EntityAPI.SetCustomPropertyValue (engineIDs[3], "breaker", true);
+			
+			// Vector3d velocity = (Vector3d)EntityAPI.GetPropertyValue(vehicleID, "velocity");
+			
+			// // get the distance to the destination point. If distance > halfwayPointDistance keep going.
+			// // otherwise if we haven't flipped, start flip maneuver by setting state to .Rotating and orientation to
+			// // angle + 180.
+			
+			// // if its a negative value or 0, we need to flip 
+			// // if we've already flipped, continue until our distance to destination is within epsilon
+			// double Hz = 30d;
+			// double distanceEpsilon = velocity.Length * elapsedSeconds * Hz;
+			
+			// if (dir.Length <= distanceEpsilon)
+			// {
+				// EntityAPI.SetCustomPropertyValue(entityID, "state", (int)ManeuverState.None);
+				// EntityAPI.SetPropertyValue(vehicleID, "velocity", Vector3d.Zero());
+				// EntityAPI.SetPropertyValue(vehicleID, "position", destination);
+				// EntityAPI.SetCustomPropertyValue (engineIDs[0], "breaker", false);
+				// EntityAPI.SetCustomPropertyValue (engineIDs[1], "breaker", false);
+				// EntityAPI.SetCustomPropertyValue (engineIDs[2], "breaker", false);
+				// EntityAPI.SetCustomPropertyValue (engineIDs[3], "breaker", false);
+				// return;
+			// }
+		}
+		// todo: do we need to check if we have enough fuel to reach this destination?
+		
+		// todo: get the damage modifier to thrust
+		
+		// todo: calls to OnUpdate() perhaps can be threaded
+		
+		// todo: helm seems to need to update every frame since it directly
+		//       controls movement, but other components we don't want updates every frame.
+		//       How do we divide them up?
+		// todo: should i assign the rotation unit vectors in InitializeEntity()?
+		
+		// todo: right mouse click function to target and/or follow/match velocity or intercept the selected Vehicle
+
+		
+
+		
+		// how much deltaV do we have? 
+		
+		// what is the current heading? are we already facing destination heading?
+		// if we are within a certain epsilon of destination heading, snap to the destination heading and stop all rotational thrusters
+		
+		// todo: if angularVelocity gets too high, test if stress on ship causes damage to the structure and hull
+
+
+		// 
+		// calc time to fire? with linear acceleration can this be done analytically?
+		
+		// are we in acceleration or deceleration phase?
+		
+		// determine reaction time based on operator or ship's computer 
+		
+		// what is the half rotation angle? we will accelerate until we reach it then decelerate in opposite rotation
+		// todo: we should probably compute the half angular velocity to help with that so we don't overshoot.
+		
+		
+		// get the distance from our current position to the destination position
+		
+		// todo: for linear velocity and injection into an orbit, we dont want to necessarily decelerate to 0,0,0 assuming we want to model gravitation
+		
+	}
+	
+	// todo: since maneuver code needs to operate every tick, how do we only do it for some entities and not others
+	//       where we don't need or want to update EVERYTHING every frame, but use round robbin and other strategies
+	//       Maybe crewstation scripts OnUpdate() should run at same frequency as physics.
+	// todo: main engine acceleration might need to be limited to certain distances away from gravity wells in order
+	//       for the game to be interesting.  We could use some techno-babble such as the containment field needing
+	//       to be operated outside of large gravity wells.  But rather than have some damaging accident occur, i can
+	//       just shut down those engines when their running conditions are not met.
+	// public static void OnUpdate (string entityID, double elapsedSeconds)
+	// {
+		// string vehicleID = EntityAPI.GetOwnerID(entityID);
+		// if (string.IsNullOrEmpty(vehicleID)) return;
+		
+		// string[] engineIDs = (string[])EntityAPI.GetCustomPropertyValue(entityID, "engines");		
+		// string[] thrusterIDs = (string[])EntityAPI.GetCustomPropertyValue(entityID, "thrusters");
+		
+		
+		// ManeuverState state = (ManeuverState)EntityAPI.GetCustomPropertyValue(entityID, "state");
+		
+		// if (state == ManeuverState.None) 
+		// {
+			// ShutDown(entityID, vehicleID, thrusterIDs);
+			// return;
+		// }
+		
+		// // todo: first lets just get rotation working.  We can use code similar to turret i think
+		// //       and just modify the delta.  Even the deceleration can be done by just modifying the delta
+		// //       We don't really need physics at all for this.  
+		
+		// // todo: one of the problems with the physics based approach is that in one frame
+		// //       we can overshoot the halfangle significantly.
+		
+		// Vector3d position = EntityAPI.GetPositionRegionSpace(vehicleID);
+		// Vector3d destination = (Vector3d)EntityAPI.GetCustomPropertyValue (entityID, "destination");
+				
+		// double angleEpsilon = 0.5d;
+		
+					
+		// // todo: are we already executing a maneuver or is there no maneuver or a new maneuver?
+		// Quaternion currentRotation = EntityAPI.GetRotationRegionSpace(vehicleID);
+		// Vector3d currentHeading = currentRotation.GetEulerAngles(true);
+		// double currentYaw = currentHeading.y;
+		
+		// double targetHeading = ((Vector3d)EntityAPI.GetCustomPropertyValue(entityID, "heading")).y;
+				
+		// double currentAngleDistance; 
+		// Vector3d currentDirection = GetDirection(targetHeading, currentYaw, out currentAngleDistance);
+		// Vector3d direction = (Vector3d)EntityAPI.GetCustomPropertyValue (entityID, "direction");
+		
+		// double halfAngle = (double)EntityAPI.GetCustomPropertyValue(entityID, "halfangle");
+		
+		// //System.Diagnostics.Debug.WriteLine("Target heading =" + targetHeading.ToString());
+		// //System.Diagnostics.Debug.WriteLine("Half Heading = " + halfAngle.ToString());
+		// //System.Diagnostics.Debug.WriteLine("Current Yaw = " + currentYaw.ToString());
+		// //System.Diagnostics.Debug.WriteLine("Direction = " + direction.y.ToString());
+		// //System.Diagnostics.Debug.WriteLine("currentAngleDistance = " + currentAngleDistance.ToString());
+		
+		// if (state == ManeuverState.Rotating_Accelerating)
+		// {
+				
+			// SetAngularThrust (thrusterIDs, true);
+
+			// // todo: when using chase camera, it should always orient itself with the z-roll 
+			// // if rotating clockwise and currentYaw is less than halfway point then accelerate
+			// if (currentAngleDistance > halfAngle) // accelerate rotation
+			// {
+				// //System.Diagnostics.Debug.WriteLine("Accelerating");
+			// //	Accelerate(); // todo: which thrusters fire depends on the direction of the acceleration
+				// // for now let's just turn on clockwise thrusters
+				// EntityAPI.SetCustomPropertyValue (thrusterIDs[0], "breaker", true);
+				// EntityAPI.SetCustomPropertyValue (thrusterIDs[3], "breaker", true);
+						
+				// EntityAPI.SetCustomPropertyValue (thrusterIDs[2], "breaker", false);
+				// EntityAPI.SetCustomPropertyValue (thrusterIDs[1], "breaker", false);
+
+				// //double throttle = 1.0d; new Vector3d(0, 0.0001, 0) * direction;
+				// EntityAPI.SetCustomPropertyValue(thrusterIDs[0], "thrust vector", direction);
+				// EntityAPI.SetCustomPropertyValue(thrusterIDs[3], "thrust vector", direction);
+				
+			// }
+			// else
+			// {
+				// EntityAPI.SetCustomPropertyValue(entityID, "state", (int)ManeuverState.Rotating_Decelerating);
+			// }
+		// }
+		// else if (state == ManeuverState.Rotating_Decelerating)
+		// {
+			// System.Diagnostics.Debug.WriteLine("Decelerating");
+		// //	Decelerate(); // todo: which thrusters visually fire depends on the direction of the decleration
+			// // todo: would be nice to be able to set an array of PropertySpec instead of seperate calls to same Entity
+			// EntityAPI.SetCustomPropertyValue (thrusterIDs[0], "breaker", false);
+			// EntityAPI.SetCustomPropertyValue (thrusterIDs[3], "breaker", false);
+			
+			// EntityAPI.SetCustomPropertyValue (thrusterIDs[2], "breaker", true);
+			// EntityAPI.SetCustomPropertyValue (thrusterIDs[1], "breaker", true);
+			
+			// EntityAPI.SetCustomPropertyValue(thrusterIDs[2], "thrust vector", -direction);
+			// EntityAPI.SetCustomPropertyValue(thrusterIDs[1], "thrust vector", -direction);
+				
+			// // todo: i think if i try to enable angular velocity on each axis, i will get
+			// //       incorrect looking rotations because axis orientations will change.  For instance
+			// //       if i roll 90 degrees and then try to yaw, it should yaw around the ship's new up vector not the 
+			// //       world up vector.
+			// //       This is why i should probably restrict heading to just yaw for 1.0 
+			
+			// // todo: is the thruster powered?
+			// System.Diagnostics.Debug.WriteLine ("Half Angle Distance = " + halfAngle.ToString());
+			// System.Diagnostics.Debug.WriteLine("Actual Angle Distance = " + currentAngleDistance.ToString());
+				
+			// // todo: force needs to be modified by any damage to the thruster, but that should occur within the engine.css
+			// // if the direction has changed, we have overshot and should immediately just snap to orientation
+			// if (currentDirection.y != direction.y) //currentAngleDistance <= angleEpsilon)
+			// {
+				// ShutDown (entityID, vehicleID, thrusterIDs);
+			// }	
+		// }
+		// // else if (state == ManeuverState.Translating_Accelerating)
+		// // {
+			// // Vector3d dir = position - destination;
+			// // Vector3d velocity = (Vector3d)EntityAPI.GetPropertyValue(vehicleID, "velocity");
+			// // EntityAPI.SetPropertyValue(vehicleID, "angularforce", Vector3d.Zero());
+			// // EntityAPI.SetPropertyValue(vehicleID, "angularvelocity", Vector3d.Zero());
+				
+			// // // get the distance to the destination point. If distance > halfwayPointDistance keep going.
+			// // // otherwise if we haven't flipped, start flip maneuver by setting state to .Rotating and orientation to
+			// // // angle + 180.
+			
+			// // // todo: we could make the target the halway point and then flip and then set
+			// // //       
+			// // // if its a negative value or 0, we need to flip 
+			// // // if we've already flipped, continue until our distance to destination is within distanceEpsilon
+			// // double Hz = 30d;
+			// // double distanceEpsilon = velocity.Length * elapsedSeconds * Hz;
+			
+			// // if (dir.Length <= distanceEpsilon)
+			// // {
+				// // // TODO: I think setting the "state" here is resulting in the change handler firing
+				// // // and it shouldn't if the customproperty is changed from within the same script.
+				// // EntityAPI.SetCustomPropertyValue(entityID, "state", (int)ManeuverState.None);
+				// // EntityAPI.SetPropertyValue(vehicleID, "velocity", Vector3d.Zero());
+				// // EntityAPI.SetCustomPropertyValue (engineIDs[0], "breaker", false);
+				// // EntityAPI.SetCustomPropertyValue (engineIDs[1], "breaker", false);
+				// // EntityAPI.SetCustomPropertyValue (engineIDs[2], "breaker", false);
+				// // EntityAPI.SetCustomPropertyValue (engineIDs[3], "breaker", false);
+				// // return;
+			// // }
+						
+			// // // todo: damage modifier and throttle should be grabbed from each engine?
+						
+			// // EntityAPI.SetCustomPropertyValue (engineIDs[0], "breaker", true);
+			// // EntityAPI.SetCustomPropertyValue (engineIDs[1], "breaker", true);
+			// // EntityAPI.SetCustomPropertyValue (engineIDs[2], "breaker", true);
+			// // EntityAPI.SetCustomPropertyValue (engineIDs[3], "breaker", true);
+			
+			// // double engineCount = engineIDs.Length;
+			
+			
+			// // // which engines do we need based on distance and thrust... main engines or aft facing thrusters?
+			// // // todo: for now lets just not worry about the differences caused by having to rotate 
+			// // // to decelerate on time.  just tur
+			
+			// // // todo: set decelerating state - actually its just a rotation and then acceleration in the facing direction.
+			// // //       otherwise acceleration and decleration should behave the same way.
+			// // // first we must rotate 180 degrees.  we should cache the heading quaternion and then
+			// // //       snap the vehicle's rotation to it then here grab it again and negate it and
+			// // //       accelerate in the new direction until we reach our target position
+			
+		// // }
+		// // else if (state == ManeuverState.Translating_Decelerating)
+		// // {
+			// // Vector3d dir = position - destination;
+			// // EntityAPI.SetCustomPropertyValue (engineIDs[0], "breaker", true);
+			// // EntityAPI.SetCustomPropertyValue (engineIDs[1], "breaker", true);
+			// // EntityAPI.SetCustomPropertyValue (engineIDs[2], "breaker", true);
+			// // EntityAPI.SetCustomPropertyValue (engineIDs[3], "breaker", true);
+			
+			// // Vector3d velocity = (Vector3d)EntityAPI.GetPropertyValue(vehicleID, "velocity");
+			
+			// // // get the distance to the destination point. If distance > halfwayPointDistance keep going.
+			// // // otherwise if we haven't flipped, start flip maneuver by setting state to .Rotating and orientation to
+			// // // angle + 180.
+			
+			// // // if its a negative value or 0, we need to flip 
+			// // // if we've already flipped, continue until our distance to destination is within epsilon
+			// // double Hz = 30d;
+			// // double distanceEpsilon = velocity.Length * elapsedSeconds * Hz;
+			
+			// // if (dir.Length <= distanceEpsilon)
+			// // {
+				// // EntityAPI.SetCustomPropertyValue(entityID, "state", (int)ManeuverState.None);
+				// // EntityAPI.SetPropertyValue(vehicleID, "velocity", Vector3d.Zero());
+				// // EntityAPI.SetPropertyValue(vehicleID, "position", destination);
+				// // EntityAPI.SetCustomPropertyValue (engineIDs[0], "breaker", false);
+				// // EntityAPI.SetCustomPropertyValue (engineIDs[1], "breaker", false);
+				// // EntityAPI.SetCustomPropertyValue (engineIDs[2], "breaker", false);
+				// // EntityAPI.SetCustomPropertyValue (engineIDs[3], "breaker", false);
+				// // return;
+			// // }
+		// // }
+		// // todo: do we need to check if we have enough fuel to reach this destination?
+		
+		// // todo: get the damage modifier to thrust
+		
+		// // todo: calls to OnUpdate() perhaps can be threaded
+		
+		// // todo: helm seems to need to update every frame since it directly
+		// //       controls movement, but other components we don't want updates every frame.
+		// //       How do we divide them up?
+		// // todo: should i assign the rotation unit vectors in InitializeEntity()?
+		
+		// // todo: right mouse click function to follow the selected Vehicle
+
+		
+		// // are we at our current destination?
+		// // if we are within current epsilon of destination, snap to the destination
+		
+		// // how much deltaV do we have? 
+		
+		// // what is the current heading? are we already facing destination heading?
+		// // if we are within a certain epsilon of destination heading, snap to the destination heading and stop all rotational thrusters
+		
+		// // todo: if angularVelocity gets too high, test if stress on ship causes damage to the structure and hull
+
+
+		// // 
+		// // calc time to fire? with linear acceleration can this be done analytically?
+		
+		// // are we in acceleration or deceleration phase?
+		
+		// // determine reaction time based on operator or ship's computer 
+		
+		// // what is the half rotation angle? we will accelerate until we reach it then decelerate in opposite rotation
+		// // todo: we should probably compute the half angular velocity to help with that so we don't overshoot.
+		
+		
+		// // get the distance from our current position to the destination position
+		
+		// // todo: for linear velocity and injection into an orbit, we dont want to necessarily decelerate to 0,0,0 assuming we want to model gravitation
+		
+	// }
+	
+
+	// public static void OnUpdate (string entityID, double elapsedSeconds)
+	// {
+		// string vehicleID = EntityAPI.GetOwnerID(entityID);
+		// if (string.IsNullOrEmpty(vehicleID)) return;
+		
+		// ManeuverState state = (ManeuverState)EntityAPI.GetCustomPropertyValue(entityID, "state");
+		
+		
+		// // todo: first lets just get rotation working.  We can use code similar to turret i think
+		// //       and just modify the delta.  Even the deceleration can be done by just modifying the delta
+		// //       We don't really need physics at all for this.  
+		
+		// // todo: one of the problems with the physics based approach is that in one frame
+		// //       we can overshoot the halfangle significantly.
+		
+		// Vector3d position = EntityAPI.GetPositionRegionSpace(vehicleID);
+		// Vector3d destination = (Vector3d)EntityAPI.GetCustomPropertyValue (entityID, "destination");
+		// Vector3d dir = position - destination;
+				
+		// double angleEpsilon = 1.0d;
+		
+		// string[] engineIDs = (string[])EntityAPI.GetCustomPropertyValue(entityID, "engines");		
+		// string[] thrusterIDs = (string[])EntityAPI.GetCustomPropertyValue(entityID, "thrusters");
+			
+		// // todo: are we already executing a maneuver or is there no maneuver or a new maneuver?
+		// Quaternion currentRotation = EntityAPI.GetRotationRegionSpace(vehicleID);
+		// Vector3d currentHeading = currentRotation.GetEulerAngles(true);
+		// double currentYaw = currentHeading.y;
+		
+		// double targetHeading = ((Vector3d)EntityAPI.GetCustomPropertyValue(entityID, "heading")).y;
+				
+		// double currentAngleDistance; 
+		// Vector3d currentDirection = GetDirection(targetHeading, currentYaw, out currentAngleDistance);
+		// Vector3d direction = (Vector3d)EntityAPI.GetCustomPropertyValue (entityID, "direction");
+		
+		// double halfAngle = (double)EntityAPI.GetCustomPropertyValue(entityID, "halfangle");
+		
+		// //System.Diagnostics.Debug.WriteLine("Target heading =" + targetHeading.ToString());
+		// //System.Diagnostics.Debug.WriteLine("Half Heading = " + halfAngle.ToString());
+		// //System.Diagnostics.Debug.WriteLine("Current Yaw = " + currentYaw.ToString());
+		// //System.Diagnostics.Debug.WriteLine("Direction = " + direction.y.ToString());
+		// //System.Diagnostics.Debug.WriteLine("currentAngleDistance = " + currentAngleDistance.ToString());
+		
+		// if (state == ManeuverState.Rotating_Accelerating)
+		// {
+				
+			// SetAngularThrust (thrusterIDs, true);
+
+			// // todo: when using chase camera, it should always orient itself with the z-roll 
+			// // if rotating clockwise and currentYaw is less than halfway point then accelerate
+			// if (currentYaw < halfAngle) // accelerate rotation
+			// {
+				// //System.Diagnostics.Debug.WriteLine("Accelerating");
+			// //	Accelerate(); // todo: which thrusters fire depends on the direction of the acceleration
+				// // for now let's just turn on clockwise thrusters
+				// EntityAPI.SetCustomPropertyValue (thrusterIDs[0], "breaker", true);
+				// EntityAPI.SetCustomPropertyValue (thrusterIDs[3], "breaker", true);
+						
+				// EntityAPI.SetCustomPropertyValue (thrusterIDs[2], "breaker", false);
+				// EntityAPI.SetCustomPropertyValue (thrusterIDs[1], "breaker", false);
+
+				// //double throttle = 1.0d; new Vector3d(0, 0.0001, 0) * direction;
+				// EntityAPI.SetCustomPropertyValue(thrusterIDs[0], "thrust vector", direction);
+				// EntityAPI.SetCustomPropertyValue(thrusterIDs[3], "thrust vector", direction);
+				
+			// }
+			// else
+			// {
+				// EntityAPI.SetCustomPropertyValue(entityID, "state", (int)ManeuverState.Rotating_Decelerating);
+			// }
+		// }
+		// else if (state == ManeuverState.Rotating_Decelerating)
+		// {
+			// System.Diagnostics.Debug.WriteLine("Decelerating");
+		// //	Decelerate(); // todo: which thrusters visually fire depends on the direction of the decleration
+			// // todo: would be nice to be able to set an array of PropertySpec instead of seperate calls to same Entity
+			// EntityAPI.SetCustomPropertyValue (thrusterIDs[0], "breaker", false);
+			// EntityAPI.SetCustomPropertyValue (thrusterIDs[3], "breaker", false);
+			
+			// EntityAPI.SetCustomPropertyValue (thrusterIDs[2], "breaker", true);
+			// EntityAPI.SetCustomPropertyValue (thrusterIDs[1], "breaker", true);
+			
+			// EntityAPI.SetCustomPropertyValue(thrusterIDs[2], "thrust vector", -direction);
+			// EntityAPI.SetCustomPropertyValue(thrusterIDs[1], "thrust vector", -direction);
+				
+			// // todo: i think if i try to enable angular velocity on each axis, i will get
+			// //       incorrect looking rotations because axis orientations will change.  For instance
+			// //       if i roll 90 degrees and then try to yaw, it should yaw around the ship's new up vector not the 
+			// //       world up vector.
+			// //       This is why i should probably restrict heading to just yaw for 1.0 
+			
+			// // todo: is the thruster powered?
+			// System.Diagnostics.Debug.WriteLine ("Half Angle Distance = " + halfAngle.ToString());
+			// System.Diagnostics.Debug.WriteLine("Actual Angle Distance = " + currentAngleDistance.ToString());
+				
+			// // todo: force needs to be modified by any damage to the thruster, but that should occur within the engine.css
+			// // if the direction has changed, we have overshot and should immediately just snap to position
+			// if (direction.y != currentDirection.y || currentAngleDistance <= angleEpsilon)
+			// {
+				// // if we're already at rest, there's no need to keep resetting all these thruster state vars
+				// EntityAPI.SetCustomPropertyValue (thrusterIDs[0], "breaker", false);
+				// EntityAPI.SetCustomPropertyValue (thrusterIDs[3], "breaker", false);
+				
+				// EntityAPI.SetCustomPropertyValue (thrusterIDs[2], "breaker", false);
+				// EntityAPI.SetCustomPropertyValue (thrusterIDs[1], "breaker", false);
+				
+				// EntityAPI.SetCustomPropertyValue (thrusterIDs[0], "angular thrust", false);
+				// EntityAPI.SetCustomPropertyValue (thrusterIDs[3], "angular thrust", false);
+				
+				// EntityAPI.SetCustomPropertyValue (thrusterIDs[2], "angular thrust", false);
+				// EntityAPI.SetCustomPropertyValue (thrusterIDs[1], "angular thrust", false);
+				
+				// EntityAPI.SetPropertyValue(vehicleID, "angularforce", Vector3d.Zero());
+				// EntityAPI.SetPropertyValue(vehicleID, "angularvelocity", Vector3d.Zero());
+				// Quaternion quatHeading = (Quaternion)EntityAPI.GetCustomPropertyValue(entityID, "quatheading");
+				// EntityAPI.SetRotationRegionSpace(vehicleID, quatHeading);
+				
+				// System.Diagnostics.Debug.WriteLine("ROTATION REACHED");
+				// System.Diagnostics.Debug.WriteLine("ROTATION REACHED");
+				// System.Diagnostics.Debug.WriteLine("ROTATION REACHED");
+				// System.Diagnostics.Debug.WriteLine("ROTATION REACHED");
+				// System.Diagnostics.Debug.WriteLine("ROTATION REACHED");
+				// System.Diagnostics.Debug.WriteLine("ROTATION REACHED");
+				// System.Diagnostics.Debug.WriteLine("ROTATION REACHED");
+				// System.Diagnostics.Debug.WriteLine("ROTATION REACHED");
+				// System.Diagnostics.Debug.WriteLine("ROTATION REACHED");
+				// System.Diagnostics.Debug.WriteLine("ROTATION REACHED");
+				// System.Diagnostics.Debug.WriteLine("ROTATION REACHED");
+				// System.Diagnostics.Debug.WriteLine("ROTATION REACHED");
+				// System.Diagnostics.Debug.WriteLine("ROTATION REACHED");
+				// System.Diagnostics.Debug.WriteLine("ROTATION REACHED");
+				// System.Diagnostics.Debug.WriteLine("ROTATION REACHED");
+				// System.Diagnostics.Debug.WriteLine("ROTATION REACHED");
+				
+				// if (position == destination)
+					// EntityAPI.SetCustomPropertyValue(entityID, "state", (int)ManeuverState.None);
+				// else 
+				// {
+					// EntityAPI.SetCustomPropertyValue(entityID, "state", (int)ManeuverState.Translating_Accelerating);
+					
+				// }
+			// }
+			// else
+			// {		;
+				// EntityAPI.SetCustomPropertyValue(thrusterIDs[1], "thrust vector", direction);
+				// EntityAPI.SetCustomPropertyValue(thrusterIDs[2], "thrust vector", direction);
+			// }	
+		// }
+		// else if (state == ManeuverState.Translating_Accelerating)
+		// {
+			// Vector3d velocity = (Vector3d)EntityAPI.GetPropertyValue(vehicleID, "velocity");
+			// EntityAPI.SetPropertyValue(vehicleID, "angularforce", Vector3d.Zero());
+			// EntityAPI.SetPropertyValue(vehicleID, "angularvelocity", Vector3d.Zero());
+				
+			// // get the distance to the destination point. If distance > halfwayPointDistance keep going.
+			// // otherwise if we haven't flipped, start flip maneuver by setting state to .Rotating and orientation to
+			// // angle + 180.
+			
+			// // todo: we could make the target the halway point and then flip and then set
+			// //       
+			// // if its a negative value or 0, we need to flip 
+			// // if we've already flipped, continue until our distance to destination is within distanceEpsilon
+			// double Hz = 30d;
+			// double distanceEpsilon = velocity.Length * elapsedSeconds * Hz;
+			
+			// if (dir.Length <= distanceEpsilon)
+			// {
+				// // TODO: I think setting the "state" here is resulting in the change handler firing
+				// // and it shouldn't if the customproperty is changed from within the same script.
+				// EntityAPI.SetCustomPropertyValue(entityID, "state", (int)ManeuverState.None);
+				// EntityAPI.SetPropertyValue(vehicleID, "velocity", Vector3d.Zero());
+				// EntityAPI.SetCustomPropertyValue (engineIDs[0], "breaker", false);
+				// EntityAPI.SetCustomPropertyValue (engineIDs[1], "breaker", false);
+				// EntityAPI.SetCustomPropertyValue (engineIDs[2], "breaker", false);
+				// EntityAPI.SetCustomPropertyValue (engineIDs[3], "breaker", false);
+				// return;
+			// }
+						
+			// // todo: damage modifier and throttle should be grabbed from each engine?
+						
+			// EntityAPI.SetCustomPropertyValue (engineIDs[0], "breaker", true);
+			// EntityAPI.SetCustomPropertyValue (engineIDs[1], "breaker", true);
+			// EntityAPI.SetCustomPropertyValue (engineIDs[2], "breaker", true);
+			// EntityAPI.SetCustomPropertyValue (engineIDs[3], "breaker", true);
+			
+			// double engineCount = engineIDs.Length;
+			
+			
+			// // which engines do we need based on distance and thrust... main engines or aft facing thrusters?
+			// // todo: for now lets just not worry about the differences caused by having to rotate 
+			// // to decelerate on time.  just tur
+			
+			// // todo: set decelerating state - actually its just a rotation and then acceleration in the facing direction.
+			// //       otherwise acceleration and decleration should behave the same way.
+			// // first we must rotate 180 degrees.  we should cache the heading quaternion and then
+			// //       snap the vehicle's rotation to it then here grab it again and negate it and
+			// //       accelerate in the new direction until we reach our target position
+			
+		// }
+		// else if (state == ManeuverState.Translating_Decelerating)
+		// {
+			// EntityAPI.SetCustomPropertyValue (engineIDs[0], "breaker", true);
+			// EntityAPI.SetCustomPropertyValue (engineIDs[1], "breaker", true);
+			// EntityAPI.SetCustomPropertyValue (engineIDs[2], "breaker", true);
+			// EntityAPI.SetCustomPropertyValue (engineIDs[3], "breaker", true);
+			
+			// Vector3d velocity = (Vector3d)EntityAPI.GetPropertyValue(vehicleID, "velocity");
+			
+			// // get the distance to the destination point. If distance > halfwayPointDistance keep going.
+			// // otherwise if we haven't flipped, start flip maneuver by setting state to .Rotating and orientation to
+			// // angle + 180.
+			
+			// // if its a negative value or 0, we need to flip 
+			// // if we've already flipped, continue until our distance to destination is within epsilon
+			// double Hz = 30d;
+			// double distanceEpsilon = velocity.Length * elapsedSeconds * Hz;
+			
+			// if (dir.Length <= distanceEpsilon)
+			// {
+				// EntityAPI.SetCustomPropertyValue(entityID, "state", (int)ManeuverState.None);
+				// EntityAPI.SetPropertyValue(vehicleID, "velocity", Vector3d.Zero());
+				// EntityAPI.SetPropertyValue(vehicleID, "position", destination);
+				// EntityAPI.SetCustomPropertyValue (engineIDs[0], "breaker", false);
+				// EntityAPI.SetCustomPropertyValue (engineIDs[1], "breaker", false);
+				// EntityAPI.SetCustomPropertyValue (engineIDs[2], "breaker", false);
+				// EntityAPI.SetCustomPropertyValue (engineIDs[3], "breaker", false);
+				// return;
+			// }
+		// }
+		// // todo: do we need to check if we have enough fuel to reach this destination?
+		
+		// // todo: get the damage modifier to thrust
+		
+		// // todo: calls to OnUpdate() perhaps can be threaded
+		
+		// // todo: helm seems to need to update every frame since it directly
+		// //       controls movement, but other components we don't want updates every frame.
+		// //       How do we divide them up?
+		// // todo: should i assign the rotation unit vectors in InitializeEntity()?
+		
+		// // todo: right mouse click function to follow the selected Vehicle
+
+		
+		// // are we at our current destination?
+		// // if we are within current epsilon of destination, snap to the destination
+		
+		// // how much deltaV do we have? 
+		
+		// // what is the current heading? are we already facing destination heading?
+		// // if we are within a certain epsilon of destination heading, snap to the destination heading and stop all rotational thrusters
+		
+		// // todo: if angularVelocity gets too high, test if stress on ship causes damage to the structure and hull
+
+
+		// // 
+		// // calc time to fire? with linear acceleration can this be done analytically?
+		
+		// // are we in acceleration or deceleration phase?
+		
+		// // determine reaction time based on operator or ship's computer 
+		
+		// // what is the half rotation angle? we will accelerate until we reach it then decelerate in opposite rotation
+		// // todo: we should probably compute the half angular velocity to help with that so we don't overshoot.
+		
+		
+		// // get the distance from our current position to the destination position
+		
+		// // todo: for linear velocity and injection into an orbit, we dont want to necessarily decelerate to 0,0,0 assuming we want to model gravitation
+		
+	// }
+	
+	private static void ShutDown(string entityID, string vehicleID, string[] thrusterIDs)
+	{
+		// if we're already at rest, there's no need to keep resetting all these thruster state vars
+		EntityAPI.SetCustomPropertyValue (thrusterIDs[0], "breaker", false);
+		EntityAPI.SetCustomPropertyValue (thrusterIDs[3], "breaker", false);
+		
+		EntityAPI.SetCustomPropertyValue (thrusterIDs[2], "breaker", false);
+		EntityAPI.SetCustomPropertyValue (thrusterIDs[1], "breaker", false);
+		
+		EntityAPI.SetCustomPropertyValue (thrusterIDs[0], "angular thrust", false);
+		EntityAPI.SetCustomPropertyValue (thrusterIDs[3], "angular thrust", false);
+		
+		EntityAPI.SetCustomPropertyValue (thrusterIDs[2], "angular thrust", false);
+		EntityAPI.SetCustomPropertyValue (thrusterIDs[1], "angular thrust", false);
+			
+		Quaternion quatHeading = (Quaternion)EntityAPI.GetCustomPropertyValue(entityID, "quatheading");
+		
+		EntityAPI.SetRotationRegionSpace(vehicleID, quatHeading);
+		
+	//EntityAPI.SetCustomPropertyValue(thrusterIDs[2], "thrust vector", Vector3d.Zero());
+	//EntityAPI.SetCustomPropertyValue(thrusterIDs[1], "thrust vector", Vector3d.Zero());
+	
+
+		EntityAPI.SetCustomPropertyValue(entityID, "state", (int)ManeuverState.None);
+
+	}
+	
+	private static void Translation_Accelerate(string entityID, string[] engineIDs, Vector3d position, Vector3d destination)
+	{
+		
+		EntityAPI.SetCustomPropertyValue (engineIDs[0], "angular thrust", false);
+		EntityAPI.SetCustomPropertyValue (engineIDs[1], "angular thrust", false);
+		EntityAPI.SetCustomPropertyValue (engineIDs[2], "angular thrust", false);
+		EntityAPI.SetCustomPropertyValue (engineIDs[3], "angular thrust", false);
+		
+		EntityAPI.SetCustomPropertyValue (engineIDs[0], "breaker", true);
+		EntityAPI.SetCustomPropertyValue (engineIDs[1], "breaker", true);
+		EntityAPI.SetCustomPropertyValue (engineIDs[2], "breaker", true);
+		EntityAPI.SetCustomPropertyValue (engineIDs[3], "breaker", true);
+
+		
+	}
+
+	private static void RotateClockwise(string entityID, string[] thrusterIDs, Vector3d direction)
+	{
+		//System.Diagnostics.Debug.WriteLine("Accelerating");
+	//	Accelerate(); // todo: which thrusters fire depends on the direction of the acceleration
+		// for now let's just turn on clockwise thrusters
+		EntityAPI.SetCustomPropertyValue (thrusterIDs[0], "breaker", true);
+		EntityAPI.SetCustomPropertyValue (thrusterIDs[3], "breaker", true);
+				
+		EntityAPI.SetCustomPropertyValue (thrusterIDs[2], "breaker", false);
+		EntityAPI.SetCustomPropertyValue (thrusterIDs[1], "breaker", false);
+
+		//double throttle = 1.0d; new Vector3d(0, 0.0001, 0) * direction;
+		EntityAPI.SetCustomPropertyValue(thrusterIDs[0], "thrust vector", direction);
+		EntityAPI.SetCustomPropertyValue(thrusterIDs[3], "thrust vector", direction);
+	}
+	
+	private static void RotateCounterClockwise(string entityID, string[] thrusterIDs, Vector3d direction)
+	{
+		//	Decelerate(); // todo: which thrusters visually fire depends on the direction of the decleration
+		// todo: would be nice to be able to set an array of PropertySpec instead of seperate calls to same Entity
+		EntityAPI.SetCustomPropertyValue (thrusterIDs[0], "breaker", false);
+		EntityAPI.SetCustomPropertyValue (thrusterIDs[3], "breaker", false);
+		
+		EntityAPI.SetCustomPropertyValue (thrusterIDs[2], "breaker", true);
+		EntityAPI.SetCustomPropertyValue (thrusterIDs[1], "breaker", true);
+		
+		EntityAPI.SetCustomPropertyValue(thrusterIDs[2], "thrust vector", direction);
+		EntityAPI.SetCustomPropertyValue(thrusterIDs[1], "thrust vector", direction);
+			
+		// todo: i think if i try to enable angular velocity on each axis, i will get
+		//       incorrect looking rotations because axis orientations will change.  For instance
+		//       if i roll 90 degrees and then try to yaw, it should yaw around the ship's new up vector not the 
+		//       world up vector.
+		//       This is why i should probably restrict heading to just yaw for 1.0 
+		
+			
+		// todo: force needs to be modified by any damage to the thruster, but that should occur within the engine.css
+		// if the direction has changed, we have overshot and should immediately just snap to orientation
+	}
+	private static void SetAngularThrust(string vehicleID, string[] thrusterIDs, bool value)
+	{
+		EntityAPI.SetCustomPropertyValue(thrusterIDs[0], "angular thrust", value);
+		EntityAPI.SetCustomPropertyValue(thrusterIDs[1], "angular thrust", value);
+		EntityAPI.SetCustomPropertyValue(thrusterIDs[2], "angular thrust", value);
+		EntityAPI.SetCustomPropertyValue(thrusterIDs[3], "angular thrust", value);
+		
+		if (value == false)
+		{
+			EntityAPI.SetPropertyValue(vehicleID, "angularforce", Vector3d.Zero());
+			EntityAPI.SetPropertyValue(vehicleID, "angularvelocity", Vector3d.Zero());
+		}
+	}
+	
+	private static double Difference (Quaternion q1, Quaternion q2)
+	{
+		Quaternion difference = Quaternion.Inverse(q1 * q2);
+		Vector3d vec = new Vector3d(difference.X, difference.Y, difference.Z);
+		double length = vec.Length;
+		double angle = 2d * Math.Atan2(length, difference.W);
+		angle = angle *= Keystone.Utilities.MathHelper.RADIANS_TO_DEGREES;
+		return angle;
+	}
+	
+	private static Vector3d GetDirection (double targetHeading, double currentYaw, out double distance)
+	{
+		double a = targetHeading - currentYaw;
+		double b = a + 360;
+		double c = a - 360;
+		Vector3d result = Vector3d.Zero();
+		
+		if (Math.Abs(a) <= Math.Abs(b) && Math.Abs(a) <= Math.Abs(c)) 
+		{
+			if (a >= 0) 
+				result = new Vector3d(0, 1, 0);
+			else 
+				result = new Vector3d (0, -1, 0);
+			
+			distance = Math.Abs(a);
+		}
+		else if (Math.Abs(b) <= Math.Abs(a) && Math.Abs(b) <= Math.Abs(c)) 
+		{
+			if (b >= 0) 
+				result = new Vector3d(0, 1, 0);
+			else 
+				result = new Vector3d(0, -1, 0);
+			
+			distance = Math.Abs(b);
+		}
+		else if (Math.Abs(c) <= Math.Abs(a) && Math.Abs(c) <= Math.Abs(b)) 
+		{
+			if (c >= 0) 
+				result = new Vector3d(0, 1, 0);
+			else 
+				result = new Vector3d (0, -1, 0);
+			
+			distance = Math.Abs(c);
+		}
+		else 
+			throw new Exception();
+		
+		
+		
+		return result;
+	}
+}
+

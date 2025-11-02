@@ -1,0 +1,44 @@
+using System;
+using Keystone.Types;
+using KeyScript;
+using KeyScript.Interfaces;
+using KeyScript.Delegates;
+using KeyScript.Host;
+
+public class Test : BaseScript
+{
+	
+	// static should work here
+	public static void OnSpawn (string entityID)
+	{
+		//todo: verify the user can't access Keystone.Core._Core and such
+		System.Diagnostics.Debug.WriteLine (string.Format("Entity {0} Spawned in world at {1}", entityID, 1));
+	}
+	
+	public static void OnUpdate (string entityID, int elapsedMilliseconds)
+	{
+		// orbit this entity around the origin
+		Vector3d origin = new Vector3d();
+		Vector3d position = EntityAPI.GetPosition (entityID);
+		double heading = Keystone.Math2.Math2.Heading2DDegrees(position);
+		double radius = position.Length;
+		heading += (double)elapsedMilliseconds * .01;
+		if (heading > 360) heading = 0;
+		double vertAngle = 0 ;
+		Vector3d velocity = EntityAPI.GetVelocity (entityID);
+		Vector3d newPosition = Keystone.Math2.Math2.MoveAroundPoint(origin, radius, heading, vertAngle);
+		EntityAPI.SetPosition(entityID, newPosition);
+	}
+}
+
+//public class DefaultDynamicEntity : IDynamicEntity
+//{
+//	public void Update (int elapsedMilliseconds, string entityID)
+//	{
+//		System.Diagnostics.Debug.WriteLine ("Hello world2");
+//	}
+//	public void Update()
+//	{
+//		System.Diagnostics.Debug.WriteLine ("Hello world");
+//	}
+//}

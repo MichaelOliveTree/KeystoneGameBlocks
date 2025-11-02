@@ -1,0 +1,181 @@
+1 - recover my phone #    (SafeLink and TruConnect)
+      - GitHub and Threads left
+
+
+4 -  BioLife / redcross
+
+
+5 - make Visual Arithmetic Repo public
+
+___________________________
+
+boris the brave - Varia
+varia is a unity asset that can be used to give random variation to prefabs.
+
+for instance, random positions, scales, rotations, colors, vertex positions too.
+
+- if we store certain variations in a texture for all instances, that could allow us to set variance in shader .
+____________________________
+
+A Plus A Pawn Shop
+186 S Alvarado
+223 484 5414
+
+zaks
+6767 Santa Monica Blvd
+213 679 0221
+
+____________________
+
+Hello. I don't know if you will receive this message. My name is Michael Joseph and I had an appointment with you for July 2 @10:00am. Unfortunately I did not realize I had an appointment because my sister who lives at the mailing address you have on file for me (870 S Gilbert St, Hemet, CA 92543) did not tell me I had mail waiting for me. I am actually in Los Angeles near the LA Mission and was not given the letter until two weeks ago when I visited my sister. Currently I am trying to get my phone w/ previous number and Gmail service restored after my phone was stolen 3 weeks ago.
+
+I have a backup email address at
+tp_walkswithgod@proton.me
+
+I hope I'm not in danger of losing any benefits such as EBT.
+
+Regards,
+Michael Joseph
+
+____________________
+- Todo: I think I fixed this, but the frame length \ Duration needs to be a float and not an int for our AnimationTrack I believe it was.  I know there was an error here related to using an "int" for Duration of one type of AnimationClip.  it might've been I was counting the number of frames
+    - ACTUALLY, it's AnimationClips.cs.public abstract int KeyFrameCount { get; }  needs to be a float.  
+
+
+
+,- on rendering far away terrain and world items to hide where horizon meets sea level 
+   - https://www.gamedev.net/forums/topic/711289-far-away-objects-and-horizon-in-an-open-world-game/
+
+  1 - render the far away chunks at low LOD.  note: tv3d terrain is a problem here because it needs to be tweaked to do that, 
+   but for our isometric and Minecraft style terrain, we need to combine the individual tile geometry to create approximations 
+ 2- we can load many multiple far away chunks as just one low LOD chunk!  so we need to be able to generate these combined low LOD chunks from our terrain data... 
+
+- mhull can be used to create a LOD actually.  we don't even have to pass all verts for voxels or isometric tiles, just bounds box verts
+
+
+
+
+- Todo: 
+
+
+- repository.create needs the case : names for the animation interpolation nodes we added for material colors and lights and floats too for opacity and specular power 
+
+
+
+
+- events - no tests in any of the scripts
+
+- properties - specs are used to store. verify persist string is common for all strings in group attributes or entity.
+
+- usedirlight_as_point_light
+rings2.fx shader
+modelspace
+unit sphere and unit ring (radius==1 meter.   duh because all points on sphere are 1 meter away from origin)
+
+- max distance for placing a prefab... eg far plane distance. RenderingContext.GetZoomToFitDistance()
+
+- scaleculler - interior decks should get culled based on traversal, not get settings in viewport control drop-down menu
+
+- axial billboards
+
+- portals
+
+- occluders
+
+- behavior tree for chase camera produces jitter on mouse move quaternion issue
+- behavior tree doesn't init to camera angles after Move to()
+
+- clean up debug draw functions... consolidate code
+
+- get rid of inputhandler
+
+- light management - enable disable for each model (optimizations some other time)
+
+        /// <summary>
+        /// This value is assigned via the EntityEditPlugin General tab.  mHost.Entity_GetUserTypeIDsToString() is used
+        /// to populate the combobox with string versions of the enum Game01.Enums.COMPONENT_TYPE
+        /// </summary>
+        /// <remarks>I don't know about this since it means to have a distinct userTypeID, every component needs its own script.  I should probably just use a customproperty to hold this value instead.  In fact the game00.Rules.BuildWeapon() can probably be used to modify this custom property value</remarks>
+        public uint UserTypeID
+        {
+            // Enum assign from game01.dll.Enums.COMPONENT_TYPE
+            set { mUserTypeID = value; }
+            get
+            {
+                return mUserTypeID;
+            }
+        }
+        
+____________________
+- animation interpolation
+- star values and relative updates rather than absolute values.
+- ability to play clips in sequence rather than at same time
+- plugin animation support (entity tree )
+- reverse animation option
+- materials
+ambient
+diffuse
+specular
+emissive
+
+- lights
+Transform
+position
+scale
+rotation
+ambient
+diffuse
+specular
+// emissive
+
+
+GUI Nodes
+____________________
+
+Control
+    Window 
+    Pane
+
+
+SELECTOR NODES
+____________________
+WARNING: behavior tree has a Selector.cs node.... below might be incorrect.
+- make selector.cs our base type for switch and sequence nodes. maybe base type for any type for any type of switch such as appearance switch node.
+
+recall our Switch nodes we want to use linear interpolation to determine which node to select
+todo: look at different types of interpolation functions that are weighted differently
+
+e.g. health amount as determinant for which damage model node to select
+minValue = 0
+maxValue = 100
+
+damage model
+level of detail model
+
+
+Model[] results = entity.Select
+
+USE CASES FOR SELECTOR nodes
+Scenegraph switch nodes: beyond basic visibility toggling
+
+Scene graph switch nodes are powerful tools for managing the visibility and behavior of elements within a scene graph structure, going beyond simple on/off states. Here are some other situations where they are used:
+
+Animation sequences and dynamic behavior:
+By switching between different child nodes, each representing a distinct frame or state, switch nodes can be used to create animation sequences or dynamically alter the appearance of an object over time. Imagine a game character's walk cycle: each child node could hold a different pose, and the switch node would sequentially activate them to create the illusion of movement. This can also be used to show damage progression on objects, like a car door becoming increasingly damaged in a racing game.
+
+Level of Detail (LOD) management:
+For optimizing performance, especially in large scenes or complex models, switch nodes can be used to control the Level of Detail (LOD) of objects. As the distance between the camera and an object increases, the switch node can activate a child node containing a lower-resolution version of the object, reducing the rendering overhead. When the camera gets closer, a higher-resolution version can be switched in.
+
+Conditional rendering:
+Switch nodes can enable conditional rendering, where certain elements or subgraphs are only rendered under specific conditions. For instance, a switch node could be used to display a loading screen only when data is being fetched from an API. This is similar to how conditional rendering is used in frameworks like React, where UI components are rendered based on conditions.
+
+Managing environment variants: Tools like Autodesk VRED utilize switch nodes to manage different environment variants within a scene. This could involve switching between different geometries for displaying the environment and a shadow plane, or associating different materials and textures to create diverse environments.
+
+User Interface (UI) elements:
+Switch nodes can also be used in creating dynamic UI elements. Imagine a UI where different panels or sections are displayed based on user interaction. A switch node could activate the corresponding panel when a specific button is clicked, dynamically updating the UI.
+
+Optimization with culling and masks:
+While switch nodes can be used for basic visibility toggling, for scenarios involving a large number of potential children, optimizations like culling nodes or NodeMasks might be more efficient. A switch node still has to test each child to determine if it's switched off or on, which can be computationally expensive with many children. NodeMasks, on the other hand, can be more performant as the testing is done before traversing the child itself.
+
+In summary, switch nodes provide a flexible and powerful way to manage the state, appearance, and behavior of elements within a scene graph, enabling a variety of applications from animation and LOD management to conditional rendering and environment switching.
+

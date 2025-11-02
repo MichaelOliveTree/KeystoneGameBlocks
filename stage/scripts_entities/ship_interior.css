@@ -1,0 +1,864 @@
+using System;
+using Game01.GameObjects;
+using KeyCommon.Simulation;
+using KeyCommon.Traversal;
+using Keystone.Types;
+using KeyScript;
+using KeyScript.Interfaces;
+using KeyScript.Delegates;
+using KeyScript.Host;
+using KeyScript.Rules; // todo: maybe Rules should exist in Game01.dll
+using Settings;
+
+public class Ship_Interior : BaseScript
+{
+	public static void Initialize(string scriptID)
+	{
+		string category = "public properties/misc";
+		Settings.PropertySpec[] properties = new Settings.PropertySpec[10];
+		properties[0] = new PropertySpec("description", typeof(string).Name, category, (object)"Ship Interior");
+		category = "public properties/statistics";
+		properties[1] = new PropertySpec("weight", typeof(double).Name, category, 0);
+        properties[2] = new PropertySpec("cost", typeof(double).Name, category, 0);
+		properties[3] = new PropertySpec("volume", typeof(double).Name, category, 0);
+		properties[4] = new PropertySpec("surfacearea", typeof(double).Name, category, 0);
+		properties[5] = new PropertySpec("health", typeof(int).Name, category, 0);
+		
+		category = "build"; // the following apply for entire interior
+		properties[6] = new PropertySpec("frame strength", typeof(string).Name, category, "", "Light", "", typeof (FrameStrengthConverter).AssemblyQualifiedName);
+		properties[7] = new PropertySpec("materials quality", typeof(string).Name, category, "", "", "", typeof (MaterialQualityConverter).AssemblyQualifiedName);
+		properties[8] = new PropertySpec("craftsmanship", typeof(string).Name, category, "", "", "", typeof (CraftsmanshipConverter).AssemblyQualifiedName);
+		properties[9] = new PropertySpec("tech level", typeof(int).Name, category, "", 7, "", typeof (TechLevelConverter).AssemblyQualifiedName);
+		
+		
+		// living metal, biomechanical, robotic, responsive) <-- THESE CAN USUALLY BE DESCRIBED IN TERMS OF WHAT THEY CONSUME OR PRODUCE
+		//    - for robotic, i think ill be physically plotting any electrical and communications lines that will 
+		//      automatically added weight and cost
+		//		- living metal (nanobot) offers self regenerative bonus)
+		//         and consumes supplies to recover hitpoints (aka: Produces regeneration)
+		//
+		// 		- biomechanical can feel pain but can heal 
+		//        but also can consume pathogens and result in loss of hitpoints
+		// 
+		// enum FrameAttributes  // see above notes: Perhaps these function as Production/Consumption _IF_ the
+		//                       // structural frame attributes exist
+		// {
+		//		none = 0,
+		// 		robotic = 1 << 0,
+		//		responsive = 1 << 1,
+		// 		living metal= 1 << 2,
+		// 		mechanical = 1 << 3
+		// }
+		
+		category = "armor"; // the following can be added to every single tile thus an array is used
+		                    // however, these are actually a dictionary so that we can use tile index
+							// and not waste space with empty arrays
+		// struct ArmorLayer
+		// {
+		// 		DR
+		// 		PD
+		// }
+		
+//		properties[10] = new PropertySpec("tilestate", typeof(InteriorStructureState[]).Name, category, 0);
+		// struct StructureState // individual wall or floor/ceiling structure
+		// {
+		//		ArmorLayer[] Armor;  
+		// 		hitpoints
+		// 		damage
+		//		doubleSided
+		//		style // style of wall, can be brick, fence, etc
+		//		TextureUV // to match the atlas sub-texture
+		// }
+		category = "private variables"; // not persisted, not visible in quicklook or script plugin
+
+		
+		category= "operations";
+		// todo: ideally if we could create a list of repairable things under the "repair" category
+		//       then we could get repair-able properties and their etas, their supply cost, etc
+		//properties[11] = new PropertySpec("repair", typeof(float).Name, category, 0.0f);		
+
+		
+		// add the properties to the entity's domain object
+		EntityAPI.AddCustomProperties(scriptID, properties);
+		
+		
+		// create a test rule using a Delegate rule
+		//EntityAPI.AddRule (
+		//	scriptID, "description", new SimpleRule(1, delegate {null, return ((string)properties[0].DefaultValue).Length != 0; }));
+			
+		// todo: can this rule work with intrinsic as well as our cusotm properties?
+		// todo: our ROUTES (which we can use for animations too) seems to me can work
+		//       similar to our Rules
+		// Entity.SetCustomPropertyValues --> calls validate this is only for custom properties though
+		// but i see no reason we cant have rules added for intrinsic properties.  
+		// similarly, our ROUTE should be able to respond to changes in fields just like
+		// our business rules do...
+		// note: we have scriptID.mRulesSet because there we can share all those rules with all
+		// instances of that entity.  so maybe a seperate set of rules for intrinsics? but wait
+		// that's not needed really. that same scriptID rules can test the intrinsics too,we just
+		// need to create the rules and then if we want different rules behavior, we use a different entity
+		// script.   Same then is said for our Routes
+		// Routes than are listeners and handlers
+		EntityAPI.AddRule (scriptID, "description", new SimpleRule(1, Rule_Description));
+			
+	}
+		
+	public static void InitializeEntity(string entityID)
+	{
+		EntityAPI.SetCustomFlagValue (entityID, (uint)UserConstants.CustomFlags.CF_STATS_DIRTY ,true);
+	
+		// Entity FLAGS (as opposed to Component flags) should be set here as they are per entity
+		EntityAPI.SetEntityFlag(entityID, (uint)UserConstants.ExplicitEvents, true);
+	}
+	
+	public static object RegisterChild(string entityID, string childID)
+	{
+		// make modifications 
+
+		// LINKS
+		// are links inherent to KGB or do they largely represent EXE side qualities?
+		// - well, links are apart of the CellMap footprint, but they are just data, where does the logic 
+		// for processing that data reside?
+		
+		// HARDPOINTS
+		// todo: this is an Interior of ship, and is this child a component?
+		//       - if so, does this child have a hardpoint source endpoint?
+		//			- a hardpoint that is to be exposed should be a flag perhaps on this entity
+		//            and then this flag can be inherited by the exterior Vehicle.  Then we still need
+		//            a way to go from exterior flag to rendering a link point.  We then also need to know
+		//            what fields the link point connects to.
+		//
+		//			Exterior <flags routes> <-- inherit routes?
+		//				Interior
+		//					.AddChild (engine)
+		//						// set flags in exterior Vehicle that there are events
+		//                      // that can be wired
+		//						// perhaps the interior component has a flag that says
+		//                      // if it's Parent is a "Container" then it can also be exposed
+		//                      // one level up further to the Container's parent.
+		//						// THE INTERIOR IS OUR FRIEND.  THe interior
+		//                      // is responsible for examining the interior entity, and creating the things
+		//                      // it needs for our HUD to find on the Exterior.  So now the question is
+		//                      // what does the Interior create?
+		//
+		//                      Agnostically, i can just recurse down from a staring Exterior Vehicle
+		//                      to find all potential "routes" and draw them and then allow user to
+		//                      connect them or not.
+		//
+		// Normally HUD if "show event routeable fields" connectors flag is set, for all visible entities
+		// if such a field exists, we can draw a hud cube there.  
+		// - but what do we do when we're rendering an exterior component and where children of it's children
+		//   have fields we want hud cubes rendered for but in the space of the exterior, not the interior.
+		//   OR, what if we do this differently.  What if we do this in two passes.  
+		// 		- we generate interiors hardpoints as overlay, then we render the exterior then render the 
+		//      overlay hud icons?
+		//
+		//
+		//					Engine -> has a flag that says "I have one or more properties that
+		//                            are in a category of "routeable" where a listener can be created
+		//                            and the fields value routed to another entity field of same type.
+		//                            - the hud 
+		//
+		//						flag<hardpoint/thruster>
+		//						On<bool>
+		//							-> invoke Route for "on" if it exists
+		//
+		//       	- if so, we should create the Linkage and then notify the parent Vehicle
+		//            of this interior so that the hardpoint linkage can be exposed to
+		//            assignment of exterior entities as a target endpoint.
+		//          - a hardpoint source is denoted by a bool custom property being in a category called "hardpoint_thruster_mount"
+		//            and from that we know the fields that the linkage will listen to as well as
+		//            know what types of entities can be set as the endpoint.
+		//
+		// so the above is doable in the short term, but what im still not fully sure about is how 
+		// in our vehicle editor to assign target entities to linkage endpoints.
+		// I think perhaps if the endpoints are rendered so we can see them, then we should
+		// in our exterior editor workspace code, drag and drop from toolbox to an endpoint
+		// and then add the entity to the vehicle exterior as well as connect the hardpoint endpoint
+		// to that entity.
+		//
+		// So the placement tool for exterior editor must determine if the placed entity is over a valid type of hardpoint (eg thruster hardpoint vs turret mount) and then allow a certain amount of
+		// positionability around that mount location.  The mount location should be completely virtual though
+		// based on the interior mount location and the ray pick of the face of the exterior mesh where
+		// we're attempting to place the exterior component.
+		// string vehicleID = EntityAPI.GetOwner (entityID);
+		// uint cellIndex = EntityAPI.GetProperty (childID, "cellid"); 
+		// byte cellRotation = EntityAPI.GetProperty (childID, "cellrotation"); // 256 byte rotation
+		// do we have a way to Execute scripts on the other components here?  I suppose just through
+        // an "Execute()" method in our
+// 		object = EntityAPI.Execute (childID, 
+//                                  "QueryCellPlacement", 
+//                                   new object[] { this.ID, cellIndex, dummy, cellRotation });
+		
+		
+		// how do i get the parent vehicle to know that a link can be made from
+		// this child entity (eg an interior thruster engine) so that
+		// also while in exterior edit rendering, we can display the locations of those
+		// available hardpoints?  And why they aren't available to the interior, but
+		// essentially one entity higher up... 
+		// And then when the "link" is made, where is it stored/tracked as a variable and then
+		// where is it saved/deserialized and in what order?
+		// 1) routes need to be restored only after both the source and target are deserialized.
+		//    - if the route is in fact defined here actually as a property of the engine, then
+		//      the target can be assigned by the Vehicle's script itself whenever a new exterior 
+		//      child is added it can test to see if it needs to restore a route target.
+		//     - the Route hardpoint instead of "Vector3d" can be of type "Route" 
+		// 2) for engines, our routes specifically use certain properties eg "on" and these will be done
+		//    already.  the key is that the route will not have an endpoint until the user creates one.
+		//    So how is the target endpoint restored?  I think 
+		// struct Route
+		// {
+		//		string ID;
+		//		string sourceID = "";
+		//		string sourceMethod = "on";
+		//		string targetID = "";
+		//      string targetMethod = "on"; 
+		//		// RouteEndPoint Source;
+		//		// RouteEndPoint Target;
+		// }
+		//
+		// struct RouteEndPoint
+		// {
+		//		public Route Route;
+		//		public string EntityID;
+		//		public string MethodName;
+		// }
+		//
+		//  combined with an EventListener added to the Thruster that references the Route
+		// http://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-EventListener
+		
+		// class EventListener // stored in dictionary like BusinessRules
+		// {
+		//		public Route Route; // can be null
+		// }
+		
+		// we need hud notification of available route-able entities
+		// this is the only clean way without having dummy objects
+		// hud just needs to be smart of discovering them and showing them
+		// - actually i think hud will just do a render pass where the find these routes
+		//   and we render them as overlays.  There is no need to "expose" anything or have flags
+		// we simply need to do a special render pass where we query all the entities that have 
+		// listeners 
+		
+		AIAPI.EnableBehavior (childID, true);
+		return entityID;
+	}
+	
+	public static object UnRegisterChild (string entityID, string childID)
+	{
+
+		return entityID;
+
+	}
+	
+	public static object OnAddedToParent(string entityID, string parentID)
+	{
+		// make modifications 
+
+
+		return entityID;
+	}
+	
+	public static object OnRemovedFromParent (string entityID, string parentID)
+	{
+
+		return entityID;
+	}
+	
+	#region GUI // http://www.antlr.org/wiki/display/ST/Examples
+	public static string GUILayout_GetMarkup (string entityID, PickResultsBase pickDetails)
+	{
+		
+		// determine the tile we are over (on which floor as well)
+		// are we close to an edge and if so, is the edge assigned a structure?  
+		int cellID = -1;
+		int tileID = -1; 
+		int edgeID = -1;
+		
+		if (pickDetails != null)
+		{
+			cellID = pickDetails.FaceID;
+			//tileID = pickDetails.TileID; 
+			edgeID = pickDetails.EdgeID;
+		}
+		
+		object propertyValue = EntityAPI.GetCustomPropertyValue(entityID, "description");
+		string name = null;
+		if (propertyValue != null)
+			name = (string)propertyValue;
+			
+		name = "Morena Smuggler";
+		
+		// todo: we have the interior entityID but can we get the exact pick cell and pick edge so we can
+		// use API to grab details about the selected cell or wall or door and display any stats along with
+		// options for modifying that structural component?
+		// - we modify _GetMarkup to always include Face/Tile and Edge and Vertex
+		//		- perhaps we include the PickResult altogether
+		// - either we make a seperate _GetMarkup 
+		// - we store the last selected in the CelledRegion so we can use an API to grab it
+		// - the "entityID" actually we append cell and edge
+		//  
+		
+		// // string dir = System.IO.Path.Combine (mHost.DataPath, "\\templates");
+		// //NOTE: must use RawGroupDirectory if we just want straight template text with no type definition info required
+		// TemplateRawGroupDirectory group = new TemplateRawGroupDirectory(@"E:\dev\c#\KeystoneGameBlocks\Data\mods\common\layouts\", System.Text.Encoding.ASCII, '$', '$');
+	// //    group.LoadGroupFile(prefix, @"E:\dev\c#\KeystoneGameBlocks\Data\mods\common\layouts\group_components.stg"); 
+	// //    group.LoadTemplateFile(prefix, "component_page.st");
+	// //    group.LoadTemplateFile(prefix, "power_gen_body.st");
+	// //    group.LoadTemplateFile(prefix, "power_gen_consumers.st");
+	// //    group.LoadTemplateFile(prefix, "power_gen_consumers_row.st");
+
+		// // note: the problem with TemplateGroup (as opposed to GroupDirectory) is you cannot supply
+		// // names to the templates you load.  Names are always based on a filename.
+		// //TemplateGroup group = new TemplateGroup('$', '$');
+		// //group.LoadGroupFile ("testgroup", @"E:\dev\c#\KeystoneGameBlocks\Data\mods\common\layouts"); 
+		
+		// // these effectively re-read the file everytime and allows runtime modification
+		// Template pageST = group.GetInstanceOf("component_page");
+		// Template bodyST = group.GetInstanceOf("power_gen_body");
+		// Template consumerListST = group.GetInstanceOf("power_gen_consumers");
+
+		// // .Add cannot be done on compiled templates.  CompiledTemplates are effectively frozen so it makes sense!
+		// bodyST.Add("componenttypename", name);
+		// pageST.Add("title", "Component Page");
+		// pageST.Add("body", bodyST);
+		
+		// ConsumerTest[] consumerArray = null;
+		// // get list of consumer device IDs (how do i differentiate between consumption of power
+		// // versus consumption of explosion heat/concussion damage when the reactor is destroyed?
+		// // well, that type of consumer is never added as a "linked" consumer.  Consumption of damage
+		// // and such is done through Simulation and scripted production and consumption methods for those products.
+		// object tmp = EntityAPI.GetCustomPropertyValue (entityID, "production");
+		// if (tmp != null)
+		// {
+			// Production[] production = (Production[])tmp;
+			// int productCount = production.Length;
+			// if (productCount > 0)
+			// { 
+				// for (int i = 0; i < productCount; i++)
+				// {
+					// int deviceCount = 0;
+					// if (production[i].Consumers == null)
+						// continue;
+						
+					// deviceCount = production[i].Consumers.Length;
+						
+					// consumerArray = new ConsumerTest[deviceCount];	
+					
+					// // power consuming devices
+					// double totalLoad = 0.0d;
+					// for (int j = 0; j < deviceCount; j++)
+					// {	
+						// ConsumerTest ct = new ConsumerTest();
+     					// string consumerID = production[i].Consumers[j];
+						// ct.ID = consumerID;				
+
+						// tmp = EntityAPI.GetCustomPropertyValue (consumerID, "power_reqt");
+						// ct.Usage = tmp != null ? (double)tmp : 0f;
+						// totalLoad+= ct.Usage;
+						// // for reactor it regulates reaction, for weapons it regulates the minimum level 
+						// // of power before firng again
+						// // if value = -1 or null then regulator is N/A for this  device
+						// tmp = EntityAPI.GetCustomPropertyValue (consumerID, "regulator");
+						// ct.Regulator =  tmp != null ? (float)tmp * 100f : 100f;   
+						// //ct.T1 = 						
+						// tmp = EntityAPI.GetCustomPropertyValue (consumerID, "breaker");
+						// ct.Breaker = tmp != null ? (bool)tmp : true; 
+						// consumerArray[j] = ct;
+					// }
+					// consumerListST.Add("consumers", consumerArray);
+					
+					// tmp = EntityAPI.GetCustomPropertyValue (entityID, "output");
+					// double powerOutput = (double)tmp;
+					// string powerStatus = totalLoad.ToString() + "kW\\" + powerOutput.ToString() + "kW";
+					// bodyST.Add("poweruse_over_powergenerated", powerStatus); 
+				// }
+			// }
+		// }
+		
+		
+		// bodyST.Add("consumertable", consumerListST);
+		
+		
+		string html = string.Format ("<html><body>{0}: INTERIOR <br> Cell ID: {1} <br> Tile ID: {2} <br> Edge ID: {3} </body></html>", name, cellID, tileID, edgeID);
+		return html;
+		
+		//return pageST.Render();		
+		
+	}
+	
+	// <summary>
+	// Handler for all link clicks within the layout.
+	// </summary>
+	// <param name="entityID"></param>
+	// <param name="name">Name of specific button that triggered the event.</param>
+	public static void GUILayout_LinkClick(string entityID, string name)
+	{
+		System.Diagnostics.Debug.WriteLine("GUILayout_LinkClick() - '" + name + "'");
+
+		switch (name)
+		{
+			default:
+				System.Diagnostics.Debug.WriteLine("GUILayout_LinkClick() - Unexpected link '" + name + "'");
+				break;
+		}
+	}
+	
+	// <summary>
+	// Handler for all button clicks within the layout.
+	// </summary>
+	// <param name="entityID"></param>
+	// <param name="name">Name of specific button that triggered the event.</param>
+	public static void GUILayout_ButtonClick(string entityID, string name)
+	{
+		System.Diagnostics.Debug.WriteLine("GUILayout_ButtonClick() - '" + name + "'");
+
+		switch (name)
+		{
+			default:
+				System.Diagnostics.Debug.WriteLine("GUILayout_ButtonClick() - Unexpected button '" + name + "'");
+				break;
+		}
+	}
+
+	// <summary>
+	// Handler for all checkbox clicks within the layout.
+	// </summary>
+	// <param name="entityID"></param>
+	// <param name="name">Name of specific button that triggered the event.</param>
+	public static void GUILayout_CheckBoxClick(string entityID, string name)
+	{
+		System.Diagnostics.Debug.WriteLine("GUILayout_CheckBoxClick() - '" + name + "'");
+
+		switch (name)
+		{
+			default:
+				System.Diagnostics.Debug.WriteLine("GUILayout_CheckBoxClick() - Unexpected checkbox '" + name + "'");
+				break;
+		}
+	}
+	
+	// <summary>
+	// Handler for all textbox clicks within the layout.
+	// </summary>
+	// <param name="entityID"></param>
+	// <param name="name">Name of specific button that triggered the event.</param>
+	public static void GUILayout_TextBoxClick(string entityID, string name)
+	{
+		System.Diagnostics.Debug.WriteLine("GUILayout_TextBoxClick() - '" + name + "'");
+
+		switch (name)
+		{
+			default:
+				System.Diagnostics.Debug.WriteLine("GUILayout_TextBoxClick() - Unexpected textbox '" + name + "'");
+				break;
+		}
+	}
+	
+	// <summary>
+	// Handler for all textbox keypresses within the layout.
+	// </summary>
+	// <param name="entityID"></param>
+	// <param name="name">Name of specific button that triggered the event.</param>
+	public static void GUILayout_TextBoxKeyPress(string entityID, string name)
+	{
+		System.Diagnostics.Debug.WriteLine("GUILayout_TextBoxKeyPress() - '" + name + "'");
+
+		switch (name)
+		{
+			default:
+				System.Diagnostics.Debug.WriteLine("GUILayout_TextBoxKeyPress() - Unexpected textbox '" + name + "'");
+				break;
+		}
+	}	
+	#endregion
+	
+	#region Rules
+	private static bool Rule_Description(string entityID, object[] args)
+	{
+		// we also get the value from the args
+		string description = (string)args[0];  // whwere know for property rules the value is the first and only arg
+		
+		System.Diagnostics.Debug.WriteLine ("Running rule 'Description'.  Testing value '" + description + "'");
+		return !string.IsNullOrEmpty(description);		
+	}	
+	#endregion
+	
+	#region PlacementTool related
+	public static uint QueryPlacementBrushType() {return (uint)UserConstants.BRUSH_TYPE.BRUSH_SINGLE_DROP;}	
+	
+	// todo: where do we return a bool indicating whether placement is valid?  I cant just hardcode
+	// within Interior validity checking reqts for all component types?
+	// a Validate function needs to be added to this script and for it to be called by the Interior during assetplacement and during
+	// restore from saved file.
+	// TODO: should individual prefabs for components not have a QueryCellPlacement() because only Structure and Interiors know
+	//       the rules that should be used based on the type of structure and child component? 
+	// TODO: interiorID argument should appear before childID argument 
+	public static Vector3d[] QueryCellPlacement (string childID, string interiorID, Vector3d position, byte cellRotation)
+	{
+		// NOTE: items being placed inside the Interior.cs use this QueryCellPlacement() call and not the
+		// the ones that are in the various Components' scripts that we are placing.  Those Components don't need QueryCellPlacement() functions at all.
+		Vector3d scale, rotation;
+		scale.x = 1;
+		scale.y = 1;
+		scale.z = 1;
+		rotation.x = 0;
+		rotation.y = 0;
+		rotation.z = 0;
+		
+		// if the footprint for either axis is even, we should modify the "position" vector
+		// on relevant axis to sit between tiles.  I'm assuming that when we compute tileLocation
+		// that we select the bottom left most tile of the tiles that share the same boundary.
+		// This way we can easily snap to the boundary for the relevant axises.
+		
+					
+		
+		// get the actual brush type from the child entity
+		uint brushStyle = EntityAPI.GetBrushStyle (childID); 
+		// TODO: rather than say things like BRUSH_DOOR, BRUSH_STAIRS, BRUSH_HATCH etc why not just
+		// use BRUSH_CELL_SNAP, BRUSH_TILE_SNAP, BRUSH_EDGE_SNAP, etc?
+		switch (brushStyle)
+		{
+			case (uint)UserConstants.BRUSH_TYPE.BRUSH_DOOR:
+				// perform a mouse pick of sorts using the position to find the nearest edge
+				// that also gives us the orientation (rotation) to use for the door
+				// position arg passed in should be ImpactPointLocalSpace
+				// NOTE: the position.y value returned is at floorheight for that edge and not in the center of that floor height
+				int edgeID;
+				position = EntityAPI.CellMap_GetEdgePosition(interiorID, position, out rotation, out edgeID);
+				break;
+			case (uint)UserConstants.BRUSH_TYPE.BRUSH_LIFT:
+			case (uint)UserConstants.BRUSH_TYPE.BRUSH_HATCH:
+			case (uint)UserConstants.BRUSH_TYPE.BRUSH_STAIRS:
+			case (uint)UserConstants.BRUSH_TYPE.BRUSH_LADDER:
+			{
+				//EntityAPI.CellMap_SetCeilingCollapseState(entityID, elementIndex, (bool)value);
+				// TODO: if we collapse the ceiling on placement, how do we uncollapse it upon deletion?
+				
+				const double TO_DEGREES = 360d / 256d;
+				rotation.x = 0;
+				rotation.y = (double)(cellRotation * TO_DEGREES);
+				rotation.z = 0;
+				// AssetPlacementTool does not compute snap positions. We do that here.
+				// stairs and hatch are snap centered in the cell.  They can be rotated. 0, 90, 180, 270 degrees.
+				uint cellID = EntityAPI.CellMap_GetCellIndexFromWorldPosition(interiorID, position);
+				Vector3d center = EntityAPI.CellMap_GetCellPosition (interiorID, cellID);
+				Vector3d size = EntityAPI.CellMap_GetCellSize (interiorID);
+				// move the position.y to the floor of that deck/level instead of hovering in center of the cell
+				position = center;
+				position.y = position.y - (size.y * 0.5d);
+				// NOTE: the footprint on stairs and hatches are always snapped directly to the center of the cell floor 
+				// In other words, the position is not in the center of a tile because
+				// that would NOT give us the center of the cell or allow us to center the footprint
+				// to even number of footprint tiles on either side.
+				// NOTE: this requires footprint for hatches and ladders should have even numbered count on both X and Z axis.
+				// Currently, we find the startTileLocation in interior.RegisterChild() 
+							
+				// TODO: AssetPlacementTool could perhaps install the railings for us
+				// TODO: how do i change the style of the railings?  Or do i just hardcode a built in prefab and prevent changes?
+				//       IT's the same thing with walls... i dont have a way yet of changing wall styles when using the toolbar to select wall placement mode.
+				// TODO: The railings do need to set footprints so that user cannot place wall on that occupied edge.
+				// TODO: what we need is to have an Array of Entities we want to place along with seperate positions and rotations for each.
+				//       If any of the Entities in the Array are not placeable, then all Entities in the Array are not placeable.
+				//       TODO: Does this mean we need to allow for the prefab to have multiple root level Entities?
+				//       The footprint editor can be modified to select from dropdown/comobox the current prefab array entity.
+				// TODO: The railings should be one prefab with 3 models because we're not using Wall Segment painter to deploy them. 
+				// TODO: Do we modify AssetPlacementTool to be able to accept an array of Prefabs rather than having one prefab with multiple entities in it?
+				// TODO: Is this something that needs to be done now?  I can use a seperate prefab and place it myself and then decide if we want to automate this later.
+				// TODO: Does this mean that we only delete upper ceiling and upper floor after we've placed a hatch?
+				
+				//       
+				break; 
+			}
+			case (uint)UserConstants.BRUSH_TYPE.BRUSH_SINGLE_DROP:
+			default:
+			{
+				// standard snap position call for single drop items.
+				// todo: but it seems almost worthless to have interior.css compute the placements
+				// because we just end up calling an EntityAPI call to handle the whole thing anyway. Hrm..
+				position = EntityAPI.CellMap_GetTileSnapPosition(interiorID, childID, position, cellRotation);
+				
+				const double TO_DEGREES = 360d / 256d;
+										
+				rotation.x = 0;
+				rotation.y = (double)(cellRotation * TO_DEGREES);
+				rotation.z = 0;
+				
+				// AssetPlacementTool does not compute snap locations, we do that here.				
+				//position = EntityAPI.CellMap_GetTilePosition3D(interiorID, tileLocation);
+				Vector3d size = EntityAPI.CellMap_GetTileSize (interiorID);
+								
+				// assuming the componen we are placing has it's Y position at floor (not centered in it's bbox)
+				// then we need to lower position.y we return to be on the floor of the cell.		
+				double floorHeight = position.y - (size.y * 0.5d);
+				//position.y = floorHeight;
+				break;
+			}
+		}
+		
+		// return values and dont use EntityAPI to set, since it's a Query and not an Update
+		return new Vector3d[] {position, scale, rotation}; 
+	}
+	#endregion
+		
+
+	public static void OnCelledRegion_DataLayerValue_Changed (string entityID, 
+					string layerName, uint elementIndex, object value)
+	{
+		//System.Diagnostics.Debug.WriteLine ("ship_interior.css_OnCelledRegion_DataLayerValue_Changed");
+ 
+		
+		// we know here the hashcode has changed, so we dont need to check it.  we just need to
+		// react based on the layer type
+		switch (layerName)
+		{
+			case "boundaries": // boundaries can never be changed by end user, only modders.
+								// Even during complete interior remodel 
+			{                   // by user, they are restricted from modifying boundaries.
+				// NOTE: following call assumes Model is paged in as well as it's Geometry  
+				// obsolete: boundaries no longer have any affect on starting collapsed state of a deck's floor tile
+				EntityAPI.CellMap_SetFloorCollapseState(entityID, elementIndex, (bool)value);
+				EntityAPI.CellMap_SetCeilingCollapseState(entityID, elementIndex, (bool)value);
+				// todo: if the cell contains entities and value == false for removing from in bounds
+				// what do we do?  Simplest solution is to abort.
+				//EntityAPI.CellMap_SetCellBoundsValue (entityID, elementIndex, (bool)value); // applies or unapplies TILEMASK_FLAGS.BOUNDS_IN
+				
+				break;
+			}
+			case "powerlink":
+			{
+				// TODO: i believe this method gets called for each tile we lay even when laying an entire line of tilestate
+				// instead of after the final tile is layed.  This will be slow!  We need to only call this method
+				// after all tiles in the link are layed down.  BUT, don't we need the elementIndex for each tile?
+				// could we pass in an array of elementIndex?
+
+				// power link has changed, we must remap consumers to producers according to the drawn links current state
+				System.Diagnostics.Debug.WriteLine ("OnCelledRegion_DataLayerValue_Changed() - 'Layer' = " + layerName);
+				
+				// we need to initiate update to the list of consumers held by producers of this link or any sub-links that have spawned
+				// from the removal of this tile (elementIndex == tileIndex in this case).  We need i think
+				// the flag value for powerlink and then a bool of set =true/false.  so how do we do this? i could just
+				// pass the name back to it
+				// TODO: we need to update links when adding/removing a producer OR consumer too right?
+				// TODO: does the update link network take into account 3D networks by looking at wall edge segments and traversing up/down walls to networks above/below?
+				EntityAPI.CellMap_UpdateLinkNetwork (entityID, elementIndex, layerName, (bool)value);
+				break;
+			}
+			case "tile style":
+			{
+				// elementIndex in this case a Cell index and not a Tile index
+				// TODO: 
+				EntityAPI.CellMap_SetTileSegmentStyle (entityID, elementIndex, value);
+				// TODO: should ApplyFootprint get called automatically during SetTileSegmentStyle?
+				EntityAPI.CellMap_ApplyFootprint (entityID, elementIndex, value);
+
+				// TOOD: Here we can collapse the ceiling and upper floor and assign railings to the
+				// open sides of the hole.
+				break;
+			}
+			case "segment style":
+			{
+				
+				// TODO: what is a segment compared to "tile style" and "wall style"?
+				
+				break;
+			}
+			case "wall style": 
+			{
+				// NOTE: Running these scripts here allows our deserialization to execute same way
+				//       as our real-time paint commands.  I think this is why I should also have
+				//       OnCelledRegion_DataLayerValue_ValidateChange which we can easily skip during 
+				//       deserialization but which we can run during real-time paint commands.
+				// TODO: I'm not convinced it's a good idea to call 
+				//       EntityAPI.CellMap_SetEdgeSegmentStyle 
+				//       and
+				//       EntityAPI.CellMap_SetEdgeSegmentStyle
+				//       here in script.  Deserialization can just as easily make the calls
+				//       from within Interior.cs can't it?  So I just don't see the advantages to
+				//       having these calls occur here in script.  
+				
+				// todo: here we should do any architectural rules validation (eg wall must be placed on floor or another wall)
+				//       - architectural rules validation seems well suited for scripts since different interiors can have
+				//       different rules, but the basic setting of Style and Footprint done in script seems wrong.
+				//       - or wall cannot be placed ontop of a railing edge segment
+				// 		- but the data layer has already changed at that point.  shouldn't validation be handled earlier?
+				//         (mCellMap.SetMapValue() call could be delayed until after Layer_ValueChanged())
+				//			- here the data layer is a dictionary containing our wall segments right?  footprint rotation and
+				//          apply/unapply occur in the API calls below.  This means, we can make
+				//          any custom modifications to scale and footprints here too i think.
+				
+				
+				
+				
+				// TODO: HOW are we able to cancel if the footprint intersects an obstacle?  Is the CellMap_ApplyFootprint()
+				// only applying and the test to actual place the edge segment is done earlier?
+				// I think we need a OnCelledRegion_DataLayerValue_ValidateChange
+				
+				
+				// TODO: here perhaps is where we need to determine what sub-model(s) we use and which edges and / or tiles
+				//       need to be updated with wall segments.
+
+				
+
+				// following call updates the style (visual and physical) but NOT the data model which was already updated.
+				EntityAPI.CellMap_SetEdgeSegmentStyle (entityID, elementIndex, value);
+				// elementIndex here is the Edge index and not a cell or tile index.  The following call
+				// checks the type of "value" which in this case is an EdgeStyle and then knows to call ApplyEdgeSegmentFootprint().
+				// NOTE: WARNING: I think we know longer ApplyFootprint() from here.  The footprint is dynamically calculated based on
+				// the adjacent edges.  Further, a client side script shouldn't be setting footprints right?
+// TEMP: commented out footprint apply here while we test placement of walls				EntityAPI.CellMap_ApplyFootprint (entityID, elementIndex, value);
+				break;
+			}
+			case "wall interior texture":
+				break;
+			case "wall exterior texture":
+				break;
+			case "physical properties":
+				break;
+			
+		}
+	}
+	
+	private string GetModelName (string entityID, string description, uint id)
+	{
+		return "$_" + entityID + "_Model_" + description + "_" + id.ToString(); 
+	}
+	
+	
+	#region Build statistics
+		// todo: rather than this specific OnCustomPropertyChanged, why not a 
+	//       specific handler for a specific property change? It can be similar to how we handle
+	//       rules validation
+	public static void OnCustomPropertyChanged (string entityID, int index)
+	{
+	
+		
+		// when a build property changes, run BuildUpdate() to recompute statS?
+		// Not exactly.  We instead set a flag that the "stats" are dirty 
+		// this way future property changes dont result in multiple calls to update stats.
+		// 
+		switch (index)
+		{
+			case 9:
+			case 10:
+			case 11:
+			case 12:
+				//EntityAPI.SetCustomFlagValue (entityID, (uint)UserConstants.CustomFlags.CF_STATS_DIRTY ,true);
+				break;
+			default:
+				break;
+		}
+	}
+	
+	// Updates the build statistics
+	private static void UpdateStats (string entityID) 
+	{
+
+		
+		// todo: condense into a single call
+		// EntityAPI.SetCustomPropertyValue (entityID, "output", output);
+		// EntityAPI.SetCustomPropertyValue (entityID, "cost", cost);
+		// EntityAPI.SetCustomPropertyValue (entityID, "weight", weight);
+		// EntityAPI.SetCustomPropertyValue (entityID, "volume", volume);
+		// EntityAPI.SetCustomPropertyValue (entityID, "fuel usage", fuel);
+		// EntityAPI.SetCustomPropertyValue (entityID, "surfacearea", surfacearea);
+		// EntityAPI.SetCustomPropertyValue (entityID, "hitpoints", hitpoints);
+		
+		EntityAPI.SetCustomFlagValue (entityID, (uint)UserConstants.CustomFlags.CF_STATS_DIRTY ,false);
+	}	
+	#endregion
+	//http://8bit.neverdaunt.com/wiki/index.php?title=Tronics_(Guide)
+	// todo: when a child is being added, that child can be validated here
+	//       and if that child has a hardpoint, we can register it too.
+	//       this way, the hardpoint is mostly agnostic.  The only thing
+	//       we then need is a way to have hud render them on the exterior
+	// 0) keep in mind that our hardpoints are for ship editing, not for
+	//    generic editor stuff.  In this way, if we say hardpoints must be registered
+	//    by the interior script of the vehicle when a hardpoint yielding component is added
+	//    then so be it.  
+	//    - the only question is, how do we make it agnostic for the client to display 
+	//      a hud icon where we can connect a thruster entity to.  Again, we should remember
+	//      this part of the editor should be for user game play simplicity, not for general purpose 
+	//      editor.
+	//1) add the exterior view to our floorplan editor
+	//   - it is now generally the visual ship studio or ship design studio
+	//2) allow for interior components with a "hardpoint" category custom property
+	//   a) perhaps multiple hardpoints can be created and they can be interior or exterior
+	//   b) if a "hardpoint" is a type of input/output "tab" that exists and is normally invisible
+	//      - if a data-in field exists, then in a design mode that allows us to wire two nodes together
+	//      such that turning a field "on" results in that value being transmitted to the "on/off" field
+	//      of target entity... allowing that entity to set it's "script_active" flag to true so it responds
+	//      to update() perhaps...
+	//       - these data fields can be seen visually like a flow chart editor where in/out fields can be represented at runtime by various primitive types. (just as n8 does)
+	// 3)perhaps when the interior receives a hardpoint enabled component, it registers that will the
+	//   exterior vehicle which can create a middle-man custom hardpoint property that points to the interior
+	//   one.  This way when editng the exterior, we'll see all the hardpoints of the Vehicle and since thoes hardpoints are pointers to interior hardpoints (or input/output routes)
+	//     - this ends up being very much like tronics.
+	
+	//   to be detected on addchild to interior and then for interior to register that
+	//   (perhaps later we can group all component types into seperate buckets)
+	//   (for fast querying)
+	// 4) interior connector points can be used to plug into various grids such as plumbing, vents
+	//    electrical, fuel, etc.  this way we cna build seperate electrical grids for redundancy.
+	// 5) above we think in terms of ship design studio
+	//    HOWEVER, i think a "route" could be something that we can manage as "unwired and wires" where the uniwired ones are the ones we look to matchup when new entites are added and where the wired ones are managed directly by the entities they are attached to.
+	// in other words, these routes we can add to the list of routes assigned to an entity and each entity when a property changes or when a even occurs, it can check to see if there is a route assigned to that field and then it can invoke it.  
+	// this could be perhaps similar to how we do rules checking.  business rules checking because there the rules are associated directly with the entity.
+	// the main difference is, id like for our routes to work with both intrinsic properties and cusotm.
+	#region Run-time
+	public static void OnUpdate (string entityID, double elapsedSeconds)
+	{
+		// NOTE: if simulation is paused, graphics can still render, but this
+		//       OnUpdate() will not be called.
+		// NOTE: If simulation is NOT paused, this OnUpdate() will be called
+		//       as many times per entity to satisfy fixed timestep settings!
+		//       Thus it is important to keep this function optimized!
+		// NOTE: We shouldn't be too afraid of complex entities like engines & hardpoints 
+		//       for exterior thrusters because even though this does represent 
+		//       relatively complex ship design, it is still a very modest, and
+		//       controlled, and contained way of extending the game as a platform.
+		//       It's like in Tribes.  Ultimately the modding was still grounded
+		//       by the rules of the system.  The system rules were immuteable.
+		//       That is the most important thing to remember about this approach.  
+		//       The system rules must make sense, they must contrain freedom,
+		//       or else it ends up being like Unity3d.  
+		
+		// TODO: where in code is CF_STATS_DIRTY flag set to true when a build variable has been changed?
+		if (EntityAPI.GetCustomFlagValue (entityID, (uint)UserConstants.CustomFlags.CF_STATS_DIRTY) == true)
+		{
+			System.Diagnostics.Debug.WriteLine ("Updating Stats");
+			UpdateStats (entityID);
+			System.Diagnostics.Debug.WriteLine ("Updating Stats - COMPLETED.");
+		}
+		
+		// get hashcodes array for data layers
+		
+		// if our floors data layer has changed, update the mesh which visually represents the floor
+		// - update collapsed/uncollapsed
+		// - update UVs based on the atlas index
+		
+	}
+	
+	
+	public static void OnRender (string contextID, string entityID, string[] modelIDs, string shaderID, 
+								 Vector3d cameraSpacePosition, Vector3d[] cameraSpaceBoundingBoxVertices, double elapsedSeconds)
+	{
+	
+	}
+	
+	// "result" param contains things such as impactPoint, normalVector, speed, etc
+	//public static void OnCollision(string entityID, string objectID, CollisionResult result}
+	//{
+		// So, question is, do we add a type of Collider object to our Entity as a "component" or child node? Just as we
+		// have other child nodes like a Script, a Model, etc.  Do we have to configure that like a Prefab and Save it? And then 
+		// assume the script author knows of the existance of the Collider and can provide appropriate methods in the script that the Entity.Collider will call.
+
+		// https://docs.unity3d.com/ScriptReference/Collision2D.html
+		// https://docs.unity3d.com/ScriptReference/Collider2D.html
+		// https://docs.unity3d.com/ScriptReference/Collider.OnCollisionEnter.html
+	//	// we don't yet have any flags for what this Entity can collide with, whether it should behave (also) as a 2DTriggerVolume, a 3DTriggerVolume, Sensor, Obstacle, etc.
+	
+	//}
+	#endregion
+	
+}

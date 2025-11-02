@@ -1,0 +1,1091 @@
+using System;
+using Game01;
+using Game01.GameObjects;
+using Keystone.Types;
+
+using KeyCommon.Simulation;
+using KeyCommon.Traversal;
+
+using KeyScript;
+using KeyScript.Interfaces;
+using KeyScript.Delegates;
+using KeyScript.Host;
+using KeyScript.Rules;
+
+using Settings;
+using Antlr4.StringTemplate;
+
+public class Carrier_Ship : BaseScript
+{
+	public static void Initialize(string scriptID)
+	{
+		string category = "public properties";
+		Settings.PropertySpec[] properties = new Settings.PropertySpec[9];
+		properties[0] = new PropertySpec("description", typeof(string).Name, category, (object)"Carrier");
+		
+		category = "statistics";
+		properties[1] = new PropertySpec("maxspeed", typeof(double).Name, category, 0);
+        properties[2] = new PropertySpec("maxforce", typeof(double).Name, category, 0);
+		properties[3] = new PropertySpec("weight", typeof(double).Name, category, 0);
+        properties[4] = new PropertySpec("cost", typeof(double).Name, category, 0);
+		properties[5] = new PropertySpec("volume", typeof(double).Name, category, 0);
+		properties[6] = new PropertySpec("surfacearea", typeof(double).Name, category, 0);
+		properties[7] = new PropertySpec("hitpoints", typeof(int).Name, category, 500);
+		
+		category = "build";
+				// todo: minimum tech level defined in rule  
+				
+		category = "private variables"; // not persisted, not visible in quicklook or domainobject plugin
+
+		category= "operations";
+		
+		category = "production";
+		// values are not serialized
+		// create array of products produced by this component.  
+		Production[] production = new Production[1];
+		
+		// NOTE: production 0 - 5 are for thrust and are created in InitializeEntity()
+		production[0].ProductID = (uint)UserConstants.Product.VisibleLight;
+		production[0].UnitCount = -1; // infinite production can be distributed to all consumers with no regard for priority since there is enough to supply all relevant consumers.
+		production[0].DistributionMode = DistributionType.Region; 
+		// our FilterTest just needs to fit the signature
+		production[0].DistributionFilterFunc = VisibleLightDistributionFilter;
+		
+		properties[8] = new PropertySpec("production", typeof(Production[]).Name, category, production);
+		properties[8].IsSerializable = false;
+		
+		// list of products consumed by this component
+		//properties[10] = new PropertySpec("consumption", typeof(uint[]).Name, category, new uint[]{(uint)UserConstants.Product.Gravity});
+		//properties[10].IsSerializable = false;
+		
+		// add the properties to the entity's domain object
+		EntityAPI.AddCustomProperties(scriptID, properties);
+		
+		// create a test rule using a Delegate rule
+		//EntityAPI.AddRule (
+		//	scriptID, "description", new SimpleRule(1, delegate {return ((string)properties[0].DefaultValue).Length != 0; }));
+			
+		EntityAPI.AddRule (scriptID, "navpoints", new SimpleRule (1, Rule_WaypointChanged));
+		EntityAPI.AddRule (scriptID, "description", new SimpleRule(1, Rule_Description));
+		EntityAPI.AddRule (scriptID, "hitpoints", new SimpleRule(1, Rule_HitpointsChanged));
+		
+		
+		// create a test rule that uses the Validate script method below if no delegate Rule exists
+		//EntityAPI.AddRule (); // todo: maybe this version is not necessary?
+		
+		// queryable mods
+		// assign values to specific "mod" properties that the celledregion will query
+		// to determine what modifications this domainobject will have on the parent.
+		// so for a celledregion parent, maybe it modifies the map layer
+		// for some other entity, maybe it modifies a crew members skill level.
+		
+		// so celledRegion can query the layout of this entity
+		// it can query the allowed places it can be set/orientation <-- there's no need to put that in the DomainObject explicitly
+		// 
+		
+		// force production handler runs every physics tick
+//		EntityAPI.AssignProductionHandler(scriptID, (uint)UserConstants.Product.Thrust, Force_Production_Update);
+		
+		// regular production handler runs at seperate hz (possibly once per frame)
+		EntityAPI.AssignProductionHandler(scriptID, (uint)UserConstants.Product.VisibleLight, Production_VisibleLight);
+		
+		// add consumptions
+
+		// todo: if thrusters are built in, we need to have Consumption_Power and/or Consumption_Fuel
+		EntityAPI.CreateConsumption(scriptID, "gravity", (uint)UserConstants.Product.Gravity, Consumption_Gravity);
+		EntityAPI.CreateConsumption(scriptID, "thrust", (uint)UserConstants.Product.Thrust, Consumption_Thrust);
+		EntityAPI.CreateConsumption(scriptID, "angularthrust", (uint)UserConstants.Product.Angular_Thrust, Consumption_Thrust);
+		EntityAPI.CreateConsumption(scriptID, "microwaves", (uint)UserConstants.Product.Microwaves, Consumption_Microwaves);
+		
+		// create any stores.  Is this necessary?  The idea is that most production is emitted and used
+		// or lost.  But a store defines a place where production can be stored and then used later.
+		// A battery for example doesn't produce, but it can store production but really that just makes it
+		// a consumer.  It's "Production" is then limited to the supply it has on hand... it cant make more on it's own.
+		// but i suppose we dont need a special method for this, we can just have the "store" as a customproperty???
+		//EntityAPI.CreateStore(scriptID, productID, capacity);
+	}
+	
+	public static void InitializeEntity(string entityID)
+	{
+		// set stats flag as dirty so OnUpdate() will call UpdateStats()
+		EntityAPI.SetCustomFlagValue (entityID, (uint)UserConstants.CustomFlags.CF_STATS_DIRTY ,true);
+	
+		// todo: actually, shouldn't the following belong to "crew_station_helm.css"?
+		//       Well, helm already has heading and destination.  The "purpose" of those vars
+		//       are what is unique and should be handled by a higher up logic. Or higher up
+		//       in the sequence of the helm behavior tree.
+		KeyCommon.Data.UserData data = EntityAPI.GetAIBlackboardData(entityID);
+		if (data == null) data = new KeyCommon.Data.UserData();
+			
+		data.SetBool("destroyed", false);      // used in hitpoints change handler 
+		data.SetDouble("destroyed_elapsed", 0);
+		data.SetDouble("destroyed_duration", 15d);
+		data.SetBool ("ai_patrolling", false); // used by behavior tree	
+		
+		EntityAPI.SetAIBlackboardData(entityID, data);
+		
+		// TODO: should these thrusters be Entity's like our main engines?
+		
+		// init source of production to this entity.
+		// NOTE: there are 6 axis of thrust +x/-x, +z/-z, +y/-y
+		// todo: here we are assuming thrusters as inherent to the ship exterior, but what if we decide
+		//       to have seperate thruster entities attached instead?
+		// Production[] production = (Production[])EntityAPI.GetCustomPropertyValue (entityID, "production");
+		// for (int i = 0; i < 6; i++)
+		// {
+			// production[i].SourceEntityID = entityID; // ourself
+			// production[i].ProductID = (uint)UserConstants.Product.Thrust;
+			// production[i].UnitCount = 1; 
+			// production[i].UnitValue = Vector3d.Zero(); 
+			// production[i].DistributionMode = DistributionType.Self; 
+		// }
+		
+		// EntityAPI.RegisterProduction(entityID, (uint)UserConstants.Product.Thrust);
+		
+		// Entity FLAGS (as opposed to Component flags) should be set here as they are per entity
+		EntityAPI.SetEntityFlag(entityID, (uint)KeyCommon.Flags.EntityAttributes.ExplicitEvents, true);
+		
+		// If IsPlayer (controlled vehicle), call method
+		// Maybe we poll the EntityAttached method in Scene.EntityAttached for Entity that isPlayer 
+		// and then invoke a delegate to EXE to attach that entity to appmain.player and available to all workspaces
+
+		// TODO: if we're loading the prefab into a simple single region scene, then there is no DB.
+		//       Do we need to create a DB for simple scenes too?  Or we check if in "game mode" and 
+		//       skip db related access if we're in Designer mode.
+		// TODO: I don't think we want to disable the script in those situations.
+		
+		// assign the records to our local entity since for performance reasons we 
+		// cannot query database every frame
+		// TODO: this throws an exception when InitializeEntity() is called from Single Region scene
+		//       because there is no database! I could perhaps use a try/catch block :/
+		// try 
+		// {
+			// NavPoint[] tmpNavPoints = DatabaseAPI.GetWaypointRecords(entityID);
+			// EntityAPI.SetCustomPropertyValue(entityID, "navpoints", tmpNavPoints);
+		// }
+		// catch (Exception ex)
+		// {
+			// System.Diagnostics.Debug.WriteLine("Ship.InitializeEntity() - No navpoints found" + ex.Message);
+		// }
+	}
+	
+	public static void UnInitializeEntity(string entityID)
+	{
+		EntityAPI.UnRegisterProduction(entityID, (uint)UserConstants.Product.Thrust);
+	}
+	
+	public static object RegisterChild(string entityID, string childID)
+	{
+		// make modifications 
+
+		return entityID;
+	}
+	
+	public static object UnRegisterChild (string entityID, string childID)
+	{
+
+		return entityID;
+
+	}
+	
+	public static object OnAddedToParent(string entityID, string parentID)
+	{
+		// make modifications 
+
+		return entityID;
+	}
+	
+	public static object OnRemovedFromParent (string entityID, string parentID)
+	{
+
+		return entityID;
+	}
+	
+	
+	#region GUI // http://www.antlr.org/wiki/display/ST/Examples
+	public static string GUILayout_GetMarkup (string entityID, PickResultsBase pick)
+	{
+		
+		string workspaceName = GameAPI.Workspace_GetActiveName();
+		switch (workspaceName)
+		{
+			case "Navigation":
+				return GUILayout_GetHelmMarkup(entityID);
+				
+			case "Tactical":
+				return GUILayout_GetTacticalMarkup(entityID);
+			case "Engineering":
+				//engineering can have a single html with tabs for power use/allocation, damage control, 
+				return null;
+			default:
+				return null;
+		}
+		
+		object propertyValue = EntityAPI.GetCustomPropertyValue(entityID, "description");
+		string name = null;
+		if (propertyValue != null)
+			name = (string)propertyValue;
+			
+
+		
+		string basePath = GameAPI.Path_GetDataPath();
+		
+		// // string baseDir = System.IO.Path.Combine (basePath, "\\templates");
+		// //NOTE: must use RawGroupDirectory if we just want straight template text with no type definition info required
+		// TemplateRawGroupDirectory group = new TemplateRawGroupDirectory(@"D:\dev\c#\KeystoneGameBlocks\Data\mods\common\layouts\", System.Text.Encoding.ASCII, '$', '$');
+	// //    group.LoadGroupFile(prefix, @"D:\dev\c#\KeystoneGameBlocks\Data\mods\common\layouts\group_components.stg"); 
+	// //    group.LoadTemplateFile(prefix, "component_page.st");
+	// //    group.LoadTemplateFile(prefix, "power_gen_body.st");
+	// //    group.LoadTemplateFile(prefix, "power_gen_consumers.st");
+	// //    group.LoadTemplateFile(prefix, "power_gen_consumers_row.st");
+
+		// // note: the problem with TemplateGroup (as opposed to GroupDirectory) is you cannot supply
+		// // names to the templates you load.  Names are always based on a filename.
+		// //TemplateGroup group = new TemplateGroup('$', '$');
+		// //group.LoadGroupFile ("testgroup", @"D:\dev\c#\KeystoneGameBlocks\Data\mods\common\layouts"); 
+		
+		// // these effectively re-read the file everytime and allows runtime modification
+		// Template pageST = group.GetInstanceOf("component_page");
+		// Template bodyST = group.GetInstanceOf("power_gen_body");
+		// Template consumerListST = group.GetInstanceOf("power_gen_consumers");
+
+		// // .Add cannot be done on compiled templates.  CompiledTemplates are effectively frozen so it makes sense!
+		// bodyST.Add("componenttypename", name);
+		// pageST.Add("title", "Component Page");
+		// pageST.Add("body", bodyST);
+		
+		// ConsumerTest[] consumerArray = null;
+		// // get list of consumer device IDs (how do i differentiate between consumption of power
+		// // versus consumption of explosion heat/concussion damage when the reactor is destroyed?
+		// // well, that type of consumer is never added as a "linked" consumer.  Consumption of damage
+		// // and such is done through Simulation and scripted production and consumption methods for those products.
+		// object tmp = EntityAPI.GetCustomPropertyValue (entityID, "production");
+		// if (tmp != null)
+		// {
+			// Production[] production = (Production[])tmp;
+			// int productCount = production.Length;
+			// if (productCount > 0)
+			// { 
+				// for (int i = 0; i < productCount; i++)
+				// {
+					// int deviceCount = 0;
+					// if (production[i].Consumers == null)
+						// continue;
+						
+					// deviceCount = production[i].Consumers.Length;
+						
+					// consumerArray = new ConsumerTest[deviceCount];	
+					
+					// // power consuming devices
+					// double totalLoad = 0.0d;
+					// for (int j = 0; j < deviceCount; j++)
+					// {	
+						// ConsumerTest ct = new ConsumerTest();
+     					// string consumerID = production[i].Consumers[j];
+						// ct.ID = consumerID;				
+
+						// tmp = EntityAPI.GetCustomPropertyValue (consumerID, "power_reqt");
+						// ct.Usage = tmp != null ? (double)tmp : 0f;
+						// totalLoad+= ct.Usage;
+						// // for reactor it regulates reaction, for weapons it regulates the minimum level 
+						// // of power before firng again
+						// // if value = -1 or null then regulator is N/A for this  device
+						// tmp = EntityAPI.GetCustomPropertyValue (consumerID, "regulator");
+						// ct.Regulator =  tmp != null ? (float)tmp * 100f : 100f;   
+						// //ct.T1 = 						
+						// tmp = EntityAPI.GetCustomPropertyValue (consumerID, "breaker");
+						// ct.Breaker = tmp != null ? (bool)tmp : true; 
+						// consumerArray[j] = ct;
+					// }
+					// consumerListST.Add("consumers", consumerArray);
+					
+					// tmp = EntityAPI.GetCustomPropertyValue (entityID, "output");
+					// double powerOutput = (double)tmp;
+					// string powerStatus = totalLoad.ToString() + "kW\\" + powerOutput.ToString() + "kW";
+					// bodyST.Add("poweruse_over_powergenerated", powerStatus); 
+				// }
+			// }                                                                          
+		// }
+		
+		
+		// bodyST.Add("consumertable", consumerListST);
+		
+		return ""; // pageST.Render();		
+	}
+	
+	private struct WaypointRowItem
+	{
+		public int Index;
+		public string Command;
+		public string Type;
+		public double OrbitalRadius;
+		public string Delete;
+		public string MoveUp;
+		public string MoveDown;
+	}
+	private static string GUILayout_GetHelmMarkup(string entityID)
+	{
+		string basePath = GameAPI.Path_GetDataPath();
+		
+		//NOTE: must use RawGroupDirectory if we just want straight template text with no type definition info required
+		TemplateRawGroupDirectory group = new TemplateRawGroupDirectory(System.IO.Path.Combine(basePath, @"mods\common\layouts\"), System.Text.Encoding.ASCII, '$', '$');
+		
+		Template pageST = group.GetInstanceOf("component_page");
+		Template helmST = group.GetInstanceOf("vehicle_helm_body");
+		
+		
+		NavPoint[] navpoints = DatabaseAPI.GetWaypointRecords(entityID);	
+		
+			
+		//var waypointsArray = new[] { 
+		//	new { Index = "0", Command = "Translate", Type = "--", OrbitalRadius = "1", Delete = "", MoveUp = "&#9650;", MoveDown = "&#9660;" }, 
+		//	new { Index = "1", Command = "Orbit", Type = "--", OrbitalRadius = "1", Delete = "", MoveUp = "&#9650;", MoveDown = "&#9660;" }
+		//};
+		
+		var waypointsArray = new WaypointRowItem[2];
+		waypointsArray[0].Index = 0;
+		waypointsArray[0].Command = "Translate";
+		waypointsArray[0].Type = "--";
+		waypointsArray[0].OrbitalRadius = 1;
+		waypointsArray[0].Delete = "";
+		waypointsArray[0].MoveUp = "&#9650;";
+		waypointsArray[0].MoveDown = "&#9660;";
+		
+		waypointsArray[1].Index = 1;
+		waypointsArray[1].Command = "Orbit";
+		waypointsArray[1].Type = "--";
+		waypointsArray[1].OrbitalRadius = 1;
+		waypointsArray[1].Delete = "";
+		waypointsArray[1].MoveUp = "&#9650;";
+		waypointsArray[1].MoveDown = "&#9660;";
+		
+		Template waypointsTableST = group.GetInstanceOf("waypoints_table");
+		waypointsTableST.Add ("waypoints", waypointsArray);
+		
+		helmST.Add ("waypoints", waypointsTableST);
+		
+		pageST.Add("body", helmST);
+		
+		return pageST.Render();
+	}	
+	
+	private static string GUILayout_GetTacticalMarkup (string entityID)
+	{
+		string basePath = GameAPI.Path_GetDataPath();
+		
+		//NOTE: must use RawGroupDirectory if we just want straight template text with no type definition info required
+		TemplateRawGroupDirectory group = new TemplateRawGroupDirectory(System.IO.Path.Combine(basePath, @"mods\common\layouts\"), System.Text.Encoding.ASCII, '$', '$');
+		
+		Template pageST = group.GetInstanceOf("component_page");
+		Template tacticalST = group.GetInstanceOf("vehicle_tactical_body");
+		
+		// helm controls (heading, engines on/off)
+		// contacts list?
+		// tasks?
+		
+		pageST.Add("body", tacticalST);
+		return pageST.Render();
+		//
+		
+	}
+	
+	// <summary>
+	// Handler for all link clicks within the layout.
+	// </summary>
+	// <param name="entityID"></param>
+	// <param name="name">Name of specific button that triggered the event.</param>
+	public static void GUILayout_LinkClick(string entityID, string name)
+	{
+		switch (name)
+		{
+			case "engines_toggle":
+				// first 4 child entities of the Vehicle are our engines
+				// we've given them the friendly names of engine0, engine1, engine2, engine3
+				
+				
+				System.Diagnostics.Debug.WriteLine("GUILayout_LinkClick() - '" + name + "'");
+				break;
+			case "resume_waypoint_following":
+			
+			
+				System.Diagnostics.Debug.WriteLine("GUILayout_LinkClick() - '" + name + "'");
+				break;
+			case "addwaypoint":
+				NavPoint[] navPoints = DatabaseAPI.GetWaypointRecords(entityID);
+				
+				int length = 0;
+				if (navPoints != null)
+					length = navPoints.Length;
+				
+				NavPoint[] tmpNavPoints = new NavPoint[++length];
+
+				// array copy
+				for (int i = 0; i < navPoints.Length; i++)
+					tmpNavPoints[i] = navPoints[i];
+								
+				// append new waypoint
+				string regionID = null;
+				Vector3d position = Vector3d.Zero();
+				
+				if (tmpNavPoints.Length > 1)
+				{
+					regionID = tmpNavPoints[length - 2].RegionID;
+					position = tmpNavPoints[length - 2].Position;
+				}
+				else 
+				{
+					regionID = EntityAPI.GetEntityRegionID (entityID);
+					position = EntityAPI.GetPositionRegionSpace (entityID);
+				}
+				
+				// TODO: compute a position that doesn't overlap any existing waypoints
+				//       but i think this depends on which zoom level we are on
+				//       (eg galaxy, singlesystem, planetary) because they may overlap in 
+				//       one view but not the others.  What if we tied the new waypoint
+				//       to the mouse such that when user clicks it gets placed? This way
+				//       we dont need to compute a position
+				tmpNavPoints[length - 1] = new NavPoint(entityID, regionID, position);
+				
+				
+				DatabaseAPI.CreateWaypointRecord(entityID, tmpNavPoints[length - 1]);
+				
+				EntityAPI.SetCustomPropertyValue(entityID, "navpoints", tmpNavPoints);
+				System.Diagnostics.Debug.WriteLine("GUILayout_LinkClick() - '" + name + "'");
+				break;
+				
+			default:
+				System.Diagnostics.Debug.WriteLine("GUILayout_LinkClick() - Unexpected link '" + name + "'");
+				break;
+		}
+	}
+	
+	// <summary>
+	// Handler for all button clicks within the layout.
+	// </summary>
+	// <param name="entityID"></param>
+	// <param name="name">Name of specific button that triggered the event.</param>
+	public static void GUILayout_ButtonClick(string entityID, string name)
+	{
+		System.Diagnostics.Debug.WriteLine("GUILayout_ButtonClick() - '" + name + "'");
+
+		switch (name)
+		{
+			//case "addwaypoint":
+			//	System.Diagnostics.Debug.WriteLine("GUILayout_ButtonClick() - '" + name + "'");
+
+			//	break;
+			default:
+				System.Diagnostics.Debug.WriteLine("GUILayout_ButtonClick() - Unexpected button '" + name + "'");
+				break;
+		}
+	}
+
+	// <summary>
+	// Handler for all checkbox clicks within the layout.
+	// </summary>
+	// <param name="entityID"></param>
+	// <param name="name">Name of specific button that triggered the event.</param>
+	public static void GUILayout_CheckBoxClick(string entityID, string name)
+	{
+		System.Diagnostics.Debug.WriteLine("GUILayout_CheckBoxClick() - '" + name + "'");
+
+		switch (name)
+		{
+			default:
+				System.Diagnostics.Debug.WriteLine("GUILayout_CheckBoxClick() - Unexpected checkbox '" + name + "'");
+				break;
+		}
+	}
+	
+	// <summary>
+	// Handler for all textbox clicks within the layout.
+	// </summary>
+	// <param name="entityID"></param>
+	// <param name="name">Name of specific button that triggered the event.</param>
+	public static void GUILayout_TextBoxClick(string entityID, string name)
+	{
+		System.Diagnostics.Debug.WriteLine("GUILayout_TextBoxClick() - '" + name + "'");
+
+		switch (name)
+		{
+			default:
+				System.Diagnostics.Debug.WriteLine("GUILayout_TextBoxClick() - Unexpected textbox '" + name + "'");
+				break;
+		}
+	}
+	
+	// <summary>
+	// Handler for all textbox keypresses within the layout.
+	// </summary>
+	// <param name="entityID"></param>
+	// <param name="name">Name of specific button that triggered the event.</param>
+	public static void GUILayout_TextBoxKeyPress(string entityID, string name)
+	{
+		System.Diagnostics.Debug.WriteLine("GUILayout_TextBoxKeyPress() - '" + name + "'");
+
+		switch (name)
+		{
+			default:
+				System.Diagnostics.Debug.WriteLine("GUILayout_TextBoxKeyPress() - Unexpected textbox '" + name + "'");
+				break;
+		}
+	}	
+	#endregion
+	
+	#region Rules
+	private static bool Rule_Description(string entityID, object[] args)
+	{
+		// we also get the value from the args
+		string description = (string)args[0];  // we know for property rules the value is the first and only arg
+		
+		System.Diagnostics.Debug.WriteLine ("Running rule 'Description'.  Testing value '" + description + "'");
+		return !string.IsNullOrEmpty(description);		
+	}	
+	
+	
+	private static bool Rule_HitpointsChanged(string entityID, object[] args)
+	{
+		// we also get the value from the args
+		int hitpoints = (int)args[0];  // we know for property rules the value is the first and only arg
+		
+		if (hitpoints <= 0)
+		{
+			KeyCommon.Data.UserData data = EntityAPI.GetAIBlackboardData(entityID);
+			if (data == null) return false;
+			
+			bool isDestroyed = data.GetBool("destroyed");
+			if (!isDestroyed) 
+			{
+				// reactor core breach.  Note: we can still draw blastwaves and such for missiles that were fired before the ship was destroyed
+				VisualFXAPI.SpawnParticleSystem("", "explosion", entityID, new Vector3d(0,0,0), new Vector3d(0,0,0));
+				double duration = VisualFXAPI.GetParticleDuration("explosion");
+				data.SetDouble("destroyed_duration", duration);
+			}
+			
+			data.SetBool("destroyed", true);
+			
+		}
+		System.Diagnostics.Debug.WriteLine ("ship.Rule_HitpointsChanged() - Testing value '" + hitpoints.ToString() + "'");
+		return true;		
+	}	
+	
+	public static bool Rule_WaypointChanged (string entityID, object[] args)
+	{
+		System.Diagnostics.Debug.WriteLine ("Ship.Rule_WaypointChanged() - ");
+
+		// Here we need to update the waypoint's record for this entity.
+		// Should we do this in the Script or where else would we do it exactly?
+		// Only other place would be the FormMain.Commands.ProcessCompletedCommandQueue()
+		// TODO: we need an entityID here.  how else do we know which
+		//       entity this rule is relevant to?
+		
+		//	case "waypoints":
+		//		// DatabaseAPI.
+		//		break;
+		return true;
+	}
+	#endregion
+
+	#region PlacementTool related
+	public static uint QueryPlacementBrushType() {return (uint)UserConstants.BRUSH_TYPE.BRUSH_SINGLE_DROP;}	
+	#endregion
+	
+	#region Build statistics
+	// Updates the build statistics
+	public static void UpdateStats (string entityID)
+	{
+		// configuring the list of proeprty grid is no problem
+		// however what is a problem is configuring the list in some drop down.
+		// This must be client side, but then server side enforced in a rule validation delegate.
+		//
+		// We know that our propertySpec's have room for an event handler and I think that maybe we should 
+		// see if we can't trigger those events and then provide for a way for the Plugin/PropertyGrid
+		// to update a drop down list afterwards....
+		
+		// stats dirty flag can now be reset to false
+		EntityAPI.SetCustomFlagValue (entityID, (uint)UserConstants.CustomFlags.CF_STATS_DIRTY ,false);
+	}	
+	#endregion
+	
+	#region Run-time	
+	public static void OnUpdate (string entityID, double elapsedSeconds)
+	{
+		// TODO: How do we "Update()" at a specific frequency and not every render loop
+		//       FURTHERMORE, some logic updates we need to only update like every 1 second and
+		//       we may need to roundRobbin some of them for performance sake.
+		
+		// NOTE: if simulation is paused, graphics can still render, but this
+		//       OnUpdate() will not be called.
+		// NOTE: If simulation is NOT paused, this OnUpdate() will be called
+		//       as many times per entity to satisfy fixed timestep settings!
+		//       Thus it is important to keep this function optimized!
+		// NOTE: We shouldn't be too afraid of complex entities like engines & hardpoints 
+		//       for exterior thrusters because even though this does represent 
+		//       relatively complex ship design, it is still a very modest, and
+		//       controlled, and contained way of extending the game as a platform.
+		//       It's like in Tribes.  Ultimately the modding was still grounded
+		//       by the rules of the system.  The system rules were immuteable.
+		//       That is the most important thing to remember about this approach.  
+		//       The system rules must make sense, they must constrain freedom,
+		//       or else it ends up being like Unity3d.  
+		
+		//////////////////////////////////////////////////////////////
+		// SENSORS 
+		//////////////////////////////////////////////////////////////
+		
+		
+		//////////////////////////////////////////////////////////////
+		// TURRET 
+		//////////////////////////////////////////////////////////////
+		// todo: doesn't the turret's turret.css Update() get called for us?  And same with Helm.css which would be the crewstation
+		
+		// todo: don't we need to get the turretID first, what if there isn't a turret?
+		//       well, modders would need different ship.css for that. They are expected to know
+		//       what their ships are composed of.  Same goes for the AI crew station operators...
+		UpdateTurret(entityID, elapsedSeconds);
+		
+		// object property = EntityAPI.GetCustomPropertyValue(entityID, "beamweaponstate");
+		
+		// are the barrels rotated along the x axis seperately? 
+		
+		// do we have a "fire" command/order?  What about tasks and orders? Where do they fit in?
+		
+		// are we in cooldown?  if not, we can fire and then update "cooldown" var
+		
+		// do we have damage accuracy modifier
+		
+		// do we have power capacitors charged or ammunition loaded (this is seperate from turret, this is "weapon" condition)
+		
+		// what about script for turret itself? and the weapon? what functions do they serve?
+		//	- well, scripts can handle visual update of tracking rotation, whereas the only thing the server cares about
+		//    is the time to execute weapons lock and whether its already a weapons lock.
+		// how do we sychrnoize server and client if we're computing via script? For starters, there needs to be a fixed frequency update().
+		
+		// how are "orders" or "tasks" taken from the CrewStation and used to update target Entity components and SubAssemblies like a Turret?
+		
+		
+	}
+	
+	private static void UpdateTurret(string entityID, double elapsedSeconds)
+	{
+		// todo: there should be two types of update checks... 
+		//       1) position and rotation animation
+		//       2) logic regarding aquiring a new target should be at a much lower and fixed frequency than every frame
+		
+		// todo: what is the turretID and what if we have multiple?
+		
+		// todo: get the parent vehicle's rotation
+		
+		// todo: we need to get the targets position and rotation if we wish to find a rotation matrix to get our turrets aimed at it or specific subassemblies/structures.
+		
+		// adjust the accuracy of the resulting desired rotation by a modifier including one based on the operator or software running the Tactical crew station.
+		
+		// todo: does the turret already have a state? 
+		//       - has the stage changed?  eg. new "task" or "order"?
+		
+		// todo: should / can we use a Behavior for all of this?
+		
+		// is the turret functional?
+		
+		// do we have power?
+		
+		// do we have a target?
+		
+		// if we previously had a target and currently do not, return to default rotation
+		
+		// grab the entities representing the turret and barrels
+		
+		// get existing y rotation of the turret and x rotation of the barrels 
+		
+		// IMPORTANT: The y rotation and x rotation need to take into account the parent hull orientation
+	}
+	
+	public static Production[] Production_VisibleLight (string entityID, double elapsedSeconds)
+	{
+		// // todo: do we need a different production handler for every type of production?
+		// // todo: afterall, the production Hz may be different for various productIDs. 
+		// // todo: what if we don't want to update production at the same rate for every entity and for every type of product within that Entity?
+		
+		// const float lightSignature = 0.5f;
+
+		Production[] production; // = (Production[])EntityAPI.GetCustomPropertyValue (entityID, "production");
+	
+	// // todo: how do we prioritize consumption of limited resource such as power? we may want weapons at the expense of engines for example
+	// // todo: this could be ProductValue instead of EmissionValue?
+		// EmissionValue value;
+		// value.Strength = lightSignature;
+		// value.Time = 0;
+		// value.Position = EntityAPI.GetPosition(entityID);
+		// // produce a radar signature regardless of whether there are any radar sensors active.
+		// // NOTE: A radar sensor is an active scanner that emits microwaves which can also be detected
+		// // However we do not model the 2 way trip.  We only model a constant emission as if the vehicles
+		// // were always emitting radar signature like a scent.  This is not realistic but it's completely 
+		// // imperceptible in game.  
+		// // Why is this superior to having every radar emit to every vehicle and determining the reflection
+		// // then emitting a return signature and determining which sensors detect it?  Well it's a 2 way trip
+		// // which is realistic, however it offers nothing for a simulation.  That is, modeling it as just one way 
+		// // originating from the signature emitting vehicle allows for equal realism modeling with half the cpu.
+		// production[6].SourceEntityID = entityID;
+		// production[6].UnitValue = value;  
+
+		production = null;
+		return production;
+	}
+	
+	// OBSOLETE - engines and thrusters script now produce thrust and assign it to the vehicle.Force and vehicle.AngularForce
+	// public static Production[] Force_Production_Update (string entityID, double elapsedSeconds)
+	// {
+		// object property = EntityAPI.GetCustomPropertyValue(entityID, "helmstate");
+		// HelmState helm;
+		
+		// // if there is no helm, we cannot maneuver anywhere
+		// if (property == null) return null;
+		
+		// helm = (HelmState)property;
+		
+		// if (helm.EnabledThrusterCount == 0) return null; 
+		
+		
+		// //  - grab all available engines
+		// //    - mains are thrust
+		// //    - assume all axial thrusters for now are always available and free
+		// //    - we dont calculate burn times.  we enable/disable and provide burn throttle
+		// //    so that when close to where we want to be, we adjust the throttle needed based on the fixed time slice.
+		// //    and then we can enable/disable those engines.
+		
+		// // todo: here we should only produce for each if the ship's helm 
+		// // shows a particular thruster is enabled
+		// double thrust = 100;
+		// Production[] production = (Production[])EntityAPI.GetCustomPropertyValue (entityID, "production");
+		// production[0].UnitValue = thrust * Vector3d.Right(); // ThrusterDirection.RotatePositiveX; 
+		// production[1].UnitValue = thrust * -Vector3d.Right(); //ThrusterDirection.RotateNegativeX; 
+		// production[2].UnitValue = thrust * Vector3d.Up(); // ThrusterDirection.RotatePositiveY;
+		// production[3].UnitValue = thrust * -Vector3d.Up(); // ThrusterDirection.RotateNegativeY; 
+		// production[4].UnitValue = thrust * Vector3d.Forward(); // ThrusterDirection.RotatePositiveZ;
+		// production[5].UnitValue = thrust * -Vector3d.Forward(); // ThrusterDirection.RotateNegativeZ; 
+		
+		// return production;
+	// }
+	
+	
+	// Impulsive style maneuvers I think could just be done in Update()
+	// and thus done once per frame at some fixed Update() per frame (for non physics logic)
+	// such as 30x a second for starters?  30x is good to avoid overshooting our navpoints.
+	// This way we 
+
+	//		
+	// - MANEUVERS
+	// - orbital
+	//		- impulsive <- i think we should use this first.  This way we are computing
+	//                 our steering maneuver once and not updating every step interval.
+	// - deep-space maneuver
+	//	- evasive?
+	// - coasting
+	// - rendezvous to another craft
+	
+	// - http://en.wikipedia.org/wiki/Orbital_maneuver#Impulsive_maneuvers
+	//		- impuslive maneuvers perhaps can allow us to make steering decisions
+	//        without per time step?
+	// For a few space missions, such as those including a space rendezvous, high fidelity models of the trajectories are required to meet the mission goals. Calculating a "finite" burn requires a detailed model of the spacecraft and its thrusters. The most important of details include: mass, center of mass, moment of inertia, thruster positions, thrust vectors, thrust curves, specific impulse, thrust centroid offsets, and fuel consumption.
+	
+	
+	// Manuever Production?
+	// Helm logic seems like a strange mix of things
+	// - it does not just produce a steering force.  it's a logic that
+	//   will determine which engines to "fire" and at what throttle and for how long.
+	//   And that logic must be done in a fixed time step fashion.
+	// - so are these decisions made by the helm logic the same thing as
+	//   production?  And how are decision "products" consumed?
+	// - burn correction maneuvers
+
+	// NOTE: I think Craig Reynolds style Steering Behavior is good for cheap fighter AI
+	// or drones or otehr craft that have simplistic engine modeling.  Afterall, 
+	// Reynolds steering essentially combines AI and Physics.  But this is absolutely what 
+	// we do NOT want for our player commanded capitol ships.  We must have the logic
+	// for enabling/disabling the various thrusters as seperate from the thrust that
+	// is eventually produced and consumed.
+	//
+	// is steering logic a production that creates a product that it's own ship
+	// can consume?  the steering force?
+	//	- does it compute logic for performing burns on the thrusters available to it?
+	//    then those thrusters if enabled and according to the throttle and programmed
+	//    burn time, create thrust and consume fuel and such.
+	//
+	// In that way, production always occurs before consumption and thus before
+	// Consumption_Thrust for example
+	// Does Helm Logic have to produce a force at all?  If it is merely calculating which
+	// "motors" to turn on/off it is kind of like our steering library calc'ing the
+	// 
+	// OBSOLETE - Steering is ok for cheap FIGHTER craft AI or DRONES or MISSILES perhaps
+	// that have single engines that are always on and use thrust vectoring, but they are 
+	// NOT good for full blown ships.  So now I'm going to have our Helm logic
+	// select the next waypoint, 
+	// private Production ProduceSteeringForce(string entityID, double elapsedSeconds)
+	// {
+		// Vector3d value = Vector3d.Origin();
+		
+		// steeringForceProduct[0].SourceEntityID = entityID;
+		// steeringForceProduct[0].ProductID = (uint)UserConstants.Product.Thrust;
+		// steeringForceProduct[0].UnitValue = value;  
+		// steeringForceProduct[0].UnitCount = -1; // infinite production can be distributed to all consumers with no regard for priority since there is enough to supply all relevant consumers.
+		// steeringForceProduct[0].DistributionMode = DistributionType.Self; 
+		// // our FilterTest just needs to fit the signature
+		// steeringForceProduct[0].DistributionFilter = null;
+		
+		// return steeringForceProduct;
+	// }
+	
+	// todo: i will need entityID argument for DistributionFilter function signature
+	// returns TRUE if the entity passes the filter test and
+	// should be allowed to receive the product for consumption
+	private static bool VisibleLightDistributionFilter (Production production, string targetEntityID)
+	{
+		// A targetEntityID id is passed in and we must determine if that entity which consumes
+		// radar signatures (i.e. is a radar sensor) should be filtered or 
+		// This can be unintuitive at first glance because we are testing the targetEntityID which is a senor
+		// component against this ship's production of radar signature.
+		System.Diagnostics.Trace.WriteLine ("VisibleLightDistributionFilter");
+		// if this ship's ID matches the vehicle owner of the detector, return false
+		string vehicleID = production.SourceEntityID;
+		if (vehicleID == EntityAPI.GetOwnerID(targetEntityID)) return false;
+		
+		return true;
+	}
+	
+	public static Consumption[] Consumption_Gravity (string entityID, Production production, double elapsedSeconds)
+	{
+		Consumption[] result = new Consumption[1];
+		
+		// for this function, rather than script it we will call the API
+		double sourceEntityMass = (double)EntityAPI.GetCustomPropertyValue (production.SourceEntityID, "mass");
+		Vector3d force = (Vector3d)EntityAPI.GetPropertyValue (entityID, "force");
+		force += PhysicsAPI.Gravitation (entityID, production.SourceEntityID, sourceEntityMass, elapsedSeconds);
+		
+		// NOTE: force returned from Physics_Gravitation is already multiplied by elapsedSeconds
+		// todo: i think we should assign the force to the Consumption result in then allow
+		//        the Simulation.cs to send a command to the Client to change that property.
+		EntityAPI.SetPropertyValue (entityID, "force" , force);
+		
+		
+		result[0].ConsumerID = entityID; // the entity that is consuming a product
+        result[0].ProducerID = production.SourceEntityID; // todo: should production and consumption be handled server side and the Consumption "result" passed to the client? Simulation.cs should maybe be run on loopback server.
+        result[0].ProductID = production.ProductID;     // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer
+        
+		System.Diagnostics.Debug.WriteLine ("Ship.Consumption_Gravity()");
+		
+		Settings.PropertySpec[] properties = new Settings.PropertySpec[1];
+		properties[0] = new PropertySpec("force", typeof(double).Name, "private variables", force);
+		result[0].Properties = properties;
+		KeyCommon.Simulation.PropertyOperation[] operations = new  KeyCommon.Simulation.PropertyOperation[1];
+		operations[0] = KeyCommon.Simulation.PropertyOperation.Increment;
+		result[0].Operations = operations;
+		result[0].TargetID = entityID;
+		return result;
+	}
+
+	// todo: we should also consume "heat" "explosive" "kinetic" and other forces and return a result
+	// todo: to "consume" microwaves really just means to produce an emission of microwaves back to the
+	//       production.SourceEntityID.  I'm not sure how to do that.  
+	// todo: here we can modify the emission result based on distance, emissions strength,"stealth" and "size" factors.
+	//       we could update a property of pending production that will then result in a production of microwaves returned. But we don't want an infinite loop of emissions resulting in emissions resulting in more emissions.  Only the sensor should receive the returned emission.  The distribution should be only a single entity.
+	// todo: also detection of being hit with microwaves can be used to detect the source of those emissions
+	// todo: perhaps the consumption function can assign a property to the producer directly? It should still go through the server though.
+	// todo: Consumption could have an array of propertyspec and values to change as well as an array of the nodeIDs each property should be applied to.
+	// todo: to think of it another way, maybe we don't return Consumption at all, but changes.
+	public static Consumption[] Consumption_Microwaves (string entityID, Production production, double elapsedSeconds)
+	{
+		Consumption[] result = new Consumption[1];
+		// todo: determine consumption based on production values and consumption rules such as distance from producer as well as any modifiers to the Vehicles hull such as "stealth" options.
+		
+		result[0].Properties = null;
+		result[0].TargetID = null;
+		result[0].ConsumerID = entityID; // the entity that is consuming a product
+        result[0].ProducerID = production.SourceEntityID; // todo: should production and consumption be handled server side and the Consumption "result" passed to the client? Simulation.cs should maybe be run on loopback server.
+        result[0].ProductID = production.ProductID;     // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer
+        
+		string sourceOwnerID = EntityAPI.GetOwnerID(production.SourceEntityID);
+		if (entityID == sourceOwnerID) return result;
+		
+		string tacticalStationID = EntityAPI.FindDescendantByName (sourceOwnerID, "tactical");
+		if (string.IsNullOrEmpty(tacticalStationID)) 
+		{
+			System.Diagnostics.Debug.WriteLine("ship_ai_controlled.Consumption_Microwaves() - no tactical station found.");
+			return result;
+		}
+		
+		// todo: if the tacticalStationID entity is disabled/turned off/destroyed, what then?
+		// todo: should sensors then update every frame?
+		// todo: i also want to show the friendly names of the contacts in Hud
+		
+		
+		Settings.PropertySpec[] properties = new Settings.PropertySpec[1];
+		// todo: we need contact name, positions and velocities. Positions and Velocities can be grabbed from the Entity itself.
+		//       if the contact has a transponder, we know the name, otherwise we need to be in optical range to determine
+		// todo: should "tacticalstate" be a property of TacticalStation placed in Interior? Currently its a customproperty of this vehicle exterior. This
+		//       is not important for now.  What's important is how to update the TacticalStation.Contacts[].  We want to be able to Add operation 
+		//       but with no duplicates from previous ticks. And we want to be able to update the lastTick() value for each contact in the array.
+		//       Thats why using propertyspec is so useful.  we can make changes based on consumption to multiple entities and use multiple operations and 
+		//       this allows us to serialize the operations sequentially.
+		SensorContact contact;
+		contact.ContactID = entityID;
+		contact.Position = EntityAPI.GetPositionRegionSpace(entityID);
+        contact.Velocity = EntityAPI.GetVelocity(entityID);
+        contact.IFF = 0;            // identify friend or foe. This could be an Enum FRIEND, FOE, UNKNOWN
+        contact.IsTarget = true;
+        contact.IsGhost = false;       // occurs when the contact moves out of sensor range, or has used evasive maneuvers sufficiently, or has cloaked
+        contact.Age = 0;
+        contact.GhostAge = 0;
+        contact.Priority = 1;
+        contact.ThreatLevel = 1; 
+		
+		
+		properties[0] = new PropertySpec("contacts", typeof(SensorContact[]).Name, "contacts", new SensorContact[]{contact});
+		result[0].Properties = properties;
+		KeyCommon.Simulation.PropertyOperation[] operations = new  KeyCommon.Simulation.PropertyOperation[1];
+		operations[0] = KeyCommon.Simulation.PropertyOperation.Union;
+		result[0].Operations = operations;
+		result[0].TargetID = tacticalStationID; // NOTE: this is the Producer's Vehicle's tactical station if available
+		
+		// todo: all sensors on the ship that are operating, need to combine contacts into the "tactical" station component.  
+		//       no duplicates, age, deletion.  When to delete is the most problematic.  A ship can hyperspace away and be off sensors immediately.
+		//       or it can be destroyed, or hidden behind a World.  Or the sensor that detected them can be destroyed or disabled or turned off.
+		
+		// todo: i dont know about the above need for a PropertySpec.  Game01 knows all game objects and we can
+		//       simply assign its member properties here then make the API call to update the property.
+		// todo: the issue becomes one about thread sychronization.  If i pass results with nodeID and operator (eg add, remove, replace, increment, decrement)
+		//       then i can apply the changes in the ProcessCommandCompleted handler sequentially, but can run the update with multiple threads. From
+		//       there i can also run any Rules tests and perform any explosions for instance if Health reaches 0.
+		// todo: perhaps EntityAPI.ProcessConsumptionResult(result); 
+		return result; 	
+	}
+	
+	// todo: does/should Consumption_Thrust include steering here?
+	// todo: it's tricky because helm operator should compute engine thrusts and
+	//       burn times, and when to decelerate.  In effect, "Steering" is our Helm.
+	// todo: Thrust consumption could for instance receive full total thrust production
+	//       that is available for steering including burn times available, the individual
+	//       thrusters that are available (the axis they control) and burn time available.
+	//       And then here, we can decide which ones to use for steering and then
+	//       Apply that thrust. It's a thought.  I'm still thinking that turning (steering)
+	//       and main thrust are different steps, but maybe they aren't?  In the context
+	//       of our steering lib, steering is catch all for guidance.
+	public static Consumption[] Consumption_Thrust (string entityID, Production production, double elapsedSeconds)
+	{
+
+		Consumption[] result = new Consumption[1];
+		
+		result[0].ConsumerID = entityID; // the entity that is consuming a product
+        result[0].ProducerID = production.SourceEntityID; 
+        result[0].ProductID = production.ProductID; 
+        
+//		string helmStationID = EntityAPI.FindDescendantByName (entityID, "helm");
+//		if (string.IsNullOrEmpty(helmStationID)) return result;
+		
+
+		Settings.PropertySpec[] properties = new Settings.PropertySpec[1];
+		// todo: we need to determine if this production is linear thrust or angular so that we can increment the appropriate property
+		//       is it the helm that decides that? because remember, if two maneuvering thrusters at opposite ends of same vehicle and on same side fire
+		//       then they combine to produce a strafe force which does not alter rotation
+		
+		bool angularForce = (bool)EntityAPI.GetCustomPropertyValue(production.SourceEntityID, "angular thrust");
+		
+		if (angularForce)
+			properties[0] = new PropertySpec("angularforce", typeof(Vector3d).Name, "private variables", (Vector3d)production.UnitValue);
+		else 
+			properties[0] = new PropertySpec("force", typeof(Vector3d).Name, "private variables", (Vector3d)production.UnitValue);
+		
+
+		
+		
+		//System.Diagnostics.Debug.WriteLine(production.UnitValue.ToString());
+		result[0].Properties = properties;
+		KeyCommon.Simulation.PropertyOperation[] operations = new  KeyCommon.Simulation.PropertyOperation[1];
+		operations[0] = KeyCommon.Simulation.PropertyOperation.Increment;
+		result[0].Operations = operations;
+		result[0].TargetID = entityID;
+		
+		
+		// // can we individually accumulate thrust from multiple engines
+		
+		// // TODO: how should axis rotation thrusters work?
+		// // - in game, i want the helm to be given a heading and bearing and for the thrusters to fire
+		// //   with that goal in mind.
+		// //	- the alternative is just thrusters firing for a given amount of time, to rotate by a certain amount 
+		// //    and then to thrust the opposite direction to slow down in time so we precisely hit the desired rotation.
+		// // - TODO: we also want ability to set desired velocity to 0 and have the ship know what to do to attain that velocity on each axis.
+		// // -     ability to set a waypoint for the helm and have the ship know which thrusters and for how long, and then mains and for how long.
+		
+		// // - TODO: I need a GUI that will allow us to experiment with assigning thruster settings and ship helm commands.
+		
+		
+		// // TODO: shouldn't thrust consumption and thrust emission by engines occur at a fixed frequency?
+		
+		// // todo: if the thrust direction is axial, that force should be added
+		// //       to our angularAcceleration
+		
+		// // strafe or angular because two axial thrusters on same side of ship can work together
+		// // to provide strafing.  note: if for some reason both axials on same side arent firing we can't strafe
+		// // TODO: shouldn't our thrust direction be transformed by rotation matrix?
+		// // TODO: and the thrust direction should be normalized production.UnitValue
+		// // TODO: thrustDirection is for the non entity axis thrusters, but maybe we'll make each thruster an Entity afterall?
+		// Vector3d thrustDirection = Vector3d.Forward(); // = yaw pitch roll? quaternion?
+
+		
+		// // get the thrust amount. todo: production.UnitValue should contain
+		// // thrust axis, thrust value, and whether it's angular or strafing
+		// // and thus be a either an array of values or a struct.
+		// Vector3d thrust = (Vector3d)production.UnitValue;
+		// if (thrust == Vector3d.Zero()) return result;
+		
+		// // TODO: thrust here should be converted to acceleration based on the pounds of thrust
+		// //       and the mass of the ship.
+		// // further, i think "force" SetPropertyValue should be "acceleration" += force property instead.
+		// // TODO: is thrust already fractionalized per frame (*elapsedSeconds) before it gets here or do we need to do that here? I don't think it is.
+		// Vector3d force = (Vector3d)EntityAPI.GetPropertyValue (entityID, "force");
+		// force += thrust;
+		
+		// // TODO: i don't think thrust should be added to force (at least until the force from thrusters is transformed by vehicle rotation)
+		// EntityAPI.SetPropertyValue (entityID, "force", force);
+		
+// //		System.Diagnostics.Debug.WriteLine ("Ship.Consumption_Thrust() - thrust == " + thrust.ToString());
+		 return result;
+	}
+	
+	public static Consumption[] Consumption_AngularThrust (string entityID, Production production, double elapsedSeconds)
+	{
+
+		Consumption[] result = new Consumption[1];
+		
+		result[0].ConsumerID = entityID; // the entity that is consuming a product
+        result[0].ProducerID = production.SourceEntityID; 
+        result[0].ProductID = production.ProductID; 
+        
+//		string helmStationID = EntityAPI.FindDescendantByName (entityID, "helm");
+//		if (string.IsNullOrEmpty(helmStationID)) return result;
+		
+
+		Settings.PropertySpec[] properties = new Settings.PropertySpec[1];
+		// todo: we need to determine if this production is linear thrust or angular so that we can increment the appropriate property
+		//       is it the helm that decides that? because remember, if two maneuvering thrusters at opposite ends of same vehicle and on same side fire
+		//       then they combine to produce a strafe force which does not alter rotation
+		properties[0] = new PropertySpec("torque", typeof(Vector3d).Name, "private variables", (Vector3d)production.UnitValue);
+		
+		//System.Diagnostics.Debug.WriteLine(production.UnitValue.ToString());
+		result[0].Properties = properties;
+		KeyCommon.Simulation.PropertyOperation[] operations = new  KeyCommon.Simulation.PropertyOperation[1];
+		operations[0] = KeyCommon.Simulation.PropertyOperation.Increment;
+		result[0].Operations = operations;
+		result[0].TargetID = entityID;
+		
+		return result;
+	}
+	// OnRender gets called for each model including all Models in nested Sequence/Selector nodes
+	public static void OnRender (string contextID, string entityID, string[] modelIDs, string shaderID, 
+								 Vector3d cameraSpacePosition, Vector3d[] cameraSpaceBoundingBoxVertices, double elapsedSeconds)
+	{
+		
+	}
+	#endregion
+	
+	
+}

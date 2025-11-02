@@ -1,0 +1,143 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>9.0.30729</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{017FBBA2-80E6-4982-8451-FEACB1C4CDB8}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>KeyScript</RootNamespace>
+    <AssemblyName>KeyScript</AssemblyName>
+    <FileUpgradeFlags>
+    </FileUpgradeFlags>
+    <OldToolsVersion>2.0</OldToolsVersion>
+    <UpgradeBackupLocation>
+    </UpgradeBackupLocation>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkProfile />
+    <NoWin32Manifest>False</NoWin32Manifest>
+    <AllowUnsafeBlocks>False</AllowUnsafeBlocks>
+    <NoStdLib>False</NoStdLib>
+    <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
+    <IntermediateOutputPath>obj\$(Configuration)\</IntermediateOutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>Full</DebugType>
+    <Optimize>False</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug_x86|AnyCPU' ">
+    <OutputPath>bin\Debug_x86\</OutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x86\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <ErrorReport>prompt</ErrorReport>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
+    <OutputPath>bin\x86\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <ErrorReport>prompt</ErrorReport>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug_x86|x86' ">
+    <OutputPath>bin\x86\Debug_x86\</OutputPath>
+    <DefineConstants>DEBUG</DefineConstants>
+    <DebugType>full</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
+    <BaseIntermediateOutputPath>obj\</BaseIntermediateOutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Platform)' == 'AnyCPU' ">
+    <BaseAddress>4194304</BaseAddress>
+    <PlatformTarget>x86</PlatformTarget>
+    <RegisterForComInterop>False</RegisterForComInterop>
+    <GenerateSerializationAssemblies>Auto</GenerateSerializationAssemblies>
+    <FileAlignment>4096</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Platform)' == 'x86' ">
+    <PlatformTarget>x86</PlatformTarget>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Antlr4.StringTemplate, Version=4.0.7.0, Culture=neutral, PublicKeyToken=eb42632606e9261f, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\Libs\StringTemplate4.0\Antlr4.StringTemplate.dll</HintPath>
+    </Reference>
+    <Reference Include="CSScriptLibrary">
+      <HintPath>..\Libs\cs-script_3.6.0\Lib\Bin\NET 4.0\CSScriptLibrary.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="BaseScript.cs" />
+    <Compile Include="DefaultScript.cs" />
+    <Compile Include="Delegates\EntityDelegates.cs" />
+    <Compile Include="Events\Delegates.cs" />
+    <Compile Include="Interfaces\IAIAPI.cs" />
+    <Compile Include="Interfaces\IAnimationAPI.cs" />
+    <Compile Include="Interfaces\IAudioFXAPI.cs" />
+    <Compile Include="Interfaces\IDatabaseAPI.cs" />
+    <Compile Include="Interfaces\IGameAPI.cs" />
+    <Compile Include="Interfaces\IGraphicsAPI.cs" />
+    <Compile Include="Interfaces\IPhysicsAPI.cs" />
+    <Compile Include="Interfaces\IScriptingHost.cs" />
+    <Compile Include="Host\Loader.cs" />
+    <Compile Include="Host\ScriptInfo.cs" />
+    <Compile Include="Interfaces\IEntityAPI.cs" />
+    <Compile Include="Interfaces\IScriptable.cs" />
+    <Compile Include="Interfaces\IVehicleAPI.cs" />
+    <Compile Include="Interfaces\IVisualFX.cs" />
+    <Compile Include="LuaTest.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Routes\Route.cs" />
+    <Compile Include="Rules\Rule.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Game01\Game01.csproj">
+      <Project>{708FB6BF-0843-4088-894E-05BB1A2E3707}</Project>
+      <Name>Game01</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\KeyCommon\KeyCommon.csproj">
+      <Project>{6C7BBA7F-03F4-4D7D-B1D3-CF8D14E2B939}</Project>
+      <Name>KeyCommon</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\KeyStandardLibrary\KeyStandardLibrary.csproj">
+      <Project>{427cc8d0-5448-4816-a2ed-59f821d98cfa}</Project>
+      <Name>KeyStandardLibrary</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Settings\Settings.csproj">
+      <Project>{EF75621B-EF64-4EA7-8451-BA53BA9408A9}</Project>
+      <Name>Settings</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup />
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

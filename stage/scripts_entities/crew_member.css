@@ -1,0 +1,1351 @@
+using System;
+using Game01.GameObjects;
+using KeyCommon.Simulation;
+using KeyCommon.Traversal;
+using Keystone.Types;
+using Keystone.Utilities;
+using KeyScript;
+using KeyScript.Interfaces;
+using KeyScript.Delegates;
+using KeyScript.Host;
+using KeyScript.Rules;
+using Settings;
+
+public class npc : BaseScript
+{
+	public static void Initialize(string scriptID)
+	{
+		string category = "public properties";
+		Settings.PropertySpec[] properties = new Settings.PropertySpec[13];
+		properties[0] = new PropertySpec("description", typeof(string).Name, category, (object)"Engineer");
+		properties[1] = new PropertySpec("station", typeof(string[]).Name, category, null); // NOTE: a crew member can control multiple nearby stations
+		
+		category = "statistics";
+		
+		// todo: maybe most of these stats belong in a game01.dll "Character" object
+		// TODO: we could maybe add a string table to the PropertyBag itself.
+		//       And we could require we add properties in alphabetical order so that
+		//       when we run AI Rules Query in same alphabetical order, we can avoid heavy nested iterating 
+		properties[2] = new PropertySpec("maxspeed", typeof(double).Name, category, 0);
+        properties[3] = new PropertySpec("maxforce", typeof(double).Name, category, 0);
+		properties[4] = new PropertySpec("strength", typeof(double).Name, category, 0);
+		properties[5] = new PropertySpec("constitution", typeof(double).Name, category, 0);
+		properties[6] = new PropertySpec("intelligence", typeof(double).Name, category, 0);
+		properties[7] = new PropertySpec("dexterity", typeof(double).Name, category, 0);
+		properties[8] = new PropertySpec("health", typeof(int).Name, category, (int)100);
+		properties[9] = new PropertySpec("team", typeof(int).Name, category, (int)0);
+		properties[10] = new PropertySpec("securitylevel", typeof(int).Name, category, (int)1);
+		
+		category = "private variables"; // not persisted, not visible in quicklook or domainobject plugin
+		// contacts property is configured by Sensors that are assigned to this npc. Sensors include eyes, nose, hearing, as well
+		// as robot AI sensors
+
+		category = "game objects"; // game objects can be queried and displayed in game (things like sensor contacts, navpoints, etc)
+		
+		int[] effectIndices = null;// InitializeParticles();
+				
+		properties[11] = new PropertySpec("particle_effects", typeof(int[]).Name, category, effectIndices);
+		properties[11].IsSerializable = false;
+		properties[12] = new PropertySpec("paths", typeof(Game01.GameObjects.Path[]).Name, category, null);
+		properties[12].IsSerializable = false;
+		
+		category = "production";  // heat, odor, sound/noise, reflection (for radar), 
+		
+		// properties[13] = new PropertySpec("production", typeof(Production[]).Name, category, production);
+		// properties[13].IsSerializable = false;
+		
+		category = "consumption";  
+		//properties[14] = new PropertySpec("consumption", typeof(uint[]).Name, category, new uint[]{(uint)UserConstants.Product.Heat});
+		//properties[14].IsSerializable = false;
+		
+		// add the properties to the entity's domain object
+		EntityAPI.AddCustomProperties(scriptID, properties);
+
+
+		// create a test rule using a Delegate rule
+		//EntityAPI.AddRule (
+		//	scriptID, "description", new SimpleRule(1, delegate {return ((string)properties[0].DefaultValue).Length != 0; }));
+		EntityAPI.AddRule (scriptID, "description", new SimpleRule(1, Rule_Description));
+			
+		// EXPLICIT EVENTS - events must be added after the custom properties have been added
+		// TODO: this event "zonechanged" is essentially hardcoded into the Entity's movement checking.  It's not really the type
+		//       of event we should be adding here.  It should be an intrinsic function of the script just like for OnRender() and OnUpdate() and such.
+		// TODO: also, all properties automatically have "OnCustomPropertyChanged" called when a property changes, however
+		//       it IS an intrinsic script function call.  It is not an explicit event.  But sometimes we don't want to 
+		//       create custom event handlers for each property.  This also means that if there is no explicit event 
+		//       no other Entity's script can subscribe to receive events for other Entities custom property changes.
+		//       If there is an explicit propertychanged handler for a custom property, then we can check if that exists
+		//       and avoid calling OnCustomPropertyChanged for that property?
+		EntityAPI.PropertyChangedEventAdd (scriptID, "zonechanged", Event_ZoneChanged);
+		
+		EntityAPI.EventAdd (scriptID, "test_event", Event_Handle);
+		
+		
+		// queryable mods
+		// ...
+		
+		// force production handler runs every physics tick
+//		EntityAPI.AssignForceProductionHandler(scriptID, Force_Production_Update);
+		
+		// regular production handler runs at seperate hz (possibly once per frame)
+//		EntityAPI.AssignProductionHandler(scriptID, Production_Update);
+		
+		// add consumptions - NPC might consume "air" or "oygen" 
+		//                    NPC might also consume heat and various sources of damage like radiation, shockwave, etc
+		EntityAPI.CreateConsumption(scriptID, "heat", (uint)UserConstants.Product.Heat, Consumption_Heat);
+//		EntityAPI.CreateConsumption(scriptID, "gravity", (uint)UserConstants.Product.Gravity, Consumption_Gravity);
+//		EntityAPI.CreateConsumption(scriptID, "thrust", (uint)UserConstants.Product.Thrust, Consumption_Thrust);
+		
+		// create any stores.  Is this necessary?  The idea is that most production is emitted and used
+		// or lost.  But a store defines a place where production can be stored and then used later.
+		// A battery for example doesn't produce, but it can store production but really that just makes it
+		// a consumer.  It's "Production" is then limited to the supply it has on hand... it cant make more on it's own.
+		//EntityAPI.CreateStore(scriptID, productID, capacity);
+		
+		// audio clips
+		//AudioFXAPI.RegisterSoundClip ("laser", @"caesar\audio\laser.wav");
+	}
+		
+	/* private static int[] InitializeParticles()
+	{
+		// NOTE: ParticleSystem initialization done in this.Initialize() so that particles
+		// and their production is only attempted to be created once per shared instance type.
+		// -note: though perhaps if the script is different and attempts to create otherwise same
+		// particle, maybe we could make that particle unique?
+		// -note2: or perhaps best solution is to load the custom particle system from a data file that can be shared.
+		
+		// define and register the particles (and their production[]) we'll be using
+		// potentially - maybe these particles and their productions can be defined in 
+		// a data file and then loaded here.
+		
+		int[] effectIndices = new int[2];
+		// TODO: can we have multiple  modifiers for the same type? eg. two opacity modififers?  
+		//       why would we want to?
+				
+		// explosion effect - is a result of consumption of collision with laser bolt 
+		effectIndices[0] = VisualFXAPI.ParticleEffect_Register ("explosion");
+		
+		// - explosion animated texture
+//		string explosionResource = @"pool\textures\exp05_atlas.dds";
+//		int emitterType = 0;
+//		int emitterIndex = VisualFXAPI.ParticleEmitter_Register (effectIndices[0], emitterType, 200, 1.0f, 0.0f, 1, explosionResource);
+		
+		// - explosion flash
+		string explosionFlash = @"caesar\particles\mercury\Particle005.png"; 	
+		int emitterType = 1;
+		int emitterIndex = VisualFXAPI.ParticleEmitter_Register (effectIndices[0], emitterType, 200, 0.25f, 0.0f, 1, explosionFlash);
+		VariableVector3d scale;
+		scale.Value = new Vector3d (1, 1, 1);
+		scale.Variation = 0;
+		VisualFXAPI.ParticleEmitter_SetParameter (effectIndices[0], emitterIndex, "initial_scale", scale);
+		float startOpacity = 1.0f;
+		float endOpacity = 0.0f;
+		VisualFXAPI.ParticleEmitter_SetModifier (effectIndices[0], emitterIndex, "opacity_modifier", startOpacity, endOpacity);
+		
+		// - explosion sparks
+		string explosionSparks = @"caesar\particles\mercury\Particle005.png"; 
+		int quantityReleased = 35;
+		emitterType = 1;
+		emitterIndex = VisualFXAPI.ParticleEmitter_Register (effectIndices[0], emitterType, 200 * quantityReleased, 0.75f, 0.0f, 1, explosionSparks);
+		VisualFXAPI.ParticleEmitter_SetParameter (effectIndices[0], emitterIndex, "quantity_released", quantityReleased);
+		VariableDouble speed;
+		speed.Value = 0;
+		speed.Variation = 5;
+		VisualFXAPI.ParticleEmitter_SetParameter (effectIndices[0], emitterIndex, "initial_speed", speed);
+		scale.Value = new Vector3d (0.1, 0.1, 0.1);
+		scale.Variation = 0.05;
+		VisualFXAPI.ParticleEmitter_SetParameter (effectIndices[0], emitterIndex, "initial_scale", scale);
+		VariableColor color;
+		color.Value = new Color(1.0f, 0.8784314f, 0.7529412f, 1.0f);
+		color.Variation = new Color (0.0f, 0.0f, 0.0f, 0.0f);
+		VisualFXAPI.ParticleEmitter_SetParameter (effectIndices[0], emitterIndex, "initial_color", color);
+		// modifiers
+		VisualFXAPI.ParticleEmitter_SetModifier (effectIndices[0], emitterIndex, "opacity_modifier", startOpacity, endOpacity);
+		float damping = 2.0f;
+		VisualFXAPI.ParticleEmitter_SetModifier (effectIndices[0], emitterIndex, "damping_modifier", damping, null);
+		
+		// - explosion flames
+		string explosionFlames = @"caesar\particles\mercury\Particle004.png"; 
+		quantityReleased = 64;
+		emitterType = 1;
+		emitterIndex = VisualFXAPI.ParticleEmitter_Register (effectIndices[0], emitterType, 200 * quantityReleased, 1.0f, 0.0f, 1, explosionFlames);
+		VisualFXAPI.ParticleEmitter_SetParameter (effectIndices[0], emitterIndex, "quantity_released", quantityReleased);
+		speed.Value = 0;
+		speed.Variation = 0.25;
+		VisualFXAPI.ParticleEmitter_SetParameter (effectIndices[0], emitterIndex, "initial_speed", speed);
+		scale.Value = new Vector3d (0.5, 0.5, 0.5);
+		scale.Variation = 0.15;
+		VisualFXAPI.ParticleEmitter_SetParameter (effectIndices[0], emitterIndex, "initial_scale", scale);
+		VariableVector3d rotation;
+		rotation.Value = new Vector3d(0.0, 0.0, 360);
+		rotation.Variation = 360;
+		VisualFXAPI.ParticleEmitter_SetParameter (effectIndices[0], emitterIndex, "initial_rotation", rotation);
+		color.Value = new Color(1.0f, 0.5019608f, 0.0f, 1.0f);
+		color.Variation = new Color (0.3f, 0.0f, 0.0f, 0.0f);
+		VisualFXAPI.ParticleEmitter_SetParameter (effectIndices[0], emitterIndex, "initial_color", color);
+		// modifiers
+		VisualFXAPI.ParticleEmitter_SetModifier (effectIndices[0], emitterIndex, "opacity_modifier", startOpacity, endOpacity);
+		damping = 2.0f;
+		VisualFXAPI.ParticleEmitter_SetModifier (effectIndices[0], emitterIndex, "damping_modifier", damping, null);
+		VisualFXAPI.ParticleEmitter_SetModifier (effectIndices[0], emitterIndex, "rotation_modifier", 1.0f, null);	
+
+		// - explosion smoke 
+		string explosionSmoke = @"caesar\particles\mercury\Cloud001.png"; 
+		quantityReleased = 16;
+		emitterType = 1;
+		emitterIndex = VisualFXAPI.ParticleEmitter_Register (effectIndices[0], emitterType, 200 * quantityReleased, 2.5f, 0.0f, 1, explosionSmoke);
+		VisualFXAPI.ParticleEmitter_SetParameter (effectIndices[0], emitterIndex, "quantity_released", quantityReleased);
+		speed.Value = 0;
+		speed.Variation = 0.25;
+		VisualFXAPI.ParticleEmitter_SetParameter (effectIndices[0], emitterIndex, "initial_speed", speed);
+		scale.Value = new Vector3d (0.4, 0.4, 0.4);
+		scale.Variation = 0.05;
+		VisualFXAPI.ParticleEmitter_SetParameter (effectIndices[0], emitterIndex, "initial_scale", scale);
+		rotation.Value = new Vector3d(0.0, 0.0, 360);
+		rotation.Variation = 360;
+		VisualFXAPI.ParticleEmitter_SetParameter (effectIndices[0], emitterIndex, "initial_rotation", rotation);
+		color.Value = new Color(0.5019608f, 0.5019608f, 0.5019608f, 1.0f);
+		color.Variation = new Color (0.0f, 0.0f, 0.0f, 0.0f);
+		VisualFXAPI.ParticleEmitter_SetParameter (effectIndices[0], emitterIndex, "initial_color", color);
+		// modifiers
+		VisualFXAPI.ParticleEmitter_SetModifier (effectIndices[0], emitterIndex, "opacity_modifier", startOpacity, endOpacity);
+		damping = 0.5f;
+		VisualFXAPI.ParticleEmitter_SetModifier (effectIndices[0], emitterIndex, "damping_modifier", damping, null);
+		VisualFXAPI.ParticleEmitter_SetModifier (effectIndices[0], emitterIndex, "rotation_modifier", 1.0f, null);
+		
+		// laser bolt effect
+		effectIndices[1] = VisualFXAPI.ParticleEffect_Register ("laser");
+		string laserResource = @"caesar\particles\bar_blur_rotated.dds"; 	
+		emitterType = 3;
+		emitterIndex = VisualFXAPI.ParticleEmitter_Register (effectIndices[1], emitterType, 200, 2.0f, 0.0f, 1, laserResource);
+		VisualFXAPI.ParticleEmitter_SetParameter (effectIndices[1], emitterIndex, "collision_enable", true);
+		
+		// define Heat damage as product produced on laser collision
+		Production[] production = new Production[1];
+		production[0].ProductID = (uint)UserConstants.Product.Heat; 
+		production[0].UnitValue = (int)25;  
+		production[0].UnitCount = (int)1;  
+		production[0].DistributionMode = DistributionType.Collision; 
+		VisualFXAPI.ParticleEmitter_SetParameter (effectIndices[1], 0, "production", production);
+		
+		return effectIndices;
+	} */
+	
+	private static int[] InitializeParticles(string entityID)
+	{
+		// NOTE: ParticleSystem initialization done in this.Initialize() so that particles
+		// and their production is only attempted to be created once per shared instance type.
+		// -note: though perhaps if the script is different and attempts to create otherwise same
+		// particle, maybe we could make that particle unique?
+		// -note2: or perhaps best solution is to load the custom particle system from a data file that can be shared.
+		
+		// define and register the particles (and their production[]) we'll be using
+		// potentially - maybe these particles and their productions can be defined in 
+		// a data file and then loaded here.
+		
+		int[] effectIndices = new int[1];
+		// TODO: can we have multiple  modifiers for the same type? eg. two opacity modififers?  
+		//       why would we want to?
+				
+		// laser bolt effect
+		effectIndices[0] = VisualFXAPI.ParticleEffect_Register ("laser", entityID);
+		string laserResource = @"caesar\particles\bar_blur_rotated.dds"; 	
+		int emitterType = 3;
+		int emitterIndex = VisualFXAPI.ParticleEmitter_Register (effectIndices[0], emitterType, 200, 3.0f, 0.0f, 1, laserResource);
+		VisualFXAPI.ParticleEmitter_SetParameter (effectIndices[0], emitterIndex, "collision_enable", true);
+		
+		// define Heat damage as product produced on laser collision
+		Production[] production = new Production[1];
+		production[0].ProductID = (uint)UserConstants.Product.Heat; 
+		production[0].UnitValue = (int)25;  
+		production[0].UnitCount = (int)1;  
+		production[0].DistributionMode = DistributionType.Collision; 
+		VisualFXAPI.ParticleEmitter_SetParameter (effectIndices[0], 0, "production", production);
+		
+		return effectIndices;
+	}
+	
+	public static void InitializeEntity(string entityID)
+	{
+//		int[] effectIndices = InitializeParticles (entityID);
+//		EntityAPI.SetCustomPropertyValue(entityID, "particle_effects", effectIndices);
+		
+		// set stats flag as dirty so OnUpdate() will call UpdateStats()
+		EntityAPI.SetCustomFlagValue (entityID, (uint)UserConstants.CustomFlags.CF_STATS_DIRTY ,true);
+	
+
+		// // init source of production to this entity
+		// Production[] production = (Production[])EntityAPI.GetCustomPropertyValue (entityID, "production");
+		// for (int i = 0; i < 6; i++)
+		// {
+			// production[i].SourceEntityID = entityID; // ourself
+			// production[i].ProductID = (uint)UserConstants.Product.Thrust;
+			// production[i].UnitCount = 1; 
+			// production[i].UnitValue = Vector3d.Zero(); 
+			// production[i].DistributionMode = DistributionType.Self; 
+		// }
+		
+		//<QUEST id="KillBoars" titleStringID="KillBoarsTitle" timeLimit="30">
+		//	<CONDITION hasItemID="BoarHide" quantity="3"/>
+		//	<CONDITION hasItemID="BoarTooth" quantity="3"/>
+		//	<SUCCESS successStringID="KillBoarsComplete">
+		//	<REWARD>
+		//		<ITEM id="Gold" quantity="100"/>
+		//		<ITEM id="MagicSword" quantity="1"/>
+		// 	</REWARD>
+		// TODO: we could have IO API to save / load npc data from xml files where one file per NPC.
+		// TODO: But how does this method work with client/server multiplayer? The server needs to 
+		//       use this same script.
+		int health = 100; // TODO: value should be retrieved from xml or db.  Could be seperate xml file for each NPC.
+		EntityAPI.SetCustomPropertyValue (entityID, "health", health);
+		AIAPI.EnableBehavior (entityID, false);
+		
+		// TODO: but the following doesnt allow us to have different settings for each
+		//       AI which will have different jobs and tasks and goals based on their personality, etc.
+		//       For that we need to use either custom properties saved to XML or a db.
+		//       When i get behaviortrees working preliminarily, i will research dbs again 
+		//       and decide whether my XML db for scenes needs to be changed, or hybrid approach. Because otherwise,
+		//       i could use flat files for each different NPC's custom properties.
+		// we don't want same data shared by all entities so we must
+		// initialize here for specific entity
+		KeyCommon.Data.UserData data = EntityAPI.GetAIBlackboardData(entityID);
+		if (data == null) data = new KeyCommon.Data.UserData();
+		data.SetString ("ai_action", "none");
+		data.SetBool("ai_path_in_progress", false);
+		data.SetDouble ("ai_pathing_cooldown_elapsed", 0);
+		data.SetDouble("ai_pathing_cooldown", 2.5d);
+		data.SetVector3dArray ("ai_path_points", null);
+		data.SetStringArray("ai_path_components", null);
+		data.SetInteger ("ai_current_point", -1);
+		data.SetDouble ("ai_path_proximity_radius", 0.125d); // proximity to point (aka epsilon)
+		data.SetBool("ai_follow_target", false);
+		data.SetBool("ai_wander", false);
+		data.SetDouble("max_speed", 2d); // meters per second - values like this one should be retreived from custom property or db per NPC
+		data.SetDouble("max_force", 2.6);
+		data.SetDouble("steer_wander_theta", 0);
+		data.SetDouble("ai_last_weapon_fire_time", 0);
+		data.SetString("ai_current_target", null);
+		data.SetVector("ai_current_target_position", Vector3d.Zero());
+					
+		EntityAPI.SetAIBlackboardData(entityID, data);
+		
+		// Entity FLAGS (as opposed to Component flags) should be set here as they are per entity
+		EntityAPI.SetEntityFlag(entityID, (uint)UserConstants.ExplicitEvents, true);
+	}
+	
+	public static object RegisterChild(string entityID, string childID)
+	{
+		// make modifications 
+
+		return entityID;
+	}
+	
+	public static object UnRegisterChild (string entityID, string childID)
+	{
+
+		return entityID;
+
+	}
+	
+	public static object OnAddedToParent(string entityID, string parentID)
+	{
+		// make modifications 
+
+		return entityID;
+	}
+	
+	public static object OnRemovedFromParent (string entityID, string parentID)
+	{
+
+		return entityID;
+	}
+	
+	public static object OnParentChanged (string entityID, string parentID, string previousParentID)
+	{
+
+		return entityID;
+	}
+	
+	
+	
+	#region GUI // http://www.antlr.org/wiki/display/ST/Examples
+	public static string GUILayout_GetMarkup (string entityID, PickResultsBase pick)
+	{
+		return "<html><body>TODO: NPC Infantry Bot</body></html>";
+		
+		object propertyValue = EntityAPI.GetCustomPropertyValue(entityID, "description");
+		string name = null;
+		if (propertyValue != null)
+			name = (string)propertyValue;
+			
+		name = "Infanty Bot MKI";
+		
+		
+
+		return ""; // pageST.Render();		
+	}
+	
+	// <summary>
+	// Handler for all link clicks within the layout.
+	// </summary>
+	// <param name="entityID"></param>
+	// <param name="name">Name of specific button that triggered the event.</param>
+	public static void GUILayout_LinkClick(string entityID, string name)
+	{
+		System.Diagnostics.Debug.WriteLine("GUILayout_LinkClick() - '" + name + "'");
+
+		switch (name)
+		{
+			default:
+				System.Diagnostics.Debug.WriteLine("GUILayout_LinkClick() - Unexpected link '" + name + "'");
+				break;
+		}
+	}
+	
+	// <summary>
+	// Handler for all button clicks within the layout.
+	// </summary>
+	// <param name="entityID"></param>
+	// <param name="name">Name of specific button that triggered the event.</param>
+	public static void GUILayout_ButtonClick(string entityID, string name)
+	{
+		System.Diagnostics.Debug.WriteLine("GUILayout_ButtonClick() - '" + name + "'");
+
+		switch (name)
+		{
+			default:
+				System.Diagnostics.Debug.WriteLine("GUILayout_ButtonClick() - Unexpected button '" + name + "'");
+				break;
+		}
+	}
+
+	// <summary>
+	// Handler for all checkbox clicks within the layout.
+	// </summary>
+	// <param name="entityID"></param>
+	// <param name="name">Name of specific button that triggered the event.</param>
+	public static void GUILayout_CheckBoxClick(string entityID, string name)
+	{
+		System.Diagnostics.Debug.WriteLine("GUILayout_CheckBoxClick() - '" + name + "'");
+
+		switch (name)
+		{
+			default:
+				System.Diagnostics.Debug.WriteLine("GUILayout_CheckBoxClick() - Unexpected checkbox '" + name + "'");
+				break;
+		}
+	}
+	
+	// <summary>
+	// Handler for all textbox clicks within the layout.
+	// </summary>
+	// <param name="entityID"></param>
+	// <param name="name">Name of specific button that triggered the event.</param>
+	public static void GUILayout_TextBoxClick(string entityID, string name)
+	{
+		System.Diagnostics.Debug.WriteLine("GUILayout_TextBoxClick() - '" + name + "'");
+
+		switch (name)
+		{
+			default:
+				System.Diagnostics.Debug.WriteLine("GUILayout_TextBoxClick() - Unexpected textbox '" + name + "'");
+				break;
+		}
+	}
+	
+	// <summary>
+	// Handler for all textbox keypresses within the layout.
+	// </summary>
+	// <param name="entityID"></param>
+	// <param name="name">Name of specific button that triggered the event.</param>
+	public static void GUILayout_TextBoxKeyPress(string entityID, string name)
+	{
+		System.Diagnostics.Debug.WriteLine("GUILayout_TextBoxKeyPress() - '" + name + "'");
+
+		switch (name)
+		{
+			default:
+				System.Diagnostics.Debug.WriteLine("GUILayout_TextBoxKeyPress() - Unexpected textbox '" + name + "'");
+				break;
+		}
+	}	
+	#endregion
+	
+	#region PlacementTool related
+	public static uint QueryPlacementBrushType() {return (uint)UserConstants.BRUSH_TYPE.BRUSH_SINGLE_DROP;}	
+	#endregion
+	
+	#region Rules
+	private static bool Rule_Description(string entityID, object[] args)
+	{
+		// we also get the value from the args
+		string description = (string)args[0];  // we know for property rules the value is the first and only arg
+		
+		System.Diagnostics.Debug.WriteLine ("Running rule 'Description'.  Testing value '" + description + "' for Entity '" + entityID + "'");
+		
+		EntityAPI.EventRaise (entityID, "test_event");
+		return !string.IsNullOrEmpty(description);		
+	}	
+	#endregion
+	
+	public static void OnRegionChanged (string entityID, string regionID, string previousRegionID)
+	{
+		// NOTE: this is really only useful for planetside operations where there exists
+		// Zones/Regions patched/tiled together.
+		// It is not useful for Interior of starship where the entire Interior is just one Region.
+		// except maybe when a NPC character exits the Interior and enters the Exterior realm (eg space zone or planetside zone).
+		// Perhaps even entering a shuttlecraft within the Interior...
+		
+		// gets a relative offset from previous to region which we can Add to 
+		// nav path points to convert to new region's coordinate system
+		Vector3d offset = EntityAPI.GetRegionOffsetRelative (regionID, previousRegionID);
+		
+		System.Diagnostics.Debug.WriteLine("Script.OnRegionChanged()");
+		
+		// TODO: seems this event should be a hardcoded event
+				
+		// NOTE: this event should be handled before this.Update() 
+
+						
+		// convert all path points from previous Zone to current's coordinate system
+		// to do that, we need to know zone dimensions and the deltaX, deltaZ in zone location
+		// if the event could provide us that, it would be ideal... if this was a real hard coded event
+		// we could do that
+		// TODO: why not store the path in the AI blackboard as object? Perhaps so that
+		//       i can see the path in property display where as AI blackboard values are
+		//       not as easy to display?
+		// TODO: should paths be stored in AIBlackboard?
+		object property = EntityAPI.GetCustomPropertyValue(entityID, "paths");
+		if (property != null)
+		{
+			Path[] paths = (Path[])property;
+						
+			if (paths == null)
+			{				
+				return;
+			}
+			
+			int numPaths = paths.Length;
+			for (int i = 0; i < numPaths; i++)
+			{
+				if (paths[i].Points == null) continue;
+				
+				int numPathPoints = paths[i].Points.Length;
+				for (int j = 0; j < numPathPoints; j++)
+				{
+					Vector3d oldCoord = paths[i].Points[j].Position;
+					paths[i].Points[j].Position = oldCoord - offset;
+				}
+			}
+			
+			// store the updated paths array object.
+			// TODO: should path be stored in AIBlackboard data?
+			EntityAPI.SetCustomPropertyValue(entityID, "paths", paths);
+		}
+	}
+	
+	#region Events
+	public static void OnCustomPropertyChanged (string entityID, int index)
+	{
+		System.Diagnostics.Debug.WriteLine("npc.OnCustomPropertyChanged() - '" + index.ToString() + "'");
+		// when a build property changes, run BuildUpdate() to recompute statS?
+		// Not exactly.  We instead set a flag that the "stats" are dirty 
+		// this way future property changes dont result in multiple calls to update stats.
+		// 
+		switch (index)
+		{
+			case 0:
+			case 1:
+			case 2:
+				break;
+			case 7:
+			case 8:
+			case 9:
+			case 10:
+				EntityAPI.SetCustomFlagValue (entityID, (uint)UserConstants.CustomFlags.CF_STATS_DIRTY ,true);
+				break;
+			default:
+				break;
+		}
+	}
+	
+	private static void Event_ZoneChanged (string entityID)
+	{
+		System.Diagnostics.Debug.WriteLine("npc.Event_ZoneChanged()");
+		
+	}	
+	
+	public static void OnTriggerAreaEnter (string entityID, string triggerEntityID)
+	{
+		System.Diagnostics.Debug.WriteLine ("Script.OnTriggerAreaEnter() - " + entityID);
+	}
+
+	public static void OnTriggerAreaExit (string entityID, string triggerEntityID)
+	{
+		System.Diagnostics.Debug.WriteLine ("Script.OnTriggerAreaExit() - " + entityID);
+		
+		
+	}
+	
+	private static void Event_Handle(string entityID, string eventName, object[] args)
+	{
+		
+		switch (eventName)
+		{
+			case "test_event":
+				string description = (string)EntityAPI.GetCustomPropertyValue (entityID, "description");
+				System.Diagnostics.Debug.WriteLine("npc.Event_Test() - event '" + eventName + "' raised by '" + entityID + "' " + description + "'");
+				break;
+			default:
+				break;
+		}
+	}
+	#endregion
+
+	
+	#region Build statistics
+	// Updates the build statistics
+	public static void UpdateStats (string entityID)
+	{
+		// configuring the list of proeprty grid is no problem
+		// however what is a problem is configuring the list in some drop down.
+		// This must be client side, but then server side enforced in a rule validation delegate.
+		//
+		// We know that our propertySpec's have room for an event handler and I think that maybe we should 
+		// see if we can't trigger those events and then provide for a way for the Plugin/PropertyGrid
+		// to update a drop down list afterwards....
+		
+		// stats dirty flag can now be reset to false
+		EntityAPI.SetCustomFlagValue (entityID, (uint)UserConstants.CustomFlags.CF_STATS_DIRTY ,false);
+	}	
+	#endregion
+	
+	#region Run-time	
+	public static void OnSelected (string entityID, string workspaceName, string contextName)
+	{
+		// 
+		// load the "patrol" "attack" etc menu to command bar
+		// (vehicle menu should be positioned each frame for us based on window size)
+		
+		
+		// switch mouse tool to "unit_action" tool by with value of "move_to_location" by default
+		// keyboard hotkeys can modify the value to things like "attack_location" 
+		string toolName = "unit_action"; // "waypoint_placer";
+		object toolValue = "move_to_location"; // "pursue_target"; // "attack_location"; // "attack_target"
+		string toolTarget = entityID;
+// TODO: this causes problems when we are in ComponentEditor or simply in a void space Region.
+//       where we're not interested in sending UnitAction commands to the NPC
+//		GameAPI.Workspace_SetTool(workspaceName, toolName, toolTarget, toolValue);
+	}
+	
+	public static void OnSelectionLost (string entityID, string workspaceName, string contextName)
+	{
+	
+		// clear command bar 
+		
+		
+	}
+	
+	// TODO: where do i actually run a "Think" method that determines what action an NPC should perform?
+	//       when do they pull a task from the task database to determine what their next assignment is?
+	//       Or when their shift ends and they can relax before going to bed?
+	// http://www.what-could-possibly-go-wrong.com/fluent-behavior-trees-for-ai-and-game-logic/
+	public static void OnUpdate (string entityID, double elapsedSeconds)
+	{
+		// NOTE: if simulation is paused, graphics can still render, but this
+		//       OnUpdate() will not be called.
+		// NOTE: If simulation is NOT paused, this OnUpdate() will be called
+		//       as many times per entity to satisfy fixed timestep settings!
+		//       Thus it is important to keep this function optimized!
+		// NOTE: We shouldn't be too afraid of complex entities like engines & hardpoints 
+		//       for exterior thrusters because even though this does represent 
+		//       relatively complex ship design, it is still a very modest, and
+		//       controlled, and contained way of extending the game as a platform.
+		//       It's like in Tribes.  Ultimately the modding was still grounded
+		//       by the rules of the system.  The system rules were immuteable.
+		//       That is the most important thing to remember about this approach.  
+		//       The system rules must make sense, they must contrain freedom,
+		//       or else it ends up being like Unity3d.  
+		
+		//////////////////////////////////////////////////////////////
+		// AI - User Data
+		//////////////////////////////////////////////////////////////
+		KeyCommon.Data.UserData data = EntityAPI.GetAIBlackboardData(entityID);
+		if (data == null) return;
+				
+		// TODO: see if there are any tasks in the data store for this agent.
+		//       - if no tasks (even sleeping off duty is a task that gets completed) then create one.
+		//       - if already performing a task, verify that no higher priority task has been issued ahead of it.
+		
+		// Gamebryo scripting video
+		// https://www.youtube.com/watch?v=PoV8sOyXZS8
+		// notice that in Gamebryo scripting, if you change a property it updates in the engine and perhaps
+		// what is happening internally, is changes to properties can be intercepted and sent to a server as well.
+		// That's why we shouldn't have public access to Node properties, but go through the GetProperties and SetProperties() methods.
+		// Then changes to those properties can be replicated to the server and then to other clients.
+		
+		// If destroyed, AI will not run but we may need to continue any running 
+		// destruction animations (perpetual burning for instance), sounds, emissions, etc.
+		// TODO: what about "EntityAttributes.Active" ? Is that physics only? 
+		int health = (int)EntityAPI.GetCustomPropertyValue (entityID, "health");
+		if (health <= 0) return;
+			
+		string state = data.GetString("ai_action");
+				
+		bool pathInProgress = data.GetBool("ai_path_in_progress");
+		
+		if (pathInProgress)
+		{
+			Vector3d velocity = EntityAPI.GetVelocity (entityID);
+			const double EPSILON = 0.0001d; // TODO: I think this epsilon breaks on very high frame rates but for testing atm, we'll see
+			if (Vector3d.GetLength(velocity) > (0.0d + EPSILON))
+			{		
+				// TODO: when entity reaches final destination, the velocity
+				// vector somehow ends up being 0,1,0 and is parallel with up vector
+				// and climb gets called briefly before idle then gets called. You can't
+				// notice it, but it does occur in the script.
+				Vector3d direction = Vector3d.Normalize(velocity);
+				const double PARALLEL_EPSILON = 0.1d;
+				if (Vector3d.AreParallel (Vector3d.Up(), direction, PARALLEL_EPSILON) || Vector3d.AreParallel (-Vector3d.Up(), direction, PARALLEL_EPSILON))
+				{
+					if (state != "climb")
+					{
+						// TODO: these ai_action "state" strings seem they should be apart of behaviorTree and not in the general OnUpdate() scripted method.
+						//       But this does work and is simple.  Should i stick with this thinking?
+						AnimationAPI.Animation_Play(entityID, "climb", true);
+						data.SetString ("ai_action", "climb");
+					}
+				}
+				else
+				{
+					if (state != "walk")
+					{
+						AnimationAPI.Animation_Play(entityID, "walk", true);
+						data.SetString ("ai_action", "walk");
+					}
+				}
+			}
+			else 
+			{
+				// speed = 0 so we should play "idle".  This can occur when doing things like waiting for a door to open
+				AnimationAPI.Animation_Play(entityID, "idle", true);
+				data.SetString ("ai_action", "idle");
+			}
+		}
+		else 
+		{
+			if (state != "idle")
+			{
+				AnimationAPI.Animation_Play(entityID, "idle", true);
+				data.SetString ("ai_action", "idle");
+			}
+		}
+		
+		EntityAPI.SetAIBlackboardData (entityID, data);
+		
+		// Pathing (entityID, data);
+		
+		// ////////////////////////////////////////////////////////////
+		// Firing AI - a simple AI for now to fire lasers at random directions
+		// ////////////////////////////////////////////////////////////
+		// TODO: this belongs in the BehaviorTree
+		// Targeting(entityID, data);
+
+		
+	}
+	
+	// TODO: OBSOLETE?  We now use BehaviorTree "Execute()" to handle path finding
+	// TODO: OBSOLETE?  We now use BehaviorTree "Execute()" to handle path finding
+	// TODO: OBSOLETE?  We now use BehaviorTree "Execute()" to handle path finding
+	// TODO: OBSOLETE?  We now use BehaviorTree "Execute()" to handle path finding
+	private static void Pathing (string entityID, KeyCommon.Data.UserData data)
+	{
+		// ////////////////////////////////////////////////////////////
+		// Pathing AI - a simple AI for now will be to find a valid random spot
+		     // within it's own Zone and move there.
+			 // NOTE: This pathing was originally intended to work on terrain where there could be many Zones/Regions
+			 //       each with their own coordinate system, but where the NPC could seemlessly pathfind between. 
+			 //       I think in the future if we do planet-side operations, then just a single Zone that the landing
+			 //       party can arrive at will be used.  Zones are just too complicated - for now.
+		// ////////////////////////////////////////////////////////////		
+		// bool followTarget = data.GetBool ("ai_follow_target");
+		// bool wander = data.GetBool ("ai_wander");
+		// KeyEdit.Workspaces.Tools.UnitActionTool.On_MouseUp() - creates NavPoint gameobject and sets "ai_path_in_progress" = true;
+		bool pathInProgress = data.GetBool("ai_path_in_progress");
+		double maxSpeed = data.GetDouble ("max_speed");
+		double max_force = data.GetDouble("max_force");
+		double slowDownDistance;
+		
+		// if (followTarget)
+		// {
+			// // subtract a minimum radius from the target's position so we dont collide with it
+			// Vector3d destination = _targetAgent.Translation +
+								   // (Vector3d.Normalize(Translation - _targetAgent.Translation)*Radius);
+
+			// // determine if we should wander or follow a target
+			// double detectRangeSquared = 256f*256f;
+				// // radiusSq at which the agent will start to follow the target, beyond which he'll break off
+			// if (Vector3d.GetDistance3dSquared(destination, Translation) > detectRangeSquared)
+				// Acceleration += Steering.Wander(this);
+			// else
+				// Acceleration += Steering.Steer(this, maxForce, maxSpeed, destination, 20);
+		// }
+		// else if (pathInProgress)
+		// TODO: for now while we test our InteriorPathing code, we should just ask the AIAPI to 
+		//       create a path for us if none exists.  To then pick a new path when finished with the previous
+		//       but allowing variable time interval or "cooldown" between completing a path and starting a new one.
+		// Do we have / need an overall AI/TaskManager creating paths and tasks for our crew to do?  Well, that
+		// might be job of the 1st Officer or some other chiefs of department(s).  There AI scripts and/or behavior trees
+		// would include the ability to assign tasks to subordinates.
+		// Subordinates can assign themselves recreational tasks, eating, sleeping, bathing, relaxing in the "bar" room, etc.
+		// How does a task like "fix engine nacelle 01" turned into multiple tasks like pathing, then fixing, then completing and updating
+		// the log, then taking the next task.
+		if (!pathInProgress)
+		{
+			// current translation is our "start" vector3d
+			// pick random floor and ranom x,z coordinates to use for our destination path
+			// todo: call Path[] paths = AIAPI.ComputePath(start, end);
+			// EntityAPI.SetCustomPropertyValue(entityID, "paths", paths);
+			// data.SetBool ("ai_path_in_progress", true);
+			// EntityAPI.SetCustomPropertyValue(entityID, "userdata", data);
+			return;
+		}
+		if (pathInProgress)
+		{
+			object property = EntityAPI.GetCustomPropertyValue(entityID, "paths");
+			if (property != null)
+			{
+				Path[] paths = (Path[])property;
+							
+				if (paths == null)
+				{
+					// TODO: reset ai state vars					
+					return;
+				}
+				
+				int numPaths = paths.Length;
+				int currentPath = data.GetInteger ("ai_current_path");
+									
+				// /* // do we need to compute path to this navpoint?
+				// if (paths[currentPath].Path == null) // || paths[currentPath].PathCreationTime > StaleAge)
+				// {
+					// string destinationRegionID = paths[currentPath].RegionID;
+					// Vector3d[] path = AIAPI.Path_Find(entityID, destinationRegionID, paths[currentPath].Position);					
+					// paths[currentPath].Path = path;		
+					// store the path we've computed 
+					// EntityAPI.SetCustomPropertyValue(entityID, "paths", paths);
+					
+					// if (path == null)
+					// {
+						// still null? we have a problem, the path failed to compute
+						// we should cancel path finding and reset ai state vars
+						// data.SetBool ("ai_wander", false);
+						// data.SetBool ("ai_path_in_progress", false);
+						// data.SetInteger ("ai_current_path", -1);
+						// data.SetInteger ("ai_current_point", -1);
+						// EntityAPI.SetCustomPropertyValue(entityID, "userdata", data);
+						// return;
+					// }	
+					// else 
+						// System.Diagnostics.Debug.WriteLine("Beginning Navigation: " + path.Length.ToString() + " PATH points created for " + currentNavPoint.ToString());
+				// } */
+				
+				
+				
+				 // if (currentPath != -1)
+				 // {
+					// int currentPathPoint = data.GetInteger ("ai_current_point");
+					
+					// Vector3d currentTranslation = EntityAPI.GetPosition (entityID);
+					// Vector3d goal = navpoints[currentPath].Path[currentPathPoint];
+					// slowDownDistance = (currentTranslation - goal).Length / 2d;
+					// // find steering force then apply to movement.
+					// Vector3d acceleration = AIAPI.Steer(entityID, goal, maxForce, maxSpeed, slowDownDistance, elapsedSeconds);
+					// // NOTE: we move first and update paths if necessary afterwards
+					// Vector3d direction = ApplySteering(entityID, acceleration, elapsedSeconds, out currentTranslation);
+						
+					// // Now that we've moved, check progress towards goal
+					// double distanceToPathPoint; 
+					// Vector3d resultDirection = Vector3d.Normalize(goal - currentTranslation, out distanceToPathPoint);
+					
+					// // TODO: if our acceleration takes us beyond the goal, we should not go back
+					// //       but advance towards next
+					// // TODO: actually, we should just have a proximity radius to point and if we're close enough, advance to next point in path
+					
+					// // if direction to current sub-goal before and after movement has changed, then we overshot
+					// //bool reachedPathPoint = Math.Abs(distanceToPathPoint) <= double.Epsilon * 2;
+					// //bool reachedPathPoint = Vector3d.GetDistance3d (direction, resultDirection)) < 0.1;
+					// // exactly opposite facing vectors will yeild a dotproduct of -1.0f
+					// double epsilon = 0.5; // TODO: this should be our "ai_path_proximity_radius" variable, not hard coded
+					// bool reachedPathPoint = (goal == currentTranslation || Vector3d.DotProduct(direction, resultDirection) - epsilon <= -1.0);
+					
+					// if (reachedPathPoint) 
+					// {
+						// // move to next pathpoint
+						// int numPathPoints = navpoints[currentPath].Path.Length;
+						// System.Diagnostics.Debug.WriteLine("WAYPOINT destination reached");
+						// if (currentPathPoint < numPathPoints - 1)
+						// {
+							// currentPathPoint++;
+							// goal = navpoints[currentPath].Path[currentPathPoint];
+							// System.Diagnostics.Debug.WriteLine("moving to PATH point:" + currentPathPoint.ToString());
+						// }
+						// else
+						// {
+							// currentPathPoint = 0;
+							// // move to next NavPoint
+							// if (currentPath < numPaths - 1)
+							// {
+								// currentPathPoint = 0;
+								// currentPath++;
+								// goal = navpoints[currentPath].Path[currentPathPoint];
+								// System.Diagnostics.Debug.WriteLine("moving to Path point:" + currentPath.ToString());
+							// }
+							// else
+							// {
+								// // we've reached final destination
+								// currentPath = -1;
+								// data.SetBool ("ai_path_in_progress", false);
+								// EntityAPI.SetCustomPropertyValue(entityID, "paths", null);
+								// EntityAPI.SetVelocity (entityID, Vector3d.Zero());
+								// // set final position in case we overshot a bit
+								// EntityAPI.SetPosition (entityID, goal);
+								// System.Diagnostics.Debug.WriteLine("FINAL destination reached.");
+							// }
+						// }
+						
+						// data.SetInteger ("ai_current_path", currentPath);
+						// data.SetInteger ("ai_current_point", currentPathPoint);
+						// // is the following call necessary?  or is data a reference that updates in our property value too?
+						// EntityAPI.SetAIBlackboardData(entityID, data);
+					// }
+					// else
+					// {
+						// goal = navpoints[currentPath].Path[currentPathPoint];	
+					// }
+				// }
+			}
+		}
+		// else if (wander)
+		// {
+			// TODO: AIAPI.Wander is allowing entity to move out of bounds and through obstacles!
+			// Vector3d acceleration = AIAPI.Wander(entityID);
+			// Vector3d dummy;
+			// Vector3d direction = ApplySteering(entityID, acceleration, elapsedSeconds, out dummy);
+		// }
+	}
+	
+	private static void Targeting (string entityID, KeyCommon.Data.UserData data)
+	{
+		
+		// hack - for now always find new target since there will only be
+		//        one or two - search params are priority/threat, assignment by leader/role, proximity,
+		Vector3d targetPosition = Vector3d.Zero();
+		string targetID = data.GetString("ai_current_target");
+		
+		if (string.IsNullOrEmpty (targetID))
+		{
+			// no current target.  find target
+			// TODO: how should we add filters for things like
+			// - target Team (enemies vs allies)
+			// - target Health (alive vs dead)
+			// these are custom game specific properties... do I supply my own predicate lambda?
+			// to the find?  But without direct access to Entity we will need to act on target EntityIDs
+			// and using those id's we could still mess with entities... i still need a way to prevent
+			// non-owning entities from modifying others... just don't worry about it for now i guess..
+			Predicate<string> match = (foundEntityID) =>
+			{
+				KeyCommon.Data.UserData foundEntityData =(KeyCommon.Data.UserData) EntityAPI.GetCustomPropertyValue(foundEntityID, "userdata");
+				
+				if (foundEntityData == null) return false;
+				int health = (int)EntityAPI.GetCustomPropertyValue (foundEntityID, "health");
+				if (health <= 0) return false;
+				int teamID= (int)EntityAPI.GetCustomPropertyValue (foundEntityID, "team");
+				if (teamID == 0) return false;
+				
+				return true;
+			};
+			
+			targetID = AIAPI.Target_Find (entityID, match, out targetPosition);
+			data.SetString("ai_current_target", targetID);
+			data.SetVector("ai_current_target_position", targetPosition);
+			
+			// could not find target
+			if (string.IsNullOrEmpty (targetID))
+			{
+				return;
+			}
+		}
+		else 
+		{
+			// have existing target? stay with it or change?
+			int health = (int)EntityAPI.GetCustomPropertyValue (targetID, "health");
+			if (health <= 0) 
+			{
+				data.SetString("ai_current_target", null);
+				//recurse
+				Targeting(entityID, data);
+				return;
+			}
+			else 
+				targetPosition = data.GetVector("ai_current_target_position");
+		//	{
+			//	- time since last target switch 	
+			//	- higher priority target now available
+			//  - existing target is destroyed or disabled
+		//	}
+		}
+		
+		WeaponsFire (entityID, data, targetPosition);				
+	}
+	
+	private static void WeaponsFire(string entityID, KeyCommon.Data.UserData data, Vector3d targetPosition)
+	{
+		const double RATE_OF_FIRE = 5.0d;
+		
+		// get direction to target
+		Vector3d position = EntityAPI.GetPositionRegionSpace(entityID);
+		Vector3d direction = Vector3d.Normalize(targetPosition - position);
+		
+		// move starting position slightly in front of muzzle to avoid immediate self collision
+		position += direction * 2d;
+		
+		// rotate to target - limit rotation speed by frame rate and entity's max rotation speed
+		Quaternion rotation = AIAPI.RotateTo(-direction); 
+		// todo: skip rotation if our current Rotation is within epsilon of 
+		// target Rotation otherwise will jitter
+//		Quaternion currentRotation = EntityAPI.GetRotationRegionSpace(entityID);
+//		double costheta = Quaternion.DotProduct(currentRotation,rotation);
+//		double epsilon = 0.1d; // double.Epsilon is so small we'll just oscillate back and forth passed it's cut off if the frame rate isn't high enough
+//		if ( costheta > epsilon)
+			EntityAPI.SetRotationRegionSpace (entityID, rotation);
+			
+		double lastFireTime = data.GetDouble ("ai_last_weapon_fire_time");
+		string sceneID = (string)EntityAPI.GetEntitySceneID (entityID); 
+		double totalElapsed = (double)GameAPI.GetTotalElapsedSeconds (sceneID);
+		if (totalElapsed - lastFireTime > RATE_OF_FIRE)
+		{
+			int[] effectIndices = (int[])EntityAPI.GetCustomPropertyValue(entityID, "particle_effects");
+			Vector3d scale = new Vector3d(1,1,1);
+			
+			// modify accuracy based on skill (note: skill is modified by distance, damage, evasiveness of target, etc)
+			Vector3d aimDirection = RandomHelper.RandomVector(direction, 2.5);
+			
+			// TODO: velocity should go along with registeration of particle... ? 
+			Vector3d velocity = aimDirection * 30d;
+			VisualFXAPI.ParticleEffect_Trigger (effectIndices[0], entityID, position, velocity);
+			AudioFXAPI.Sound_Play (entityID, "laser");
+			data.SetDouble ("ai_last_weapon_fire_time", totalElapsed);
+			
+			// is this necessary?  or is data a reference that updates in our property value too?
+			EntityAPI.SetCustomPropertyValue(entityID, "userdata", data);
+		}
+	}
+	
+
+	
+	// public static Production[] Production_Update (string entityID, double elapsedSeconds)
+	// {
+		// const float radarSignature = 0.5f;
+
+		// Production[] production = (Production[])EntityAPI.GetCustomPropertyValue (entityID, "production");
+	
+		// EmissionValue value;
+		// value.Strength = radarSignature;
+		// value.Time = 0;
+		// value.Position = EntityAPI.GetPosition(entityID);
+		// // produce a radar signature regardless of whether there are any radar sensors active.
+		// // NOTE: A radar sensor is an active scanner that emits microwaves which can also be detected
+		// // However we do not model the 2 way trip.  We only model a constant emission as if the vehicles
+		// // were always emitting radar signature like a scent.  This is not realistic but it's completely 
+		// // imperceptible in game.  
+		// // Why is this superior to having every radar emit to every vehicle and determining the reflection
+		// // then emitting a return signature and determining which sensors detect it?  Well it's a 2 way trip
+		// // which is realistic, however it offers nothing for a simulation.  That is, modeling it as just one way 
+		// // originating from the signature emitting vehicle allows for equal realism modeling with half the cpu.
+		// production[6].SourceEntityID = entityID;
+		// production[6].UnitValue = value;  
+
+		// return production;
+	// }
+	
+		
+	 public static Consumption[] Consumption_Heat (string entityID, Production production, double elapsedSeconds)
+	 {
+		 // System.Diagnostics.Debug.WriteLine ("NPC.Consumption_Heat()");
+		 
+		 // TODO: what if we're already destroyed?  Can we be more destroyed?
+		 // - do we disable a branch of our ModelSelector forcing Select() to return destroyed branch?
+		 //   - wouldn't this make this npc.cs script more limited to a few model types?
+		 //   - is there a general mechanism we can establish - perhaps having friendly named
+		 //     branches so we can disable sub-branch by name and/or promote priority of another?
+		 //   - change appearance/material to one that is darker.. where glowing emissive eyes are now gray
+		 //     - or is it a shader param where damage detail map transparency decreases?
+		 //   - explode into a shower of particles... 
+		 //		- it's sub-body parts can all seperate and fall to ground, smoldering
+		 //			- DEBRIS & LOOT ?
+		 //		- then gamescript should delete destroyed entities if that setting is set 
+		 //       in the gamescript 
+		 
+		 Consumption[] result = new Consumption[1];
+		
+		// if the heat product's value exceeds our heat tolerance threshold, we will apply damage 
+		int resistance = 10; // (int)EntityAPI.GetCustomPropertyValue (entityID, "heatresistance");
+		
+		// get existing health
+		int health = (int)EntityAPI.GetCustomPropertyValue (entityID, "health");
+		
+		// lower heat resistance based on damage and compute applicable damage
+		
+		// apply damage that gets through heat resistance
+		health -= (int)production.UnitValue;
+		EntityAPI.SetCustomPropertyValue (entityID, "health", health);
+				
+		// we apply damage here, but we'll wait for Update() to respond to it?
+		// eg. when health == 0, destroy event is fired (related state changes, appearance changes, animations, sounds, etc)
+		// eg. on consumption, an explosion particle + product is emitted
+		// eg. on consumption, a slight hit force is applied to impact point 
+		// if destroyed, do we have to stop any currently running animations
+		// especially if we're now going to disable the "alive" ModelSelector branch
+		
+		
+		Vector3d locationWS = production.Location; // collision impact point stored here?
+		
+		int[] effectIndices = (int[])EntityAPI.GetCustomPropertyValue(entityID, "particle_effects");
+		// TODO: CustomParticleSystem_EmitParticle() for lasers, and for TVParticleSystems ParticleSystem_EmitParticle
+		Vector3d scale;
+		scale.x = scale.y = scale.z = 1.0d;
+		
+		// TODO: here the effectIndices[] are not global (not universal server side) and that is bad
+		//       since different scripts will register at different times resulting in indices that are
+		//       not deterministic.  
+		VisualFXAPI.ParticleEffect_Trigger (effectIndices[0], entityID, locationWS, Vector3d.Zero()); 
+		
+		
+		// play appropriate sound based on our own material  
+		// and what we were hit by
+		// AudioAPI.SoundFX_Emit(soundIndices[0], entityID, locationWS);
+		
+		System.Diagnostics.Debug.WriteLine ("NPC.Consumption_Heat() - Health: " + health.ToString());
+			
+		if (health <= 0)
+		{	
+			// explode - emit an explosive blast (note: this particle was registered along with .Explosive damage production)
+			//  - also what about TexturedAnimation explosion?  I think one thing to be mindful of is that the
+			//    interfaces to dealing with any type of visualFX, are the same... whether its tvparticle, custom particle
+			//    or texture animation.
+			//
+			// VisualFXAPI.ParticleEffect_Trigger (effectIndices[0], entityID, locationWS, Vector3d.Zero()); 
+			
+			// switch to destroyed LOD modelselector node path
+			
+			// 
+		}	
+		
+		result[0].ConsumerID = entityID; // the entity that is consuming a product
+        result[0].ProducerID = production.SourceEntityID; // todo: should production and consumption be handled server side and the Consumption "result" passed to the client? Simulation.cs should maybe be run on loopback server.
+        result[0].ProductID = production.ProductID;     // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer
+        //result.UnitValue = production.UnitValue;
+		result[0].TargetID = null;
+		result[0].Properties = null;
+		KeyCommon.Simulation.PropertyOperation[] operations = new  KeyCommon.Simulation.PropertyOperation[1];
+		operations[0] = KeyCommon.Simulation.PropertyOperation.Decrement;
+		result[0].Operations = operations;
+		
+		
+		return result;
+	 }
+	 
+	// public static Consumption Consumption_Gravity (string entityID, Production production, double elapsedSeconds)
+	// {
+		// Consumption result;
+		
+		// // for this function, rather than script it we will call the API
+		// double sourceEntityMass = (double)EntityAPI.GetCustomPropertyValue (production.SourceEntityID, "mass");
+		// Vector3d force = (Vector3d)EntityAPI.GetPropertyValue (entityID, "force");
+		// force += EntityAPI.Physics_Gravitation (entityID, production.SourceEntityID, sourceEntityMass, elapsedSeconds);
+		
+		// EntityAPI.SetPropertyValue (entityID, "force" , force);
+		// return result;
+	// }
+	
+	// // todo: does/should Consumption_Thrust include steering here?
+	// // todo: it's tricky because helm operator should compute engine thrusts and
+	// //       burn times, and when to decelerate.  In effect, "Steering" is our Helm.
+	// // todo: Thrust consumption could for instance receive full total thrust production
+	// //       that is available for steering including burn times available, the individual
+	// //       thrusters that are available (the axis they control) and burn time available.
+	// //       And then here, we can decide which ones to use for steering and then
+	// //       Apply that thrust. It's a thought.  I'm still thinking that turning (steering)
+	// //       and main thrust are different steps, but maybe they aren't?  In the context
+	// //       of our steering lib, steering is catch all for guidance.
+	// public static Consumption Consumption_Thrust (string entityID, Production production, double elapsedSeconds)
+	// {
+		// Consumption result;
+		// // can we individually accumulate thrust from multiple engines
+		
+		
+		// // todo: if the thrust direction is axial, that force should be added
+		// //       to our angularAcceleration
+		
+		// // strafe or angular because two axial thrusters on same side of ship can work together
+		// // to provide strafing.  note: if for some reason both axials on same side arent firing we can't strafe
+		// Vector3d thrustDirection; // = yaw pitch roll? quaternion?
+		// thrustDirection.x = 0;
+		// thrustDirection.y = 0;
+		// thrustDirection.z = 1;
+		
+		// // get the thrust amount. todo: production.UnitValue should contain
+		// // thrust axis, thrust value, and whether it's angular or strafing
+		// // and thus be a either an array of values or a struct.
+		// Vector3d thrust = (Vector3d)production.UnitValue;
+		
+		// // TODO: thrust here should be converted to acceleration based on the pounds of thrust
+		// //       and the mass of the ship.
+		// // further, i think "force" SetPropertyValue should be "acceleration" += force property instead.
+		// Vector3d force = (Vector3d)EntityAPI.GetPropertyValue (entityID, "force");
+		// force += thrust;
+		
+		// EntityAPI.SetPropertyValue (entityID, "force", force);
+		// return result;
+	// }
+	
+
+	public static void OnRender (string contextID, string entityID, string[] modelIDs, string shaderID, 
+								 Vector3d cameraSpacePosition, Vector3d[] cameraSpaceBoundingBoxVertices, double elapsedSeconds)
+	{
+		float barWidth = 80f;
+		float barHeight = 10f;
+		
+		// TODO: if distance is too far, dont draw the health bar
+		// TODO: get the setting of DrawHealthBar bool from APISettings so we can enable/disable via menu item
+		// KeyScript.BaseScript method
+		//DrawHealthBar(contextID, entityID, cameraSpacePosition, cameraSpaceBoundingBoxVertices, barWidth, barHeight);
+	}
+	
+	// returns 32bit child node filter mask
+	// - if this function is "per node" then the nodeID will be passed in
+	// and we can return a mask and it will use that to query children if applicable
+	// and we don't need to worry about finding the ancestor node's ID or using friendly name hierarchy
+	// like XPath... and it's probably the easiest way to do things...
+	// - however, i think it means we end up having to load some of the same data over and over...
+	// such as retreiving the hitpoints 
+	// - but there wont be context for all nodes in the switch... does it matter?  if we've reached that
+	// switch element, then there's only one specific test right?
+	// - each child must have a unique friendly name or else how do we create a proper switch(selectorNodeName) ?
+	public static int OnSelectModel (string entityID, 
+									  string selectorNodeID,
+									  string selectorNodeName,
+									  double distance)
+	{
+		// if using script to select, why even bother with this
+		// deep nested tree?  we could simply have a single selector and then enable/disable relevant children
+		// bits in the childEnabledMask.  For instance, you could have
+		// names "single body", "single body damage 0 lod 0" "single body damage 0 lod 1" 
+		// where essentially you only have the models...
+		
+		// one key benefit to the hierarchy however is being able to animate all sub-models
+		// just by transforming the parent.  furthermore, children that are not selected dont get
+		// updated so we do lazy updates (only when needed) which is a further optimization.
+		
+		// TODO: we only want to change flags that have changed?  
+		
+		// The main drawbacks are
+		// - constructing the hierarchy in plugin will be annoying
+		// - deep traversal and combining "results.AddRange" could be slow
+		
+//		Entity
+//			ModelSelector "body selector" (0 = single body, 1= component body)
+//				ModelSelector "single body"
+//					ModelSelector "damage selector" 
+//						ModelSelector "damage0"
+//							ModelSelector "lod selector"
+//								Model "lod0"
+//								Model "lod1"
+//						ModelSelector "damage1"
+//							ModelSelector "lod selector"
+//								Model "lod0"
+//								Model "lod1"
+//								
+//				ModelSelector "component body"
+//					ModelSelector "head"
+//						ModelSelector "damage selector" 
+//							ModelSelector "damage0"
+//								ModelSelector "lod selector"
+//									Model "lod0"
+//									Model "lod1"
+//							ModelSelector "damage1"
+//								ModelSelector "lod selector"
+//									Model "lod0"
+//									Model "lod1"
+//					ModelSelector "torsoe"
+//						ModelSelector "damage selector" 
+//							ModelSelector "damage0"
+//								ModelSelector "lod selector"
+//									Model "lod0"
+//									Model "lod1"
+//							ModelSelector "damage1"
+//								ModelSelector "lod selector"
+//									Model "lod0"
+//									Model "lod1"
+					
+		//System.Diagnostics.Debug.WriteLine ("NPC.OnSelectModel() - " + selectorNodeName);
+		int mask = 0;
+		
+		// NOTE: this method presumes that as author of the game mod, the developer customizing
+		//       this method knows the exact order of childnodes under any given Selector node
+		//       and thus allows us to enable/disable those children by enabling/disabling the 
+		//       exact required bitflag
+		//       
+
+		// get existing health
+		int health = (int)EntityAPI.GetCustomPropertyValue (entityID, "health");
+		if (health > 0)
+			mask |= 1 << 0; // alive
+		else 
+			mask |= 1 << 1; // destroyed
+		
+		// but if this is shadow pass then, select lower LOD than normal?
+		
+		// choose filter based on:
+		// - the friendly node name
+		// - hitpoints
+		// - distance
+		// switch (selectorNodeName)
+		// {
+			// case "body selector":
+				// break; 
+			// case "single body":     // lod option or destroyed option - far away 
+				// break;
+			// case "component body":  // lod option - near but also not destroyed
+				// break;
+			// case "damage0":
+				// break;
+			// case "damage1":
+				// break;
+			// case "destroyed0":
+				// break;
+			// case "destroyed1":
+				// break;
+			// case "lod0":
+				// break;
+			// case "lod1":
+				// break;
+			// default:
+				// break;
+		// }
+		
+		// switch (selectorNodeName)
+		// {
+			// case "head":
+				// break;
+			// case "larm":
+				// break;
+		// }
+		
+		return mask;
+	}
+	#endregion
+	
+	
+}

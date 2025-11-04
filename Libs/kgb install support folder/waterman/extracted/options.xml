@@ -1,0 +1,11 @@
+<options>
+  <LicenseKey value="Truevision3d licence" />
+  <LicensedTo value="Stormwind Ltd" />
+  <SrcFile value="g:\Stormwind\stormwind.exe" />
+  <KeyFile value="" />
+  <OutputFile value="stormwind.lic" />
+  <OutputDir value="g:\stormwind" />
+  <UseKeyFile value="False" />
+  <Type value="P" />
+  <OutputType value="2" />
+</options>

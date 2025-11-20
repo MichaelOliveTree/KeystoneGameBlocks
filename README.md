@@ -40,7 +40,8 @@ Keystone Game Blocks(KGB) is a 3D Game Framework written in C#.  The primary goa
     * ability to define custom Events and allow any Entity to subscribe to the Events of another.
 * Behavior Tree option for individual Entity AI Logic
 * A* Pathfinding for Agents
-* Prefab Save/Load with complex hierarchies.
+* Prefab Design/Save/Load with complex hierarchies.
+* Particle Systems can be Designed/Saved/Loaded as Prefabs.
 * Wavefront .Obj loading
 * Linear Interpolation Animation Editing via Plugin (can create CPU driven animations that interpolate Model & Entity Translations Scale and Rotation as well as Light Entities' diffuse/ambient/specular, and Materials' diffuse/ambient/specular/emissive, and 
 * Multiple rendering viewports on screen at the same time (which is used by my also work-in-progress game SciFi Command which features simultaneous Exterior Ship views typical of most space-sims, with the addition of Interior Deck Plan and "Away-Team" views onscreen at the same time for a unique Capital Ship Management Simulation) 

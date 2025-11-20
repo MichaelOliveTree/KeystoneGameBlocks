@@ -15,14 +15,14 @@ MichaelWalksWithGod@gmail.com
 Also, if you are interested in licensing from me the applicable code contained within this Game Framework (the code to which I have full copyrights), contact me via either of the previous email addresses provided.  I am very busy these days, but I will try to get back to you ASAP.
 
 _______________________________________________________________________________________________________________________
-Keystone Game Blocks is a 3D Game Framework written in C#.  The primary goal was to make a 3D game framework that met the following criteria:
+Keystone Game Blocks(KGB) is a 3D Game Framework written in C#.  The primary goal was to make a 3D game framework that met the following criteria:
 
 - EASY to use for developers  which means the architecture and organization of the code had to be well designed. 
 - EXTENSIBILE via plugins, C# scripting and in adding new features and capabilities such as a new renderers using DirectX12 or Vulcan for instance. (it currently just uses DirectX9 via a wrapper called Truevision3D, but because the KGB architecture is well designed, it's very easy to add new renderers) 
 - PERFORMANT is the third consideration because this framework is designed for AA games that focus on GAMEPLAY and not AAA games that often focus on GRAPHICS and AESTHETICS.
-- NEWORKING/MULTIPLAYER - the entire framework currently uses LOOPBACK messaging for virtually everything.  This means making real network enabled games will be as simple as changing the HOST to target a remote server instead of LOCALHOST.  This will also eventually allow for the EDITOR to support collaborative EDITING and UNDO/REDO options very easily.  Keystone Game Blocks can use either the Lidgren UDP Connection objects or a custom derived version of the base Lidgren Connection object, which I developed myself, that uses TCP instead.
+- NEWORKING/MULTIPLAYER - the entire framework currently uses LOOPBACK messaging for virtually everything.  This means making real network enabled games will be as simple as changing the HOST to target a remote server instead of LOCALHOST.  This will also eventually allow for the EDITOR to support collaborative EDITING and UNDO/REDO options very easily.  Keystone Game Blocks can use either the Lidgren UDP Connection objects or a custom derived version of the base Lidgren Connection object, which I developed myself, that uses TCP instead of UDP, and does so in an agnostic way so that the calling application does need to care whether it's working with a UDP Lidren Connection or the custom TCP Connection object.
 
- It features typical game framework things:
+ KGB features typical game framework things:
  
 * 3D Editor
 * Hybrid Scene Graph (Nodes not ECS) with Scene Management functions including

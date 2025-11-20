@@ -50,6 +50,7 @@ WARNING: All code in the \\stage\\ folder needs to be integrated into the main b
 I'm most interested in getting the Generic Memory<T> code integrated to replace the slow per-Entity 'updates()' (for movement for example) to a "Data Processing Model" that iterates once per frame over contiguous memory of all relevant Entities' data with a single Memory<T> instance.  This should result in significant CPU performance improvements.
 
 Thank you.
+
 Michael P. Joseph
 
 TODO:

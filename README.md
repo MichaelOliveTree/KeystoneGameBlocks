@@ -38,6 +38,7 @@ Keystone Game Blocks(KGB) is a 3D Game Framework written in C#.  The primary goa
 * C# Scripting.
     * ability to define custom Entity properties
     * ability to define custom Events and allow any Entity to subscribe to the Events of another.
+* Behavior Tree option for individual Entity AI Logic
 * A* Pathfinding for Agents
 * Prefab Save/Load with complex hierarchies.
 * Wavefront .Obj loading

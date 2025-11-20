@@ -57,3 +57,4 @@ TODO:
 - 2D and 3D GUI that is built on top of the existing Node based 3D Scene Composition to provide a consistant and intuitive way for developing User Interfaces, including UIs that can be attached to in world 3D objects.
 - Physics
 - DX12 and Vulkan renderers
+- Linux / WINE support testing.  I believe the Truevision3d graphics engine will work on Linux using WINE but I have not tested it myself nor have I been using Mono.  Would love to test this in the future however.

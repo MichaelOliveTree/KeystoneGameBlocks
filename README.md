@@ -26,17 +26,17 @@ Keystone Game Blocks is a 3D Game Framework written in C#.  The primary goal was
  
 * 3D Editor
 * Hybrid Scene Graph (Nodes not ECS) with Scene Management functions including
- * 64bit precision for storing Entity Translations, Scales and Rotations.
- * multi-threaded hierarchical culling
- * finding and grouping of visible sets into Buckets.
- * camera-relative rendering to support artifact-free rendering far from the logical camera position.
- * Save / Load of Scenes
- * Region based spatial partioning.  Every "Region" such as a Starship's Interior uses its own coordinate system with origin (0,0,0) and is rendered in camera relative position with respect to the logical "world" coordinates.  This allows KGB to handle rendering large planets and stars at realistic scales while also rendering comparatively tiny objects like chairs within the interior of a ship at the same time.
- * optional spatial tree partitioning including Octree and Quadtrees within Regions.
- * optional Zone based partitioning.  Zones are inheritied from Region, but the difference is that a Zone can never be translated, rotated or scaled.
+    * 64bit precision for storing Entity Translations, Scales and Rotations.
+    * multi-threaded hierarchical culling
+    * finding and grouping of visible sets into Buckets.
+    * camera-relative rendering to support artifact-free rendering far from the logical camera position.
+    * Save / Load of Scenes
+    * Region based spatial partioning.  Every "Region" such as a Starship's Interior uses its own coordinate system with origin (0,0,0) and is rendered in camera relative position with respect to the logical "world" coordinates.  This allows KGB to handle rendering large planets and stars at realistic scales while also rendering comparatively tiny objects like chairs within the interior of a ship at the same time.
+    * optional spatial tree partitioning including Octree and Quadtrees within Regions.
+    * optional Zone based partitioning.  Zones are inheritied from Region, but the difference is that a Zone can never be translated, rotated or scaled.
 * C# Scripting.
- * ability to define custom Entity properties
- * ability to define custom Events and allow any Entity to subscribe to the Events of another.
+    * ability to define custom Entity properties
+    * ability to define custom Events and allow any Entity to subscribe to the Events of another.
 * CPU Portal and Occlusion Culling options
 * A* Pathfinding for Agents
 * Prefabs

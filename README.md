@@ -65,7 +65,7 @@ KGB TODO ITEMS:
 - DX12 and Vulkan renderers
 - Linux / WINE support testing.  I believe the Truevision3d graphics engine will work on Linux using WINE but I have not tested it myself nor have I been using Mono.  Would love to test this in the future however.
 _____________
-SciFi Command Specific Features
+SciFi Command Specific Features (See included project under folder \\Game01)
 - (WIP) Procedural Galaxy Generation (including Star systems with worlds and moons)
 - (WIP) Procedural World Texture generation
 - Starship Deckplan Designer allowing the PLAYER to design the interior layouts of their starship

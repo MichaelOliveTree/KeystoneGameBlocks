@@ -13,6 +13,11 @@ in CoreCliet.Initialize() on line _audio.Initialize(graphics.Handle); i have the
 im not sure if its vorbisdotnet or directsound.  just commenting out _audio.Initialize(graphics.Handle); allows the app to run.
 
 --------------------------------------
+If any other strange issues with an unknown external DLL that fails to load, try Depenendency Walker on the mtv3d65.dll being used.
+Dependency Walker (binaries available)
+https://github.com/lucasg/Dependencies
+
+--------------------------------------
 Windows Defender "Controlled Folder Acess" & File Attributes = Read Only
 	- if for some reason you have issues with .css scripts being copied from mods\\caesar\\scripts to \\bin\\...\\
           make sure the folder and file attributes are NOT read only.
@@ -37,9 +42,15 @@ This updated MTV3D65.DLL should have the logo/watermark removed and it also adds
 It is located currently in \\Libs\kgb install support folder\\waterman\\extracted
 
 --------------------------------------
-If any strange issues loading any other external DLL that fails to load, try
-Dependency Walker (binaries available)
-https://github.com/lucasg/Dependencies
+MHull.sln build "error spawning cmd.exe"
+
+go to VS.NET Tools\Options\Projects and Solutions\VC++ Directories and add
+
+$(SystemRoot)\System32
+
+that one line should do it... if for some reason no, try also adding
+$(SystemRoot)
+$(SystemRoot)\System32\wbem
 
 
 

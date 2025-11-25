@@ -1,4 +1,4 @@
-﻿\<A[^ \t\n\r.,;:"()=<>'+!\[\]]*  progress prior to starting on custom Mesh recycling code without using mesh.Duplicate().  
+*  progress prior to starting on custom Mesh recycling code without using mesh.Duplicate().  
 
 May.25.2007 - Commented out the old Render2 and am started using seperate Cull and Draw traversals.  One problem is that prompted me to archive is that "Draw" is not a real traversal anymore as it depends on the Cull's NOdeStack result to be passed in.  And this changes the way I handle the Render of FXBase inheritors that have meshes that arent necessarily "added" to the scene but yet must be rendered.  So what Im going to need to do is have them use the Culler first then the Draw'er or a special combination Culler and Drawer that is more based on the original REnder2.
 
@@ -1680,24 +1680,6 @@ Use() - can sometimes result in a critical failure and even an explosion that ha
 
 https://www.gamedeveloper.com/game-platforms/online-multiplayer-the-hard-way
 
-obfuscator
-https://www.eziriz.com/dotnet_reactor.htm
-
-https://orkframework.com/
-
-
-Avis - Washington - 1072 Wisconsin Ave Northwest
-
-1072 Wisconsin Ave Northwest
-(202) 469-7179
-
-Washington, 20007
-Pick up
-
-Sunday Jul 14, 202
-
-4 3:00 PM
-
 
 - todo: how do we generate and load crew in the new context of spawn points?  And what about people living in world-side regions like colonies or bases or military installations or headquarters and such?
 	- we want to be able to know the names of key characters so they can't all just be randomly generated.
@@ -1934,47 +1916,6 @@ todo: mouse picking should always occur on Entity.Pickable = false when not in A
 todo: behavior tree execution probably should not occur if not in Arcade mode.
 
 
-
-Britta pitcher w/ refills	bought April.11.2024
-
-
-Shaq UFO sound effect - https://www.youtube.com/watch?v=gxreSxkvETI
-
-chicken x 3
-rice x 2
-OJ x 2
-coffee 
-coffee creamer
-cheese
-canned chilli
-soup
-frozen veggies
-bananas
-bread x 2
-salad kits
-potato salad
-
-
-==============================================
-LABCORP
-schedule appointment with labcorp for labs	
-thu 18th 1pm
-1950 e. southern ave, tempe
-(480) 491-4161
-FAST WEDS
-Please arrive 15 mins before your visit.
-Appointment Confirmation Number
-    1925884454
-	
-
-==============================================
-
-Erika Okuendo - APPOINTMENT
-july 11, 10:20Am
-	- told her i quit smoking and drinking feb 11th 2024
-==============================================
-feb.29.2024 - acccs expired
-
 todo: since v1.0 will be mission based, we won't allow saving.  We only track which missions were completed.
 todo: on saving scene, we should do it at the end of the graphics loop so we dont inadvertantly save wrong alphablending and material transparency values
 		todo: what if i skipped graphics loop entirely while "save" is in progress?
@@ -2010,94 +1951,6 @@ todo: when the velocity is already at a high enough value, we cant just use a ha
 	https://www.youtube.com/watch?v=am9Q789af5s 
 
 
-Bayless - Jan.11.2024 @10:20am 
-	- Sonora Quest labs
-	
-	
-paranoia, severe anxiety and depression 
-
-im here to cooperate fully
-
-I'm confused.  My employment status hasn't changed. The only monthly income i have is SSI. I thought i only had to report if my "employment status changed" and i havent been employmed for over 9 years.
-
-inheritance 
-=============
-june 2021 -power of attorney 70k most of which went to pay for my moms assisted living home, hospital bills and prescriptions.
-and 3k to hospital bills
-eliquis prescriptions
-
-Prudential 75k - oct 2021
-
-TransAmerica - $12,487.34 Jan.19.2022
-
-8125.00 gold coins inherited sold a few months ago
-==============================
-
-
-- what are my current balances - checking, investment, savings.
-$137.66
-$202,313.74 - sexual harrassment and discrimination suit
-$11.21
-
-- the savings isn't mine, its my older sister.  She just deposited the amount in a savings account under my name because she has creditors she's not willing to settle with until she sells her house in California.
-	- my sister might be willing to sign an affidavit that it is her money
-	
-- my rent is $1480.00
-
-
-$1,250.00 to a lawyer since my mom didn't leave a will and to make me executor of a small estate
-$12000 lost in the stock market
-$10,000 to my younger sister who has been battling brain and spinal cancer and can't work.
-
-
-
-call SSI and stop payment because of my chase balance on Sat 10/30/2021
-
-LAWYERS 
-Payment Receipt 	$1,250.00	
-keystone law Firm (paid 1250.00 ) march 10, 2022
-march.10.2022 - 3:30PM call
-
-Law Office of Francisco P. Sirvent, PLC, dba Keystone Law Firm
-2701 W. Queen Creek Rd., #3
-Chandler, Arizona 85248
-(480) 209-6942	
-http://www.startrek.com/
-Paseo Lease Renewal on 5.23.2022  - last day on July 24th
-	- $1391.00 per month for 12 months (1415.84 with other charges!)
-	- last day July 31, 2023 
-	- possible to go on Month to month basis?
-	
-	
-	
-	
-	SSI Call received 9am on Oct.30.2023
-	oc7 2021 to present - jp morgan investment statements
-	writtent letter from Adriana 
-	by end of this week (Friday 3rd Nov 2023) i should get certified letter
-	
-titles for missions: "Mith meets miniature Kirk" (concept idea oct.21.2023)
-
-
-	
-	
-​​480-946-9940
-
-Don @ The Estate Watch & Jewelry Co $1750.00
-https://www.watchlink.com/pages/scottsdale-gold-buyer 
-
-Ken @ c & c coin and stamp  - 3404 N 24th Street, Phoenix AZ 85016, USA
-1825.00 - 602-667-5766 - https://www.candccoin.com/
-
-mary @ Valley Goldmine - .98 oz - 1881.00 - $1787.00
-
-
-You have the right under article 27, section 2 of the Arizona Constitution and Arizona Revised Statutes title 36, section 3802 to keep your health information from being shared electronically through Health Current:
- 
-1. Except as otherwise provided by state or federal law, you may “opt out” of having your information shared through Health Current. To opt out, ask your healthcare provider for the Opt Out Form. Your information will not be available for sharing through Health Current within 30 days of Health Current receiving your Opt Out Form from your healthcare provider. Caution: If you opt out, your health information will NOT be available to your healthcare providers—even in an emergency.
-2. If you opt out today, you can change your mind at any time by completing an Opt Back In Form and returning it to your healthcare provider.
-3. If you do nothing today and allow your health information to be shared through Health Current, you may opt out in the future
-
 - MISSION BASED CAMPAIGN
 	- i think one of the keys to avoid the game feeling like its in a huge universe but a small playable environment is how we structure the missions of a campaign.  The player should constantly be finding / discovering more information about the galaxy.  For instance, they may discover that a region of space is controlled by another civilization and make first contact with them - whether they are aggressive or peaceful.
 	- some missions should require more oversight and instructions of the crew.  Remember, ours is the only game with a massive amount of crew and marines and passengers.  We need missions that creatively take them into account.
@@ -2116,51 +1969,12 @@ You have the right under article 27, section 2 of the Arizona Constitution and A
 - cant place components on interior level 0
 
 
-thegoldguy-sw.com
-Phone number
-(623) 500-4271
-Get Directions
-840 E Southern Ave Ste 102 Tempe, AZ 85282
-
 scene.cs should have an EntityCache to host things like laser beams, projectiles, explosion fx, etc.
 7936
 
 
-
-
-1255 Lease Agreement signed July.20.2023
-	1502.37
-
-
 https://www.youtube.com/watch?v=yDyJe1nmSOM
 	
-	
-
-
-
-sponges
-
-
-
-
-
-PASEO - July 11.2023 - 11:27am
-	Contact Us
-	Thank you!
-
-	Your Information has been received. We will contact you shortly.
-	Phone Number (855) 920-3259
-	Open Now
-
-		Mondayto - Friday: 9 AM to - 6 PM
-		Saturday: 10 AM to - 5 PM
-		Sunday: 12 PM to - 5 PM
-
-	Paseo on University
-	1255 E University Dr,
-	Tempe, AZ 85281
-
-
 
 
 west point mess hall - https://www.youtube.com/watch?v=cgnMNzvYqkk
@@ -2200,19 +2014,6 @@ todo: add promt and cancel when trying to enter two directional lights under the
 - todo: for v 1.0, lets just give the user a bunch of vehicles with preset configurations to choose from rather than allow total refit and modification.
 
 https://www.gamedev.net/blogs/entry/2276310-spells-as-code/
-
-
-Message Good day Michael. I am contacting you because of a referral for case management services. I wanted to discuss and assess your needs for resources and/or referrals within the community to meet your needs. Can you please call me back at 602-918-8951 or email me at MUnrein@baylesshealthcare.com to set up an appointment. If I do not answer, please leave a message and I will return your call within 24-48 business hours. This is my second attempt to reach you and I will try to contact you one more time. Thank you. Bayless Healthcare Case Manager, Marcus Unrein 602-918-8951 Munrein@baylesshealthcare.com
-
-
-Message Hello Michael. My name is Marcus Unrein, and I am a Case Manager. I am trying to reach you to discuss a referral that has been received to stating you need help with housing related resources. Can you please call me back at 602-918-8951 or email me at MUnrein@baylesshealthcare.com to set up an appointment to discuss your current CM needs. If I do not answer, please leave a message and I will return your call within 24-48 business hours. Thank you for your time. Bayless Healthcare Case Manager, Marcus Unrein
-
-BAYLESS APPOINTMENT - 602-230-7373
-	- thurs april 13th, 10am zoom -  KARLA TORRES - annual intake/assessment
-	- july 11th wednessday 9:40am  BAYLESS ZOOM CALL - SET ALARM FOR 9AM
-APPOINTMENT 
-
-June.25.2023 - replaced water filter
 
 
 // we need to prevent top velocity from being > zone dimensions
@@ -2302,13 +2103,6 @@ Post office - 480-929-0180 - called June.6.2023 and finally got through to a per
 - todo: test lasers traversing across zones
 
 - todo: script helm/navigation. selecting a star system and world and setting course then allowing for the ship to orient itself and start engines and travel there.  First test will be from Earth to Mars geostationary altitude.+
-
-I HAD A MOUNTAIN PARK APPOINTMENT I FORGOT TO CANCEL ON March 3rd. LISTEN TO VOICEMAIL
-
-PAY RENT ON SAFE DEPOSIT BOXES
-
-
-BUY DENIM JEANS 
 
 https://free3d.com/3d-model/futuristic-space-fighter-1149.html
 	- this is probably built as a Container Vehicle as well.
@@ -2642,22 +2436,6 @@ ENGINE PYLONS
 - then get placement valid only against assigned Vehicle hull and get it to snap to the impactpoint
 
 	
-	
-
-coffee
-creamer
-milk (for oatmeal)
-orange juice
-eggs
-bananas
-salad kits
-garlic
-onions
-canned chilli beans
-tuna in water 
-soup? check cholesterol
-
-
 
 
 	
@@ -2685,111 +2463,6 @@ soup? check cholesterol
 6. multithreading of Update() of Entities
 7. GUI
 8. the problem with having multiple viewports visible and the BonedEntities walking slower.  I think i need cumulative elapsedSeconds after each viewport is rendered
-
-
-
-how much is the rent?
-N-156 - 1415.84
-buyout 2545.00
-through July 31, 2023
-
-Paseo - 480-561-2785
-Phone: (480) 968-8118
-
-
-how much is the rent?
-N-156 - 1415.84
-buyout 2545.00
-through July 31, 2023
-
-
-PIZZA DELIVER
-Gate code #5150
-
-walmart pharmacy - 480 966 2791
-feb.8.23 picked up prescriptions
-
-Bayless Healthcare 
-Phone: (602) 281-7300
-	Bayless - april 5th, 2023 wed 9:40am
-
-
-
-988
-	
-jessica - quit smoking - nov.10.2022 1pm
-monica - registered dietician - nov.10.2022 12pm
-
-Mountain Park Health Center - next followup in 4 weeks (bloodwork Nov 4 friday)
-oct.28.2022
-1840 E. Broadway Rd.
-Tempe, AZ 85281 
-Dr. Supriya Bhandari
-(602) 243-7277
-8:20am
-
-monday dec.12 9:30am
-
-Mountain Park- (602) 243-7277
-Nov 29th appointment cancelled.  Must call back when im back in town to reschedule	
-11:30am tomorrow (Nov.10.22) over the phone - Dr. Supriya Bhandari, MD - elevated cholesterol levels	
-	- how high is it? - diet has gotten bad since my mom passed 13 months ago
-	- can it be reversed?
-	- does it fluctuate?
-	- when i read on the food labels, how much collesteroal is too much? (campbells soup)
-	- losing weight helps?
-	- pain in abdomin worse... feels tighter, not necessarily sharper. less pain in my back. no pain when laying down in bed on my back or on my left side so i dont think its the matress 
-		- feel bloated after eating and drinking water even if i dont eat that much.
-	anymore since i stopped sleeping on my right side approx 3 weeks ago.
-	- been drinking metamucil twice a day
-	
-muscle strain - old mattress - too firm near the side of the mattress
-loss of flexibility
-gas
-hernia
-kidney, mom had a history of kidney infections
-xanax and zyprexa
-inflamattion (xanax + alcohol)
-seemed to start suddenly, but now not as sharp pain when moving around
-only hurts when i move my torso in certain ways. in other words, when just sitting or standing there is no pain whatsoever
-feel a bit bloated 
-changed my diet
-haven't had alcohol since Oct.19th. (fell off wagon on Nov.1 and Nov.3)
-smoke and drink
-when i press into my abdomen, i dont feel any swelling or hardness. Left and right sides feel the same.
-
-
-
-SCHEDULE ULTRA-SOUND w/ SimonMed
-1-866-614-8555
-1111 S Dobson Rd, Suite 105, Mesa
-Thursday, Dec 22nd 8:00am
-15 minutes early 
-8hours FASTING
-
-
-Mountain Park Health Center - next followup march.3.2023 9:00am friday
-
-1840 E. Broadway Rd.
-Tempe, AZ 85281 
-Dr. Supriya Bhandari
-(602) 243-7277
-oct.28.2022 8:20am
-bloodwork Nov 4 friday
-dec.12 9:30am  monday 
-march.3 9:00am friday
-
-jasmine's medical assistant? 602-806-6655
-480-927-1005 tempe clinic 
-thurs Dec.29 11am - tele-visit 
-	- slightly enlarged liver... could be from weight gain and/or alcohol.
-	- liver enzyme at 45. so barely over "normal" which is 44.
-	- throwing out those vitamin k2 gel capsules aj gave me.  thats when this all started.
-	
-	
-miroslax
-	gi doctor endpcopy
-
 
 
 FINISH INSTALLING SOFTWARE ON MOM'S LAPTOP
@@ -2863,8 +2536,7 @@ todo: if i don't want to share my entity scripts, i could put them in an encrypt
 		
 		https://www.redblobgames.com/grids/hexagons/
 		
-C:\Program Files (x86)\Avira\Security\Swu\wa_3rd_party_host_32.exe
- 
+
 todo: we dont need surface area and volume for components since the ships total volume is already defined
  todo: what is the scale of the cafeteria table so i can use it again?  it seems perfect scale right now.
  
@@ -3017,135 +2689,6 @@ https://kotaku.com/jumplight-odyssey-pc-strategy-macross-gundam-yamato-184979902
 https://www.youtube.com/watch?v=sIIlpatVwBE
 
 
-
-CALL CHASE and verify safe deposit box is still in good standing.
-	- i think July 2023 is when im supposed to get a letter for renewal
-	
-POKER RULES TO Self
-	-each hand seperately.  - do not try to judge a hand based on previous hand.
-	- no "gut" feelings allowed.  Each hand dealt is irrelevant to emotionaly feelings.
-	- play hand all the way through.  dont let people catch up for free
-	- RECALL - bluffing early before establishing table image is critical! And being black makes this even harder.
-
-https://gamedev.stackexchange.com/questions/139778/tilemap-collision-detection
-https://stackoverflow.com/questions/24856725/tilemap-collision-resolution-between-two-tiles
-
-Promethius Wept
-	https://forums.tigsource.com/index.php?topic=72851.0
-
-
-
-
-
-
-Slava Ukraini !!!
-
-
-
-
-
-"A Memory Called Empire"
-- https://tokybook.com/a-memory-called-empire/
-"A Desolation Called Peace"
- https://www.youtube.com/watch?v=2LA_ToxhiOk
-- Arkady Martine
-
-Jordan Peele
-	- Get Out (2017)
-	- Us (2019)
-	- Nope (2022)
-
-PIZZA DELIVER
-Gate code #5150
-	
-pizza hut (May 21, 2022) - 25.00 credit on next order
-	Delivery Address 1255 E University Dr , N156
-Tempe, AZ 85281
-Your Store (480) 968-0740 
-
-
-	Tempe Apache Station Post Office
-NOTICE: The Postal Service is an essential government service, and will remain open wherever possible.	
-
-1962 E Apache Blvd, Tempe, AZ 85281
-Contact Numbers
-
-Phone: 480-929-0180
-
-
-
-Pest Control
-- Oct.15.2021 - 2:25pm 
-	- told to expect a second treatment in one week. So approx Oct 22, 2021
-
-
-
-- cancel netflix
-
-
-
-mail letters to Rosi and Carmin
-
-
--check if any owed to Post Acute nursing facility in Scottsdale
-
-
-JCPenny
-	- jeans
-	- tshirts
-	- underwear
-	- shoes
-	
-
-
-
-480-967-7766
-
-	
-LAWYERS 
-Payment Receipt 	$1,250.00	
-keystone law Firm (paid 1250.00 ) march 10, 2022
-march.10.2022 - 3:30PM call
-
-Law Office of Francisco P. Sirvent, PLC, dba Keystone Law Firm
-2701 W. Queen Creek Rd., #3
-Chandler, Arizona 85248
-(480) 209-6942	
-http://www.startrek.com/
-Paseo Lease Renewal on 5.23.2022  - last day on July 24th
-	- $1391.00 per month for 12 months (1415.84 with other charges!)
-	- last day July 31, 2023 
-	- possible to go on Month to month basis?
-	
-
-USBank Tempe Branch
-Lobby open for walk-in or by appointment
-1800 E Baseline Rd
-Tempe, AZ, 85283-1502
-480.756.8000
-daniel - 
-mary - 11:30am tuesday
-
-June.7.2022 - USBank safe deposit box #98 @ Tempe Marketplace branch.  (Chase stopped issuing safe deposit boxes altogether)
-rented for 12 months.  should get letter in the mail on renewal.
-$
-renewed for 12 months on June 21, 2023
-
-Chase Bank
-You're meeting with
-Marilin Velasquez
-May 31st, Tuesday 9:30am
-(480) 890-6340
-Why
-Something else
-How
-Meet at a branch
-Where
-McClintock and Southern
-1744 E Southern Ave,
-Tempe, AZ 85282
-(480) 890-6340
-	
 - todo: 
 	- todo: structures like mines and factories and artifacts would all go in the static scene.
 	
@@ -3217,41 +2760,6 @@ https://www.youtube.com/channel/UCOkZLNwa8BfhJEE7mmi7DUQ
 
 
 
-
-
-
-Destination Coffee Bar & Bistro
-Dine-in· Curbside pickup·
-Delivery
-Address: 100 W Florida Ave, Hemet, CA 92543
-Hours: Open ⋅ Closes 4:30PM
-Phone: (951) 652-0040
-
-Nick - 951 502 6498
-
-Ross - 55 S McClintock Dr, Tempe, AZ 85281
-- Mask required
-
-
-
-	- diet
-		- chicken rice
-		- red beans with pork
-		- spaghetti w/ meat sauce (sauce maybe too rich?)
-		- milk? no more dairy?  trying to limit it
-		- no more coffee
-		- oatmeal w/ no dairy
-		- eggs and toast
-		- balogna sandwiches for lunch
-		- raisin bran with milk (lactose free ok?)
-		- scrambled eggs
-		- bananas
-		- pizza
-		- chips ahoy chocolate chip cookies
-		- potatoes
-	
-	
-
 SQLite Database vs Prefab
 - we probably shouldn't be storing our entire game universe in a XMLDatabase.
 			- only prefabs should be in compressed archives
@@ -3294,69 +2802,8 @@ scene.cs should have an EntityCache to host things like laser beams, projectiles
 7936
 
 
-1255 Lease Agreement signed July.20.2023
-	1502.37
-
-
-https://www.youtube.com/watch?v=yDyJe1nmSOM
-	
-	
-- Walmart Pharmacy
-Address: 800 E Southern Ave, Tempe, AZ 85282
-Hours: Open ⋅ Closes 7 PM
-Phone: (480) 966-2791
-
-
-
-sponges
-
-
-
-PAID DISCOVER 38.00 - July 12, 2023
-
-
-PASEO - July 11.2023 - 11:27am
-	Contact Us
-	Thank you!
-
-	Your Information has been received. We will contact you shortly.
-	Phone Number (855) 920-3259
-	Open Now
-
-		Mondayto - Friday: 9 AM to - 6 PM
-		Saturday: 10 AM to - 5 PM
-		Sunday: 12 PM to - 5 PM
-
-	Paseo on University
-	1255 E University Dr,
-	Tempe, AZ 85281
-
-
-BAYLESS
-	oct 11th, 2023 - 10am Baylesss - Erika Okuendo
-
-*****************
-FAST
-- july.1. - rice and veggies
-- july.1 - 12 beers
-- july.2 - soup
-- july.2 - chicken breast
-- july.2 - coke x 2
-- july.2 - brocolli
-- july.3 - beans & chicken
-- july.3 - coke 
-- july.3 - small bag of chips
-- july.3 - 12 beers
-*****************
-
 west point mess hall - https://www.youtube.com/watch?v=cgnMNzvYqkk
 
-june 30 2023 - rent paid  
-
-SAFE DEPOSIT BOX RENEWAL!!!!!!!!!!!!!!
-contact paseo and enquire about lease renewal = inquire about a month 2 month option (actually dont ask about this until after they offer an electronic renewal)
-apply for chase credit card for emergency purposes
-GoFundMe, Patreon
 
 todo: add promt and cancel when trying to enter two directional lights under the same Region\Zone
 // TODO: add option to set the origin at one end of the billboard rather than the center.
@@ -3387,20 +2834,6 @@ todo: add promt and cancel when trying to enter two directional lights under the
 - todo: for v 1.0, lets just give the user a bunch of vehicles with preset configurations to choose from rather than allow total refit and modification.
 
 https://www.gamedev.net/blogs/entry/2276310-spells-as-code/
-
-
-Message Good day Michael. I am contacting you because of a referral for case management services. I wanted to discuss and assess your needs for resources and/or referrals within the community to meet your needs. Can you please call me back at 602-918-8951 or email me at MUnrein@baylesshealthcare.com to set up an appointment. If I do not answer, please leave a message and I will return your call within 24-48 business hours. This is my second attempt to reach you and I will try to contact you one more time. Thank you. Bayless Healthcare Case Manager, Marcus Unrein 602-918-8951 Munrein@baylesshealthcare.com
-
-
-Message Hello Michael. My name is Marcus Unrein, and I am a Case Manager. I am trying to reach you to discuss a referral that has been received to stating you need help with housing related resources. Can you please call me back at 602-918-8951 or email me at MUnrein@baylesshealthcare.com to set up an appointment to discuss your current CM needs. If I do not answer, please leave a message and I will return your call within 24-48 business hours. Thank you for your time. Bayless Healthcare Case Manager, Marcus Unrein
-
-BAYLESS APPOINTMENT - 602-230-7373
-	- thurs april 13th, 10am zoom -  KARLA TORRES - annual intake/assessment
-	- july 11th wednessday 9:40am  BAYLESS ZOOM CALL - SET ALARM FOR 9AM
-APPOINTMENT 
-june 6th tuesday 11am - Zoom with Marcus Unrein 
-July/12/23 Wednessday at 9 am.
-June.25.2023 - replaced water filter
 
 string CurrentZoneID;
 string DestZoneID;
@@ -3436,15 +2869,6 @@ else
 - todo: i should be able to remove Jitter from Keystone.dll
 - todo: i thought i could remove KeyCommon.dll from Keystone.dll but there are 2k dependancies!
 - todo: can we attach a "helm(guidance)" script to missiles and treat them just like vehicles?
-
-
-Buy denim, crew neck t-shirts, underwear
-
-
-
-Post office - 480-929-0180 - called June.6.2023 and finally got through to a person.  Joined "Informed Delivery" on usps.gov and confirmed email as ursulajo99@yahoo.com   and address at 156
-
-
 
 
 https://www.redblobgames.com/articles/probability/damage-rolls.html	
@@ -3485,13 +2909,6 @@ https://www.redblobgames.com/articles/probability/damage-rolls.html
 - todo: test lasers traversing across zones
 
 - todo: script helm/navigation. selecting a star system and world and setting course then allowing for the ship to orient itself and start engines and travel there.  First test will be from Earth to Mars geostationary altitude.+
-
-I HAD A MOUNTAIN PARK APPOINTMENT I FORGOT TO CANCEL ON March 3rd. LISTEN TO VOICEMAIL
-
-PAY RENT ON SAFE DEPOSIT BOXES
-
-
-BUY DENIM JEANS 
 
 https://free3d.com/3d-model/futuristic-space-fighter-1149.html
 	- this is probably built as a Container Vehicle as well.
@@ -3827,21 +3244,6 @@ ENGINE PYLONS
 - then get placement valid only against assigned Vehicle hull and get it to snap to the impactpoint
 
 	
-	
-
-coffee
-creamer
-milk (for oatmeal)
-orange juice
-eggs
-bananas
-salad kits
-garlic
-onions
-canned chilli beans
-tuna in water 
-soup? check cholesterol
-
 
 
 
@@ -3872,259 +3274,6 @@ soup? check cholesterol
 8. the problem with having multiple viewports visible and the BonedEntities walking slower.  I think i need cumulative elapsedSeconds after each viewport is rendered
 
 
-
-PAY DISCOVER - paid 200.00 on Jan.19.2023
-PAY CENTURY Link - paid 95.00  Jan.19.2023 - confirmation #14602183833
-	
-- BUY MORE DENIM'S ONLINE
-
-
-how much is the rent?
-N-156 - 1415.84
-buyout 2545.00
-through July 31, 2023
-
-Paseo - 480-561-2785
-Phone: (480) 968-8118
-
-
-how much is the rent?
-N-156 - 1415.84
-buyout 2545.00
-through July 31, 2023
-
-
-PIZZA DELIVER
-Gate code #5150
-
-walmart pharmacy - 480 966 2791
-feb.8.23 picked up prescriptions
-
-Bayless Healthcare 
-Phone: (602) 281-7300
-	Bayless - april 5th, 2023 wed 9:40am
-
-
-
-988
-	
-jessica - quit smoking - nov.10.2022 1pm
-monica - registered dietician - nov.10.2022 12pm
-
-Mountain Park Health Center - next followup in 4 weeks (bloodwork Nov 4 friday)
-oct.28.2022
-1840 E. Broadway Rd.
-Tempe, AZ 85281 
-Dr. Supriya Bhandari
-(602) 243-7277
-8:20am
-
-monday dec.12 9:30am
-
-Mountain Park- (602) 243-7277
-Nov 29th appointment cancelled.  Must call back when im back in town to reschedule	
-11:30am tomorrow (Nov.10.22) over the phone - Dr. Supriya Bhandari, MD - elevated cholesterol levels	
-	- how high is it? - diet has gotten bad since my mom passed 13 months ago
-	- can it be reversed?
-	- does it fluctuate?
-	- when i read on the food labels, how much collesteroal is too much? (campbells soup)
-	- losing weight helps?
-	- pain in abdomin worse... feels tighter, not necessarily sharper. less pain in my back. no pain when laying down in bed on my back or on my left side so i dont think its the matress 
-		- feel bloated after eating and drinking water even if i dont eat that much.
-	anymore since i stopped sleeping on my right side approx 3 weeks ago.
-	- been drinking metamucil twice a day
-	
-muscle strain - old mattress - too firm near the side of the mattress
-loss of flexibility
-gas
-hernia
-kidney, mom had a history of kidney infections
-xanax and zyprexa
-inflamattion (xanax + alcohol)
-seemed to start suddenly, but now not as sharp pain when moving around
-only hurts when i move my torso in certain ways. in other words, when just sitting or standing there is no pain whatsoever
-feel a bit bloated 
-changed my diet
-haven't had alcohol since Oct.19th. (fell off wagon on Nov.1 and Nov.3)
-smoke and drink
-when i press into my abdomen, i dont feel any swelling or hardness. Left and right sides feel the same.
-
-
-SCHEDULE ULTRA-SOUND w/ SimonMed
-1-866-614-8555
-1111 S Dobson Rd, Suite 105, Mesa
-Thursday, Dec 22nd 8:00am
-15 minutes early 
-8hours FASTING
-
-
-Mountain Park Health Center - next followup march.3.2023 9:00am friday
-
-1840 E. Broadway Rd.
-Tempe, AZ 85281 
-Dr. Supriya Bhandari
-(602) 243-7277
-oct.28.2022 8:20am
-bloodwork Nov 4 friday
-dec.12 9:30am  monday 
-march.3 9:00am friday
-
-jasmine's medical assistant? 602-806-6655
-480-927-1005 tempe clinic 
-thurs Dec.29 11am - tele-visit 
-	- slightly enlarged liver... could be from weight gain and/or alcohol.
-	- liver enzyme at 45. so barely over "normal" which is 44.
-	- throwing out those vitamin k2 gel capsules aj gave me.  thats when this all started.
-	
-	
-miroslax
-	gi doctor endpcopy
-
-
-
-dec.2 - picked up prescriptions
-dec.2 - one 6 pack beer 
-dec.3.2022 - abdominal pain seems better, but im still very "backed-up".
-	- i had two bananas - potassium deficiency and cramping?
-dec.4 - p- 
-dec.5 - 2 chicken sands no mayo, w cheese
-dec.5 - 1 salad kit
-dec.5 - 2 bananas
-dec.5 - p+
-dec.5 - p
-dec.6 - 2 chicken sands no mayo, w cheese
-dec.6 - p
-dec.6 - 2 bananas
-dec.6 - 1 salad kit
-dec.7 - p
-dec.7 - 2 bananas
-dec.7 - 2 chicken sands no mayo, w cheese
-dec.7 - 1 soup
-dec.7 - abdominal and back pain seem worse, but felt a little better after a xanax and a nap
-dec.7 - p
-dec.7 - bloating seems better
-dec.7 - 7 beers
-dec.8 - trail mix
-dec.8 - p
-dec.8 - 7 beers
-dec.8 - sun chips
-dec.8 - 2 tuna sandwiches
-dec.9 - 1 soup
-dec.9 - OJ
-dec.9 - p
-dec.9 - 11 beers
-dec.9 - 10 	hot wings
-dec.9 - half veggie pizza
-dec.10 - half veggie pizza
-dec.10 - p
-dec.10 - p-
-dec.10 - oatmeal
-dec.10 - abdominal and back pain seem better, but now the right side is the main source of pain.  last night i slept entirely on my left side so maybe that helped.
-dec.10 - soup
-dec.11 - 2 bananas
-dec.11 - 4 pieces of bread
-dec.11 - 1 salad kit
-dec.11 - 1 soup
-dec.11 - tator tots
-dec.12 - woke up and pain is very low. no back pain, just very slight abdominal on right side
-dec.12 - 2 breakfast burritos
-dec.12 - 1 soup
-dec.12 - p-
-dec.12 - 12 beers
-dec.12 - 2 tuna sandwiches
-dec.13 - 2 breakfast burritos
-dec.13 - 1 soup
-dec.13 - small bag of Ruffles cheddar chips
-dec.13 - 12 beers
-dec.14 - 1 large pepperoni pizza
-dec.15  w oke up with no abdominal pain,but some backpain
-dec.15 - oatmeal
-dec.15 - small bag of doritoes
-dec.15 - 12 beers
-dec.15 - salad kit
-dec.15 - soup
-dec.15 - 2 tuna sandwiches
-dec.16 - pain minimal on front, side and back
-dec.16 - p
-dec.16 - bag of cashews
-dec.16 - 2 coca-colas
-dec.17 - p
-dec.17 - pain suddenly back again on all sides
-dec.17 - 1 frozen bag of brocolli w cheddar
-dec.17 - 2 tuna sandwiches
-dec.17 - 3 coca-colas
-dec.18 - p-
-dec.18 - 2 breakfast burritos
-dec.18 - 1 trail mix
-dec.18 - 3 coca-cola
-dec.18 - 1 small pack of m&m's
-dec.18 - 1 salad kit
-dec.18 - 2 slices of bread
-dec.18 - p+
-dec.18 - p-
-dec.19 - 1 soup
-dec.19 - 1 frozen bag of brocolli w cheddar
-dec.19 - 2 tuna sandwiches
-dec.19 - 2 cokes
-dec.20 - 1 coke
-dec.20 - 1 soup
-dec.20 - p+
-dec.20 - 2 ground turkey patty sandwiches
-dec.21 - 2 ground turkey patty sandwiches
-dec.21 - p
-dec.21 - small bag of dorritos
-dec.21 - banana chips bag
-dec.21 - trail mix bag
-dec.22 - very little pain so far today.  banana chips perhaps?
-dec.22 - p
-dec.22 - 2 breakfast burritos
-dec.22 - 2 cokes
-dec.23 - right after waking up, steady low pain in right abdomen. no back pain so far.
-dec.23 - rice-a-roni cheesey rice with steak and chilli
-dec.23 - p
-dec.23 - p-
-dec.23 - beer / poker 
-dec.24 - rice-a-roni spanish rice with steak and chilli
-dec.24 - 1/3 bag of banana chips
-dec.25 - 2/3 bag of banana chips
-dec.25 - rice-a-roni spanish rice with chicken and pork-n-beans
-dec.25 - p-
-dec.25 - p
-dec.26 - 1 coke
-dec.26 - bag of brocolli with chicken and pork-n-beans
-dec.26 - 7 beers
-dec.27 - p-
-dec.27 - 11 beers
-dec.27 - 2 cups of potatoe salad
-dec.28 - 1 cup macaroni salad
-dec.28 - 1 banana
-dec.28 - p-
-dec.28 - p-
-dec.28 - 1 coke
-dec.28 - 2 chicken sandwiches
-dec.28 - 3 hawaiian rolls
-dec.29 - 1 banana
-dec.29 - 2 cups potato salad
-dec.30 - 1 banana
-dec.30 - p-
-dec.30 - p-
-dec.30 - 3 hawaiian rolls
-dec.30 - 1 small bag potato chips
-dec.30 - 6#  beers
-dec.30 - 8 hot wings
-dec.30 - 6 breadsticks
-dec.31 - 6 slices pizza
-dec.31 - 1 coke 
-
-
-
-
-	email aj re gabi anett
-Jan.19.2023
-	+200.00 buy in
-	bust in no time. rigged bullshit
-	
-	
 FINISH INSTALLING SOFTWARE ON MOM'S LAPTOP
 	- make sure i can login to email, chase and paseo's website for payment
 	- try Thunderbird for email.  Can i hook up moms, mine and my scificommand emails to the same client? can i open my old .pst files?
@@ -4296,17 +3445,6 @@ https://kotaku.com/jumplight-odyssey-pc-strategy-macross-gundam-yamato-184979902
 
 https://www.youtube.com/watch?v=sIIlpatVwBE
 
-
-
-CALL CHASE and verify safe deposit box is still in good standing.
-	- i think July 2023 is when im supposed to get a letter for renewal
-	
-POKER RULES TO Self
-	-each hand seperately.  - do not try to judge a hand based on previous hand.
-	- no "gut" feelings allowed.  Each hand dealt is irrelevant to emotionaly feelings.
-	- play hand all the way through.  dont let people catch up for free
-	- RECALL - bluffing early before establishing table image is critical! And being black makes this even harder.
-
 https://gamedev.stackexchange.com/questions/139778/tilemap-collision-detection
 https://stackoverflow.com/questions/24856725/tilemap-collision-resolution-between-two-tiles
 
@@ -4314,105 +3452,6 @@ Promethius Wept
 	https://forums.tigsource.com/index.php?topic=72851.0
 
 
-
-
-
-
-"A Memory Called Empire"
-- https://tokybook.com/a-memory-called-empire/
-"A Desolation Called Peace"
- https://www.youtube.com/watch?v=2LA_ToxhiOk
-- Arkady Martine
-
-Jordan Peele
-	- Get Out (2017)
-	- Us (2019)
-	- Nope (2022)
-
-PIZZA DELIVER
-Gate code #5150
-	
-pizza hut (May 21, 2022) - 25.00 credit on next order
-	Delivery Address 1255 E University Dr , N156
-Tempe, AZ 85281
-Your Store (480) 968-0740 
-
-
-	Tempe Apache Station Post Office
-NOTICE: The Postal Service is an essential government service, and will remain open wherever possible.	
-
-1962 E Apache Blvd, Tempe, AZ 85281
-Contact Numbers
-
-Phone: 480-929-0180
-
-
-
-Taxes - TransAmerica - $12,487.34 Jan.19.2022
-
-
-
-call SSI and stop payment because of my chase balance on Sat 10/30/2021
-
-
-Pest Control
-- Oct.15.2021 - 2:25pm 
-	- told to expect a second treatment in one week. So approx Oct 22, 2021
-
-
-
-- cancel netflix
-
-
-
-mail letters to Rosi and Carmin
-
-
--check if any owed to Post Acute nursing facility in Scottsdale
-
-
-JCPenny
-	- jeans
-	- tshirts
-	- underwear
-	- shoes
-	
-
-
-
-480-967-7766
-
-	
-
-
-USBank Tempe Branch
-Lobby open for walk-in or by appointment
-1800 E Baseline Rd
-Tempe, AZ, 85283-1502
-480.756.8000
-daniel - 
-mary - 11:30am tuesday
-
-June.7.2022 - USBank safe deposit box #98 @ Tempe Marketplace branch.  (Chase stopped issuing safe deposit boxes altogether)
-rented for 12 months.  should get letter in the mail on renewal.
-$
-renewed for 12 months on June 21, 2023
-
-Chase Bank
-You're meeting with
-Marilin Velasquez
-May 31st, Tuesday 9:30am
-(480) 890-6340
-Why
-Something else
-How
-Meet at a branch
-Where
-McClintock and Southern
-1744 E Southern Ave,
-Tempe, AZ 85282
-(480) 890-6340
-	
 - todo: 
 	- todo: structures like mines and factories and artifacts would all go in the static scene.
 	
@@ -4482,42 +3521,6 @@ on the first link below, i kinda like the diagram of the soldiers at bottom left
 https://www.youtube.com/watch?v=pEDPXDZ0KxA
 https://www.youtube.com/channel/UCOkZLNwa8BfhJEE7mmi7DUQ
 
-
-
-
-
-
-Destination Coffee Bar & Bistro
-Dine-in· Curbside pickup·
-Delivery
-Address: 100 W Florida Ave, Hemet, CA 92543
-Hours: Open ⋅ Closes 4:30PM
-Phone: (951) 652-0040
-
-Nick - 951 502 6498
-
-Ross - 55 S McClintock Dr, Tempe, AZ 85281
-- Mask required
-
-
-
-	- diet
-		- chicken rice
-		- red beans with pork
-		- spaghetti w/ meat sauce (sauce maybe too rich?)
-		- milk? no more dairy?  trying to limit it
-		- no more coffee
-		- oatmeal w/ no dairy
-		- eggs and toast
-		- balogna sandwiches for lunch
-		- raisin bran with milk (lactose free ok?)
-		- scrambled eggs
-		- bananas
-		- pizza
-		- chips ahoy chocolate chip cookies
-		- potatoes
-	
-	
 
 SQLite Database vs Prefab
 - we probably shouldn't be storing our entire game universe in a XMLDatabase.

@@ -8,7 +8,10 @@ namespace Keystone.Simulation
     {
         Scene.Scene Scene { get; set; }
         GameTime GameTime { get; }
-        Game Game { get; }
+        IGame Game { get; }
+
+        DataProcessors IntrinsicProcessors { get;}
+        DataProcessors RulesProcessors { get;}
 
 
         /// <summary>
@@ -33,16 +36,11 @@ namespace Keystone.Simulation
         void RegisterProducer(uint productID, Entity entity);
 
 		
-       
-        //void AddEntity(Region region);
-        //void AddEntity(IEntity ent);
-        //void AddEntity(Player p, Vector3d position);
-        //void AddEntity(Light l, Vector3d position);
-        //void AddEntity(StaticEntity ent, Vector3d position);
         void AddPlayer(Player p);
         void RemovePlayer(Player p);
 
         void UserMessageReceived(Lidgren.Network.NetConnectionBase connection, Lidgren.Network.NetBuffer buffer);
+        double Update(Keystone.Simulation.GameTime gameTime);
 
     }
 }

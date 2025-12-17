@@ -22,6 +22,11 @@ namespace KeyEdit
 {
     partial class FormMain : FormMainBase
     {
+
+        private Scene mScene; // todo: delete this
+        private string mStartingRegionID; // todo: delete this
+        // here we can react based on all children scene elements within a particular Zone or Region being loaded successfully
+
         private Dictionary<long, KeyCommon.Messages.MessageBase> mUnconfirmedCommands = new Dictionary<long, KeyCommon.Messages.MessageBase>();
 
         private Stack<KeyCommon.Messages.MessageBase> _redo = new Stack<KeyCommon.Messages.MessageBase>();
@@ -101,7 +106,265 @@ namespace KeyEdit
             _undo.Clear();
         }
 
+#region CREATE Messages
+        private KeyCommon.Messages.MessageBase CreateMessage(int commandID, out Amib.Threading.WorkItemCallback cb)
+        {
+            KeyCommon.Messages.MessageBase msg;
 
+            if (commandID > (int)KeyCommon.Messages.Enumerations.UserMessages)
+            {
+                switch ((Game01.Enums.UserMessage)commandID)
+                {
+                    case Game01.Enums.UserMessage.Game_AttackResults:
+
+                        msg = new Game01.Messages.AttackResults();
+                        cb = null;
+                        break;
+
+                    default:
+                         msg = null;
+                        cb = null; ;
+
+                        Debug.WriteLine("FormClient.UserMessageReceived() - Unsupported message type '" + commandID.ToString() + "'.");
+                        break;
+                }
+
+                return msg;
+            }
+
+
+            switch ((KeyCommon.Messages.Enumerations)commandID)
+            {
+                case KeyCommon.Messages.Enumerations.CommandSuccess:
+                    msg = new KeyCommon.Messages.CommandSuccess();
+                    cb = Worker_CommandSucceeded;
+                    break;
+                case KeyCommon.Messages.Enumerations.CommandFail:
+                    msg = new KeyCommon.Messages.CommandFail();
+                    cb = Worker_CommandFailed;
+                    break;
+                case KeyCommon.Messages.Enumerations.MissionResult:
+                    msg = new KeyCommon.Messages.MissionResult();
+                    cb = Worker_MissionResult;
+                    break;
+                case KeyCommon.Messages.Enumerations.NotifyPlugin_NodeSelected:
+                    msg = new KeyCommon.Messages.NotifyPlugin_NodeSelected();
+                    cb = Worker_NotifyPlugin_NodeSelected;
+                    break;
+                case KeyCommon.Messages.Enumerations.NotifyPlugin_ProcessEventQueue:
+                    msg = new KeyCommon.Messages.NotifyPlugin_ProcessEventQueue();
+                    cb = Worker_NotifyPlugin_ProcessEventQueue;
+                    break;
+                case KeyCommon.Messages.Enumerations.TransferEntityFile:
+                    msg = new KeyCommon.Messages.Transfer_Entity_File();
+                    cb = Worker_File_Transfer;
+                    System.Diagnostics.Debug.WriteLine("File Transfer Command Received");
+                    break;
+
+                
+                //case KeyCommon.Messages.Enumerations.LoadScene:
+                //	mOpenSceneInProgress = true;
+                //    msg = new KeyCommon.Messages.Scene_Load();
+                //    cb = Worker_LoadScene;
+                //    break;
+                case KeyCommon.Messages.Enumerations.Simulation_Join:
+                    msg = new KeyCommon.Messages.Simulation_Join();
+                    cb = Worker_SimulationJoin;
+                    break;
+               case KeyCommon.Messages.Enumerations.NewScene:
+                    msg = new KeyCommon.Messages.Scene_New();
+                    cb = Worker_GenerateNewScene;
+                    break;
+                case KeyCommon.Messages.Enumerations.NewFloorplan:
+                    msg = new KeyCommon.Messages.Floorplan_New();
+                    cb = Worker_GenerateNewFloorplan;
+                    break;
+                case KeyCommon.Messages.Enumerations.NewUniverse:
+                    msg = new KeyCommon.Messages.Scene_NewUniverse();
+                    cb = Worker_GenerateNewUniverse;
+                    break;
+                case KeyCommon.Messages.Enumerations.NewTerrainScene:
+                    msg = new KeyCommon.Messages.Scene_NewTerrain();
+                    cb = Worker_GenerateNewTerrainScene;
+                    break;
+                    
+                case KeyCommon.Messages.Enumerations.Node_Remove:
+                    msg = new KeyCommon.Messages.Node_Remove();
+                    cb = Worker_NodeRemove;
+                    break;
+                case KeyCommon.Messages.Enumerations.Node_Create:
+                    msg = new Keystone.Messages.Node_Create();
+                    cb = Worker_NodeCreate;
+                    break;
+                case KeyCommon.Messages.Enumerations.Node_MoveChildOrder:
+                    msg = new KeyCommon.Messages.Node_MoveChildOrder();
+                    cb = Worker_NodeMoveOrder;
+                    break;
+                case KeyCommon.Messages.Enumerations.Node_InsertUnderNew:
+                    msg = new KeyCommon.Messages.Node_InsertUnderNew();
+                    cb = Worker_InsertUnderNew;
+                    break;
+                case KeyCommon.Messages.Enumerations.Node_RenameResource:
+                    msg = new KeyCommon.Messages.Node_RenameResource();
+                    cb = Worker_NodeRenameResource;
+                    break;
+                case KeyCommon.Messages.Enumerations.Node_ReplaceResource:
+                    msg = new KeyCommon.Messages.Node_ReplaceResource();
+                    cb = Worker_NodeReplaceResource;
+                    break;
+                case KeyCommon.Messages.Enumerations.Node_ChangeParent:
+                    msg = new KeyCommon.Messages.Node_ChangeParent();
+                    cb = Worker_NodeChangeParent;
+                    break;
+                case KeyCommon.Messages.Enumerations.NodeChangeState:
+                    msg = new KeyCommon.Messages.Node_ChangeProperty();
+                    cb = Worker_NodeChangeProperty;
+                    break;
+                case KeyCommon.Messages.Enumerations.Geometry_ChangeProperty:
+                    msg = new KeyCommon.Messages.Geometrty_ChangeGroupProperty();
+                    cb = Worker_GeometryChangeGroupProperty;
+                    break;
+                case KeyCommon.Messages.Enumerations.NodeGetState:
+                    msg = new KeyCommon.Messages.Node_GetProperty();
+                    cb = Worker_NodeGetProperty;
+                    break;
+                case KeyCommon.Messages.Enumerations.Entity_Move:
+                    msg = new KeyCommon.Messages.Entity_Move();
+                    cb = Worker_EntityMove;
+                    break;
+                // Entity_GetCustomProperties - only required on Server (eg LoopbackServer.cs)
+                //case KeyCommon.Messages.Enumerations.Entity_GetCustomProperties :
+                //    break;
+                case KeyCommon.Messages.Enumerations.Entity_SetCustomProperties:
+                    msg = new KeyCommon.Messages.Entity_SetCustomProperties();
+                    cb = Worker_EntitySetCustomProperties;
+                    break;
+                case KeyCommon.Messages.Enumerations.Entity_ChangeCustomPropertyValue:
+                    msg = new KeyCommon.Messages.Entity_ChangeCustomPropertyValue();
+                    cb = Worker_EntityChangeCustomProperty;
+                    break;
+                // case KeyCommon.Messages.Enumerations.NodeChangeShaderParameter:
+                // Worker_EntityChangeShaderParameter
+                case KeyCommon.Messages.Enumerations.Geometry_CreateGroup:
+                    msg = new KeyCommon.Messages.Geometry_CreateGroup();
+                    cb = Worker_GeometryCreateGroup;
+                    break;
+                case KeyCommon.Messages.Enumerations.Geometry_RemoveGroup:
+                    msg = new KeyCommon.Messages.Geometry_RemoveGroup();
+                    cb = Worker_GeometryRemoveGroup;
+                    break;
+                case KeyCommon.Messages.Enumerations.Geometry_ResetTransform:
+                    msg = new KeyCommon.Messages.Geometry_ResetTransform();
+                    cb = Worker_Geometry_ResetTransform;
+                    break;
+                case KeyCommon.Messages.Enumerations.NodeChangeFlag:
+                    msg = new KeyCommon.Messages.Node_ChangeFlag();
+                    cb = Worker_NodeChangeFlag;
+                    break;
+                // OBSOLETE - users should use Node_Create() instead
+                //case KeyCommon.Messages.Enumerations.AddLight:
+                //    msg = new KeyCommon.Messages.Scene_LoadLight();
+                //    cb = Worker_AddLight;
+                //    break;
+                case KeyCommon.Messages.Enumerations.Task_Create:
+                    msg = new Game01.Messages.Task_Create();
+                    cb = Worker_Task_Create;
+                    break;
+                case KeyCommon.Messages.Enumerations.GameObject_Create:
+                    msg = new KeyCommon.Messages.GameObject_Create();
+                    cb = Worker_GameObject_Create;
+                    break;
+                case KeyCommon.Messages.Enumerations.GameObject_ChangeProperties:
+                    msg = new KeyCommon.Messages.GameObject_ChangeProperties();
+                    cb = Worker_GameObject_ChangeProperties;
+                    break;
+                case KeyCommon.Messages.Enumerations.DeleteFileFromArchive:
+                    msg = new KeyCommon.Messages.Archive_DeleteEntry();
+                    cb = Worker_ArchiveDeleteFile;
+                    break;
+                case KeyCommon.Messages.Enumerations.RenameEntryInArchive:
+                    msg = new KeyCommon.Messages.Archive_RenameEntry();
+                    cb = Worker_ArchiveRenameEntry;
+                    break;
+                case KeyCommon.Messages.Enumerations.AddFolderToArchive:
+                    msg = new KeyCommon.Messages.Archive_AddFolder();
+                    cb = Worker_ArchiveAddFolder;
+                    break;
+                case KeyCommon.Messages.Enumerations.AddFileToArchive:
+                    msg = new KeyCommon.Messages.Archive_AddFiles();
+                    cb = Worker_ModImportFile;
+                    break;
+                case KeyCommon.Messages.Enumerations.Geometry_Add:
+                    msg = new KeyCommon.Messages.Geometry_Add();
+                    cb = Worker_Geometry_Add;
+                    break;
+                case KeyCommon.Messages.Enumerations.AddGeometryToArchive:
+                    msg = new KeyCommon.Messages.Archive_AddGeometry();
+                    cb = Worker_ModImportGeometryAsEntity;
+                    break;
+                case KeyCommon.Messages.Enumerations.InsertPrefab_Interior:
+                    msg = new KeyCommon.Messages.Prefab_Insert_Into_Interior();
+                    cb = Worker_Prefab_Insert_Interior;
+                    break;
+                case KeyCommon.Messages.Enumerations.InsertPrefab_Structure:
+                    msg = new KeyCommon.Messages.Prefab_Insert_Into_Structure();
+                    cb = Worker_Prefab_Insert_Into_Structure;
+                    break;
+                case KeyCommon.Messages.Enumerations.PlaceEntity_EdgeSegment :
+                    msg = new KeyCommon.Messages.Place_Entity_In_EdgeSegment();
+                    cb = Worker_Prefab_Insert_EdgeSegment;
+                    break;
+                    
+                    
+                case KeyCommon.Messages.Enumerations.Terrain_Paint:
+                    msg = new KeyCommon.Messages.Terrain_Paint();
+                    cb = Worker_Terrain_Paint;
+                    break;
+                case KeyCommon.Messages.Enumerations.CelledRegion_PaintCell:
+                    msg = new KeyCommon.Messages.PaintCellOperation();
+                    cb = Worker_CelledRegion_Paint;
+                    break;
+                case KeyCommon.Messages.Enumerations.TileMapStructure_PaintCell:
+                    msg = new KeyCommon.Messages.TileMapStructure_PaintCell();
+                    cb = Worker_TileMapStructure_Paint;
+                    break;
+                //case KeyCommon.Messages.Enumerations.PlaceWall_CelledRegion:
+                //    msg = new KeyCommon.Messages.Place_Wall_Into_CelledRegion();
+                //    break;
+                //case KeyCommon.Messages.Enumerations.CelledRegion_PaintLink:
+                //    msg = new KeyCommon.Messages.CelledRegion_PaintLink();
+                //    cb = Worker_CelledRegion_Link;
+                //    break;
+                case KeyCommon.Messages.Enumerations.PrefabLoad:
+                    msg = new KeyCommon.Messages.Prefab_Load();
+                    cb = Worker_Prefab_Insert;
+                    break;
+                case KeyCommon.Messages.Enumerations.PrefabSave:
+                    msg = new KeyCommon.Messages.Prefab_Save();
+                    cb = Worker_PrefabSave;
+                    break;
+                case KeyCommon.Messages.Enumerations.GeometrySave:
+                    msg = new KeyCommon.Messages.Geometry_Save();
+                    cb = Worker_Geometry_Save;
+                    break;
+                case KeyCommon.Messages.Enumerations.Simulation_Spawn:
+                    msg = new KeyCommon.Messages.Simulation_Spawn();
+                    cb = Worker_Spawn;
+                    break;
+                default:
+                    msg = null;
+                    cb = null; ;
+                   
+                    Debug.WriteLine("FormClient.UserMessageReceived() - Unsupported message type '" + ((KeyCommon.Messages.Enumerations)commandID).ToString() + "'.");
+                    break;
+            }
+
+            return msg;
+        }
+
+#endregion
+
+#region WORKERS
         // called for new simple scenes and prefabs.  multi-region scenes use different method
         private object Worker_GenerateNewScene(object state)
         {
@@ -528,233 +791,6 @@ namespace KeyEdit
             }
         }
 
-        private Keystone.TileMap.StructureVoxels GenerateVoxelTerrain(int x, int y, int z, double voxelSizeY, int minFloor, int maxFloor, int maxFloorCount, int octreeDepth)
-        {
-            // NOTE: structure ID MUST be based on zone ID 
-            string id = Keystone.TileMap.StructureVoxels.GetStructureID(x, y, z);
-            Keystone.TileMap.StructureVoxels voxelStructure = (Keystone.TileMap.StructureVoxels)Repository.Create(id, "StructureVoxels");
-            voxelStructure.SetProperty("floorheight", typeof(double), voxelSizeY);
-            voxelStructure.SetProperty("minfloor", typeof(int), minFloor);
-            voxelStructure.SetProperty("maxfloor", typeof(int), maxFloor);
-            voxelStructure.SetProperty("maxfloorcount", typeof(int), maxFloorCount);
-            voxelStructure.SetProperty("octreedepth", typeof(uint), octreeDepth);
-
-
-
-            // ----------------------------------------------
-            // DEBUG TEMP - GENERATE LEVEL VARS
-            //int zoneTileWidth = (int)newTerrainScene.RegionResolutionX;
-            //int zoneTileDepth = (int)newTerrainScene.RegionResolutionZ;
-            //double floorHeight = newTerrainScene.TileSizeY;
-            //string persistDimensions = newTerrainScene.RegionDiameterX.ToString() + "," +
-            //                           floorHeight.ToString() + "," +
-            //                           newTerrainScene.RegionDiameterZ.ToString() + ",";
-            string levelsPersistString;
-            int numLevels;
-
-
-            return voxelStructure;
-        }
-
-
-        private Keystone.TileMap.Structure GenerateIsometricTerrain(int x, int y, int z, float regionDiameterX, float regionDiameterZ)
-        {
-            // Zone will have a visible tile based structure such as floors, walls and ceilings.
-            // The structure is regarded as part of the Region and not as seperate entities.
-            // This is for performance (rendering and memory consumption) primarily.
-            // Since having seperate entities for every Tile in the 
-
-            // NOTE: structure ID MUST be based on zone ID 
-            string id = Keystone.TileMap.Structure.GetStructureID(x, y, z);
-            Keystone.TileMap.Structure structure = (Keystone.TileMap.Structure)Repository.Create(id, "Structure");
-            //structure.SetProperty("floorheight", typeof(double), (double)newTerrainScene.TileSizeY);
-            //structure.SetProperty("minfloor", typeof(int), newTerrainScene.MinimumFloor);
-            //structure.SetProperty("maxfloor", typeof(int), newTerrainScene.MaximumFloor);
-            //structure.SetProperty("maxfloorcount", typeof(int), (int)newTerrainScene.TerrainTileCountY);
-
-
-
-            // ----------------------------------------------
-            // DEBUG TEMP - GENERATE LEVEL VARS
-            int zoneTileWidth = 32; // (int)newTerrainScene.RegionResolutionX;
-            int zoneTileDepth = 32; // (int)newTerrainScene.RegionResolutionZ;
-            double floorHeight = 2.82983f; // newTerrainScene.TileSizeY;
-            string persistDimensions = regionDiameterX.ToString() + "," +
-                                       floorHeight.ToString() + "," +
-                                       regionDiameterZ.ToString() + ",";
-            string levelsPersistString;
-            int numLevels;
-
-            // ----------------------------------------------
-            // DEBUG TEMP - GENERATE DEFAULT STRUCTURE LEVELS
-            // Index 0 = Floor Level -1 = underground
-            // Index 1 = Floor Level 0 = above ground
-            // Index 2 = Floor Level 1 = air above 
-            //	- when placing items upon Level2 (and on top of Level 1) a new air Level gets added
-            //    as Level 3, and Level 2 items will write to obstacle layer of Level 1
-            // since we deduce filepaths from layer name, all we need is the name of the layer and it's level
-            string[] layerNames = new string[] { "obstacles", "layout", "style" };
-            const int TERRAIN_SEGMENT_INDEX = 1;
-            byte segmentIndex = TERRAIN_SEGMENT_INDEX;
-
-            for (int floorLevel = -1; floorLevel <= 0; floorLevel++)
-            {
-                // begin temp: create these bitmaps and save to disk.... seed with random values from 0 - N for now
-                for (int n = 0; n < layerNames.Length; n++)
-                {
-                    int initializationValue = 0;
-                    if (layerNames[n] == "obstacles")
-                    {
-                        initializationValue = 0; // segments placed on this LEVEL affect obstacle map of the level BELOW it!
-                    }
-                    else if (layerNames[n] == "layout")
-                    {
-                        if (floorLevel == -1)
-                            initializationValue = segmentIndex;
-                        else
-                            initializationValue = 0; // 0 == null empty segment
-                    }
-                    else if (layerNames[n] == "style") // "style"
-                    {
-                        // style has to be discovered during autotile
-                        initializationValue = -1;
-                    }
-
-                    ProceduralHelper.InitializeMapLayerBitmap(layerNames[n], floorLevel, x, z, zoneTileWidth, zoneTileDepth, initializationValue);
-                }
-            }
-            numLevels = 2;
-            // format: numLevels, worldDimensions, {floorLevel, numLayers, layerNames{}}
-            levelsPersistString = numLevels + "," + persistDimensions + "-1,3,obstacles,layout,style,0,3,obstacles,layout,style";
-            //						        	// END TEMP - GENERATE DEFAULT STRUCTURE LEVELS
-            // ----------------------------------------------
-
-            //// BEGIN TEMP - GENERATE PROCEDURAL BASED LEVEL DATA
-            //// ----------------------------------------------
-
-            //// - for this zone, determine range of floor levels we need to generate based on altitude
-            ////   of the terrain. (NOTE: subterranian caverns not generated yet)
-            ////   - note: unlike above where each level has same initializationValue, here
-            ////     visible levels will have varying initialization values for each x,z tile location based on
-            ////     whether terrain exists there or not.
-            //int seed = 0;
-            //int minFloorLevel, maxFloorLevel;
-            //numLevels = ProceduralHelper.GenerateMapLayerBitmap(seed, 
-            //                                                    x,  z,
-            //                                                    zoneTileWidth, zoneTileDepth, 
-            //                                                    structureLevelsHigh, newTerrainScene.MinimumFloor, newTerrainScene.MaximumFloor - 1, 
-            //                                                    out minFloorLevel, out maxFloorLevel);
-
-            //levelsPersistString = numLevels + "," + persistDimensions;
-
-            //string delimitedText = null;
-            //for (int i = minFloorLevel; i <= maxFloorLevel; i++)
-            //{
-            //	if (string.IsNullOrEmpty(delimitedText) == false)
-            //		delimitedText +=",";
-
-            //	delimitedText += i + ",3,obstacles,layout,style";
-            //}
-
-            //levelsPersistString += delimitedText;
-            //// ----------------------------------------------
-            //// END TEMP - GENERATE PROCEDURAL BASED LEVEL DATA
-
-
-            // TODO: this persist string after structure.SetProperty ("maplevels"...) is being ignored.  Actually, I think it's being
-            //       overwritten by another persist string that is computed because no actual Levels and Layers are created being added to Structure!  
-            //       What we're trying to do is generate the save file without having to load the level and serialize the xml.
-            //       So the question then is, can we override the overwriting of the persist string so that we do not need to use
-            //       the hackish "persistPath" file.
-            //       WAIT: The other reason we use persistPath is so we can load MapLayer's in Pager without needing to load in Zones
-            //       or their Structures and that way when we do load structures, the AutoTile will work across Zones because the MapLayer
-            //       will be loaded already so we can see what types of segments exist in relevant adjacent tiles across zone boundaries.
-            structure.SetProperty("maplevels", typeof(string), levelsPersistString); // <- is being overwritten by computed persist string during structure.PersistFloorLevels()
-
-            // We need to update the actual persist file with this string for the current structure because
-            // assigning "maplevels" property above is not working.
-            string persistPath = Keystone.TileMap.Structure.GetLayersDataPath(x, z);
-            System.IO.File.WriteAllText(persistPath, levelsPersistString);
-
-            // hard coded default dirt segment
-            string[] modelLookupPaths = new string[] { AppMain.ModName + @"\meshes\terrain\dirt.kgbsegment" };
-            // Add a default segment to go with the default floor i've painted in the layout above
-            structure.SetProperty("modellookuppaths", typeof(string[]), modelLookupPaths);
-
-            // domain objects (aka entity scripts) are assigned via entity.ResourcePath
-            //        	string scriptPath = @"E:\dev\c#\KeystoneGameBlocks\Data\pool\scripts\tile_structure.css";
-            //        	structure.ResourcePath = scriptPath;
-
-            return structure;
-        }
-
-        private ModeledEntity GenerateTVLandscapeTerrain()
-        {
-            // TVLandscape based terrain
-            // create terrain Entity and add to zone
-            // TODO: terrain entity names should be generated by server and sent back to client to use
-            string terrainEntityID = Repository.GetNewName(typeof(ModeledEntity));
-            ModeledEntity newTerrain = new ModeledEntity(terrainEntityID);
-            Model model = new Model(Repository.GetNewName(typeof(Model)));
-            string geometryID = Repository.GetNewName(typeof(Terrain));
-            Terrain terrainGeometry = (Terrain)Repository.Create(geometryID, "Terrain");
-            terrainGeometry.SetProperty("heightmap", typeof(string), null); // empty default terrain 
-                                                                            // force loading of terrainGeometry resource since this is already in Worker thread
-                                                                            // TODO: i don't think loading of the terrain is necessary here since it actually doesn't need to be rendered here.
-                                                                            //       that will occur when this generated terrain scene XML is read in and rebuilt.
-                                                                            //terrainGeometry.LoadTVResource ();
-
-            // splatting appearance
-            string appearanceID = Repository.GetNewName(typeof(SplatAppearance));
-            SplatAppearance appearance = new SplatAppearance(appearanceID);
-            // we'll use single group that is same for all chunks
-            Material material = Material.Create(Material.DefaultMaterials.matte);
-            appearance.AddChild(material);
-
-            // TODO: this path is just a resource path to find textures, it's not a mod path at all
-            string path = System.IO.Path.Combine(AppMain._core.ModsPath, "terrain");
-
-            string texturePath1 = System.IO.Path.Combine(path, "grass1.png");
-            string texturePath2 = System.IO.Path.Combine(path, "rock 6.png");
-            string texturePath3 = System.IO.Path.Combine(path, "dirt 1.png");
-            string texturePath4 = System.IO.Path.Combine(path, "snow 1.png");
-            string alphaPath = "";     // we will be autogenerating the values contained in our alpha map using our AutoUpdateOpacityMap() method
-
-
-            Keystone.Appearance.SplatAlpha splatLayer = (SplatAlpha)Keystone.Resource.Repository.Create("SplatAlpha");
-            Keystone.Appearance.Texture tex = (Texture)Keystone.Resource.Repository.Create(texturePath1, "Texture");
-            tex.TextureType = Texture.TEXTURETYPE.Default;
-            splatLayer.AddChild(tex);
-            appearance.AddChild(splatLayer);
-            //appearance.AddDefine("DIFFUSEMAP", null);
-
-            splatLayer = (SplatAlpha)Keystone.Resource.Repository.Create("SplatAlpha");
-            tex = (Texture)Keystone.Resource.Repository.Create(texturePath2, "Texture");
-            tex.TextureType = Texture.TEXTURETYPE.Default;
-            splatLayer.AddChild(tex);
-            appearance.AddChild(splatLayer);
-
-            splatLayer = (SplatAlpha)Keystone.Resource.Repository.Create("SplatAlpha");
-            tex = (Texture)Keystone.Resource.Repository.Create(texturePath3, "Texture");
-            tex.TextureType = Texture.TEXTURETYPE.Default;
-            splatLayer.AddChild(tex);
-            appearance.AddChild(splatLayer);
-
-            splatLayer = (SplatAlpha)Keystone.Resource.Repository.Create("SplatAlpha");
-            tex = (Texture)Keystone.Resource.Repository.Create(texturePath4, "Texture");
-            tex.TextureType = Texture.TEXTURETYPE.Default;
-            splatLayer.AddChild(tex);
-            appearance.AddChild(splatLayer);
-
-
-            model.AddChild(appearance);
-            model.AddChild(terrainGeometry);
-            newTerrain.AddChild(model);
-
-
-            return newTerrain;
-        }
-
         private object Worker_GenerateNewUniverse(object state)
         {
             Keystone.Commands.Command cmd = (Keystone.Commands.Command)state;
@@ -781,421 +817,6 @@ namespace KeyEdit
             }
         }
 
-        // NOTE: Generating a new scene is NOT the same thing as LOADING a scene. For instance, no scene is added to scenemanager when generating
-        private void GenerateNewUniverse(KeyCommon.Messages.Scene_NewUniverse newUniverse)
-        {
-            // TODO: i should be using seperate seed for each stellar system, star, world, asteroid field rather than
-            // passing a _random.  This is because we cannot create the individual system, star, world, etc without having
-            // a seed for each.  
-            // TODO: so i believe to do this is to use the _random created with the first seed, to actually generate a seed to use
-            // in the next call.  This way that seed value can be stored, and this way that star,world,etc can be restored from just
-            // the initial seed value.
-            Keystone.Utilities.XXHash hash = new Keystone.Utilities.XXHash(newUniverse.RandomSeed);
-            Random _random = new Random(newUniverse.RandomSeed); // new Random((int)hash.GetHash(new int[] { 0, 0, 0 }));
-            // NOTE: we generate all star systems and stars because they're needed for starmap and navigation screen
-            StellarSystemGenerator _systemGen = new StellarSystemGenerator(newUniverse.RandomSeed);
-            // TODO: generate worlds and moons only as needed. page in and out as required, but i think actually, this is what Zones are for.
-            GenerateWorld _worldGen = new GenerateWorld(_random);
-            GenerateMoon _moonGen = new GenerateMoon(_random);
-            List<StellarSystem> _systems = new List<StellarSystem>();
-
-            uint octreeDepth = uint.Parse(AppMain._core.Settings.settingRead("scene", "octreedepth"));
-
-            try
-            {
-                // Feb.29.2024 - Disabling the pager does NOT prevent loading of Entity scritps since we need to have Scripts loaded if we want to save CustomProperties
-                 ClientPager.Disabled = true;
-
-                System.Diagnostics.Stopwatch stopWatch = new System.Diagnostics.Stopwatch();
-                stopWatch.Start();
-
-                // TODO: we should get the root node name from the returned newUniverse message from server.
-                //       Then we can create the child zones ourselves because those are named based off the root's name
-                System.Diagnostics.Debug.Assert(System.IO.Directory.Exists(System.IO.Path.Combine(AppMain.SCENES_PATH, newUniverse.FolderName)));
-                string sceneName = System.IO.Path.GetFileName(newUniverse.FolderName);
-                AppMain.CURRENT_SCENE_NAME = sceneName;
-
-                Keystone.Portals.ZoneRoot root;
-                Keystone.Scene.SceneInfo info;
-                Keystone.IO.XMLDatabase xmldb;
-
-                // Create new Scene XML DB and Viewpoints
-                AppMain._core.SceneManager.CreateNewSceneDatabase(newUniverse.FolderName, sceneName,
-                                                                  Keystone.Scene.SceneType.MultiReginSpaceStarsAndWorlds,
-                                                                  newUniverse.RegionsAcross, newUniverse.RegionsHigh, newUniverse.RegionsDeep,
-                                                                  newUniverse.RegionDiameterX, newUniverse.RegionDiameterY, newUniverse.RegionDiameterZ,
-                                                                  newUniverse.SerializeEmptyZones,
-                                                                  0,
-                                                                  0,
-                                                                  out root,
-                                                                  out info,
-                                                                 out xmldb);
-
-                PagerBase.Disabled = true;
-
-                if (newUniverse.CreateStarDigest) // todo: add checkbox for GenerateStarfield
-                {
-                    int[] starCount = new int[] { 5000, 1000, 100 };
-                    int[] colors = new int[]{Keystone.Utilities.RandomHelper.RandomColor().ToInt32(),
-                                     Keystone.Utilities.RandomHelper.RandomColor().ToInt32(),
-                                     Keystone.Utilities.RandomHelper.RandomColor().ToInt32()};
-
-                    float variance = 1.0f;
-                    //float[] spriteSize = new float[] {500 + (500 * (float)rand.NextDouble()),
-                    //            500 + (500 * (float)rand.NextDouble()),
-                    //            500 + (500 * (float)rand.NextDouble())};
-                    float[] spriteSize = new float[] { 250, 500, 1000 };
-
-                    float radius = 90000;
-
-                    string[] texture = new string[] { @"caesar\Shaders\Planet\stardx7.png", @"caesar\Shaders\Planet\stardx7.png", @"caesar\Shaders\Planet\stardx7.png" }; // star2.dds";
-                    string fieldName = "starfield_" + Repository.GetNewName(typeof(Entity)); // "starfield1"  // random name means we should be able to produce more than one
-
-                    Entity field = Keystone.Celestial.ProceduralHelper.CreateRandomStarField(fieldName, texture, radius, starCount, spriteSize, colors);
-                    field.Name = "starfield";
-                    field.Translation = Vector3d.Zero(); // TODO: isn't this pos irrelevant as it follows camera?
-
-                    root.AddChild(field);
-                }
-
-                // create and write to disk the regions we will need to pass to the universe gen
-                Keystone.Portals.Zone[,,] regions = null;
-                if (info.SerializeEmptyZones)
-                    regions = Keystone.Portals.Zone.Create(root, octreeDepth, xmldb);
-
-                // this routine essentially creates a cube shaped galaxy.  It can be made
-                // to be more irregular by haing the Z level go to rnd(min) to rnd(maxDiameter)
-                // it takes diameter of our galaxy and then begins to plot stars
-                // Basically it starts at coordinates 1,1,1 and then goes to 1,1,2 then 1,1,3, etc
-                // til it eventually reaches Diameter,Diameter,Diameter
-                // so the maximum number of stars we can have in our system is Diameter^3
-                // The actual diameter of our galaxy in lightyears is the MinimumSystemSeperation * Diameter.
-                // So if the minimum seperation (as set by the user) is 2 light years then
-                // our diamter in light years is 2 * Diameter.  So if the diameter is 10 then our cube is
-                // actually 20 light years across and can hold at most 1000 (or 10^3) star systems.
-                // Incidentally, Generating 1000 star systems as detailed as we are doing will take quite
-                // a while, but fortunately its jsut for creating the initial map.
-
-                // //note that the user is setting the minimum distance between systems in LightYears
-                //   but we calculate all of our locations in AU so we must convert
-                int width = (int)root.RegionsAcross;
-                int height = (int)root.RegionsHigh;
-                int depth = (int)root.RegionsDeep;
-
-                int totalZoneCount = width * height * depth;
-                                
-                System.Diagnostics.Debug.WriteLine("-- {0} -- ZONE GENERATION BEGINNING", width * height * depth);
-                
-
-                for (int i = 0; i < width; i++)
-                {
-                    for (int j = 0; j < height; j++)
-                    {
-                        for (int k = 0; k < depth; k++)
-                        {
-                            Zone zone = null;
-                            if (info.SerializeEmptyZones)
-                                zone = regions[i, j, k]; 
-
-                            if (newUniverse.Mode != KeyCommon.Messages.Scene_NewUniverse.CreationMode.Empty)
-                            {
-                                KeyCommon.Messages.UniverseCreationParams celestialParams = newUniverse.mParams;
-                                // systems gets added and written to disk and then the region is unloaded and we move to the next
-                                if (totalZoneCount == 1 || ShouldSystemGoHere(celestialParams.ClusterDensity, _random))
-                                {
-                                    // TODO: for empty Zones, shouldn't we still have a default DirectionalLight? or we could add one when the Zone is paged in.
-                                    // if we are NOT serializing empty zones, the current Zone will not have
-                                    // been created above and so be NULL here. So we will need to create the zone instance obviously
-                                    // BEFORE WE CAN ADD A STELLAR SYSTEM TO IT
-                                    if (info.SerializeEmptyZones == false)
-                                    {
-                                        // NOTE: Here even though client side we are creating the child zone off root
-                                        //       we can compute the child's name because it's based off the root Zone's name
-                                        string name = root.GetZoneName(i, j, k);
-
-                                        BoundingBox box = root.GetChildZoneSize();
-                                        float offsetX = root.StartX + i;
-                                        float offsetY = root.StartY + j;
-                                        float offsetZ = root.StartZ + k;
-
-                                        zone = new Zone(name, box, octreeDepth, i, j, k, offsetX, offsetY, offsetZ);
-                                    }
-
-                                    StellarSystem newsystem;
-                                    // TODO: we should have a flag in the newUniverse command for AddSolSystem = true
-                                   
-                                    int centerX, centerY, centerZ;
-                                    root.GetZoneCenterSubscripts(out centerX, out centerY, out centerZ);
-                                    // todo: we should add a default viewpoint to the SceneInfo pointing to this zone as well.
-                                    if (totalZoneCount == 1 || (i == centerX && j == centerY && k == centerZ))
-                                        newsystem = Keystone.Celestial.ProceduralHelper.GenerateSolSystem(new Vector3d(0, 0, 0), newUniverse.RandomSeed);
-                                    else
-                                    {
-                                        // create new stellar system and add to zone
-                                        uint starCount = GetNumberofStars(celestialParams, _random);
-                                        newsystem = _systemGen.GenerateSystem(starCount);
-
-
-                                        // - flesh out the solar system if this is not a bare bones universe with stars only
-                                        if (celestialParams.GeneratePlanets)
-                                            GenerateWorldsForSystem(newsystem, _worldGen, _random, celestialParams.GenerateMoons, celestialParams.GeneratePlanetoidBelts);
-                                    }
-                                    zone.AddChild(newsystem);
-
-                                    // only create db star record AFTER system is added to zone or globaltranslations will be incorrect
-                                    if (newUniverse.CreateStarDigest)
-                                    {
-                                        CreateStarSystemDatabaseRecords(newsystem);
-                                    }
-
-                                    // Nov.5.2016 - WriteSychronous() is very slow.  It is the bottleneck during universe creation
-                                    // TODO: Maybe faster if I can do one XML file per Zone or 
-                                    //       switch to sqlite.  First i should try the one XML file per Zone though... and Stars 
-                                    //       and worlds should be inline.  The other problem is that textures, models are all in one file still.
-                                    //       so even if we break up the Zones, they still wind up pointing to other bloated XML files. In other words
-                                    //       if instead we could have a seperate FOLDER for each Zone, and then have the XML in those folders be just
-                                    //       for entities and resources in that Zone.  In effect, we're talking about a seperate XMLDB for each Zone.
-                                    //       The problem there is, shared resources are no longer shared properly. Is that a problem?
-
-
-                                    xmldb.WriteSychronous(zone, true, false, false);
-                                }
-                            }
-                            // now we can write this region which has a fully created star (or empty) system with planets and moons
-                            if (info.SerializeEmptyZones == true && zone.ChildCount == 0)
-                                xmldb.WriteSychronous(zone, true, false, false); // must not increment/decrement 
-                            // TODO: removeChildren here can screw up the scene whilst IPageable resources
-                            // that depend on this branch are being unloaded and removed from Repository!
-                            // so how to fix this aspect of IPageableNode
-                            // TODO: I should be able to put some kind of "abort" status on it?
-                            // but how to ensure i cover all cases?
-
-                            if (zone != null) // empty zones with serializeemptyzones == false will result in zone == null here so test for it
-                            {
-                                // Dec.6.2012 - zone.RemoveChildren() is wrong.
-                                //      in fact tests show that zone.RemoveChildren() is not required 
-                                // 		so long as IncrementRef/DecrementRef removes from cache and will trigger cascade of RemoveChild 
-                                // 		as all parent refcounts == 0.
-                                //zone.RemoveChildren();  
-                                //Repository.Remove(zone);
-                                Repository.IncrementRef(zone); // artificially raise refcount to 1
-                                Repository.DecrementRef(zone); // force refcount back to 0 and this will trigger removal from cache and cascade to children
-                            }
-
-                            //System.Diagnostics.Debug.WriteLine("ZONES REMAINING = " + (--totalZoneCount).ToString());
-                        }
-                    }
-                }
-
-                // NOTE: Disabling paging for resources (except for DomainObject scripts for now until we start persisting to .save)
-                //       But even with disabling paging of most resources, the generation is slow because the xmldb.WriteSynchronous() is taking
-                //       ~30 seconds whereas the actual galaxy generation for 5x1x5 galaxy takes just 2 seconds.
-                PagerBase.Disabled = false;
-
-                System.Diagnostics.Debug.WriteLine("-- {0} -- ZONES CREATED", width * height * depth);
-
-
-                // NOTE: ZoneRoot does not actually add any Zone's as children here.  Otherwise they would be deserialized automatically
-                // when we actually want the Pager to handle loading and unloading of child Zones to the ZoneRoot.
-                xmldb.WriteSychronous(root, true, true, false);
-
-                xmldb.WriteSychronous(info, true, false, false);
-                xmldb.SaveAllChanges();
-                xmldb.Dispose();
-
-                // NOTE: Node.ctor adds to Repository with refcount == 0, however the call above to xmldb.Create() already does IncrementRef and DecrementRef on the SceneInfo
-                //       node to remove it from Repository.
-                //Repository.IncrementRef(info); 
-                //Repository.DecrementRef(info); 
-                // however we do need to remove StarDigest and Viewpoints
-                info.RemoveChildren();
-
-                stopWatch.Stop();
-                System.Diagnostics.Trace.WriteLine(string.Format("Universe generated in {0} seconds", stopWatch.Elapsed.TotalSeconds));
-                
-            }
-            catch (Exception ex)
-            {
-            }
-        }
-
-
-        private void CreateStarSystemDatabaseRecords(StellarSystem system)
-        {
-            // In SQLite3 opening the db also creates the file if necessary
-            // NOTE: GetConnection() returns an opened database connection 
-            System.Data.SQLite.SQLiteConnection conn = Database.AppDatabaseHelper.GetConnection();
-
-
-            // using a single transaction allows MUCH faster inserts
-            using (var transaction = conn.BeginTransaction())
-            {
-                for (int n = 0; n < system.StarCount; n++)
-                {
-                    Database.AppDatabaseHelper.CreateStarRecord(system.Stars[n], conn);
-
-                    for (int m = 0; m < system.Stars[n].ChildCount; m++)
-                    {
-                        World planet = system.Stars[n].Children[m] as World;
-                        if (planet != null)
-                        {
-                            Database.AppDatabaseHelper.CreateWorldRecord(planet, conn);
-
-                            for (int p = 0; p < planet.ChildCount; p++)
-                            {
-                                World moon = planet.Children[p] as World;
-                                if (moon != null)
-                                {
-                                    Database.AppDatabaseHelper.CreateWorldRecord(moon, conn);
-                                }
-                            }
-                        }
-                    }
-                }
-                transaction.Commit();
-            }
-            conn.Close();
-        }
-
-        // crew and world generation belong in game01.dll
-        private void GenerateCrew(string interiorID, int crewCount, int seed)
-        {
-            if (crewCount <= 0) return;
-
-            // todo:  Maybe we can use a callback from .CreateCharacters() to then load the models?
-            // todo: i need a ratio for the department each member will be assigned and i dont even know yet what full list of departments there will be. 
-            // todo: need to construct a chain of command
-            // todo: our behaviorContext can be assigned to mCustomData as well if its not already
-            Game01.GameObjects.Character[] characters = Game01.ProcGen.CreateCharacters(crewCount, _core.Seed);
-            System.Diagnostics.Debug.Assert(crewCount == characters.Length);
-            BonedEntity[] bonedEntities = new BonedEntity[crewCount];
-
-            string[] relativePaths = new string[crewCount];
-            string[] malePrefabs = new string[] { "caesar\\actors\\colonel-x.kgbentity" };
-            string[] femalePrefabs = new string[] { "caesar\\actors\\aiko_physics.kgbentity" };
-
-
-            // NOTE: using parallel.for() breaks SceneReader which is not thread safe particularly when it comes to shared behavior tree nodes
-            //System.Threading.Tasks.Parallel.For(0, crewCount, i =>
-            //{
-            //    string[] prefabs = malePrefabs;
-
-            //    if (characters[i].Gender == 1)
-            //        prefabs = femalePrefabs;
-            //    // todo: when i have multiple male and female models, i may need to know their rank and department to determine which model to use
-            //    Random random = new Random(seed + i);
-            //    bonedEntities[i] = GenerateCrewModel(prefabs, random); // todo: pass in characters[i] so we have access to more data about this crew member to determine the models to use
-            //    bonedEntities[i].CustomData = new KeyCommon.Data.UserData();
-            //    // todo: same should be done for celestial bodies.  Celestial should be merged into game01.dll and all propertiies for it should be assigned by the script
-            //    bonedEntities[i].CustomData.SetObject("character", characters[i]);
-            //    bonedEntities[i].Name = characters[i].FirstName + " " + characters[i].LastName;
-            //    relativePaths[i] = AppMain.CURRENT_SCENE_NAME + "\\" + bonedEntities[i].ID + ".kgbentity";
-            //});
-
-            for(int i = 0; i < crewCount; i++)
-            {
-                string[] prefabs = malePrefabs;
-
-                if (characters[i].Gender == 1)
-                    prefabs = femalePrefabs;
-                // todo: when i have multiple male and female models, i may need to know their rank and department to determine which model to use
-                Random random = new Random(seed + i);
-                bonedEntities[i] = GenerateBonedEntity(prefabs, random); // todo: pass in characters[i] so we have access to more data about this crew member to determine the models to use
-                // todo: i think i need to add a random seed counter to all Entities
-                bonedEntities[i].BlackboardData = new KeyCommon.Data.UserData();
-
-                // todo: same should be done for celestial bodies.  Celestial should be merged into game01.dll and all propertiies for it should be assigned by the script
-                bonedEntities[i].BlackboardData.SetObject("character", characters[i]);
-                bonedEntities[i].Name = characters[i].FirstName + " " + characters[i].LastName;
-                relativePaths[i] = AppMain.CURRENT_SCENE_NAME + "\\" + bonedEntities[i].ID + ".kgbentity";
-
-                // set custom properties for Station operators. Grab highest ranking Characters for starters
-            }
-
-
-            // todo: server ultimately in real client/server configuration, needs to be able to send Character info over and the client can store it how it wishes.  
-            //       So GameObjects may need to implement NetBuffer read/write
-            // todo: database needs to accomodate storing/retreiving Game01.GameObjects.Character
-            // todo: i believe the bonedEntities[i].ID is the primary key we are using and so when we delete bonedEntities, we know which record to delete.
-            Database.AppDatabaseHelper.CreateCharacterRecords(bonedEntities, interiorID, relativePaths);
-
-            for (int i = 0; i < crewCount; i++)
-            {
-                bonedEntities[i].SRC = null;
-                bonedEntities[i].SetFlagValue("forceserializeseperate", true);
-                Scene.WriteEntity(bonedEntities[i], true);
-                // NOTE: we do not add these BonedEntities to the Vehicle.Interior.
-                // when vehicle is successfully spawned, then server can start spawning the Crew
-            }
-        }
-
-        // we are only generating IDs here, we dont need scripts or any other resource
-        private BonedEntity GenerateBonedEntity(string[] prefabs, Random random)
-        {
-            int index = random.Next(prefabs.Length);
-            string relativePath = prefabs[index];
-               
-            string fullPath = Path.Combine(AppMain.MOD_PATH, relativePath);
-            bool delayResourceLoading = true; // we are only generating IDs here, we dont need scripts or any other resource
-            bool generateIDs = true;
-            BonedEntity entity = (BonedEntity)LoadEntity(fullPath, relativePath, generateIDs, true, delayResourceLoading, null, new Vector3d()); // NOTE: initial (eg: first run after generation) crew translations are calculated in Loopback upon Interior region load completed.  We need Interior loaded in order to find the unoccupied FLOOR flags.
-
-            return entity;
-        }
-
-        private bool CrewPositionsNeedInitialization(Database.AppDatabaseHelper.CharacterRecord[] characters)
-        {
-            if (characters == null || characters.Length == 0) return false;
-
-            for (int i = 0; i < characters.Length; i++)
-            {
-                if (characters[i].Translation != new Vector3d())
-                    return false;
-            }
-
-            return true;
-        }
-
-        private Vector3d[] PositionCrew(string parentID, int count)
-        {
-            if (string.IsNullOrEmpty(parentID)) return null;
-
-            Keystone.Portals.Interior interior = (Keystone.Portals.Interior)Repository.Get(parentID);
-            System.Diagnostics.Debug.Assert(interior.TVResourceIsLoaded);
-
-            //Keystone.Portals.Interior.TILE_ATTRIBUTES.COMPONENT;
-
-            Vector3d[] positions = new Vector3d[count];
-            int flag = (int)Keystone.Portals.Interior.TILE_ATTRIBUTES.FLOOR;
-            uint[] cells = interior.GetCellList(0, (interior.CellCountX * interior.CellCountY * interior.CellCountZ) - 1, flag);
-
-            if (cells == null || cells.Length == 0)
-            {
-                System.Diagnostics.Debug.WriteLine("PositionCrew() - Failed to find any available FLOOR cells");
-                return null;
-            }
-            // todo: this random is not using a seed
-            Random random = new Random();
-            // we already have an OUT_OF_BOUNDS flag and TILEMASK.FLOOR i think.  We would have to find only FLOOR and no other OBSTACLE flags on them
-            bool[] occupied = new bool[cells.Length]; // of the pruned cells, flag the ones that are already occupied with an actor
-            for (uint i = 0; i < positions.Length; i++)
-            {
-                uint cellIndex = (uint)random.Next(0, cells.Length);
-                while (occupied[cellIndex] == true)
-                {
-                    cellIndex = (uint)random.Next(0, cells.Length);
-                }
-
-                occupied[cellIndex] = true;
-                uint cellID = cells[cellIndex];
-                positions[i] = interior.GetCellCenter(cellID);
-                positions[i].y = positions[i].y - (interior.CellSize.y / 2d);
-            }
-
-            return positions;
-
-        }
-        
         //private object Worker_LoadScene_Request(object state)
         //{
         //    Keystone.Commands.Command cmd = (Keystone.Commands.Command)state;
@@ -1283,177 +904,6 @@ namespace KeyEdit
                 }
         }
 
-        /// this routine determines if a new system should be created
-        ///  at a particular region in space.  It uses the
-        ///  Density setting to determine the odds that a system is created
-        ///  or not.  The higher the Density, the better the chance that a system
-        ///  will be created in that region
-        private bool ShouldSystemGoHere(float clusterDensity, Random rand)
-        {
-            return (rand.NextDouble() <= clusterDensity);
-        }
-
-        /// this function returns the number of companion stars are created based
-        /// on the users settings.  Possible outcomes are 1, 2, 3 or 4 (for now)
-        private uint GetNumberofStars(KeyCommon.Messages.UniverseCreationParams mParams, Random rand)
-        {
-            double d = rand.NextDouble() * 100;
-            uint result = 0;
-
-            //  Generate random byte between 1 and 100.
-            if (d <= mParams._percentSingleStarSystems)
-                result = 1;
-            else if (d <= mParams._percentSingleStarSystems + mParams._percentBinaryStarSystems)
-                result = 2;
-            else if (d <= mParams._percentSingleStarSystems + mParams._percentBinaryStarSystems + mParams._percentTrinarySystem)
-                result = 3;
-            else
-            {
-                result = 4;
-                Debug.Assert(d >= 0 &&
-                             d <= mParams._percentSingleStarSystems + mParams._percentBinaryStarSystems + mParams._percentTrinarySystem +
-                                  mParams._percentQuadrupleStarSystems);
-                Debug.Assert(mParams._percentSingleStarSystems + mParams._percentBinaryStarSystems + mParams._percentTrinarySystem +
-                             mParams._percentQuadrupleStarSystems == 100f);
-            }
-            return result;
-        }
-
-        
-        /// <summary>
-        /// After each system is created and before the region is written to xml, this is called to generate the orbital
-        /// info for worlds that will be in the system.
-        /// </summary>
-        /// <param name="system"></param>
-        private void GenerateWorldsForSystem(StellarSystem system, GenerateWorld worldGen, Random rand, bool moonGenerationEnabled, bool planetoidBeltGenerationEnabled)
-        {
-            // generate positions for worlds around stars and the star system 
-            // note: zoneGenerator just generates the habitable/forbidden/inner/outer zones for the star system
-            OrbitSelector zoneGenerator = new OrbitSelector(rand);
-            zoneGenerator.Apply(system);
-
-            List<OrbitSelector.OrbitInfo> orbits = new List<OrbitSelector.OrbitInfo>();
-            // note: orbitGenerator just generates the orbits and the types of planets for each star systems based on it's orbtial zone information
-            foreach (OrbitSelector.OrbitalZoneInfo zoneInfo in zoneGenerator.OribtalZones)
-                orbits.AddRange(zoneGenerator.GenerateOrbits(zoneInfo));
-
-
-            // flesh out the full world statistics for each planet
-            foreach (OrbitSelector.OrbitInfo orbit in orbits)
-            {
-            	string id = Repository.GetNewName (typeof(World));
-            	World newplanet = new World(id);
-				newplanet.Name = orbit.ParentBody.GetFreeChildName();
-				// TODO: is this generating unique orbit's based on Bode's Law or is it
-                //       just creating random orbits?  Because for moons, it seems there 
-                //       are too many bunched together.
-                // NOTE: Remember child Entity.Translation is always relative to parent Entity. This simplifies calculation.
-                // make sure this translation fits within the current region's radius.  Ideally the entire planet
-                // and it's orbit should fit within the bounds of the Zone 
-                newplanet.Translation = new Vector3d(orbit.OrbitalRadius, 0, 0);
-                // TODO: System.Diagnostics.Trace.Assert(PlanetFitsEntirelyInSystem(newplanet));
-                // TODO: eventually compute more sophisticated positions instead of linear along x axis
-                //       note: this is now fixed by selecting start epoch in orbit animation
-                newplanet.OrbitalRadius = orbit.OrbitalRadius;
-                newplanet.WorldType = orbit.WorldType;
-
-                // NOTE: if planetoidBeltGenerationEnabled == false, we'll replace the belt with a planet
-                if (orbit.WorldType == WorldType.PlanetoidBelt && planetoidBeltGenerationEnabled)
-                {
-                    int asteroidCount = 1000;
-                    //Celestial.PlanetoidBelt belt = new Celestial.PlanetoidBelt();
-                    // TODO: create a PlanetoidField object that inherits Region perhaps and then uses our new
-                    // system of "circled covered wagon formation" of boxes which we'll be procedurally generated during rendering
-                    // i.e no need to store every asteroid.  This will mitigate some of the performance annoyance with saving regions to disk
-                    // TODO: newPlanet in this case should actually be thought of as a "field"
-                    // and perhaps rather than a world at all, we should pass in an OctreeRegion
-                    ProceduralHelper.InitAsteroidField(newplanet, (float)orbit.OrbitalRadius, asteroidCount);
-                }
-                else
-                {
-                    if (orbit.ParentBody is Star)
-                    {
-                        Star star = (Star)orbit.ParentBody;
-                        worldGen.ComputeWorldStatistics(newplanet, star.Age, star.Luminosity, star.LuminosityClass,
-                                            star.SpectralType, star.SpectralSubType,
-                                            orbit, orbit.Zone);
-
-                        if (moonGenerationEnabled)
-                        {
-                            // generate moons using SINGLE star stats
-                            Keystone.Celestial.GenerateMoon moonGen = new GenerateMoon(rand);
-                            World[] moons = moonGen.GenerateMoons(newplanet, orbit, star.Age, star.Luminosity, (byte)star.LuminosityClass,
-                                (float)orbit.OrbitalZoneInfo.SnowLine, orbit.Zone);
-
-                            if (moons != null)
-                                for (int i = 0; i < moons.Length; i++)
-                                {
-                                    worldGen.ComputeWorldStatistics(moons[i], star.Age, star.Luminosity, star.LuminosityClass,
-                                                    star.SpectralType, star.SpectralSubType,
-                                                    orbit, orbit.Zone);
-
-                                    // create visual model of moon and add moon as child to world
-                                    ProceduralHelper.InitWorldVisuals(newplanet, moons[i], true, false, false, false);
-                                }
-                        }
-                    }
-                    else // starsystem
-                    {
-                        // TODO: temp hack hardcoded values
-                        SPECTRAL_TYPE spectralType = SPECTRAL_TYPE.M;
-                        SPECTRAL_SUB_TYPE spectralSubType = SPECTRAL_SUB_TYPE.SubType_5;
-                        LUMINOSITY highestLuminosityClass = LUMINOSITY.WHITEDWARF_D;
-                        float oldestAge = 0;
-                        //  multistar systems usually have stars of same age since they usually form together, exceptions are when stars capture other stars that formed seperately.  there are rules for exceptions for very old 10billion+ year systems too but i dont know if i implemented those
-
-                        float combinedLuminosity = 0;
-
-                        for (int j = 0; j < ((StellarSystem)orbit.ParentBody).StarCount; j++)
-                        {
-                            combinedLuminosity += ((StellarSystem)orbit.ParentBody).Stars[j].Luminosity;
-
-                            highestLuminosityClass =
-                                highestLuminosityClass.CompareTo(((StellarSystem)orbit.ParentBody).Stars[j].Luminosity) > 0
-                                    ?
-                                        highestLuminosityClass
-                                    : ((StellarSystem)orbit.ParentBody).Stars[j].LuminosityClass;
-                        }
-                        // TODO:  read the rules and figure out what to use for spectraltype and subtype and
-                        // verify im handling luminosity correctly with combined and highest for class
-                        worldGen.ComputeWorldStatistics(newplanet, oldestAge, combinedLuminosity, highestLuminosityClass,
-                                 spectralType, spectralSubType,
-                                orbit, orbit.Zone);
-
-                        // generate moons using COMBINED star stats
-                        if (moonGenerationEnabled)
-                        {
-                            Keystone.Celestial.GenerateMoon moonGen = new GenerateMoon(rand);
-                            World[] moons = moonGen.GenerateMoons(newplanet, orbit, oldestAge, combinedLuminosity, (byte)highestLuminosityClass,
-                                (float)orbit.OrbitalZoneInfo.SnowLine, orbit.Zone);
-
-                            if (moons != null)
-                                for (int i = 0; i < moons.Length; i++)
-                                {
-                                    worldGen.ComputeWorldStatistics(moons[i], oldestAge, combinedLuminosity, highestLuminosityClass,
-                                                    spectralType, spectralSubType,
-                                                    orbit, orbit.Zone);
-
-                                    // create visual model of moon and add moon as child to world
-                                    ProceduralHelper.InitWorldVisuals(newplanet, moons[i], true, false, false, false);
-                                }
-                        }
-                    }
-
-                    // create visual model of planet
-                    ProceduralHelper.InitWorldVisuals(orbit.ParentBody, newplanet, orbit.WorldType == WorldType.Terrestial, orbit.WorldType != WorldType.Terrestial, true, true);
-                    //Debug.WriteLine (orbit.WorldType.ToString() + " planet '" + newplanet.ID +"' placed at position " + newplanet.Translation.ToString () + " has radius of " + newplanet.Radius.ToString ());
-                }
-
-
-            } // end for
-        }
-
-        
         #region Archive Related
         private object Worker_ArchiveRenameEntry(object state)
         {
@@ -2100,272 +1550,9 @@ namespace KeyEdit
             }
             return state;
         }
-        // NOTE: This must only be allowed on Prefabs and not SavedEntities
-        // when launching floorplan, user can iterate through list of found Containers.
-        // if no interior exists (at any stage of completion) the user is presented a menu
-        // item to generate interior.
-        // 1) Upon clicking, they are given a dialog that yeilds some basic stats about the exterior mesh
-        // and then asks 
-        //   a) how many decks (and it will compute the deck height)
-        //   b) the deck height and it will compute how many decks 
-        //   -  allows selection of 2 - 6 meter deck height 
-        //   - Textures will tile at 2 meter increments and scale inbeteen.
-        //   - 6 meters allows for floorplans of buildings and space stations.  Especially warehouses for instance
-        // that can be constructed of 2 floors each 6 meters high but with no ceiling for the first floor 
-        // thus providing a continguous space and a place lots can be stored.
-        // 2) Allows for importing of a new container by popping up asset dialog and allow selection
-        //    of the exterior mesh?
-        //    - or we need some otehr way to convert an existing Entity into one that is a Container.
-        //    - we could do that via an option in the floorplan toolbar when selecting an Entity
-        //    to view the floorplan of... to allow conversion to container and then generation of interior.
-        // 3) I think the above is a good start and better than alternatives.  We can tweak from there
-        //    as need be.
-        private void AddInterior(Keystone.Entities.Container container, string interiorID, uint quadtreeDepth, string relativeDestinationPath)
-        {
 
-            // launch dialog to assist in generation of basic interior
-            FormNewInterior newInterior = new FormNewInterior();
-
-            System.Windows.Forms.DialogResult result = newInterior.ShowDialog();
-
-
-            // validate floor height is in acceptable range
-
-            // validate the Container entity's exterior mesh is 
-            // of appropriate size for a floorplan.  If it's too small
-            // it may only be allowed as a fighter/bomber
-
-            // TODOO: 
-            // TODO: the vehicle's exterior mesh is not loaded?  We're not getting proper container.BoundingBox values
-            const uint OVERLAP = 2; // ensure there is 1 out of bounds cell on BOTH sides of the Interior floors.  No walls can be placed on the outer edge of these out of bounds cells.  TODO: we need to enforce that
-            Vector3d cellSize = newInterior.CellSize;
-            // verify the mesh is loading, then verify the Container object calculates it's boundingbox properly
-            Keystone.Types.BoundingBox bounds = container.BoundingBox;
-            uint cellsAcross = (uint)(bounds.Width / cellSize.x) + OVERLAP;
-            uint cellsLayers = (uint)(bounds.Height / cellSize.y);
-            if (cellsLayers == 0) cellsLayers = 1; // minimum of one for models with low ceilings
-
-            uint cellsDeep = (uint)(bounds.Depth / cellSize.z) + OVERLAP;
-
-
-            // TODO: "decks" can be labeled as spacing decks that can be used to hold
-            // access tubes/ventilation shafts?
-            // 1) Any half deck is built as a normal deck wwhere we specify it's height as smaller
-            //    So that is how any crawlspace would be made as being a short height deck 
-            // 2) shafts within walls would be constructed as sandwiched between walls.
-            //    so you could create extra thick bulkheads and then have one part within the walls
-            //    not be solid but hollow for a special access route should it be needed.
-            //    There is no need to change how our decks are layed out otherwise.
-            //    The only thing we need is a way to specify the height of the walls of the deck and
-            //    the start (aka how thick the floor is)
-            //
-            // NOTE: from now on, creating a new vehicle consists of 
-            // 1) selecting a normal modeled entity
-            // 2) in plugin, click the floorplan tab and enable floorplan creation
-
-            // 3) click Add Deck from the floorplan plugin tab and 
-            //    generate floorplan
-            //    where you will be prompted 
-            //      a) for whether the first deck will be at lowest z or lowest y value
-            //      b) for a height between -y and +y for each
-            //    new deck you wish to add.  This y value will represent center height of that
-            //    deck/floor
-            // ?) When do we specify the thickness of the deck floor?
-            // ?) How do we specify thickness of ceiling of final top deck?
-            // 4) specify the height of the deck.  
-            //      a) allow options for user to be assisted with coming up for values by
-            //      making sure that an above floor starts at height of the below floor.
-            //      b) ensure that decks are built from bottom floor up? or top down?
-            // 
-            // 5) internally we compute a cross section at the y height of the deck
-            //    and use this polygon to determine which cells will be available for 
-            //    plotting deck design 
-            // 6) if the exterior geometry is removed, the entire deckplan will be destroyed as well.
-            // 7) create a version of this code that can validate each deck based on cross sections
-            //    after the fact so that submitted designs can be checked.
-
-
-            Keystone.Elements.Mesh3d exteriorMesh = (Keystone.Elements.Mesh3d)container.Model.Geometry;
-
-            int crc32 = 0; // TODO: we must get crc32 of the Mesh3d object
-            // that does crc32 of all verts + scale of that mesh and model
-            // and entity!  (actually model and entity scales must be 1,1,1)
-            // we do not support scaling of the geometry for security reasons???
-
-
-            // we only disable picking of exterior or rendering of exterior in the floorplan view
-            // by setting options on the Context and it's pickparameters
-            container.Pickable = true;
-            container.Visible = true;
-
-            /////////////////////////////////////////////////////////////////////////////
-            // INTERIOR 
-            /////////////////////////////////////////////////////////////////////////////
-            // based on exterior mesh bounding volume and the cell size, compute cellsacross/layers/deep
-            
-            Keystone.Portals.Interior interior =
-                new Keystone.Portals.Interior(interiorID, cellSize,
-                            cellsAcross, cellsLayers, cellsDeep, quadtreeDepth);
-
-            interior.SetProperty("datapath", typeof(string), relativeDestinationPath + "\\" + interiorID);
-
-            // todo: script path should be customizable
-            string scriptPath = @"caesar\scripts_entities\ship_interior.css";
-            Keystone.Celestial.ProceduralHelper.MakeDomainObject(interior, scriptPath);
-
-            // orientation of interior will always be origin with 0 rotation.  With "front" of exterior facing positive Z
-            // this will have the effect of the lower ID cell indices having the highest Z values and the cells
-            // at "back" of exterior vehicle having lowest Z values.  
-            container.AddChild(interior);
-
-            //  interior.CreateMask("boundaries", 0);
-            //  interior.CreateMask("floors", 0);
-
-            // add a default directional light.  Interior does not use the Zone's star light  - Dec.1.2022
-            // todo: is the correct light being used?  also, the Interior light should be placed at rroot in QuadtreeCollection and not in a single Quadtree child node. 
-            // todo: and how do reactors and shuttlecraft that take up multiple floors get placed in the QuadtreeCollection?
-            float range = (float)(cellsAcross * cellSize.x);
-            range = (float)Math.Max(range, cellsDeep * cellSize.z);
-            Keystone.Lights.DirectionalLight light = Keystone.Celestial.LightsHelper.LoadDirectionalLight(range);
-            Keystone.Traversers.SuperSetter setter = new Keystone.Traversers.SuperSetter(interior);
-            setter.Apply(light);
-
-
-            // obsolete for 1.0 - no more auto generated boundaries
-            //// autogenerate all floors based on bounds of mesh and a fixed height of 2 meters (or 3?)
-            //// TODO: maybe let's try to get our floorplan view based on an autogenerated
-            //// interior of the yorktown...
-            //System.Diagnostics.Stopwatch watch = new System.Diagnostics.Stopwatch();
-            //Keystone.Types.Polygon[] crossSections = new Keystone.Types.Polygon[cellsLayers];
-            //for (uint i = 0; i < cellsLayers; i++)
-            //{
-            //    double height = interior.GetFloorHeight(i);
-
-            //    watch.Start();
-            //    // NOTE: CreateCrossSection takes into account any scaling of the Model or Entity
-            //    //       so that should be done to each crossSection[n]
-            //    // TODO: its also taking into account rotation and that's wrong since we are conducting
-            //    // the cross section tests at origin with 0 rotation
-            //    Keystone.Types.Matrix transform = vehicle.Model.RegionMatrix;
-            //    transform.M41 = transform.M42 = transform.M43 = 0.0; // remove translation from the matrix
-            //    crossSections[i] = Keystone.Elements.Mesh3d.CreateCrossSection(exteriorMesh, (float)height, (float)cellSize.y);
-            //    crossSections[i] = crossSections[i].Transform(transform);
-            //    watch.Stop();
-            //    // TODO: for each cross section, we need to test each tile in each celledregion
-            //    // to see if that tile is INSIDE of the cross section and if so, set a flag indicating
-            //    // it has a "floor" and thus allowing user to place interior components on it. by default
-            //    // all tiles are out of bounds.
-            //    int outOfBoundsCount = 0;
-            //    for (uint j = 0; j < interior.CellCountX; j++)
-            //        for (uint k = 0; k < interior.CellCountZ; k++)
-            //        {
-
-            //            Keystone.Types.Vector3d[] tileVertices = interior.GetTileVertices(j, i, k); // j, i, k is x,y,z order
-            //            for (int n = 0; n < tileVertices.Length; n++)
-            //                tileVertices[n].y += cellSize.y *.5;
-
-            //            // is this tile entirely inside the bounds of the polygon?
-            //            if (crossSections[i].ContainsPoints(tileVertices))
-            //            // set all 16x16 footprint of this tile to FLOOR
-            //            {
-            //                uint tileStartX = j * 16;
-            //                uint tileStartZ = k * 16;
-
-            //                for (int x = 0; x < 16; x++)
-            //                    for (int z = 0; z < 16; z++)
-            //                    {
-            //                        // mTileMask is y, x, z index order
-            //                        interior.mTileMask[i, tileStartX + x, tileStartZ + z] |= 1 << 0; // TILEMASKFLAGS_FLOOR;
-            //                    }
-            //            }
-            //            else
-            //            {
-            //                System.Diagnostics.Debug.WriteLine("Tile is out of cross section boundaries.");
-            //                outOfBoundsCount++;
-            //            }
-            //        }
-
-            //    System.Diagnostics.Debug.WriteLine(string.Format("{0} of {1} tiles out of bounds", outOfBoundsCount, interior.CellCountZ * interior.CellCountX));
-            //    // TODO: then we should save this vehicle and verfy we can reload it because
-            //    // this process is too slow to have to do everytime i want to test.
-            //    System.Diagnostics.Debug.WriteLine(string.Format ("Cross Section {0} of {1} completed in {2} seconds.",i+1, cellsLayers, watch.Elapsed.TotalSeconds));
-            //    watch.Reset();
-            //}
-
-            // IMPORTANT REMINDERS:
-            // 1) Floor/Ceiling thickness is simply regulated by increasing the y height of a floor
-            //    or ceiling tile.
-            // 2) Vertical lift tubes or stairwell or "Jefferies tubes"  can be built manually out of a single
-            //    tile that has walls around it to form a tube.  Doors/hatches can exist on each level
-            //    and can contain either a ladder or an electric lift.  The idea is that these tubes
-            //    can allow access through damaged parts of the ship where pressureization has failed
-            //    while being protected by the pressurized tube itself.
-            //    Sections of the tube can be sealed off with irises to act as airlocks.
-            // 3) Horizontal ventilation shafts style tubes can be built similarly using a special
-            //    type of floor tile or ceiling tile that is hollow.  Thus the tile contains flags
-            //    that indicate it can be stepped on like a normal floor tile but also can contain
-            //    a volume.
-            // 4) The overall deck height is fixed for every single deck.  This compromise however
-            //    will still allow us to replicate any type of starship interior.
-
-            // 5) In this sims, you could simply see down through to any floor if there was no ceiling
-            //   or floor tiles in the way and it would continue until you eventually did hit one.
-            // 6) any area that has a full floor is considered a room that extends upwards until
-            //   it meets a full ceiling.  If there is a NON door/access hole in the ceiling then that 
-            //   space through the ceiling becomes apart of the room below it.
-            //
-            // I could convert a "CelledRegion" into a "CelledArea" and then enforce these are strictly
-            // 2d width x depth but which because they match the width depth of anything above or below it
-            // they can still compute traversal upstairs or downstairs
-            // Doing this we can do two things
-            // 1) we can save a bit of memory for decks that aren't all as wide as the widest deck
-            // 2) we can more easily join subassemblies that have different altitudes and such
-            //    so that subassemblies can allow for different sectors like in a huge babylon 5 station
-            //
-
-
-        }
-
-        //        private void AddFloor(Keystone.Entities.Container vehicle, float height)
-        //        {
-        //            string interiorID = vehicle.ID + "_interor";
-        //            Keystone.Portals.CelledRegion interior = (Keystone.Portals.CelledRegion)Repository.Get(interiorID);
-
-        ////            // OBSOLETE - No need to create a cross section any longer.  We will manually determine
-        ////            // in bounds and out of bounds interior tiles.
-        ////            // NOTE: CreateCrossSection takes into account any scaling of the Model or Entity
-        ////            //       so that should be done to each crossSection[n]
-        ////            // TODO: its also taking into account rotation and that's wrong since we are conducting
-        ////            // the cross section tests at origin with 0 rotation
-        ////            Keystone.Types.Matrix transform = vehicle.Model.RegionMatrix;
-        ////            transform.M41 = transform.M42 = transform.M43 = 0.0; // remove translation from the matrix
-        ////            float stepSize = 1.0f;
-        ////            Keystone.Types.Polygon crossSection = Keystone.Elements.Mesh3d.CreateCrossSection((Keystone.Elements.Mesh3d)vehicle.Model.Geometry, (float)height, stepSize);
-        ////            crossSection = crossSection.Transform(transform);
-        ////            // END OBSOLETE CROSS SECTION 
-
-        //            // cross section above should be obsolete since we no longer care to automate
-        //            // creation of inbounds/out of bounds tiles.  we will do it manually and we want
-        //            // to be able to do it with a placement tool "bounds" brush
-
-        //            // saving this vehicle in Morena_Full shoudl also be able to load the floor layers
-        //            // when we assign decks to specific layer indices.  But all inbound/out of bounds should exist
-        //            // for every possible layer even though only few decks will actually be created at runtime
-
-        //            // is there a difference between a floor being designated to a layer
-        //            // and assigning the inbounds/outofbounds of a floor?  Well yes.  A layer never
-        //            // has to be a floor, but it must always have bounds flagged before floors can be added
-        //            // because in the future, users will want to remodel and change locations of floors.
-        //            // 
-        //            // TODO: perhaps our "Interior" floors mesh is a single ModelSequence with a Model for each
-        //            // floor rather than Floor entities being added.  So how about this.  How about prelimirily
-        //            // when we "create floor" below, it adds a new grid to the Interior.ModelSequence
-        //            Keystone.Entities.Entity floor = interior.CreateFloor(0);
-        //        }
-
-
-    // TODO: this does not work with folder based file system
-    private object Worker_ArchiveDeleteFile(object state)
+        // TODO: this does not work with folder based file system
+        private object Worker_ArchiveDeleteFile(object state)
         {
             Keystone.Commands.Command cmd = (Keystone.Commands.Command)state;
             KeyCommon.Messages.Archive_DeleteEntry delFiles = (KeyCommon.Messages.Archive_DeleteEntry)cmd.Message;
@@ -2646,7 +1833,7 @@ namespace KeyEdit
             bool generateIDs = false;
             
             // todo: this needs to use the IDs generated by the server!
-            Entity entity = LoadEntity(fullPath, spawn.EntitySaveRelativePath, generateIDs, true, false, spawn.NodeIDsToUse, spawn.Translation);
+            Entity entity = LoadEntity (fullPath, spawn.EntitySaveRelativePath, generateIDs, true, false, spawn.NodeIDsToUse, spawn.Translation);
             entity.SRC = null; // spawn command only occurs during ArcadeEnabled =true, so SRC must be null.  If it's not null, when we save the scene and try to reload it later, it will fail with infinite loop
 
             // TODO: Simulation_Spawn and Prefab_Load are basically identicle.  We only need one.
@@ -2712,10 +1899,10 @@ namespace KeyEdit
                     prefab = Keystone.ImportLib.Load(fullPath, false, true, true, nodeIDsToUse);
                 }
                 else
-                    // NOTE: Since LoadEntity() is already being called in this worker thread, typically it's ok to NOT delay resource loading
+                    // NOTE: Since () is already being called in this worker thread, typically it's ok to NOT delay resource loading
                     // however, this will cause a failure to load .interior database for Containers\Vehicle Interiors because we will not have
                     // yet had a chance to change the Interior's "datapath" to point to the correct location.
-                    prefab = LoadEntity(fullPath, addPrefab.RelativeArchivePath, false, addPrefab.Recurse, addPrefab.DelayResourceLoading, nodeIDsToUse, addPrefab.Position);
+                    prefab = (fullPath, addPrefab.RelativeArchivePath, false, addPrefab.Recurse, addPrefab.DelayResourceLoading, nodeIDsToUse, addPrefab.Position);
 
 #if DEBUG
                 System.Collections.Generic.Queue<string> validate = new System.Collections.Generic.Queue<string>();
@@ -3290,188 +2477,6 @@ namespace KeyEdit
 
         //    return state;
         //}
-
-        /// <summary>
-        /// Load's an entity from either a prefab during insert in non simulation scene building, or a saved entity during a Simulation_Spawn call. 
-        /// This function should always be called from a worker thread so will occur in the background.
-        /// This function is NOT called during normal scene deserialization.
-        /// </summary>
-        /// <param name="fullpath"></param>
-        /// <param name="isSavedEntity"></param>
-        /// <param name="generateIDs"></param>
-        /// <param name="recurse"></param>
-        /// <param name="delayResourceLoading"></param>
-        /// <param name="translation"></param>
-        /// <returns></returns>
-        private Entity LoadEntity(string fullpath, string relativePath, bool generateIDs, bool recurse, bool delayResourceLoading, string[] nodeIDsToUse, Vector3d translation)
-        {
-            //delayResourceLoading = false;
-            //bool delay = true;
-            Entity entity = Keystone.ImportLib.Load(fullpath, generateIDs, recurse, delayResourceLoading, nodeIDsToUse) as Entity;
-
-            System.Diagnostics.Debug.Assert(entity != null);
-
-            // if this is a Container, copy the prefab's cellDB to the correct Scenes\\CurrentSceneName\\ folder.
-            // NOTE: This is not the same as a "Spawn" command which only occurs during Simulation and not just prefab or floorplan designing.
-            // During "Simulation_Spawn" the .interior file and .kgbentity for the Container should already exist in the \\Saves\\ folder.  todo: verify this
-            if (entity is Container)
-            {
-                Interior interior = ((Container)entity).Interior as Interior;
-                if (interior != null)
-                {
-                    // NOTE: its ok that the datapath was originally loaded from a prefab for instance, but for this instance
-                    // we now need to rename and copy the datapath so that we don't overwrite the existing prefab's Inteiror data file.
-                    string originalRelativeDBPath = (string)interior.GetProperty("datapath", false).DefaultValue;
-                    string originalFullPath = System.IO.Path.Combine(AppMain.MOD_PATH, originalRelativeDBPath);
-                    Debug.WriteLine("FormMain.Commands.LoadEntity() - Interior dbpath = " + originalRelativeDBPath);
-                    Debug.WriteLine("FormMain.Commands.LoadEntity() - Interior resource loaded = " + interior.TVResourceIsLoaded.ToString());
-                    // Feb.29.2024 - the following seems wrong for simple scenes. The new saved path of the .interior file doesn't match the expected path when Interior.LoadTVResource() is performed
-                    // Interior may not be loaded if delayResourceLoading == true, but if Interior is not null, the datapath should be set and available to reassign to this new instance
-   
-                    string newRelativePath = Path.Combine(AppMain.CURRENT_SCENE_NAME, entity.ID + ".interior");
-                                        
-                    // copy the relativePath to the new relativePath for this instance
-                    // TODO: destinationpath needs to vary based on Core.SimulationEnabled.  Actually i dont think so because the spawned Container and it's .interior file will already be in the SAVE_PATH. TODO: verify this 
-                    string newFullPath = System.IO.Path.Combine(AppMain.SCENES_PATH, newRelativePath);
-
-                    System.IO.FileInfo fileInfo = new System.IO.FileInfo(newFullPath);
-                    fileInfo.Directory.Create();
-
-                    if (System.IO.File.Exists(originalFullPath))
-                    {
-                        if (System.IO.File.Exists(newFullPath))
-                        System.IO.File.Delete(newFullPath);
-
-                        System.IO.File.Copy(originalFullPath, newFullPath);
-                    }
-                    else
-                        System.IO.File.Create(newFullPath);
-
-                    interior.SetProperty("datapath", typeof(string), newRelativePath);
-                }
-            }
-
-
-            // load any entity script now during this worker thread
-            if (!delayResourceLoading)
-                PagerBase.LoadTVResource(entity, true);
-
-            // set the prefab link.  Only caller of clone/deserialize/readsychrnous should
-            // assign prefab links because sometimes when we clone or deserialize we don't want to
-            //KeyCommon.IO.ResourceDescriptor descriptor = new KeyCommon.IO.ResourceDescriptor(addPrefab.RelativeArchivePath, addPrefab.EntryPath);
-            entity.SRC = relativePath; // descriptor.ToString();
-
-            ((Entity)entity).Translation = translation;
-            ((Entity)entity).LatestStepTranslation = translation;
-
-
-            return entity;
-        }
-
-        private void SaveInterior()
-        {
-        }
-
-
-        void PositionVehicle(Keystone.Vehicles.Vehicle vehicle)
-        {
-            Database.AppDatabaseHelper.StarRecord[] starRecords = Database.AppDatabaseHelper.GetStarRecords();
-            Database.AppDatabaseHelper.WorldRecord[] worldRecords = Database.AppDatabaseHelper.GetWorldRecords(starRecords[0].ID);
-
-            // TODO: the star and world need to be paged in or otherwise we can't get the current positions of the worlds.
-            double smass = starRecords[0].Mass;
-            double sradius = starRecords[0].Radius;
-            double wmass = worldRecords[0].Mass;
-            double wradius = worldRecords[0].Radius;
-            double woradius = worldRecords[0].OrbitalRadius;
-
-            //Star star = (Star)Repository.Get(starRecords[0].ID);
-            //            World w = (World)Repository.Get(worldRecords[0].ID);
-
-            // June.20.2017 - orbital animations feature cut (postponed til version 2.0)
-            //          w.Animations.Play(0, true);
-            //          w.Animations.Update(w, 0);
-            // TODO: this worldRecords[0].Translation is all wrong, wtf?  it's outside of the zone boundaries.
-            //       I think it's because worldRecords[0].Translation is global translation.  I think it is!  We only want the Region space translation, so we'll need to add those to the record.
-            Vector3d worldPosition = worldRecords[0].Translation; // w.Translation; // TODO: for moon this wont work since we need RegionTranslation but for planet, Translation and RegionTranslation are the same thing.
-            double altitude = wradius + 1000000;
-
-            Vector3d dir = Vector3d.Normalize(worldPosition); // can just normalize because it's dir to star and we know that star is at origin
-            Vector3d vehicleTranslation = worldPosition + dir * altitude;
-            // TODO: On even numbered zone's across, height, depth the coord 0,0,0 is far away from camera starting point! 
-            //       This is why we need to choose relative region position and parent that is Zone and not ZoneRoot (Or a position relative to a Star or World)
-            vehicle.Translation = vehicleTranslation; // vehicleTranslation; //  Vector3d.Zero(); // TODO: use proper position here based on orbit
-
-            Vector3d basisVector = Vector3d.Up();// w.RegionMatrix.Right;
-
-            Vector3d tangent = Vector3d.Normalize(Vector3d.CrossProduct(-dir, basisVector));
-            //tangent = Vector3d.CrossProduct(w.RegionMatrix.Up, tangent);
-            //double worldVelocity = GenerateWorld.GetOrbitalVelocity(smass, 0, woradius);
-            //worldVelocity = Keystone.Celestial.Temp.GetCircularOrbitVelocity(smass + wmass, woradius);
-            //worldVelocity = Keystone.Animation.EllipticalAnimation.GetTrueAnomaly(w.OrbitalPeriod, 1d);
-
-            // TODO: I don't know if this is working because it seems the star's gravity pull is pulling us
-            //       through the planet and onto the star.  It seems perhaps we need something like gravity wells
-            //       where gravity emitting bodies only affect vehicles within their well. Let's revisit this issue
-            //       once we get the tangent vector solved correctly and see if our starship can at least orbit
-            //       a few times before the orbit is destabilized by the Star's gravity pull.
-            // TODO: I could test it by just removing that from the Star script... see if we can orbit this planet.
-            double velocity = Keystone.Celestial.GenerateWorld.GetOrbitalVelocity(wmass, 0, altitude);
-            //velocity += worldVelocity;
-            // is v= Math.Sqr(GMr)
-            // - retrieve world and moon records and assign moon as parentID?  No.  That is only if we want
-            //   hierarchical position of our ship and we're still trying to use absolute region positions based on gravitation
-            // - compute velocity for ship around moon including hierarchical velocities for worlds around stars
-            //      - find tangent vector velocities for each and add them
-            vehicle.Velocity = tangent * velocity;
-
-            //float altitude = 10000000000f;
-            double semiMajorAxis = altitude;
-            ////string vehiclePath = @"caesar\\meshes\\vehicles\\uesn_yorktown.kgbentity";
-            ////// TODO: there are issues with loading .obj files.  Perhaps if i switched from AddVertex to SetGeometry it would solve the problem?
-            //////vehiclePath = @"caesar\\meshes\\vehicles\\morena smuggler\\morena1.kgbentity";
-            ////   ModeledEntity vehicle = CreateVehicle (vehiclePath, region, star, altitude);
-
-            ////   // TODO: 
-            ////   double G = Keystone.Celestial.Temp.GRAVCONST;
-
-            ////   //TODO: does this yeild KM/s or M/s? we want M/s.
-            ////   double velocityMetersPS = Math.Sqrt((2d * G * star.MassKg / altitude) - (G * star.MassKg / semiMajorAxis));
-            ////   // velocityMetersPS *= 1000;
-
-            ////   vehicle.Velocity = new Vector3d (velocityMetersPS, 0, 0 );
-            ////   //transformable.AngularVelocity = ;
-
-
-
-            // sychronous loading
-            //            Keystone.IO.PagerBase.LoadTVResource (vehicle);
-
-            //// vehicle's are not hierarchically tied to worlds, they are Region relative
-            //// so translation to a world should apply cumulative translation of Sol system hierarchy
-            //// WARNING: vehicle starting too close to planet (such as inside planet!) will cause physics to go crazy.
-            //vehicle.Translation = body.GlobalTranslation + new Vector3d(0, 0, body.Radius + altitude);
-
-            //region.AddChild(vehicle);
-
-            //// compute starting velocity
-            //vehicle.Force += body.Velocity;
-            //// TODO: how can we test this with 1 star and 1 computed velocity vector
-            ////       and then distance to star should be constant for a nearly perfect starting velocity vector
-            ////       at close distance.  
-
-            //// TODO: can we delay 1 frame so that our orbital animation can play at least once to set the
-            ////       orbits at their starting positions so we know where to place this vehicle and then 
-            ////       the starting velocity to assign?
-
-            //// actual velocity is cumulative velocity of world velocity and relative orbital velocity
-            //// - velocity of a world is vector length of previous position and current
-            ////   - but can we get it from the eliptical animation itself
-
-            // assign this vehicle as chase camera follow target
-        }
-
-
 
         private object Worker_EntityMove(object state)
         {
@@ -4223,262 +3228,9 @@ namespace KeyEdit
 
             return state;
         }
-
-        private KeyCommon.Messages.MessageBase CreateMessage(int commandID, out Amib.Threading.WorkItemCallback cb)
-        {
-            KeyCommon.Messages.MessageBase msg;
-
-            if (commandID > (int)KeyCommon.Messages.Enumerations.UserMessages)
-            {
-                switch ((Game01.Enums.UserMessage)commandID)
-                {
-                    case Game01.Enums.UserMessage.Game_AttackResults:
-
-                        msg = new Game01.Messages.AttackResults();
-                        cb = null;
-                        break;
-
-                    default:
-                         msg = null;
-                        cb = null; ;
-
-                        Debug.WriteLine("FormClient.UserMessageReceived() - Unsupported message type '" + commandID.ToString() + "'.");
-                        break;
-                }
-
-                return msg;
-            }
-
-
-            switch ((KeyCommon.Messages.Enumerations)commandID)
-            {
-                case KeyCommon.Messages.Enumerations.CommandSuccess:
-                    msg = new KeyCommon.Messages.CommandSuccess();
-                    cb = Worker_CommandSucceeded;
-                    break;
-                case KeyCommon.Messages.Enumerations.CommandFail:
-                    msg = new KeyCommon.Messages.CommandFail();
-                    cb = Worker_CommandFailed;
-                    break;
-                case KeyCommon.Messages.Enumerations.MissionResult:
-                    msg = new KeyCommon.Messages.MissionResult();
-                    cb = Worker_MissionResult;
-                    break;
-                case KeyCommon.Messages.Enumerations.NotifyPlugin_NodeSelected:
-                    msg = new KeyCommon.Messages.NotifyPlugin_NodeSelected();
-                    cb = Worker_NotifyPlugin_NodeSelected;
-                    break;
-                case KeyCommon.Messages.Enumerations.NotifyPlugin_ProcessEventQueue:
-                    msg = new KeyCommon.Messages.NotifyPlugin_ProcessEventQueue();
-                    cb = Worker_NotifyPlugin_ProcessEventQueue;
-                    break;
-                case KeyCommon.Messages.Enumerations.TransferEntityFile:
-                    msg = new KeyCommon.Messages.Transfer_Entity_File();
-                    cb = Worker_File_Transfer;
-                    System.Diagnostics.Debug.WriteLine("File Transfer Command Received");
-                    break;
-
-                
-                //case KeyCommon.Messages.Enumerations.LoadScene:
-                //	mOpenSceneInProgress = true;
-                //    msg = new KeyCommon.Messages.Scene_Load();
-                //    cb = Worker_LoadScene;
-                //    break;
-                case KeyCommon.Messages.Enumerations.Simulation_Join:
-                    msg = new KeyCommon.Messages.Simulation_Join();
-                    cb = Worker_SimulationJoin;
-                    break;
-               case KeyCommon.Messages.Enumerations.NewScene:
-                    msg = new KeyCommon.Messages.Scene_New();
-                    cb = Worker_GenerateNewScene;
-                    break;
-                case KeyCommon.Messages.Enumerations.NewFloorplan:
-                    msg = new KeyCommon.Messages.Floorplan_New();
-                    cb = Worker_GenerateNewFloorplan;
-                    break;
-                case KeyCommon.Messages.Enumerations.NewUniverse:
-                    msg = new KeyCommon.Messages.Scene_NewUniverse();
-                    cb = Worker_GenerateNewUniverse;
-                    break;
-                case KeyCommon.Messages.Enumerations.NewTerrainScene:
-                    msg = new KeyCommon.Messages.Scene_NewTerrain();
-                    cb = Worker_GenerateNewTerrainScene;
-                    break;
-                    
-                case KeyCommon.Messages.Enumerations.Node_Remove:
-                    msg = new KeyCommon.Messages.Node_Remove();
-                    cb = Worker_NodeRemove;
-                    break;
-                case KeyCommon.Messages.Enumerations.Node_Create:
-                    msg = new Keystone.Messages.Node_Create();
-                    cb = Worker_NodeCreate;
-                    break;
-                case KeyCommon.Messages.Enumerations.Node_MoveChildOrder:
-                    msg = new KeyCommon.Messages.Node_MoveChildOrder();
-                    cb = Worker_NodeMoveOrder;
-                    break;
-                case KeyCommon.Messages.Enumerations.Node_InsertUnderNew:
-                    msg = new KeyCommon.Messages.Node_InsertUnderNew();
-                    cb = Worker_InsertUnderNew;
-                    break;
-                case KeyCommon.Messages.Enumerations.Node_RenameResource:
-                    msg = new KeyCommon.Messages.Node_RenameResource();
-                    cb = Worker_NodeRenameResource;
-                    break;
-                case KeyCommon.Messages.Enumerations.Node_ReplaceResource:
-                    msg = new KeyCommon.Messages.Node_ReplaceResource();
-                    cb = Worker_NodeReplaceResource;
-                    break;
-                case KeyCommon.Messages.Enumerations.Node_ChangeParent:
-                    msg = new KeyCommon.Messages.Node_ChangeParent();
-                    cb = Worker_NodeChangeParent;
-                    break;
-                case KeyCommon.Messages.Enumerations.NodeChangeState:
-                    msg = new KeyCommon.Messages.Node_ChangeProperty();
-                    cb = Worker_NodeChangeProperty;
-                    break;
-                case KeyCommon.Messages.Enumerations.Geometry_ChangeProperty:
-                    msg = new KeyCommon.Messages.Geometrty_ChangeGroupProperty();
-                    cb = Worker_GeometryChangeGroupProperty;
-                    break;
-                case KeyCommon.Messages.Enumerations.NodeGetState:
-                    msg = new KeyCommon.Messages.Node_GetProperty();
-                    cb = Worker_NodeGetProperty;
-                    break;
-                case KeyCommon.Messages.Enumerations.Entity_Move:
-                    msg = new KeyCommon.Messages.Entity_Move();
-                    cb = Worker_EntityMove;
-                    break;
-                // Entity_GetCustomProperties - only required on Server (eg LoopbackServer.cs)
-                //case KeyCommon.Messages.Enumerations.Entity_GetCustomProperties :
-                //    break;
-                case KeyCommon.Messages.Enumerations.Entity_SetCustomProperties:
-                    msg = new KeyCommon.Messages.Entity_SetCustomProperties();
-                    cb = Worker_EntitySetCustomProperties;
-                    break;
-                case KeyCommon.Messages.Enumerations.Entity_ChangeCustomPropertyValue:
-                    msg = new KeyCommon.Messages.Entity_ChangeCustomPropertyValue();
-                    cb = Worker_EntityChangeCustomProperty;
-                    break;
-                // case KeyCommon.Messages.Enumerations.NodeChangeShaderParameter:
-                // Worker_EntityChangeShaderParameter
-                case KeyCommon.Messages.Enumerations.Geometry_CreateGroup:
-                    msg = new KeyCommon.Messages.Geometry_CreateGroup();
-                    cb = Worker_GeometryCreateGroup;
-                    break;
-                case KeyCommon.Messages.Enumerations.Geometry_RemoveGroup:
-                    msg = new KeyCommon.Messages.Geometry_RemoveGroup();
-                    cb = Worker_GeometryRemoveGroup;
-                    break;
-                case KeyCommon.Messages.Enumerations.Geometry_ResetTransform:
-                    msg = new KeyCommon.Messages.Geometry_ResetTransform();
-                    cb = Worker_Geometry_ResetTransform;
-                    break;
-                case KeyCommon.Messages.Enumerations.NodeChangeFlag:
-                    msg = new KeyCommon.Messages.Node_ChangeFlag();
-                    cb = Worker_NodeChangeFlag;
-                    break;
-                // OBSOLETE - users should use Node_Create() instead
-                //case KeyCommon.Messages.Enumerations.AddLight:
-                //    msg = new KeyCommon.Messages.Scene_LoadLight();
-                //    cb = Worker_AddLight;
-                //    break;
-                case KeyCommon.Messages.Enumerations.Task_Create:
-                    msg = new Game01.Messages.Task_Create();
-                    cb = Worker_Task_Create;
-                    break;
-                case KeyCommon.Messages.Enumerations.GameObject_Create:
-                    msg = new KeyCommon.Messages.GameObject_Create();
-                    cb = Worker_GameObject_Create;
-                    break;
-                case KeyCommon.Messages.Enumerations.GameObject_ChangeProperties:
-                    msg = new KeyCommon.Messages.GameObject_ChangeProperties();
-                    cb = Worker_GameObject_ChangeProperties;
-                    break;
-                case KeyCommon.Messages.Enumerations.DeleteFileFromArchive:
-                    msg = new KeyCommon.Messages.Archive_DeleteEntry();
-                    cb = Worker_ArchiveDeleteFile;
-                    break;
-                case KeyCommon.Messages.Enumerations.RenameEntryInArchive:
-                    msg = new KeyCommon.Messages.Archive_RenameEntry();
-                    cb = Worker_ArchiveRenameEntry;
-                    break;
-                case KeyCommon.Messages.Enumerations.AddFolderToArchive:
-                    msg = new KeyCommon.Messages.Archive_AddFolder();
-                    cb = Worker_ArchiveAddFolder;
-                    break;
-                case KeyCommon.Messages.Enumerations.AddFileToArchive:
-                    msg = new KeyCommon.Messages.Archive_AddFiles();
-                    cb = Worker_ModImportFile;
-                    break;
-                case KeyCommon.Messages.Enumerations.Geometry_Add:
-                    msg = new KeyCommon.Messages.Geometry_Add();
-                    cb = Worker_Geometry_Add;
-                    break;
-                case KeyCommon.Messages.Enumerations.AddGeometryToArchive:
-                    msg = new KeyCommon.Messages.Archive_AddGeometry();
-                    cb = Worker_ModImportGeometryAsEntity;
-                    break;
-                case KeyCommon.Messages.Enumerations.InsertPrefab_Interior:
-                    msg = new KeyCommon.Messages.Prefab_Insert_Into_Interior();
-                    cb = Worker_Prefab_Insert_Interior;
-                    break;
-                case KeyCommon.Messages.Enumerations.InsertPrefab_Structure:
-                    msg = new KeyCommon.Messages.Prefab_Insert_Into_Structure();
-                    cb = Worker_Prefab_Insert_Into_Structure;
-                    break;
-                case KeyCommon.Messages.Enumerations.PlaceEntity_EdgeSegment :
-                    msg = new KeyCommon.Messages.Place_Entity_In_EdgeSegment();
-                    cb = Worker_Prefab_Insert_EdgeSegment;
-                    break;
-                    
-                    
-                case KeyCommon.Messages.Enumerations.Terrain_Paint:
-                    msg = new KeyCommon.Messages.Terrain_Paint();
-                    cb = Worker_Terrain_Paint;
-                    break;
-                case KeyCommon.Messages.Enumerations.CelledRegion_PaintCell:
-                    msg = new KeyCommon.Messages.PaintCellOperation();
-                    cb = Worker_CelledRegion_Paint;
-                    break;
-                case KeyCommon.Messages.Enumerations.TileMapStructure_PaintCell:
-                    msg = new KeyCommon.Messages.TileMapStructure_PaintCell();
-                    cb = Worker_TileMapStructure_Paint;
-                    break;
-                //case KeyCommon.Messages.Enumerations.PlaceWall_CelledRegion:
-                //    msg = new KeyCommon.Messages.Place_Wall_Into_CelledRegion();
-                //    break;
-                //case KeyCommon.Messages.Enumerations.CelledRegion_PaintLink:
-                //    msg = new KeyCommon.Messages.CelledRegion_PaintLink();
-                //    cb = Worker_CelledRegion_Link;
-                //    break;
-                case KeyCommon.Messages.Enumerations.PrefabLoad:
-                    msg = new KeyCommon.Messages.Prefab_Load();
-                    cb = Worker_Prefab_Insert;
-                    break;
-                case KeyCommon.Messages.Enumerations.PrefabSave:
-                    msg = new KeyCommon.Messages.Prefab_Save();
-                    cb = Worker_PrefabSave;
-                    break;
-                case KeyCommon.Messages.Enumerations.GeometrySave:
-                    msg = new KeyCommon.Messages.Geometry_Save();
-                    cb = Worker_Geometry_Save;
-                    break;
-                case KeyCommon.Messages.Enumerations.Simulation_Spawn:
-                    msg = new KeyCommon.Messages.Simulation_Spawn();
-                    cb = Worker_Spawn;
-                    break;
-                default:
-                    msg = null;
-                    cb = null; ;
-                   
-                    Debug.WriteLine("FormClient.UserMessageReceived() - Unsupported message type '" + ((KeyCommon.Messages.Enumerations)commandID).ToString() + "'.");
-                    break;
-            }
-
-            return msg;
-        }
-
+#endregion
+  
+#region USER MESSAGES
         public void UserMessageSending(KeyCommon.Messages.MessageBase message)
         {
             message.SetFlag(KeyCommon.Messages.Flags.SourceIsClient);
@@ -4506,8 +3258,71 @@ namespace KeyEdit
         const int DATA_TYPE_FILE_STREAM = 2;
         const int DATA_TYPE_CHUNK = 3;
 
-        private void ServerMessageReceivedGameSpecific(int commandID, NetChannel channel, NetBuffer buffer)
+        /// <summary>
+        /// A UserMessage denotes a message that is NOT intrinsic to the Lidgren Library, but is instead
+        /// a message that the user of Lidgren has added for app specific processing.
+        ///
+        /// Create appropriate message and then wire up the correct execution callback functions based on the message type.
+        /// Since our execution is decoupled from the command and only assigned after the message
+        /// is created and when the command is created, we can have different versions of the callbacks
+        /// depending on whether it's the client or server responding to the message
+        /// </summary>
+        /// <param name="commandID"></param>
+        /// <param name="channel"></param>
+        /// <param name="buffer"></param>
+        private void UserMessageReceived(int commandID, NetChannel channel, NetBuffer buffer)
         {
+            if (commandID > (int)KeyCommon.Messages.Enumerations.UserMessages)
+            {
+                this.UserMessageReceivedGameSpecific(commandID, channel, buffer);
+                return;
+            }
+            
+            // based on the command received, wire up the command worker function and completion functions
+            Amib.Threading.WorkItemCallback cb = null;
+            KeyCommon.Messages.MessageBase msg = CreateMessage(commandID, out cb);
+
+            FormPleaseWait progress = new FormPleaseWait();
+
+            // TODO: if this message needs to be confirmed first (determined by the type of message)
+            // a flag that indicates it's unconfirmed, then we must postpone msg.Read(buffer) 
+            // and instead store the buffer, store the msg, store the callback function
+            // and then if confirmed, we construct the cmd and simply invoke the callback
+            // thusly:  cb(cmd);
+            // since we'll already be processing the confirmation message in a worker thread 
+            // there is no need to queue it. 
+
+            if (msg == null) return;
+            msg.Read(buffer);
+
+            Keystone.Commands.Command cmd = new Keystone.Commands.Command(msg);
+
+            // .BeginExecute results in this command being enqueued to SmartThreadPool and so will not
+            // execute on this current thread.
+            cmd.BeginExecute(cb, CommandCompleted, progress); // TODO: we should pass an undo here too
+                                                                //if (progress != null)
+                                                                //    progress.ShowDialog(this);
+        }
+
+        /// <summary>
+        /// A UserMessage denotes a message that is NOT intrinsic to the Lidgren Library, but is instead
+        /// a message that the user of Lidgren has added for app specific processing.
+        ///
+        /// Represents game commands that are specific to this game e.g "SciFi Command"
+        /// and not any other game##.dll made with the KGB Framework.
+        ///</summary>
+        private void UserMessageReceivedGameSpecific(int commandID, NetChannel channel, NetBuffer buffer)
+        {
+            
+        
+            //Client does not need to connect.Tag because this client is the player!
+            ////KeyCommon.GameObjects.Player player = (KeyCommon.GameObjects.Player)connection.Tag;
+
+            // however, if this is a server, the connection will be from the server... so we may very well ignore it...
+            // but if this simulation is running on the server, each player will be important.
+            // Probably best to make this abstract and have yet again... ClientSimulation, ServerSimulation
+
+
             // typically here we just want to apply the server response. This occurs on the main thread and doesn't require us to use worker functions.
             Game01.Enums.UserMessage command = (Game01.Enums.UserMessage)commandID;
 
@@ -4580,52 +3395,7 @@ namespace KeyEdit
                     break;
             }
         }
-
-        /// <summary>
-        /// Create appropriate message and then wire up the correct execution callback functions based on the message type.
-        /// Since our execution is decoupled from the command and only assigned after the message
-        /// is created and when the command is created, we can have different versions of the callbacks
-        /// depending on whether it's the client or server responding to the message
-        /// </summary>
-        /// <param name="commandID"></param>
-        /// <param name="channel"></param>
-        /// <param name="sequenceNumber"></param>
-        /// <param name="buffer"></param>
-        private void UserMessageReceived(int commandID, NetChannel channel, NetBuffer buffer)
-        {
-
-            if (commandID > (int)KeyCommon.Messages.Enumerations.UserMessages)
-            {
-                this.ServerMessageReceivedGameSpecific(commandID, channel, buffer);
-                return;
-            }
-            // based on the command received, wire up the command worker function and completion functions
-            Amib.Threading.WorkItemCallback cb = null;
-            KeyCommon.Messages.MessageBase msg = CreateMessage(commandID, out cb);
-
-            FormPleaseWait progress = new FormPleaseWait();
-
-            // TODO: if this message needs to be confirmed first (determined by the type of message)
-            // a flag that indicates it's unconfirmed, then we must postpone msg.Read(buffer) 
-            // and instead store the buffer, store the msg, store the callback function
-            // and then if confirmed, we construct the cmd and simply invoke the callback
-            // thusly:  cb(cmd);
-            // since we'll already be processing the confirmation message in a worker thread 
-            // there is no need to queue it. 
-
-            if (msg == null) return;
-            msg.Read(buffer);
-
-            Keystone.Commands.Command cmd = new Keystone.Commands.Command(msg);
-
-            // .BeginExecute results in this command being enqueued to SmartThreadPool and so will not
-            // execute on this current thread.
-            cmd.BeginExecute(cb, CommandCompleted, progress); // TODO: we should pass an undo here too
-                                                                //if (progress != null)
-                                                                //    progress.ShowDialog(this);
-
-        }
-
+#endregion
         /// <summary>
         /// This function is called prior to updating the scene (see AppMain.MainLoop()), 
         /// advancing the simulation and rendering it.
@@ -4784,7 +3554,7 @@ namespace KeyEdit
                     else if (message is KeyCommon.Messages.NotifyPlugin_NodeSelected)
                     {
                         KeyCommon.Messages.NotifyPlugin_NodeSelected selected = (KeyCommon.Messages.NotifyPlugin_NodeSelected)message;
-                        System.Diagnostics.Debug.WriteLine("Notifying plugin " + selected.Typename + " with id = " + selected.NodeID);
+                        System.Diagnostics.Debug.WriteLine("FormMain.Commands.ProcessCompletedCommandQueue() - Notifying plugin " + selected.Typename + " with id = " + selected.NodeID);
 
                         Workspaces.WorkspaceBase3D workspace3d = mWorkspaceManager.CurrentWorkspace as Workspaces.WorkspaceBase3D;
                         if (workspace3d == null) return;
@@ -5003,7 +3773,7 @@ namespace KeyEdit
                         KeyCommon.Messages.Prefab_Insert_Into_Interior insert = (KeyCommon.Messages.Prefab_Insert_Into_Interior)message;
                         Keystone.Entities.Entity parent = (Keystone.Entities.Entity)Repository.Get(insert.ParentID);
 
-                        System.Diagnostics.Debug.WriteLine("ProcessCompletedCommandQueue() Inserting into cell " + insert.Index);
+                        System.Diagnostics.Debug.WriteLine("FormMain.Commands.ProcessCompletedCommandQueue() -  Inserting into cell " + insert.Index);
                         if (insert.ComponentType == KeyCommon.Messages.ComponentType.EdgeComponent)
                         {
                             // if there is a wall or existing EdgeSegment, delete it by setting StyleID = -1 and then Applying it
@@ -5598,7 +4368,7 @@ namespace KeyEdit
                                     for (int i = 0; i < errorCodes.Length; i++)
                                     {
                                         string errorDescr = entity.Script.GetError(errorCodes[i]);
-                                        Debug.WriteLine("Validation failed for property '" + changeCustom.CustomProperties[i].Name + "' - " + errorDescr);
+                                        Debug.WriteLine("FormMain.Commands.ProcessCompletedCommandQueue() - Validation failed for property '" + changeCustom.CustomProperties[i].Name + "' - " + errorDescr);
                                     }
                                 }
                             }
@@ -5901,7 +4671,7 @@ namespace KeyEdit
 
                 }
                 else
-                    Debug.WriteLine("Command failed.", result.Exception.ToString());
+                    Debug.WriteLine("FormMain.Commands.ProcessCompletedCommandQueue() - Command failed.", result.Exception.ToString());
             }  // end foreach
 
             // AFter we've iterated through all outstanding completed commands now perhaps is best time 
@@ -5911,6 +4681,8 @@ namespace KeyEdit
 
 
 
+#region CREATE (SCENE, SIM, WORKSPACE), JOIN, LOAD
+        
         /// <summary>
         /// SceneLoad is called by worker thread.
         /// </summary>
@@ -5957,7 +4729,6 @@ namespace KeyEdit
         //    SendNetMessage(load);
         //}
 
-        
         private void SimulationJoinRequest(string username, string password, string folderName, string missionName, bool resume)
         {
             KeyCommon.Messages.Simulation_Join_Request request = new KeyCommon.Messages.Simulation_Join_Request();
@@ -5969,6 +4740,23 @@ namespace KeyEdit
             SendNetMessage(request);
         }
 
+
+
+        internal static Keystone.Simulation.ISimulation CreateSimulation(string name)
+        {
+            // TODO: would be nice if based on user having selected a "mod" from the launcher
+            //       we pass in the path of the game##.dll we want to load, and load it dynamically?
+            // TODO: this call should be done in a seperate thread and upon complettion then we should RegisterGame
+            int seed = 0;
+            Keystone.Simulation.IGame game = Game01.Game(name, seed);
+
+            System.Diagnostics.Debug.WriteLine("FormMain.Commands.CreateSimulation() - Simulationed " + game.mName + " loaded.");
+            // todo: i think i still have a Keystone.Simulation.Simulation.cs implementation that needs to be deleted.
+            //       it's currently (August.21.2025 an exact match of KeyEdit.Simulation.cs but they will diverge.)
+            Keystone.Simulation.ISimulation sim = new KeyEdit.Simulation(0.0f, game);
+            return sim;
+        }
+        
         private IWorkspace LoadWorkspace(Scene scene, string workspaceName, string regionID)
         {
             // TODO:
@@ -6087,9 +4875,6 @@ namespace KeyEdit
             
         }
 
-        private Scene mScene; // todo: delete this
-        private string mStartingRegionID; // todo: delete this
-        // here we can react based on all children scene elements within a particular Zone or Region being loaded successfully
         private void OnRegionChildrenPageComplete(Keystone.IO.ReadContext context)
         {
             
@@ -6126,241 +4911,8 @@ namespace KeyEdit
                 
             }
         }
-
-        
-
-        private static Keystone.Entities.Entity DeserializePreviewComponent(string archiveFullPath, string pathInArchive)
-        {
-            if (string.IsNullOrEmpty(archiveFullPath) ||
-                string.IsNullOrEmpty(pathInArchive)) return null;
-
-            string extension = System.IO.Path.GetExtension(pathInArchive).ToUpper();
-            switch (extension)
-            {
-            	case ".KGBSEGMENT":
-                case ".KGBENTITY":// represents a compressed archive (xmldb) within the overall xmldb
-
-                    // open an entity from a zip archive mod db or mod folder path on harddrive
-                    System.IO.Stream stream = KeyCommon.IO.ArchiveIOHelper.GetStreamFromMod(pathInArchive, "", archiveFullPath);
-                    if (stream == null) throw new Exception("FormMain.Commands.DeserializePreviewComponent() - ERROR: zip entry not found.");
-                    
-                    Keystone.IO.XMLDatabaseCompressed database = new Keystone.IO.XMLDatabaseCompressed();
-                    Keystone.Scene.SceneInfo info = database.Open(stream);
-
-                    // NOTE: we delayTVResourceLoading because we only LoadTVResource for the exterior geometry.  This also prevents us from loading Container Vehicle Interior
-                    bool delayTVResourceLoading = true;
-                    Keystone.Elements.Node node = database.ReadSynchronous(info.FirstNodeTypeName, null, true, true, null, delayTVResourceLoading, false);
-                    if (!(node is Keystone.Entities.Entity))
-                        throw new Exception("FormMain.Commands.DeserializePreviewComponent() - Node not of valid Entity type.");
-                    
-                    Debug.Assert(node is Entity, "DeserializePreviewComponent() - Node is not an Entity.");
-                    if (node is Entity)
-                    {
-                        // TODO: This isn't compiling or creating the Entity script
-                        if (node is Keystone.Vehicles.Vehicle || node is Container)
-                        {
-                            // There is no need to have an interior for a Vehicle or Container's Interior.  Preview only shows Exterior
-                            Container c = (Container)node;
-                            c.RemoveChild(c.Interior);
-                        }
-                        if (node is ModeledEntity)
-                        {
-                            ModeledEntity entity = (ModeledEntity)node;
-                            Model[] models = entity.SelectModel(SelectionMode.Render, 0);
-                            if (models != null)
-                            {
-                                for (int i = 0; i < models.Length; i++)
-                                {
-                                    Keystone.Appearance.Appearance appearance = models[i].Appearance;
-                                    Keystone.IO.PagerBase.LoadTVResource(appearance, true);
-                                    Keystone.Elements.Geometry geometry = models[i].Geometry;
-                                    Keystone.IO.PagerBase.LoadTVResource(geometry, false);
-                                }
-                            }
-                        }
-                    }
-                    
-                    stream.Close();
-                    stream.Dispose();
-                    database.Dispose();
-                    return (Keystone.Entities.Entity)node;
-
-                default:
-                    return null;
-
-            }
-        }
-
-        private void ShowPreview (string modPath, string entryName)
-        {
-            // TODO: note: here the closing event of the previewform is not hooked
-            //       so i'm not sure if we can switch back to the previous workspace!
-            // TODO: and actually, where am i even creating the formPreview workspace?
-            //       is it because I havent tested importing geometry in a while?
-            
-			string previewSceneDBPath = System.IO.Path.GetTempPath() ; // TODO: i added this tempfile for fullpath after tweaking things.  Is this correct to use a tempfile here?
-
-            string regionID;
-			if (AppMain._core.SceneManager.CreateNewSceneDatabase(previewSceneDBPath, 10000f, 10000f, 10000f, out regionID) == false)
-            	throw new Exception ("FormMain.Commands.ShowPreview() - Error creating scene database.");
-
-			if (modPath.EndsWith(".zip"))
-			{
-                // todo: this is obsolete - we don't place prefabs into zipped mods anymore. 
-            	entryName =  KeyCommon.IO.ArchiveIOHelper.TidyZipEntryName(entryName);
-			}
-            // EditorWorkspace or most others will attempt to configure the control as a document tab
-            // on the main form. We must therefore use a custom 'RenderPreviewWorkspace' where we can
-            // have it configure to the form we pass into it's constructor.
-            string workspaceName = "PREVIEW:" + entryName;
-            string sceneName = "PREVIEW:" + entryName;
-
-            AppMain.Form.Invoke(new System.Windows.Forms.MethodInvoker(delegate()
-            	{ 
-            		AppMain.PreviewForm = new FormPreview(null, null);
-            	}));
-
-            
-            Keystone.Simulation.ISimulation sim = KeyEdit.FormMain.CreateSimulation(sceneName);
-            Scene scene = AppMain._core.SceneManager.Open(previewSceneDBPath, sim, null, null);
-            scene.Load();
-            
-            // TODO: we should not be deserializing from archive, but from either a tmp src or
-            //       ...how in the heck was this even working when using zip archive? because the kgbentity
-            //       to be deserialized isn't even saved yet... yet it was working wasn't it?
-			//       kgbentity - imported, added to archive, then you could save it... how did the
-			//       modifications get added to the archived version? Were mods saved during all updates?
-			//       - if we save the entity first here, then it's loadable for preview and a re-save that includes the preview image
-			
-            // reads preview component from archive and adds to scene
-            Entity previewEntity = DeserializePreviewComponent(AppMain.MOD_PATH, entryName);
-            // NOTE: scene.Root already contains a default directionallight       	
-            //Keystone.Lights.DirectionalLight light = LightsHelper.LoadDirectionalLight(AppMain.REGION_DIAMETER * 0.5f);
-
-            Keystone.Entities.Entity parent = (Keystone.Entities.Entity)scene.Root;
-            Keystone.Traversers.SuperSetter setter = new Keystone.Traversers.SuperSetter(parent);
-            //setter.Apply(light);
-            setter.Apply(previewEntity);
-
-            // NOTE: for our AssetBrowser Preview 
-            // FloorPlanDesignWorkspace.InitializeAssetBrowser() and
-            // EditorWorksapce.AssetBrowser.cs.OnShowPreview_Click() it does NOT
-            // use a seperate workspace...  those are broken and MUST BE FIXED.
-            // they were never fixed after switching
-            // to use of workspace that configures the viewportcontrol.
-            // TODO: this is wrong workspace for showing prefab? or is it ok to share?
-            Workspaces.RenderPreviewWorkspace workSpace = new Workspaces.RenderPreviewWorkspace(workspaceName,
-                    									AppMain.PreviewForm, mWorkspaceManager.CurrentWorkspace.Name);
-            mWorkspaceManager.Add(workSpace, scene);
-            workSpace.Configure(mWorkspaceManager, scene);
-            mWorkspaceManager.ChangeWorkspace(workSpace.Name, false);
-
-            scene.Simulation.Running = true;
-            // TODO: this call to context.MoveTo() might be resulting in a deadlock 
-            // because inside it, it moves the camera via .SetMatrix() and unfortunately that is potentially
-            // occurring at any random time during rendering which is obviously bad.
-            // context.MoveTo() should result in the creation of a move command at the very least
-            // 
-            workSpace.ViewportControls[0].Context.Viewpoint_Orbit(previewEntity, .9f);
-
-            // ProcessCompletedCommand() occurs on gameloop thread and showing this
-            // FormPreview will block that thread if it's not spawned on the Windows Form thread.
-            // For some reason I seem unable to do that...
-            AppMain.Form.ShowPreview(previewEntity, modPath, entryName);
-        }
-        
-
-        internal static Keystone.Simulation.ISimulation CreateSimulation(string name)
-        {
-            // TODO: this call should be done in a seperate thread and upon complettion then we should RegisterGame
-            KeyCommon.DatabaseEntities.Game game = new KeyCommon.DatabaseEntities.Game(name);
-
-            System.Diagnostics.Debug.WriteLine("FormMain.Commands.CreateSimulation() - Simulationed " + game.mName + " loaded.");
-            Keystone.Simulation.ISimulation sim = new Simulation(0.0f, game);
-            return sim;
-        }
-
-        private void NotifyMove(string oldParentID, string newParentID, string childID, string childTypename)
-        {
-            KeyPlugins.AvailablePlugin plugin = GetCurrentPlugin(PRIMARY_WORKSPACE_NAME);
-            if (plugin != null && plugin.Instance != null)
-            {
-                if (childID == plugin.Instance.TargetID || ChildNodeIsDescendant(plugin.Instance.TargetID, childID))
-                {
-                    ((KeyEdit.PluginHost.EditorHost)AppMain.PluginService).NotifyNodeMoved(oldParentID, newParentID, childID, childTypename);
-                }
-            }
-        }
-
-        private void NotifyAdd(string parentID, string childID, string childTypename)
-        {
-            KeyPlugins.AvailablePlugin plugin = GetCurrentPlugin(PRIMARY_WORKSPACE_NAME);
-            if (plugin != null && plugin.Instance != null)
-            {
-                if (childID == plugin.Instance.TargetID || ChildNodeIsDescendant(plugin.Instance.TargetID, childID))
-                {
-                    ((KeyEdit.PluginHost.EditorHost)AppMain.PluginService).NotifyNodeAdded(parentID, childID, childTypename);
-                }
-            }
-        }
-
-        private KeyPlugins.AvailablePlugin GetCurrentPlugin (string workspace)
-        {
-            return  ((KeyEdit.Workspaces.EditorWorkspace)mWorkspaceManager.GetWorkspace(workspace)).CurrentPlugin;
-        }
-
-        private void NotifyRemove(string parentID, string childID, string childTypename)
-        {
-            KeyPlugins.AvailablePlugin plugin = GetCurrentPlugin(PRIMARY_WORKSPACE_NAME);
-
-            if (plugin != null && plugin.Instance != null)
-            {
-                if (childID == plugin.Instance.TargetID || ChildNodeIsDescendant(plugin.Instance.TargetID, childID))
-                {
-                    ((KeyEdit.PluginHost.EditorHost)AppMain.PluginService).NotifyNodeRemoved(parentID, childID, childTypename);
-                }
-            }
-        }
-
-        // TODO: this should expand to include the propertyspec holding the new value
-        private void NotifyCustomPropertyChange(string nodeID, string nodeTypename)
-        {
-            KeyPlugins.AvailablePlugin plugin = GetCurrentPlugin(PRIMARY_WORKSPACE_NAME);
-
-            // has to be a custom property defined in a shared DomainObject but stored in an Entity
-            if (plugin != null && plugin.Instance != null)
-            {
-                if (nodeID == plugin.Instance.TargetID || ChildNodeIsDescendant(plugin.Instance.TargetID, nodeID))
-                {
-                    ((KeyEdit.PluginHost.EditorHost)AppMain.PluginService).NotifyNodeCustomPropertyChanged(nodeID, nodeTypename);
-                }
-            }
-        }
-
-        private void NotifyPluginOfPropertyChange(string nodeID, string nodeTypename)
-        {
-            KeyPlugins.AvailablePlugin plugin = GetCurrentPlugin(PRIMARY_WORKSPACE_NAME);
-            if (plugin != null && plugin.Instance != null)
-            {
-                // does the modified node match the target entity of the plugin OR any 
-                // of it's descendants?  If so, then we need to notify the plugin of 
-                // the modification so that it can update it's GUI.
-                if (nodeID == plugin.Instance.TargetID || ChildNodeIsDescendant(plugin.Instance.TargetID, nodeID))
-                {
-                    ((KeyEdit.PluginHost.EditorHost)AppMain.PluginService).NotifyNodePropertyChanged(nodeID, nodeTypename);
-                }
-            }
-        }
-
-        private bool ChildNodeIsDescendant(string elderNodeID, string nodeToCompareID)
-        {
-            Node nodeToCompare = (Node)Repository.Get(nodeToCompareID);
-            if (nodeToCompare == null) throw new ArgumentOutOfRangeException();
-            
-            return nodeToCompare.IsDescendantOf (elderNodeID);
-        }
-                
-
+#endregion
+#region SAVE NODE AND RESOURCE
         internal void SaveNode(string entityID)
         {
             Node target = (Node)Repository.Get(entityID);
@@ -6493,22 +5045,239 @@ namespace KeyEdit
             Keystone.IO.WriteContext context = (Keystone.IO.WriteContext)result.State;
             System.Diagnostics.Debug.WriteLine("FormMain.Commands() - Written Node '" + context.Node.TypeName + "'");
             
-			if (context.Node is ZoneRoot)
-			{
-				// re-enable serialization for Zone children of ZoneRoot
-				IGroup group = (IGroup)context.Node;
-				foreach (Node child in group.Children)
-					if (child is Zone)
-						child.Serializable = true;
-			
-				// Feb.14.2016 - Monitor.Exits added
-				//System.Threading.Monitor.Exit (mSaveNodeLock);
-			}
-			//else if (context.Node is Zone)
-                // TODO: I think if ZoneRoot Exits first then the subsequent child Zone will fail below
+      			if (context.Node is ZoneRoot)
+      			{
+      				// re-enable serialization for Zone children of ZoneRoot
+      				IGroup group = (IGroup)context.Node;
+      				foreach (Node child in group.Children)
+      					if (child is Zone)
+      						child.Serializable = true;
+      			
+      				// Feb.14.2016 - Monitor.Exits added
+      				//System.Threading.Monitor.Exit (mSaveNodeLock);
+      			}
+      			//else if (context.Node is Zone)
+                      // TODO: I think if ZoneRoot Exits first then the subsequent child Zone will fail below
 				//System.Threading.Monitor.Exit (mSaveNodeLock);
 
         
         }
+#endregion
+#region PLUGIN notifications
+        private void NotifyMove(string oldParentID, string newParentID, string childID, string childTypename)
+        {
+            KeyPlugins.AvailablePlugin plugin = GetCurrentPlugin(PRIMARY_WORKSPACE_NAME);
+            if (plugin != null && plugin.Instance != null)
+            {
+                if (childID == plugin.Instance.TargetID || Node.ChildNodeIsDescendant(childID, plugin.Instance.TargetID))
+                {
+                    ((KeyEdit.PluginHost.EditorHost)AppMain.PluginService).NotifyNodeMoved(oldParentID, newParentID, childID, childTypename);
+                }
+            }
+        }
+
+        private void NotifyAdd(string parentID, string childID, string childTypename)
+        {
+            KeyPlugins.AvailablePlugin plugin = GetCurrentPlugin(PRIMARY_WORKSPACE_NAME);
+            if (plugin != null && plugin.Instance != null)
+            {
+                if (childID == plugin.Instance.TargetID || Node.ChildNodeIsDescendant(childID, plugin.Instance.TargetID))
+                {
+                    ((KeyEdit.PluginHost.EditorHost)AppMain.PluginService).NotifyNodeAdded(parentID, childID, childTypename);
+                }
+            }
+        }
+
+        private KeyPlugins.AvailablePlugin GetCurrentPlugin (string workspace)
+        {
+            return  ((KeyEdit.Workspaces.EditorWorkspace)mWorkspaceManager.GetWorkspace(workspace)).CurrentPlugin;
+        }
+
+        private void NotifyRemove(string parentID, string childID, string childTypename)
+        {
+            KeyPlugins.AvailablePlugin plugin = GetCurrentPlugin(PRIMARY_WORKSPACE_NAME);
+
+            if (plugin != null && plugin.Instance != null)
+            {
+                if (childID == plugin.Instance.TargetID || Node.ChildNodeIsDescendant(childID, plugin.Instance.TargetID))
+                {
+                    ((KeyEdit.PluginHost.EditorHost)AppMain.PluginService).NotifyNodeRemoved(parentID, childID, childTypename);
+                }
+            }
+        }
+
+        // TODO: this should expand to include the propertyspec holding the new value
+        private void NotifyCustomPropertyChange(string nodeID, string nodeTypename)
+        {
+            KeyPlugins.AvailablePlugin plugin = GetCurrentPlugin(PRIMARY_WORKSPACE_NAME);
+
+            // has to be a custom property defined in a shared DomainObject but stored in an Entity
+            if (plugin != null && plugin.Instance != null)
+            {
+                if (nodeID == plugin.Instance.TargetID || Node.ChildNodeIsDescendant(nodeID, plugin.Instance.TargetID))
+                {
+                    ((KeyEdit.PluginHost.EditorHost)AppMain.PluginService).NotifyNodeCustomPropertyChanged(nodeID, nodeTypename);
+                }
+            }
+        }
+
+        private void NotifyPluginOfPropertyChange(string nodeID, string nodeTypename)
+        {
+            KeyPlugins.AvailablePlugin plugin = GetCurrentPlugin(PRIMARY_WORKSPACE_NAME);
+            if (plugin != null && plugin.Instance != null)
+            {
+                // does the modified node match the target entity of the plugin OR any 
+                // of it's descendants?  If so, then we need to notify the plugin of 
+                // the modification so that it can update it's GUI.
+                if (nodeID == plugin.Instance.TargetID || Node.ChildNodeIsDescendant(nodeID, plugin.Instance.TargetID))
+                {
+                    ((KeyEdit.PluginHost.EditorHost)AppMain.PluginService).NotifyNodePropertyChanged(nodeID, nodeTypename);
+                }
+            }
+        }
+            
+#endregion
+#region PREVIEW WINDOW
+        private static Keystone.Entities.Entity DeserializePreviewComponent(string archiveFullPath, string pathInArchive)
+        {
+            if (string.IsNullOrEmpty(archiveFullPath) ||
+                string.IsNullOrEmpty(pathInArchive)) return null;
+
+            string extension = System.IO.Path.GetExtension(pathInArchive).ToUpper();
+            switch (extension)
+            {
+            	case ".KGBSEGMENT":
+                case ".KGBENTITY":// represents a compressed archive (xmldb) within the overall xmldb
+
+                    // open an entity from a zip archive mod db or mod folder path on harddrive
+                    System.IO.Stream stream = KeyCommon.IO.ArchiveIOHelper.GetStreamFromMod(pathInArchive, "", archiveFullPath);
+                    if (stream == null) throw new Exception("FormMain.Commands.DeserializePreviewComponent() - ERROR: zip entry not found.");
+                    
+                    Keystone.IO.XMLDatabaseCompressed database = new Keystone.IO.XMLDatabaseCompressed();
+                    Keystone.Scene.SceneInfo info = database.Open(stream);
+
+                    // NOTE: we delayTVResourceLoading because we only LoadTVResource for the exterior geometry.  This also prevents us from loading Container Vehicle Interior
+                    bool delayTVResourceLoading = true;
+                    Keystone.Elements.Node node = database.ReadSynchronous(info.FirstNodeTypeName, null, true, true, null, delayTVResourceLoading, false);
+                    if (!(node is Keystone.Entities.Entity))
+                        throw new Exception("FormMain.Commands.DeserializePreviewComponent() - Node not of valid Entity type.");
+                    
+                    Debug.Assert(node is Entity, "DeserializePreviewComponent() - Node is not an Entity.");
+                    if (node is Entity)
+                    {
+                        // TODO: This isn't compiling or creating the Entity script
+                        if (node is Keystone.Vehicles.Vehicle || node is Container)
+                        {
+                            // There is no need to have an interior for a Vehicle or Container's Interior.  Preview only shows Exterior
+                            Container c = (Container)node;
+                            c.RemoveChild(c.Interior);
+                        }
+                        if (node is ModeledEntity)
+                        {
+                            ModeledEntity entity = (ModeledEntity)node;
+                            Model[] models = entity.SelectModel(SelectionMode.Render, 0);
+                            if (models != null)
+                            {
+                                for (int i = 0; i < models.Length; i++)
+                                {
+                                    Keystone.Appearance.Appearance appearance = models[i].Appearance;
+                                    Keystone.IO.PagerBase.LoadTVResource(appearance, true);
+                                    Keystone.Elements.Geometry geometry = models[i].Geometry;
+                                    Keystone.IO.PagerBase.LoadTVResource(geometry, false);
+                                }
+                            }
+                        }
+                    }
+                    
+                    stream.Close();
+                    stream.Dispose();
+                    database.Dispose();
+                    return (Keystone.Entities.Entity)node;
+
+                default:
+                    return null;
+
+            }
+        }
+
+        private void ShowPreview (string modPath, string entryName)
+        {
+            // TODO: note: here the closing event of the previewform is not hooked
+            //       so i'm not sure if we can switch back to the previous workspace!
+            // TODO: and actually, where am i even creating the formPreview workspace?
+            //       is it because I havent tested importing geometry in a while?
+            
+      			string previewSceneDBPath = System.IO.Path.GetTempPath() ; // TODO: i added this tempfile for fullpath after tweaking things.  Is this correct to use a tempfile here?
+      
+                  string regionID;
+      			if (AppMain._core.SceneManager.CreateNewSceneDatabase(previewSceneDBPath, 10000f, 10000f, 10000f, out regionID) == false)
+                  	throw new Exception ("FormMain.Commands.ShowPreview() - Error creating scene database.");
+      
+      			if (modPath.EndsWith(".zip"))
+      			{
+                      // todo: this is obsolete - we don't place prefabs into zipped mods anymore. 
+                  	entryName =  KeyCommon.IO.ArchiveIOHelper.TidyZipEntryName(entryName);
+      			}
+            // EditorWorkspace or most others will attempt to configure the control as a document tab
+            // on the main form. We must therefore use a custom 'RenderPreviewWorkspace' where we can
+            // have it configure to the form we pass into it's constructor.
+            string workspaceName = "PREVIEW:" + entryName;
+            string sceneName = "PREVIEW:" + entryName;
+
+            AppMain.Form.Invoke(new System.Windows.Forms.MethodInvoker(delegate()
+            	{ 
+            		AppMain.PreviewForm = new FormPreview(null, null);
+            	}));
+
+            
+            Keystone.Simulation.ISimulation sim = KeyEdit.FormMain.CreateSimulation(sceneName);
+            Scene scene = AppMain._core.SceneManager.Open(previewSceneDBPath, sim, null, null);
+            scene.Load();
+            
+            // TODO: we should not be deserializing from archive, but from either a tmp src or
+            //       ...how in the heck was this even working when using zip archive? because the kgbentity
+            //       to be deserialized isn't even saved yet... yet it was working wasn't it?
+			//       kgbentity - imported, added to archive, then you could save it... how did the
+			//       modifications get added to the archived version? Were mods saved during all updates?
+			//       - if we save the entity first here, then it's loadable for preview and a re-save that includes the preview image
+			
+            // reads preview component from archive and adds to scene
+            Entity previewEntity = DeserializePreviewComponent(AppMain.MOD_PATH, entryName);
+            // NOTE: scene.Root already contains a default directionallight       	
+            //Keystone.Lights.DirectionalLight light = LightsHelper.LoadDirectionalLight(AppMain.REGION_DIAMETER * 0.5f);
+
+            Keystone.Entities.Entity parent = (Keystone.Entities.Entity)scene.Root;
+            Keystone.Traversers.SuperSetter setter = new Keystone.Traversers.SuperSetter(parent);
+            //setter.Apply(light);
+            setter.Apply(previewEntity);
+
+            // NOTE: for our AssetBrowser Preview 
+            // FloorPlanDesignWorkspace.InitializeAssetBrowser() and
+            // EditorWorksapce.AssetBrowser.cs.OnShowPreview_Click() it does NOT
+            // use a seperate workspace...  those are broken and MUST BE FIXED.
+            // they were never fixed after switching
+            // to use of workspace that configures the viewportcontrol.
+            // TODO: this is wrong workspace for showing prefab? or is it ok to share?
+            Workspaces.RenderPreviewWorkspace workSpace = new Workspaces.RenderPreviewWorkspace(workspaceName,
+                    									AppMain.PreviewForm, mWorkspaceManager.CurrentWorkspace.Name);
+            mWorkspaceManager.Add(workSpace, scene);
+            workSpace.Configure(mWorkspaceManager, scene);
+            mWorkspaceManager.ChangeWorkspace(workSpace.Name, false);
+
+            scene.Simulation.Running = true;
+            // TODO: this call to context.MoveTo() might be resulting in a deadlock 
+            // because inside it, it moves the camera via .SetMatrix() and unfortunately that is potentially
+            // occurring at any random time during rendering which is obviously bad.
+            // context.MoveTo() should result in the creation of a move command at the very least
+            // 
+            workSpace.ViewportControls[0].Context.Viewpoint_Orbit(previewEntity, .9f);
+
+            // ProcessCompletedCommand() occurs on gameloop thread and showing this
+            // FormPreview will block that thread if it's not spawned on the Windows Form thread.
+            // For some reason I seem unable to do that...
+            AppMain.Form.ShowPreview(previewEntity, modPath, entryName);
+        }
+
+  #endregion
     }
 }

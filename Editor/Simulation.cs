@@ -1,5 +1,6 @@
 //#define TVPhysics
 //#define GRAVITATION;
+//#define USE_PROCESSORS;
 
 using System;
 using System.Collections.Generic;
@@ -14,6 +15,8 @@ using Keystone;
 using Keystone.Types;
 using KeyCommon.DatabaseEntities;
 using KeyCommon.Flags;
+using KeyCommon.Data;
+using KeyCommon.Processors;
 using Keystone.Scene;
 using Keystone.Simulation;
 using System.IO;
@@ -48,7 +51,7 @@ namespace KeyEdit
         private Game mGame;
         
         private Scene mScene;
-
+        
         private Dictionary<uint, List<Entity>> mProduction;
 
         private Keystone.Simulation.Missions.Mission mCurrentMission;
@@ -85,22 +88,54 @@ namespace KeyEdit
             if (game == null) Debug.WriteLine("Simulation.Ctor() - WARNING: Game argument == null");
             mGame = game;
             
-            
             mEntityQuery = new Keystone.Traversers.EntityQuery();
 
             _gravity = gravity;
             
             _physicsHertzInTimesPerSecond = 100;
             _fixedTimeStep = 1.0d / _physicsHertzInTimesPerSecond;
-
+            
+            
+            // NOTE: When Entities are Created, the Intrinsic datatypes from
+            // Keystone.Data.IntrinsicData  are assigned to Stores.  So here
+            // all we need to do is wire up the Processors 
+            WireIntrinsicProcessors();
+            
             
         }
+
+
+#region Intrinsic Processors
+        private static void WireIntrinsicProcessors()
+        {
+           Repository.IntrinsicProcessors.Add ("STEER", IntrinsicProcessor_Steer);
+           
+        }
+        
+        private static void IntrinsicProcessor_Steer(Scene scene, ComponentStore<T> store, object parameters, GameTime gt)
+        {
+            Entities[] entities = scene.ActiveEntities;
+            Span<T> mem = store.Span;
+            
+            for (int i = 0; i < store.Size; i++)
+            {
+                
+            }
+        }
+        
+        private static void ReleaseIntrinsicProcessors()
+        {
+            // todo: 
+            Repository.IntrinsicProcessors.Clear();
+        }
+#endregion
+
 
         #region ISimulation Members
         public Keystone.Scene.Scene Scene { get { return mScene; } set { mScene = value; } }
         
         public Game Game { get { return mGame; } }
-
+        
         /// <summary>
         /// Simulation can only have one current mission at a time.
         /// </summary>
@@ -143,6 +178,90 @@ namespace KeyEdit
 
         int mNPCMaterial;
         int mElevatorMaterial = -1;
+        private void InitializePhysicsEngine()
+        {
+            // TODO: Switch to Jitter. Actually, im going to compare TV's Newton physics and Jitter and see which is the best fit.
+            // READ http://software.intel.com/en-us/blogs/2009/06/24/highlights-and-challenges-during-ghostbusters-development-part-2/
+            // for ideas on parallelizing physics down the road
+
+#region Jitter
+            // https://github.com/mattleibow/jitterphysics/wiki/Tutorial-1:-World-Creation-&-Raycasting
+            mCollisionSystem = new Jitter.Collision.CollisionSystemSAP();
+            mCollisionSystem.CollisionDetected += OnCollisionDetected;
+            
+            //mCollisionSystem.PassedBroadphase
+
+            // TODO: we don't need to use the World system if we don't want dynamics and just collisions right?
+            mPhysicsWorld = new Jitter.World(mCollisionSystem);
+            
+            // todo: our "pause" game needs to suspend physics updates as well.
+            // todo: when adding a BoxCollider to an Entityin the Scene, it should default size to Entity.BoundingBox
+            // todo: maybe make Jitter a global resource allocator like TVMaterailFactory?
+            // todo: do these nodes need to be Ipageable?  Or do we wait til the entire Entity is added to Simulation and then find the physics/colliders and add them to the Simulation?
+            //       We DO NOT want them added to the Simulation when we are just loading via AssetPlacementTool so that seems to indicate we'd do it after the Entity has been added to the Simulation. 
+            //       TODO: what do we do when they are added to the Simulation and we want to change a property?  How do we get those changes updated in the Physics Simulation?
+            //
+            // (do we get seperate notifications for child Entities added from a compound Prefab? I think we do.
+            // todo: update our Create() method to create nodes of the types we need.
+            // tood: update ChildSetter() to support the new nodes we need.  Our other traversers can ignore these nodes. (culler and drawer)
+            //
+            // These are non-shareable right?  Well, only if we have to keep the transform values in them, otherwise collider shapes should be shareable across prefabs such as crew that all use same CapsuleCollider
+            // Let's make them non-shareable for now until we know more.  But these are the nodes we need.  We just need to make sure we can substitute Jitter for TVPhysics so we can performance test.
+            // 
+            // TODO: TVPhysics seems to have colliders as children of the RigidBody node since to create a collider, you need to pass in the index of the RigidBody it's attached to.
+            // I think Unity3d is the same.  The collider's move with the RigidBody.  So my Collider implementations can inherit from Node and RigidBody can implement IGroup or inherit Group node.
+
+            //RigidBody : Group // can contaim multiple colliders for Compound Colliders <-- TODO: actually, what ijust did is place colliders under Entity along with RigidBody.
+            //                  // they should easily be able to get references to each other since they share the same parent Entity.
+            //CapsuleCollider : Node
+            //BoxCollider : Node
+            //SphereCollider : Node
+
+            // after i run simulation.Update() and update entity scripts so that movement occurs for our npc crew, i can update the Physics and see if there was a collision.
+
+
+
+            //tvphysics.
+            //tvphysics.Simulate ()
+            //int physicsMaterial = tvphysics.CreateMaterialGroup(name);
+            //tvphysics.SetMaterialInteractionCollision(physicsMaterial, physicsMaterial2, true);
+            //tvphysics.TestCollision ()
+            
+            //tvphysics.SetBodyPosition() // will updating TVPhysics result in the Meshes matrices being updated when we don't want them to?  We want the Entity's matrices to be updated and so would we have to 
+            //tvphysics.GetBodyMatrix() each frame for every entity? for tvphysics, only for each collision event perhaps?
+            //tvphysics.
+
+            //int eventID = tvphysics.PollEvents();
+            // while (eventID >= 0)
+            // {
+            //      TV_EVENT_PHYSICSCOLLISION coll = pEngine.GetEventCollisionDesc(eventID); 
+            //    
+            //      tvphysics.GetEventType();      
+            //      tvphysics.AdvancedCollision(tvGlobals.Vector3(ballx, bally, ballz), tvGlobals.Vector3(ballx, bally - 10, ballz),out mColResult);
+            //      // do interesting stuff here
+            //
+            //      // poll next event if any
+            //      eventID = tvphysics.PollEvents();
+            // 
+            // }
+
+#endregion
+
+#region JigLibX
+            //_physicsSystem = new PhysicsSystem();
+            //_physicsSystem.SetGravity(0, gravity, 0);
+
+            //_physicsSystem.CollisionSystem = new JigLibX.Collision.CollisionSystemSAP();
+            //_physicsSystem.EnableFreezing = true;
+            //_physicsSystem.SolverType = PhysicsSystem.Solver.Normal;
+            //_physicsSystem.CollisionSystem.UseSweepTests = true;
+
+            //_physicsSystem.NumCollisionIterations = 10; // 8;
+            //_physicsSystem.NumContactIterations = 10; // 8;
+            //_physicsSystem.NumPenetrationRelaxtionTimesteps = 15
+#endregion
+        }
+
         // TODO: what if physics object's properties change? Ideally, they should not change at run-time unless
         //       it is editing of the prefab and we are assigning values such as mass, trigger, center, size, radius, etc
         public void RegisterPhysicsObject(Entity entity)
@@ -276,90 +395,6 @@ namespace KeyEdit
             }
         }
 
-        private void InitializePhysicsEngine()
-        {
-            // TODO: Switch to Jitter. Actually, im going to compare TV's Newton physics and Jitter and see which is the best fit.
-            // READ http://software.intel.com/en-us/blogs/2009/06/24/highlights-and-challenges-during-ghostbusters-development-part-2/
-            // for ideas on parallelizing physics down the road
-
-#region Jitter
-            // https://github.com/mattleibow/jitterphysics/wiki/Tutorial-1:-World-Creation-&-Raycasting
-            mCollisionSystem = new Jitter.Collision.CollisionSystemSAP();
-            mCollisionSystem.CollisionDetected += OnCollisionDetected;
-            
-            //mCollisionSystem.PassedBroadphase
-
-            // TODO: we don't need to use the World system if we don't want dynamics and just collisions right?
-            mPhysicsWorld = new Jitter.World(mCollisionSystem);
-            
-            // todo: our "pause" game needs to suspend physics updates as well.
-            // todo: when adding a BoxCollider to an Entityin the Scene, it should default size to Entity.BoundingBox
-            // todo: maybe make Jitter a global resource allocator like TVMaterailFactory?
-            // todo: do these nodes need to be Ipageable?  Or do we wait til the entire Entity is added to Simulation and then find the physics/colliders and add them to the Simulation?
-            //       We DO NOT want them added to the Simulation when we are just loading via AssetPlacementTool so that seems to indicate we'd do it after the Entity has been added to the Simulation. 
-            //       TODO: what do we do when they are added to the Simulation and we want to change a property?  How do we get those changes updated in the Physics Simulation?
-            //
-            // (do we get seperate notifications for child Entities added from a compound Prefab? I think we do.
-            // todo: update our Create() method to create nodes of the types we need.
-            // tood: update ChildSetter() to support the new nodes we need.  Our other traversers can ignore these nodes. (culler and drawer)
-            //
-            // These are non-shareable right?  Well, only if we have to keep the transform values in them, otherwise collider shapes should be shareable across prefabs such as crew that all use same CapsuleCollider
-            // Let's make them non-shareable for now until we know more.  But these are the nodes we need.  We just need to make sure we can substitute Jitter for TVPhysics so we can performance test.
-            // 
-            // TODO: TVPhysics seems to have colliders as children of the RigidBody node since to create a collider, you need to pass in the index of the RigidBody it's attached to.
-            // I think Unity3d is the same.  The collider's move with the RigidBody.  So my Collider implementations can inherit from Node and RigidBody can implement IGroup or inherit Group node.
-
-            //RigidBody : Group // can contaim multiple colliders for Compound Colliders <-- TODO: actually, what ijust did is place colliders under Entity along with RigidBody.
-            //                  // they should easily be able to get references to each other since they share the same parent Entity.
-            //CapsuleCollider : Node
-            //BoxCollider : Node
-            //SphereCollider : Node
-
-            // after i run simulation.Update() and update entity scripts so that movement occurs for our npc crew, i can update the Physics and see if there was a collision.
-
-
-
-            //tvphysics.
-            //tvphysics.Simulate ()
-            //int physicsMaterial = tvphysics.CreateMaterialGroup(name);
-            //tvphysics.SetMaterialInteractionCollision(physicsMaterial, physicsMaterial2, true);
-            //tvphysics.TestCollision ()
-            
-            //tvphysics.SetBodyPosition() // will updating TVPhysics result in the Meshes matrices being updated when we don't want them to?  We want the Entity's matrices to be updated and so would we have to 
-            //tvphysics.GetBodyMatrix() each frame for every entity? for tvphysics, only for each collision event perhaps?
-            //tvphysics.
-
-            //int eventID = tvphysics.PollEvents();
-            // while (eventID >= 0)
-            // {
-            //      TV_EVENT_PHYSICSCOLLISION coll = pEngine.GetEventCollisionDesc(eventID); 
-            //    
-            //      tvphysics.GetEventType();      
-            //      tvphysics.AdvancedCollision(tvGlobals.Vector3(ballx, bally, ballz), tvGlobals.Vector3(ballx, bally - 10, ballz),out mColResult);
-            //      // do interesting stuff here
-            //
-            //      // poll next event if any
-            //      eventID = tvphysics.PollEvents();
-            // 
-            // }
-
-#endregion
-
-#region JigLibX
-            //_physicsSystem = new PhysicsSystem();
-            //_physicsSystem.SetGravity(0, gravity, 0);
-
-            //_physicsSystem.CollisionSystem = new JigLibX.Collision.CollisionSystemSAP();
-            //_physicsSystem.EnableFreezing = true;
-            //_physicsSystem.SolverType = PhysicsSystem.Solver.Normal;
-            //_physicsSystem.CollisionSystem.UseSweepTests = true;
-
-            //_physicsSystem.NumCollisionIterations = 10; // 8;
-            //_physicsSystem.NumContactIterations = 10; // 8;
-            //_physicsSystem.NumPenetrationRelaxtionTimesteps = 15
-#endregion
-        }
-
         public void UnRegisterPhysicsObject(Entity entity)
         {
 #if TVPhysics
@@ -389,7 +424,6 @@ namespace KeyEdit
             // todo: ideally this ISimulation implementation should be in the EXE because we need to know the game specific productIDs and what they refer to
             // todo: how and where is the Hz for each productID defined?  Perhaps its just the job of this Simulation implementation which should be implemented in the EXE, not Keystone.dll
         }
-
 
         Keystone.Vehicles.Vehicle mSpawnedVehicle;
         FileStream mFileStream;
@@ -632,92 +666,7 @@ namespace KeyEdit
             }
             return 0;
         }
-
-        public void LoadMission(string sceneName, string missionName)
-        {
-            bool hasMission = !string.IsNullOrEmpty(missionName);
-            Keystone.Simulation.Missions.Mission mission = null;
-
-            string missionsPath = System.IO.Path.Combine(sceneName, "missions");
-            missionsPath = Path.Combine(missionsPath, missionName);
-            missionsPath = Path.Combine(AppMain.SCENES_PATH, missionsPath);
-            // verify this mission exists for this campaign and that the user is authorized to play it
-            // eg. by virtue of having completed previous missions
-            bool authorized = true; // TODO: check authorizatioon
-            if (hasMission && authorized)
-            {
-                // load the mission and find this users spawnpoint
-                mission = new Keystone.Simulation.Missions.Mission();
-                mission.Load(missionsPath);
-
-                // TODO: I THINK YES WE CAN LOAD THE MISSION DATA, but we can't begin to spawn Entities or
-                //       assign and cache target's until the relevant Regions are fully paged in. So this probably
-                //       means we need to wait for OnRegionChildrenPageComplete()  In fact, maybe we can proceed to 
-                //       spawn and assign target's for just those regions that are paged in, and then delay execution
-                //       or Tick() of the Mission if _all_ relevant Region's required for it are paged in.  So do we
-                //       need to list the array of regions needed for that Mission?
-
-
-                // get this player's spawnpoint's location regionID for the startingRegionID
-                // todo: wait, consider if this is a 2 player PvP multiplayer mission, how do we know
-                // from the mission data file, which player is at which spawnpoint? we can't use ur.UserName
-                // because the mission data file is generic to accomodate any players.  However, for single player 
-                // missions, there should only be one player spawnpoint and that spawnpoints regionID should be
-                // the one we return. If there are more than one, then maybe we need to take into account
-                // the player's faction (unless it co-op and every player is of the same faction)
-                // TODO: What about if this is resuming from previous missions? The faction shouldn't change
-                // and all players resuing together should spawn from the correct locations
-                string factionName = null;
-                //startingRegionID = mission.GetStartingRegion(factionName);
-
-                // todo: i need to have persistance between missions
-
-                mCurrentMission = mission;
-                EnableMission(true);
-            }
-
-            
-        }
-
-        // If the client is using loopbck, this function is called either when toggling the "Play Mission" button
-        // in the Editor ViewportControl or after having loaded a Mission even if it was the loopback server that told us
-        // which mission to load.
-        // If _NOT_ using loopback (eg. we're connected to a real multiplayer game server) then the client will never load a 
-        // mission so we need to assign AppMain._core.ArcadeEnabled after having joined a game server that is running a Mission
-        // as opposed to a server that is offering remote + group Scene editing capabilities.
-        public void EnableMission(bool enable)
-        {
-
-            if (enable)
-            {
-                if (mCurrentMission != null)
-                    mCurrentMission.Enable = true;
-                else
-                {
-                    Keystone.Simulation.Missions.Mission mission = new Keystone.Simulation.Missions.Mission();
-                    // TEMP HACK - a "null mission objective" to test arcade play mode with no real objectives, just free roaming play
-                    Keystone.Simulation.Missions.Objective nullObjective = new Keystone.Simulation.Missions.Objective(Keystone.Simulation.Missions.Objective.ObjectiveType.None);
-                    mission.Add(nullObjective);
-
-                    // TEMP HACK - just add our test mission for player to destroy one ai ship
-                    //Keystone.Simulation.Missions.Objective destroy = new Keystone.Simulation.Missions.Objective(Keystone.Simulation.Missions.Objective.ObjectiveType.Destroy);
-                    //mission.Add(destroy);
-                    
-                    mCurrentMission = mission;
-                    mCurrentMission.Enable = true;
-                }
-            }
-            else
-                if (mCurrentMission != null)
-                    mCurrentMission.Enable = false;
-
-
-            if (AppMain._core.SceneManager.Scenes != null && AppMain._core.SceneManager.Scenes.Length >= 1)
-                AppMain._core.ArcadeEnabled = mCurrentMission != null && mCurrentMission.Enable;
-                    
-        }
-
-
+        
         int mCurrentNPC = 0;
         // https://docs.unity3d.com/Manual/ExecutionOrder.html
         // TODO: MPJ June.20.2011 - Each Region could have it's own Simulation!  
@@ -738,7 +687,43 @@ namespace KeyEdit
             // the entity outside of the commandprocessor (eg. hud added entities with no
             // use of proper sychronization methods.)  
 
+#if USE_PROCESSORS
 
+
+        // BENCHMARK - Simulation.IntrinsicDataProcessors can test 
+        //             1000 simple ships that use Steer.Wander() and Collision testing and 1) test
+        //             runs for 10 minutes using DataProcessors and ComponentStore<T>
+        //             and 2) another test runs using OOP Entity.Update() 
+        //             and 3) last test runs using OOP but with seperate Entity.Update() for
+        //             Steer.Wander and Collision detection
+        // NOTE: parallelism should occur within the processing of the Memory<T> structs with the
+        //       assigned Data/Rule Processor.  
+          mIntrinsicProcessors.Update(mScene, mScene.ActiveEntities, gameTime);
+          
+          // TODO: create intrinsic structs to store
+          // enum IntrinsicDataTypes
+          // {
+          //     Transform = 1;
+          //     Bounds = 2;
+          //     Physics = 3;
+          // }
+
+            // each struct should contain a field for holding the index to a UserData object in a UserDataStore
+            // todo: currently the structs are stored in a dictionary using a string key not an int index... 
+            //       for near term, lets just store a fixed byte[] field in our Memory<T> representing the 
+            //       GUID id of every entity.
+          
+          mRulesProcessors.Update(mScene, mScene.ActiveEntities, gameTime);
+          
+          // Updates to Game Logic including newly added high performance updates to MemoryStores. August.15.2025
+          // todo: August.21.2025 - I don't think we need a mGame.Update() because Game01.dll for example is
+          // just a library and mostly only contains rules and gameObjects.
+          // But we perform the actual processing here in the EXE
+          mGame.Update(mGameTime.ElapsedSeconds);
+
+
+          mScene.FinalizeEntityMovement(gameTime.Ticks);
+#else 
             Entity[] activeEntities = mScene.ActiveEntities;
             if (activeEntities != null)
             {
@@ -768,13 +753,15 @@ namespace KeyEdit
                 }
 
                 // todo: spawnpoints should exist but they should be initiated by loopback i think
-
                 
+                // NOTE: the following for() loop we only look to update "helm" but this seems strange.  
+                //       The only reason to do this is to ensure helm updates prior to other
+                //       Entities, however a better way to solve this would be to use an "Update Priority" value.
                 for (int i = 0; i < activeEntities.Length; i++)
                     if (activeEntities[i].Name == "helm")
                         activeEntities[i].Update(gameTime.ElapsedSeconds);
-
-                // update the simulated logic\scripts of entities
+                        
+                // UPDATE - Simulated logic\scripts of entities via calling all Entity.Update()
                 for (int i = 0; i < activeEntities.Length; i++)
                 {
                     Entity entity = activeEntities[i];
@@ -811,7 +798,12 @@ namespace KeyEdit
                     if (entity.Enable)
                     {
                         if (entity is Viewpoint) continue; // May.16.2017 - viewpoints should always be updated via ViewpointController right? TODO: wait, April.4.2019 -> i think vew updgraded Viewpoints to use BehaviorTrees.  TODO: if game is paused, the viewpoint needs to pause too and not resume with some massive amount of movement accrued during the pause
-                        if (entity.Name == "helm") continue; // todo: why did i add this? was it temporary to avoid helm script from running? Actually, i specifically check for "helm" higher up in THIS very Update() method.  Why?
+                        
+                        // todo: why did i add this? was it temporary to avoid helm script from running? 
+                        // Actually, i specifically check for "helm" higher up in THIS very Update() method.  Why?
+                        // Is it to ensure helm always updates before everything else?
+                        
+                        if (entity.Name == "helm") continue; 
                         // Entity.Update() 
                         //  - updates AnimationControllers, HOWEVER actor.Render(true) occurs during scene.Update()
                         //  - Entity.Script.OnUpdate() for updating game logic 
@@ -819,15 +811,19 @@ namespace KeyEdit
                         //  - if Steering is updated here, then it cannot benefit from
                         //    fixed step physics!
 
-                        // NOTE: entity.Update() will set the PreviousTranslation to the current Translation prior to calling any entity.scripts that might modify the current Translation.
+                        // NOTE: entity.Update() will set the PreviousTranslation to the current Translation prior to 
+                        // calling any entity.scripts that might modify the current Translation.
                         entity.Update(gameTime.ElapsedSeconds);
                     }
                 }
             }
-            // update NON force production. We may decide to lower the Hz here.
+            
+            
+            // UPDATE - NON force production. We may decide to lower the Hz here.
             // TODO: confused, why isn't production and consumption operating at a fixed frequency?  You dont get same results
             // across clients if you don't do this
             UpdateProduction(gameTime.ElapsedSeconds);
+            
             
             // updates force production & consumption, physics if fixedStep
 			// adds elapsed to remainder seconds from prev UpdatePhysics()
@@ -880,6 +876,7 @@ namespace KeyEdit
                         activeEntities[i].UpdateAI(gameTime.ElapsedSeconds);
                     }
                 }
+#endif // USE_PROCESSORS
 
 
             mEntityQuery.Clear();
@@ -1061,7 +1058,6 @@ namespace KeyEdit
             }
         }
 
-
         // http://answers.unity3d.com/questions/10993/whats-the-difference-between-update-and-fixedupdat.html
         private double UpdatePhysics(double elapsedSeconds)
         {
@@ -1215,8 +1211,6 @@ namespace KeyEdit
                 }
             }
         }
-
-
 
         // "take the last state and the state before that as the two states (interpolation). 
         // Then we use the ratio on this. Of course, this means the renderer will always be 
@@ -1399,7 +1393,6 @@ namespace KeyEdit
                     return null;
             }
         }
-
 
         private void UpdateCollisions()
         {
@@ -1663,6 +1656,87 @@ namespace KeyEdit
         //}
 
 
+        public void LoadMission(string sceneName, string missionName)
+        {
+            bool hasMission = !string.IsNullOrEmpty(missionName);
+            Keystone.Simulation.Missions.Mission mission = null;
+
+            string missionsPath = System.IO.Path.Combine(sceneName, "missions");
+            missionsPath = Path.Combine(missionsPath, missionName);
+            missionsPath = Path.Combine(AppMain.SCENES_PATH, missionsPath);
+            // verify this mission exists for this campaign and that the user is authorized to play it
+            // eg. by virtue of having completed previous missions
+            bool authorized = true; // TODO: check authorizatioon
+            if (hasMission && authorized)
+            {
+                // load the mission and find this users spawnpoint
+                mission = new Keystone.Simulation.Missions.Mission();
+                mission.Load(missionsPath);
+
+                // TODO: I THINK YES WE CAN LOAD THE MISSION DATA, but we can't begin to spawn Entities or
+                //       assign and cache target's until the relevant Regions are fully paged in. So this probably
+                //       means we need to wait for OnRegionChildrenPageComplete()  In fact, maybe we can proceed to 
+                //       spawn and assign target's for just those regions that are paged in, and then delay execution
+                //       or Tick() of the Mission if _all_ relevant Region's required for it are paged in.  So do we
+                //       need to list the array of regions needed for that Mission?
+
+
+                // get this player's spawnpoint's location regionID for the startingRegionID
+                // todo: wait, consider if this is a 2 player PvP multiplayer mission, how do we know
+                // from the mission data file, which player is at which spawnpoint? we can't use ur.UserName
+                // because the mission data file is generic to accomodate any players.  However, for single player 
+                // missions, there should only be one player spawnpoint and that spawnpoints regionID should be
+                // the one we return. If there are more than one, then maybe we need to take into account
+                // the player's faction (unless it co-op and every player is of the same faction)
+                // TODO: What about if this is resuming from previous missions? The faction shouldn't change
+                // and all players resuing together should spawn from the correct locations
+                string factionName = null;
+                //startingRegionID = mission.GetStartingRegion(factionName);
+
+                // todo: i need to have persistance between missions
+
+                mCurrentMission = mission;
+                EnableMission(true);
+            }
+        }
+
+        // If the client is using loopbck, this function is called either when toggling the "Play Mission" button
+        // in the Editor ViewportControl or after having loaded a Mission even if it was the loopback server that told us
+        // which mission to load.
+        // If _NOT_ using loopback (eg. we're connected to a real multiplayer game server) then the client will never load a 
+        // mission so we need to assign AppMain._core.ArcadeEnabled after having joined a game server that is running a Mission
+        // as opposed to a server that is offering remote + group Scene editing capabilities.
+        public void EnableMission(bool enable)
+        {
+            if (enable)
+            {
+                if (mCurrentMission != null)
+                    mCurrentMission.Enable = true;
+                else
+                {
+                    Keystone.Simulation.Missions.Mission mission = new Keystone.Simulation.Missions.Mission();
+                    // TEMP HACK - a "null mission objective" to test arcade play mode with no real objectives, just free roaming play
+                    Keystone.Simulation.Missions.Objective nullObjective = new Keystone.Simulation.Missions.Objective(Keystone.Simulation.Missions.Objective.ObjectiveType.None);
+                    mission.Add(nullObjective);
+
+                    // TEMP HACK - just add our test mission for player to destroy one ai ship
+                    //Keystone.Simulation.Missions.Objective destroy = new Keystone.Simulation.Missions.Objective(Keystone.Simulation.Missions.Objective.ObjectiveType.Destroy);
+                    //mission.Add(destroy);
+                    
+                    mCurrentMission = mission;
+                    mCurrentMission.Enable = true;
+                }
+            }
+            else
+                if (mCurrentMission != null)
+                    mCurrentMission.Enable = false;
+
+
+            if (AppMain._core.SceneManager.Scenes != null && AppMain._core.SceneManager.Scenes.Length >= 1)
+                AppMain._core.ArcadeEnabled = mCurrentMission != null && mCurrentMission.Enable;
+                    
+        }
+
         public void AddPlayer(Player player)
         {
             //mPlayers.Add(player.mID, player);
@@ -1744,17 +1818,7 @@ namespace KeyEdit
             //    mHost.mServer.Groupcast(userLeft, connections)
         }
 
-        // TODO: move to Simulation.Game ?
-        public void UserMessageReceived(Lidgren.Network.NetConnectionBase connection, Lidgren.Network.NetBuffer buffer)
-        {
-            KeyCommon.DatabaseEntities.Player player = (KeyCommon.DatabaseEntities.Player)connection.Tag;
-
-            // if this is a server, the connection will be from the server... so we may very well ignore it...
-            // but if this simulation is running on the server, each player will be important.
-            // Probably best to make this abstract and have yet again... ClientSimulation, ServerSimulation
-
-
-        }
+        
 #endregion
 
 #region jitter collision callbacks

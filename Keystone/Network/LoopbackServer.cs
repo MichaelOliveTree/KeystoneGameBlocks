@@ -89,7 +89,6 @@ namespace Keystone.Network
 		/// </summary>
         public void Update()
         {
-
             NetMessage[] messages;
             
             // pump netserver until shutdown.  
@@ -149,10 +148,6 @@ namespace Keystone.Network
             Lidgren.Network.NetConnectionBase connection = message.m_sender;
 
             UserMessageReceivedLoopbackHandler(connection, (int)command, message.Channel, message.Buffer);
-
-            
         }
-
-        
     }
 }

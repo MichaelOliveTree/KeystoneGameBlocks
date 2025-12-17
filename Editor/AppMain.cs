@@ -74,19 +74,18 @@ namespace KeyEdit
             public System.Drawing.Point p;
         }
 
-        private static Keystone.Timers.Timer mTimer = Keystone.Timers.Timer.Instance;
+
 #if USE_THREADED_GAME_LOOP
         private static Thread mGameThread;
         private static bool mRunning = false;
 #endif 
-        private static Game01.Game mGame;
         private static FormMain _form; // TODO: Inherit our window from Core and init Core with a window object
         private static FormPreview  mPreviewForm; 
         
         public static KeyPlugins.PluginServices PluginService;
         public static Keystone.CoreClient _core;
-        public static KeyEdit.Network.InternetClient mNetClient;
-        public static Keystone.Network.LoopbackServer mLoopbackServer;
+        public static KeyEdit.Network.InternetClient mKeyEditInternetClient; // instantiated from KeyEdit.FormMain.OnLoad()
+        public static Keystone.Network.LoopbackServer mKGBLoopbackServer;    // instantiated from KeyEdit.FormMain.OnLoad()
         public static Scripting.ScriptingHost mScriptingHost;
         public static Keystone.Entities.Entity mPlayerControlledEntity;
         public static string mPlayerControlledEntityID;
@@ -136,7 +135,7 @@ namespace KeyEdit
         public const float SIMPLE_SCENE_DIAMETER = 74799000000000f;
         public const float REGION_DIAMETER = 74799000000000f; // 74.799 trillion meters = 74,799,000,000,000 meters = 500 AU;
         // NOTE: It takes an octree depth of 20 to get a cell diameter of 142k meters.
-        // NOTE The largest known star  http://en.wikipedia.org/wiki/VY_Canis_Majoris    is  a red hypergiant with a radius of 1800–2,100 AU!  My star sectors
+        // NOTE The largest known star  http://en.wikipedia.org/wiki/VY_Canis_Majoris    is  a red hypergiant with a radius of 1800â€“2,100 AU!  My star sectors
         // simply cannot contain such a star.  Pluto's distance if 39.5AU so this star would gobble up every planet in our solar system.
   
    //     public const float SIMPLE_SCENE_DIAMETER = 10000;
@@ -268,9 +267,7 @@ namespace KeyEdit
 
             // TODO: gameTime needs to be accessible to animations and scripts
             mGameTime = new Keystone.Simulation.GameTime(gameSecondsPerRealLifeSecond);
-                // todo: need proper seed set in mGame
-            mGame = new Game01.Game(0); // currently Game01.Game doesn't do much except wire buffer.Read/Write() for user types that are defined in Game01.
-            
+
 #if USE_THREADED_GAME_LOOP
              // being able to run the win32 GUI and the simulation in a seperate thread is useful.
              // The good thing is our main GUI thread will barely be using any cycles most of the time.
@@ -306,8 +303,6 @@ namespace KeyEdit
         public static string ConfigFolderPath { get { return _configPath; } }
 
         public static string ConfigFilePath { get { return _configFile; } }
-
-        public static Game01.Game Game { get { return mGame; } }
 
         internal static void SetTimeScale (float scale)
         {
@@ -402,14 +397,19 @@ static int mTimerStartPeriod;
                         
             	if (_form.IsHandleCreated)
                 {
-                    if (mLoopbackServer != null)
-                        mLoopbackServer.Update();
+                    // mKGBLoopbackServer is instantiated and assigned in FormMain.cs.OnLoad()
+                    if (mKGBLoopbackServer != null)
+                        mKGBLoopbackServer.Update();
 
-                    if (mNetClient != null)
+                    // mKeyEditInternetClient is KeyEdit.Network.InternetClient.cs and not Lidgren.Network.NetClientBase.cs
+                    // mKeyEditInternetClient is instantiated and assigned in FormMain.cs.OnLoad()
+                    // mKeyEditInternetClient hosts a Lidgren.NetUDPClient for Authentication, Lobby and GameServer connections and command processing
+                    // as well as a state machine to manage transitioning between those 3 connections.
+                    if (mKeyEditInternetClient != null)
                     {
-                        // NetClient processes Authentication, Lobby and GameClient command processing.
-                        // NetClient.Update results in trigger of FormMain.Commands.UserMessageReceived()
-                        mNetClient.Update();
+                        // mKGBInternetClient processes Authentication, Lobby and GameClient command processing.
+                        // mKGBInternetClient.Update results in trigger of FormMain.Commands.UserMessageReceived()
+                        mKeyEditInternetClient.Update();
 
                         // NOTE: For dedciated game thread, we do NOT process completed commands here
                         ((FormMainBase)_form).ProcessCompletedCommandQueue();
@@ -486,15 +486,13 @@ static int mTimerStartPeriod;
             bool hasFocus = _form.Visible && _form.WindowState != FormWindowState.Minimized; //&& GetFocus() == _form.Handle;
             //hasFocus = true;
 
-            if (mLoopbackServer != null)
-                mLoopbackServer.Update();
+            if (mKGBLoopbackServer != null)
+                mKGBLoopbackServer.Update();
 
-            if (mNetClient != null)
+            if (mKeyEditInternetClient != null)
             {
-                // _authenticationManager.Update();  
-                // _lobbyManager.Update();
-                // _gameServerManager.Update();
-                mNetClient.Update();
+                // mKeyEditInternetClient contains Lidgren.NetUDPClient for Authentication, Lobby and GameServer
+                mKeyEditInternetClient.Update();
 
                 // if threaded, we want to process these on the main gui thread
                 // but we don't want to wait for the gui thread to complete these because

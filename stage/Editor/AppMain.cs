@@ -74,7 +74,7 @@ namespace KeyEdit
             public System.Drawing.Point p;
         }
 
-        private static Keystone.Timers.Timer mTimer = Keystone.Timers.Timer.Instance;
+
 #if USE_THREADED_GAME_LOOP
         private static Thread mGameThread;
         private static bool mRunning = false;
@@ -84,8 +84,8 @@ namespace KeyEdit
         
         public static KeyPlugins.PluginServices PluginService;
         public static Keystone.CoreClient _core;
-        public static KeyEdit.Network.InternetClient mNetClient;
-        public static Keystone.Network.LoopbackServer mLoopbackServer;
+        public static KeyEdit.Network.InternetClient mKeyEditInternetClient; 
+        public static Keystone.Network.LoopbackServer mKGBLoopbackServer;
         public static Scripting.ScriptingHost mScriptingHost;
         public static Keystone.Entities.Entity mPlayerControlledEntity;
         public static string mPlayerControlledEntityID;
@@ -397,17 +397,19 @@ static int mTimerStartPeriod;
                         
             	if (_form.IsHandleCreated)
                 {
-                    // mLoopbackServer is instantiated and assigned in FormMain.cs.OnLoad()
-                    if (mLoopbackServer != null)
-                        mLoopbackServer.Update();
+                    // mKGBLoopbackServer is instantiated and assigned in FormMain.cs.OnLoad()
+                    if (mKGBLoopbackServer != null)
+                        mKGBLoopbackServer.Update();
 
-                    // mNetClient is KeyEdit.Network.InternetClient.cs and not Lidgren.Network.NetClientBase.cs
-                    // mNetClient is instantiated and assigned in FormMain.cs.OnLoad()
-                    if (mNetClient != null)
+                    // mKeyEditInternetClient is KeyEdit.Network.InternetClient.cs and not Lidgren.Network.NetClientBase.cs
+                    // mKeyEditInternetClient is instantiated and assigned in FormMain.cs.OnLoad()
+                    // mKeyEditInternetClient hosts a Lidgren.NetUDPClient for Authentication, Lobby and GameServer connections and command processing
+                    // as well as a state machine to manage transitioning between those 3 connections.
+                    if (mKeyEditInternetClient != null)
                     {
-                        // NetClient processes Authentication, Lobby and GameClient command processing.
-                        // NetClient.Update results in trigger of FormMain.Commands.UserMessageReceived()
-                        mNetClient.Update();
+                        // mKGBInternetClient processes Authentication, Lobby and GameClient command processing.
+                        // mKGBInternetClient.Update results in trigger of FormMain.Commands.UserMessageReceived()
+                        mKeyEditInternetClient.Update();
 
                         // NOTE: For dedciated game thread, we do NOT process completed commands here
                         ((FormMainBase)_form).ProcessCompletedCommandQueue();
@@ -484,15 +486,13 @@ static int mTimerStartPeriod;
             bool hasFocus = _form.Visible && _form.WindowState != FormWindowState.Minimized; //&& GetFocus() == _form.Handle;
             //hasFocus = true;
 
-            if (mLoopbackServer != null)
-                mLoopbackServer.Update();
+            if (mKGBLoopbackServer != null)
+                mKGBLoopbackServer.Update();
 
-            if (mNetClient != null)
+            if (mKeyEditInternetClient != null)
             {
-                // _authenticationManager.Update();  
-                // _lobbyManager.Update();
-                // _gameServerManager.Update();
-                mNetClient.Update();
+                // mKeyEditInternetClient contains Lidgren.NetUDPClient for Authentication, Lobby and GameServer
+                mKeyEditInternetClient.Update();
 
                 // if threaded, we want to process these on the main gui thread
                 // but we don't want to wait for the gui thread to complete these because

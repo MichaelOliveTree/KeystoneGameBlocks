@@ -85,15 +85,15 @@ namespace KeyEdit
                     CreateUserRecord(userName);
                 }
 
-                AppMain.mLoopbackServer = new Keystone.Network.LoopbackServer(AppMain.HOST_ADDRESS, AppMain.HOST_PORT, AppMain.BASE_PATH);
-                AppMain.mLoopbackServer.UserMessageReceivedLoopbackHandler = UserMessageReceivedLoopback;
+                AppMain.mKGBLoopbackServer = new Keystone.Network.LoopbackServer(AppMain.HOST_ADDRESS, AppMain.HOST_PORT, AppMain.BASE_PATH);
+                AppMain.mKGBLoopbackServer.UserMessageReceivedLoopbackHandler = UserMessageReceivedLoopback;
                 
 
                 // create the client and connect it to the loopback server
-                AppMain.mNetClient = new KeyEdit.Network.LoopBackClient(_core.Settings, null);
-                AppMain.mNetClient.ConnectTo(AppMain.HOST_ADDRESS, AppMain.HOST_PORT);
-                AppMain.mNetClient.UserMessageReceivedHandler = UserMessageReceived;
-                AppMain.mNetClient.UserMessageSendingHandler = UserMessageSending;
+                AppMain.mKeyEditInternetClient = new KeyEdit.Network.LoopBackClient(_core.Settings, null);
+                AppMain.mKeyEditInternetClient.ConnectTo(AppMain.HOST_ADDRESS, AppMain.HOST_PORT);
+                AppMain.mKeyEditInternetClient.UserMessageReceivedHandler = UserMessageReceived;
+                AppMain.mKeyEditInternetClient.UserMessageSendingHandler = UserMessageSending;
                 // scene manager to hold each of our scenes
                 ClientSceneManager sm = new ClientSceneManager(_core);
 

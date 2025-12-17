@@ -57,10 +57,10 @@ using Lidgren.Network;
             public virtual void ConnectTo(string host, int port)
             {
                 // TODO: maybe here is a better place to assign the connection.Tag
-                System.Diagnostics.Debug.WriteLine("NetworkClientBase.ConnectTo() - Attempting connection to " + host + " at port " + port.ToString());
+                System.Diagnostics.Debug.WriteLine("Keystone.Network.NetworkClientBase.ConnectTo() - Attempting connection to " + host + " at port " + port.ToString());
                 mGameClient.Connect(host, port);
                 if (mGameClient.ServerConnection.RemoteEndpoint.Address.ToString() == "127.0.0.1")
-                    System.Diagnostics.Debug.WriteLine("NetworkClientBase.ConnectTo() - SUCCESS.");
+                    System.Diagnostics.Debug.WriteLine("Keystone.Network.NetworkClientBase.ConnectTo() - SUCCESS.");
             }
 
             public bool UsingLoopBack 
@@ -153,7 +153,7 @@ using Lidgren.Network;
                         if (UserMessageReceivedHandler != null)
                             UserMessageReceivedHandler.Invoke(command, message.Channel, message.Buffer);
                         else
-                            System.Diagnostics.Debug.WriteLine("ProcessUserMessage() - Unsupported message type '" + command.ToString() + "'.");
+                            System.Diagnostics.Debug.WriteLine("Keystone.Network.NetworkClientBase.ProcessUserMessage() - Unsupported message type '" + command.ToString() + "'.");
 
                         break;
                 }

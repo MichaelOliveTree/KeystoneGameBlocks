@@ -22,6 +22,11 @@ namespace KeyEdit
 {
     partial class FormMain : FormMainBase
     {
+
+        private Scene mScene; // todo: delete this
+        private string mStartingRegionID; // todo: delete this
+        // here we can react based on all children scene elements within a particular Zone or Region being loaded successfully
+
         private Dictionary<long, KeyCommon.Messages.MessageBase> mUnconfirmedCommands = new Dictionary<long, KeyCommon.Messages.MessageBase>();
 
         private Stack<KeyCommon.Messages.MessageBase> _redo = new Stack<KeyCommon.Messages.MessageBase>();
@@ -4870,9 +4875,6 @@ namespace KeyEdit
             
         }
 
-        private Scene mScene; // todo: delete this
-        private string mStartingRegionID; // todo: delete this
-        // here we can react based on all children scene elements within a particular Zone or Region being loaded successfully
         private void OnRegionChildrenPageComplete(Keystone.IO.ReadContext context)
         {
             

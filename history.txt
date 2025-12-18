@@ -1389,7 +1389,37 @@ July.10.2025 - RECOVERING FROM THEFT BEGINS
 	- SourceGrid_4_30_src_OLD
 	- Squid104_GUI
 
+August.29.2025
 
+- fixed. Transform.cs global and derived translation did not take into account parent rotation.
+- fixed: Attach to SubModelIndex support added so that a child Entity can be attached to any sub-Model in a sequence node.
+- new: ISpatialNode.Address added along with code to compute it.
+- fixed: static variables for depth and bounds removed. if you had more than one octree or quadtree, all instances would use the last assigned values instead of their original intended values.
+- new: rendering of selected mesh.Group bounding boxes added
+- new: NotifyModelTransformed enum added as well as propogation of message.
+-fixed: max GetZoomFitDistsnce() distance set to 1000.0f if target box is not initialized 
+- fixed: cloning of nodes found in repository no longer used during deserislization.  full read from xml required.
+-fixed: celledregion Collide() now sets .y component of intersection result to "ground" altitude for that deck since hit often results in an inaccurate .y impact point.
+- new: support for dynamicly loaded Custom UserDefinedType IDs (eg enums)
+- new: support for dynamic delegates to be created for Selector nodes for instance. still need to add plugin support.
+- new: KeyCommonDataComponentStoreCollection.cs
+- new: KeyCommonDataComponentStore.cs that uses Memory<T> for "data processing" of contiguous memory approach to updating various aspects of the simulation. 
+- new: KeyCommonDataUserDataStore.cs
+- new: KeyCommonDataBinaryBlob.cs (Work In Progress for replacing our UserDataStore.cs with something faster)
+- new: KeyCommonProcessorsDataProcessorStore.cs - includes a delegate for assigning data processors
+- new: ResourceRepository.RentMemoryStores()
+- new: ResourceRepository.ReclaimMemoryStores()
+- new: Animation Interpolators for Light Colors and Material Colors
+- fixed: SceneReader.cs does not use node.Clone() ever when deserializing.  Will always read from disk.
+- fixed: SceneReader.cs generation of IDs fixed.
+- change: FormMain.Commands split off into FormMain.Generators for procedural generation or loading of Entities and Crew
+- new: added KeystoneTimersTimer.cs for creating Intervals. This makes tracking cooldowns and such in entity scripts MUCH easier and robust. TimingAPI.cs STILL NEEDS some code for the API to be complete.
+- new: game01RulesProcessors.cs added for user defined data processor test
+- new: Game01ComponentsUserComponents.cs added for all structs that are are Components such as "EnergyWeapons" or "Accommodation"
+- new: ability to dynamically load User-defined types from Data\Mods\Caesar\Scripts\user_types.css
+- change: KeyCommonDatabaseObjects  folder renamed KeyCommonGameObjects
+- researched: Wave function Collapse algorithm for procedural generation of maps, textures and meshes
+- 
 
 
 void IEntityAPI.SetCustomPropertyValues (string entityID, string[] propertyNames, object[] values, bool raiseEvent = false)

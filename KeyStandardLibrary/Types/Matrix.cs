@@ -674,7 +674,8 @@ namespace Keystone.Types
             /// Creates a world matrix in camera space NOT a local space matrix.  NOTE that the billboard position is in camera space position or world position if cameraPosition is in world space.
             /// In otherwords, there is no need to multiply this returned matrix with a derivedRotation.
             /// </summary>
-            /// <param name="up"></param>
+            /// <param name="up">This is the rotation axis of the Mesh perhaps?  
+            /// This should probably NOT be the derivedRotation but just the default Up vector?</param>
             /// <param name="billboardPosition"></param>
             /// <param name="cameraPosition"></param>
             /// <returns></returns>
@@ -684,12 +685,20 @@ namespace Keystone.Types
             // https://forum.unity.com/threads/billboard-script-flat-spherical-arbitrary-axis-aligned.539481/
 
             // https://gamedev.stackexchange.com/questions/188636/cylindrical-billboarding-around-an-arbitrary-axis-in-geometry-shader
+            
+            Vector3d up = Vector3d.Up(); // Hypnotron Dec.18.2025 // TODO: verify this fixes the issue and then we can modifiy what we pass into this function
+
+            // look == forward vector
             Vector3d look = Vector3d.Normalize(billboardPosition - cameraPosition);
 
             Vector3d right = Vector3d.Normalize(Vector3d.CrossProduct(up, look));
 
             // March.11.2024 - up is actually our axis and should not be recomputed. This fixes the issue with billboard not appearing to point towards it target at certain angles
  //           up = Vector3d.Normalize(Vector3d.CrossProduct(look, right));
+
+            // recompute a new Up() vector. // Hypnotron Dec.18.2025
+            // todo: test the following now that we think we understand that the initial up vector is that of the Billboard which is always 0,1,0?
+            up = Vector3d.Normalize(Vector3d.CrossProduct(look, right));
 
             Matrix rotationMatrix = new Matrix(); // Types.Matrix.Identity();
             rotationMatrix.M11 = right.x;

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 
 namespace Keystone.Utilities
@@ -15,6 +15,28 @@ namespace Keystone.Utilities
 		// but I should generalize the function here first and then use that Primitives.BezierCurve for constructing spline primitive
 		#endregion
         
+   // c - Mapping a numeric range onto another - Stack Overflow https://share.google/nhvSCm1CltbJlzS05
+   // https://stackoverflow.com/questions/5731863/mapping-a-numeric-range-onto-another
+    public static int MapValue(float input_start, float input_end, float output_start, float outout_end, float input)
+    {
+         double slope = 1.0 * (output_end - output_start) / (input_end - input_start)
+         
+       //  output = output_start + slope * (input - input_start)
+         
+         output = output_start + round(slope * (input - input_start))
+         
+         return (int)output;
+    }
+    
+    double round(double d)
+    {
+        double result = floor(d + 0.5);
+        System.Diagnosticd.Debug.Assert (result == Math.Round(d));
+        
+        return result;
+    }
+        
+    
 		/// <summary>
         /// Returns a value between 0.0 and 1.0 that represents the ratio of the value between min & max 
         /// </summary>

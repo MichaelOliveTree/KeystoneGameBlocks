@@ -1,0 +1,503 @@
+using System;
+using Game01;
+using Game01.GameObjects;
+
+using KeyCommon.Simulation;  // todo: these should be in KeyGame where KeyGame is NOT referenced by Keystone.dll
+
+using Keystone.Types;
+using Keystone.Extensions;
+using Keystone.CSG;
+using KeyScript;
+using KeyScript.Interfaces;
+using KeyScript.Delegates;
+using KeyScript.Host;
+using KeyScript.Rules;
+using Settings;
+
+public class SensorInfrared : BaseScript
+{
+	public static void Initialize(string scriptID)
+	{
+		string category = "Misc"; //"public properties";
+		// create the custom properties	
+		Settings.PropertySpec[] properties = new Settings.PropertySpec[15];
+		// name, type, category, default value
+		// name, type, category, description, default value, editor, converter
+		properties[0] = new PropertySpec("description", typeof(string).Name, category,(object)"infrared sensor");
+		category = "Statistics";
+		properties[1] = new PropertySpec("weight", typeof(double).Name, category, 0.0);
+		properties[2] = new PropertySpec("cost", typeof(double).Name, category, 0.0);
+		properties[3] = new PropertySpec("volume", typeof(double).Name, category, 0.0);
+		properties[4] = new PropertySpec("surfacearea", typeof(double).Name, category, 0.0);
+		properties[5] = new PropertySpec("hitpoints", typeof(int).Name, category, 0);
+		properties[6] = new PropertySpec("damage", typeof(int).Name, category, 0); // hitpoints lost
+		// isConnected; // shows if the component has power
+		// 	- todo: we can show an icon above the component if it is powered.
+		//    todo: how do we have the celledregion which owns the "link" entities notify a component that it
+		//          is connected or not?
+		category = "Build";
+		properties[7] = new PropertySpec("range", typeof(double).Name, category, 100000.0);
+		properties[8] = new PropertySpec("materials quality", typeof(string).Name, category, "", "", "", typeof (MaterialQualityConverter).AssemblyQualifiedName);
+		properties[9] = new PropertySpec("craftsmanship", typeof(string).Name, category, "", "", "", typeof (CraftsmanshipConverter).AssemblyQualifiedName);
+		properties[10] = new PropertySpec("tech level", typeof(int).Name, category, "", 7, "", typeof (TechLevelConverter).AssemblyQualifiedName);
+		
+		category = "private variables";
+		// todo: minimum tech level defined in rule  
+		
+		// runtime statistics
+		category= "Operations";
+		properties[11] = new PropertySpec("on", typeof(bool).Name, category, false);
+		// todo: ideally if we could create a list of repairable things under the "repair" category
+		//       then we could get repair-able properties and their etas, their supply cost, etc
+		properties[12] = new PropertySpec("repair", typeof(float).Name, category, 0.0f);
+		
+		// category= "production";
+		// list of products produced by this component
+		properties[13] = new PropertySpec("production", typeof(Product[]).Name, category, null);
+		// list of products consumed by this component
+		properties[14] = new PropertySpec("consumption", typeof(Product[]).Name, category, null);
+		
+		// add the properties to the entity's domain object
+		EntityAPI.AddCustomProperties(scriptID, properties);
+				
+		// create a test rule using an inline delegate rule
+		//EntityAPI.AddRule (scriptID, "description", 
+		//	new SimpleRule("Name cannot be empty.", 
+		//	delegate {return ((string)properties[0].DefaultValue).Length != 0; }));
+		
+		EntityAPI.AddRule (scriptID, "description", new SimpleRule(1, Rule_Description));
+		// uses SI derived units, thus for thrust it is the "newton" 
+		// http://en.wikipedia.org/wiki/SI_derived_unit
+		EntityAPI.AddRule (scriptID, "range", new SimpleRule(3, Rule_MinimumRange));
+		EntityAPI.AddRule (scriptID, "tech level", new SimpleRule(3, Rule_MinimumTL));
+		
+		// read only property rules
+		EntityAPI.AddRule (scriptID, "cost", new SimpleRule(2, Rule_ReadOnly));
+		EntityAPI.AddRule (scriptID, "weight", new SimpleRule(2, Rule_ReadOnly));
+		EntityAPI.AddRule (scriptID, "volume", new SimpleRule(2, Rule_ReadOnly));
+		EntityAPI.AddRule (scriptID, "surface area", new SimpleRule(2, Rule_ReadOnly));
+		EntityAPI.AddRule (scriptID, "hitpoints", new SimpleRule(2, Rule_ReadOnly));
+		EntityAPI.AddRule (scriptID, "damage", new SimpleRule(2, Rule_ReadOnly));
+		EntityAPI.AddRule (scriptID, "fuel usage", new SimpleRule(2, Rule_ReadOnly));
+		
+	
+		
+		// create a test rule that uses the Validate script method below if no delegate Rule exists
+		//EntityAPI.AddRule (); // todo: maybe this version is not necessary?
+		
+		// queryable mods
+		// assign values to specific "mod" properties that the celledregion will query
+		// to determine what modifications this domainobject will have on the parent.
+		// so for a celledregion parent, maybe it modifies the map layer
+		// for some other entity, maybe it modifies a crew members skill level.
+		
+		// so celledRegion can query the layout of this entity
+		// it can query the allowed places it can be set/orientation <-- there's no need to put that in the DomainObject explicitly
+				
+				
+		// add production
+		// EntityAPI.AssignProductionHandler(scriptID, (uint)UserConstants.Product.Microwaves, Production_Microwaves);
+
+		// add power consumption
+		EntityAPI.CreateConsumption(scriptID, "power", (uint)UserConstants.Product.Power, Consumption_Power);
+
+		// add radar signature consumption
+		EntityAPI.CreateConsumption(scriptID, "radarsignature", (uint)UserConstants.Product.RadarSignature, Consumption_RadarSignature);
+	}
+	
+	#region Rules
+	private static bool Rule_ReadOnly (string entityID, object[] args)
+	{
+		return false; 
+	}
+	
+	private static bool Rule_Description(string entityID, object[] args)
+	{
+		// we get the value from the args where we know for property rules the value is first and only argument
+		string description = (string)args[0];  
+		System.Diagnostics.Debug.WriteLine ("Running rule 'Rule_Description'.  Testing value '" + description + "'");
+		return !string.IsNullOrEmpty(description);
+	}
+	
+	private static bool Rule_MinimumTL (string entityID, object[] args)
+	{		
+		// we get the value from the args where we know for property rules the value is first and only argument
+		int techlevel = (int)args[0];
+		System.Diagnostics.Debug.WriteLine ("Running rule 'Rule_MinimumTL'.  Testing value '" + techlevel.ToString() + "'");
+		return techlevel >= 8;
+	}
+	
+	private static bool Rule_MinimumRange(string entityID, object[] args)
+	{
+		double range = (double)args[0];
+		System.Diagnostics.Debug.WriteLine ("Running rule 'Rule_MinimumRange'.  Testing value '" + range.ToString() + "'");
+		return range >= 0.0;
+	}
+	
+	public static bool Validate (string domainObjectID, string propertyName, object value)
+	{
+		switch (propertyName)
+		{
+			// build properties
+			case "quality": // construction & craftsmanship quality (typically user doesn't select this
+			                // it's determined by the stats of the builder and whether the player or the 
+							// builder himself tries to save money
+							// and create a cheaper vehicle.
+							// A particular builder may have a max quality, but that quality can always wind up being less
+							// if the builder thinks he can take advantage of the player and he wont notice.
+							// within reason, some components may not all be up to the highest quality even if the
+							// builder is not intentionally trying to be a crook.  It may be a bad batch of materials
+							// or some automation diagnostics not quite working right.  So maybe there's some margin of error
+							// the player gets to play with and if they want guarantee, it could add 50 - 1000% more to the cost.
+							// (like ordering a ferrari vs an assembly line car)
+				break;
+			case "material":
+				break;
+			case "thickness": // this will replace light, medium, heavy, extra heavy, etc.
+				break;
+				
+			// runtime properties
+			case "turnon":
+				break;
+				
+			default:  // not every property has to have any validation code.  Or it may have been handled by a custom rule object
+				break;
+		}
+		return true;
+	}
+	#endregion
+
+	public static object Register(string entityID, string parentID)
+	{
+		// make modifications 
+
+		return entityID;
+	}
+	
+	public static object UnRegister (string entityID, string parentID)
+	{
+
+		return entityID;
+
+	}
+	
+	
+	#region PlacementTool related
+	public static uint QueryPlacementBrushType () { return (uint)UserConstants.BRUSH_TYPE.BRUSH_SINGLE_DROP;}
+	
+	public static Vector3d[] QueryCellPlacement (string celledRegionID, Vector3i tileLocation, byte cellRotation)
+	{
+		const double TO_DEGREES = 360d / 256d;
+		Vector3d position, scale, rotation;
+		scale.x = 1;
+		scale.y = 1;
+		scale.z = 1;
+		
+		
+		rotation.x = 0;
+		rotation.y = (double)(cellRotation * TO_DEGREES);
+		rotation.z = 0;
+			
+		// tile location is basically x, z pixel coordinate with y as floor level
+		// we need to convert this to a celledRegion relative coordinate which will give us
+		// a 3D position that represents the CENTER of that tile (not the top/left corner)
+		position = EntityAPI.CellMap_GetTilePosition3D(celledRegionID, tileLocation);
+		Vector3d size = EntityAPI.CellMap_GetTileSize (celledRegionID);
+
+				
+		// assuming this generic component has it's Y position at floor (not centered in it's bbox)
+		// then we need to lower position.y we return to be on the floor of the cell.		
+		double floorHeight = position.y - (size.y * 0.5);
+		position.y = floorHeight;
+		
+		// get the local bounding box of the component
+		// if the center.y != 0.0 (within some epsilon)
+		// then the box.min.y is likely on the floor.  test if the min.y is at 0.0 or some epsilon.
+		// if both are out of range,we'll just go with center.
+
+		
+		// return values and dont use EntityAPI to set, since it's a Query and not an Update
+		return new Vector3d[] {position, scale, rotation}; 
+	}
+	
+	#endregion
+
+	#region Build statistics
+	
+	public static void OnCustomPropertyChanged (string entityID, int index)
+	{
+	
+		// when a build property changes, run BuildUpdate() to recompute statS?
+		// Not exactly.  We instead set a flag that the "stats" are dirty 
+		// this way future property changes dont result in multiple calls to update stats.
+		// 
+		switch (index)
+		{
+			case 0:
+			case 1:
+			case 2:
+				break;
+			case 7:
+			case 8:
+			case 9:
+			case 10:
+				EntityAPI.SetCustomFlagValue (entityID, (uint)UserConstants.CustomFlags.CF_STATS_DIRTY ,true);
+				break;
+			default:
+				break;
+		}
+	}
+	
+	public static void OnUpdate (string entityID, double elapsedSeconds)
+	{
+		// clear previously produced units from last tick
+		// produce
+		// retreive unit produced during previous tick
+		// run the consumer
+		if (EntityAPI.GetCustomFlagValue (entityID, (uint)UserConstants.CustomFlags.CF_STATS_DIRTY) == true)
+		{
+			System.Diagnostics.Debug.WriteLine ("Updating Stats");
+			UpdateStats (entityID);
+			System.Diagnostics.Debug.WriteLine ("Updating Stats - COMPLETED.");
+		}
+
+		// read flag to determine if we have power
+		
+		// are we too damaged, if so set "on" = false
+		
+		// read property if we're on
+		
+		// http://www.youtube.com/watch?v=r9Xhjmg3Wf8 <-- really nice rumbly powerful looking / sounding engine thrust plumes
+		// get state of the plume emitter flags so we know whether to continue ramping up
+		// or cool down, register new if just turning on, unregister if plume is now out.
+		// are we damaged and should emit black smoke?
+		// compute's the bbox center and then moves the center.z = center.z - (center.depth / 2);
+		// FXAPI.Register( helper.computeexternalposition(entityID), vector3d offset, length, radius, color, etc);
+		
+
+		
+		// register / unregister sound 
+		// AudioAPI.Register(); // todo: like our hexalfares, can we set sound's paths in custom properties?
+		// 
+		
+		// are we destroyed and need to explode on the inside of the ship?
+		
+	}
+	
+	private static void UpdateStats (string entityID)
+	{
+		const double kwperhour = 3.78541;
+		const double kwpersecond = kwperhour / (60 * 60);
+		int tl = (int)EntityAPI.GetCustomPropertyValue (entityID, "tech level");
+				
+		float craftsmanship = UserFunctions.GetCraftsmanshipCoefficient ((string)EntityAPI.GetCustomPropertyValue (entityID, "craftsmanship"));
+		float materialsquality = UserFunctions.GetMaterialsQualityCoefficient((string)EntityAPI.GetCustomPropertyValue (entityID, "materials quality"));
+				
+		double range = (double)EntityAPI.GetCustomPropertyValue (entityID, "range");
+		double weight = 0.325 * range + 4000.0;
+		weight = UserFunctions.CalcComponentModifiedWeight (weight, tl, materialsquality);
+		double cost = weight * 25.0; 
+		cost = UserFunctions.CalcComponentModifiedCost (cost, tl, craftsmanship);
+
+		double volume = UserFunctions.CalcComponentVolume(weight);
+		double power = 0.5 * range * kwpersecond;  
+		power = UserFunctions.CalcComponentsModifiedFuelConsumption (power, craftsmanship);
+		
+		double surfacearea = UserFunctions.CalcComponentSurfaceArea (volume);
+		int hitpoints = UserFunctions.CalcComponentHitpoints(surfacearea);
+		
+		// todo: condense into a single call
+		EntityAPI.SetCustomPropertyValue (entityID, "cost", cost);
+		EntityAPI.SetCustomPropertyValue (entityID, "weight", weight);
+		EntityAPI.SetCustomPropertyValue (entityID, "volume", volume);
+		EntityAPI.SetCustomPropertyValue (entityID, "power usage", power);
+		EntityAPI.SetCustomPropertyValue (entityID, "surfacearea", surfacearea);
+		EntityAPI.SetCustomPropertyValue (entityID, "hitpoints", hitpoints);
+		
+		EntityAPI.SetCustomFlagValue (entityID, (uint)UserConstants.CustomFlags.CF_STATS_DIRTY ,false);
+	}	
+	#endregion
+	
+	#region Run-time
+	public static Production[] Production_Update (string entityID, double elapsedSeconds)
+	{		
+		// radars are active sensors and will produce a radar emission
+			
+		// if not installed in a vehicle, no production
+		string vehicleID = EntityAPI.GetOwnerID (entityID);
+		if (string.IsNullOrEmpty(vehicleID)) return null;
+		
+		// if the sensor is turned off, no production
+		object val = EntityAPI.GetCustomPropertyValue (entityID, "on");
+		if (val == null || (bool)val == false) return null;
+
+		// if we have consumed power from previous tick,we can produce sensor scan unit/emission 
+		bool hasFuel = EntityAPI.GetCustomFlagValue (entityID, (uint)UserConstants.CustomFlags.CF_NO_FUEL);
+		if (hasFuel == false) 
+		{
+			// intitiate shutdown?  
+			// set ON = false.
+			// set THROTTLE = 0.0
+			// unregister plume emitter if it was active (we can use flags for determining this)
+			return null;
+		}
+		
+		// if range amount build option == 0.0, no production
+		val = EntityAPI.GetCustomPropertyValue (entityID, "range");
+		if (val == null) return null;
+		double maxEmissions = (double)val;
+		if (maxEmissions == 0.0) return null;
+		
+		Production[] result = new Production[1];
+		
+			
+		// any modifiers on emissions?
+		double microwaveEmissions = maxEmissions; // strength of these emissions
+		
+		// emissions product of this radar distributed to microwave detecting sensors in other ships
+		result[0].SourceEntityID = entityID; 
+		result[0].ProductID = (uint)UserConstants.Product.Microwaves;
+		result[0].UnitValue = microwaveEmissions;  
+		result[0].UnitCount = -1; // infinite production can be distributed to all consumers with no regard for priority since there is enough to supply all relevant consumers.
+		result[0].DistributionMode = DistributionType.Region; 
+		result[0].DistributionFilter = MicrowaveEmissionDistributionFilter;
+				
+ 
+		// TODO: here can we add a DistributionFilter function?
+		//       The problem is, we would need to run alot of EntityAPI functions i suspect
+		//       to get access to the entity properties we need.
+		//       Take a product match filter for example, we want to test the result[0].ProductID
+		//       with an entity.domainObject.Consumers.ContainsKey(productID)
+		// TODO: an example involving sensor contacts needs to involve distance tests,
+		//       and skill tests for the sensors and the sensor operator if any,
+		//       because if these filter functions are written here, then using api functions
+		//       will be required and the downside there is, it requires a lookup to get the entity
+		//       each time... although... i think i will optimize our EntityAPI to always cache the
+		//       last used Entity so that any one script only incurs that hit once.
+		// TODO: so lets try to figure out with gravity and a single star
+		//       a way to test our FILTER function.
+		//       Let's disregard what the script needs to contain for now and we'll just return
+		//       TRUE;
+		//
+
+		
+		// light (detectable)
+		
+		// heat (damage for craft that gets too close and infrared detectable based on output level)
+		
+		// blast (damage)
+		
+		// todo: why are we not caching these results in a custom property we can retreive?
+		
+		return result;
+	}
+	
+	// returns TRUE if the entity passes the filter test and
+	// should be allowed to receive the radar sensor emission product for consumption
+	public static bool MicrowaveEmissionDistributionFilter (Production production, string targetEntityID)
+	{
+		// a targetEntityID id is passed in and we must determine if that entity which consumes
+		// radar signatures (i.e. is a radar sensor) should be filtered or 
+		return true;
+	}
+	
+	public static Consumption Consumption_Power (string entityID, Production production, double elapsedSeconds)
+	{
+		Consumption result;
+
+		// is there fuel that can be consumed from the production source?
+		
+		// if so, deduct our fuel usage
+		
+		// set flag to indicate whether we have acquired our power reqts
+		EntityAPI.SetCustomFlagValue (entityID, (uint)UserConstants.CustomFlags.CF_NO_FUEL ,true);
+		
+		return result;
+	}
+	
+	public static Consumption Consumption_RadarSignature (string entityID, Production production, double elapsedSeconds)
+	{
+		Consumption result;
+
+		System.Diagnostics.Trace.WriteLine ("Radar.Consumption_RadarSignature()");
+		
+		// is this sensor on?  would that already ahve been filtered prior to here being allowed to consume?
+		object val = EntityAPI.GetCustomPropertyValue (entityID, "on");
+		if (val == null || (bool)val == false) return result;
+		
+		// get the owner vehicle entityID - if this sensor is not installed in a vehicle, no consumption
+		string vehicleID = EntityAPI.GetOwner (entityID);
+		if (string.IsNullOrEmpty(vehicleID)) return result;
+		
+		// get the contacts custom property from owner Vehicle
+		SensorContact contact = null;
+		SensorContact[] contacts = (SensorContact[])EntityAPI.GetCustomPropertyValue(vehicleID, "contacts");
+		if (contacts != null) 
+		{
+			// does the contact for the entity production.SourceEntityID exist?
+			int contactIndex = contacts.IndexOf(c => c.EntityID == production.SourceEntityID);
+			if (contactIndex >= 0)
+			{
+				contact = contacts[contactIndex];
+			}
+		}
+		
+		if (contact == null) 
+		{
+			long gameObjectID = 0; // temp hack - we need to resolve game ojbect IDs. GameObjectAPI.GetNextGameObjectID();
+			contact = new SensorContact(gameObjectID);
+			contact.EntityID = production.SourceEntityID;
+			contacts = contacts.ArrayAppend (contact);
+		}
+						
+ 
+		EmissionValue value = (EmissionValue)production.UnitValue;		
+		contact.AddPlot (value.Time, value.Position);			
+			
+		// update the contacts
+		EntityAPI.SetCustomPropertyValue(vehicleID, "contacts", contacts);
+		
+		
+		
+		// ATC Simulator 3 - i like the contacts list design
+		// http://www.youtube.com/watch?v=Dqv1NPWl1cs
+		// Tower 2011
+		// http://www.youtube.com/watch?v=VqiLYOTsAkc
+		// SESAR Next Gen Air Traffic Control 
+		// http://www.youtube.com/watch?v=hXX2BScpntA
+		
+		
+		
+		// is the radar dish facing the target.  (simple dot product of the two vectors )
+		//
+		// http://www.youtube.com/watch?feature=player_detailpage&v=-FTYnWID3DI#t=491s
+		// longer range distance radars dishes turn more slowly to allow more time to receive
+		// return echos.  this is fascinating for understanding radar in space which i think will need to be
+		// MUCH better to have good long range coverage.  for active scanners.  i think that's why passive scanners are most useful for initial detection
+		// interagator/transponder beacon/decoder
+		
+		// use user_functions to manage contacts
+		// - history of a contact by session#
+		// - if first contact in the current sensor session, set the time
+		// - 
+		
+		// now i think our Hud implementations will grab the contacts array
+		// and use that data to render proxys and histories, etc.
+		//
+		// when does it happen?  during cull?  during render?
+		// during hud.update()?
+		// 
+		
+		// set flag to indicate whether we have acquired our power reqts
+		//EntityAPI.SetCustomFlagValue (entityID, (uint)UserConstants.CustomFlags.CF_NO_FUEL ,true);
+		
+		return result;
+	}
+	
+	public static void OnRender (string contextID, string entityID, string[] modelIDs, string shaderID, 
+								 Vector3d cameraSpacePosition, Vector3d[] cameraSpaceBoundingBoxVertices, double elapsedSeconds)
+	{
+	}
+	
+	#endregion
+}

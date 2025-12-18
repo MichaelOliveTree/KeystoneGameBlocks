@@ -1,10 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Keystone.Types;
 
 namespace KeyCommon.Data
 {
-
 	// http://www.gamasutra.com/view/news/38977/InDepth_Behavior_Tree_Entrails.php
 	// An agent's blackboard aggregates all agent specific game world knowledge. 
 	// It's the only data immediate action functions are allowed to access to keep
@@ -12,6 +11,9 @@ namespace KeyCommon.Data
 	// fields like used by Halo 2 or a key-value dictionary. It's favorable if the
 	// blackboard can be stored as a data blob that's easily kept or streamed into 
 	// local memory/cache.
+	// ---
+	// WWG Notes - August.20.2025: see KeyCommon.Data.BinaryBlob.cs
+	// ---
 	// https://social.technet.microsoft.com/wiki/contents/articles/13461.blackboard-design-pattern-a-practical-example-radar-defense-system.aspx
 	// Blackboard is a design pattern that also requires it be threadsafe.	Blackboard
 	// is great for sharing knowledge.
@@ -138,6 +140,7 @@ namespace KeyCommon.Data
         // https://www.gamedeveloper.com/programming/a-primer-on-repeatable-random-numbers
         //private int mCounter; // every traversal of the behavior tree increments this value by 1 and potentially every decision made during traversal where a Random number is needed, can increment this counter.	
 		private Dictionary <string, object> Objects;
+		private Dictionary<string, object[]> ObjectsArray;
 		private Dictionary <string, string> Strings;
         private Dictionary <string, string[]> StringArray;
 		private Dictionary <string, bool> Bools;
@@ -161,11 +164,19 @@ namespace KeyCommon.Data
         // TODO: Collections field could be used perhaps to store nested Data?
         private Dictionary <string, UserData> Collections;
 
-        public UserData()
+        /// <summary>
+        /// UseData.ctor() uses the access modifier "internal" because an instance
+        /// must be obtained via GameAPI which will result in a call to 
+        /// UserDataStore.CheckOut() which will provide an index.
+        /// Our Viewpoint BehaviorTree is one exception currently that calls 
+        /// UserDataStore.CheckOut() that does not originate from a script call 
+        /// to GameAPI.
+        /// </summary>
+        internal UserData()
         {
         }
 
-		public UserData Clone ()
+		internal UserData Clone ()
 		{
 			UserData copy = new UserData ();
 
@@ -198,10 +209,32 @@ namespace KeyCommon.Data
             return null;
 		}
 
+        // TODO: our "Entity.BlackboardData" will contain an array of objects that each script
+        //       for that Entity will assign and therefore know how to cast each array element.
+        //       So we can have bbData = new object[2];
+        //       bbData[0] = new ComponentStore<EnergyWeapon>();
+        //       bbData[1] = new UserData;  // <-- this is the AI data which can be a struct also and which the Entity's script will know what is assigned to this index
+        public object[] GetObject(string name)
+        {
+            return ObjectsArray[name];
+        }
+        
+        public void SetObject(string name, object[] value)
+        {
+            if (ObjectsArray == null)
+                ObjectsArray = new Dictionary<string, object[]>();
+
+            if (ObjectsArray.ContainsKey(name))
+                ObjectsArray[name] = value;
+            else
+                ObjectsArray.Add(name, value);
+        }
+        
         public object GetObject(string name)
         {
             return Objects[name];
         }
+        
         public void SetObject(string name, object value)
         {
             if (Objects == null)
@@ -361,4 +394,4 @@ namespace KeyCommon.Data
 				Quaternions.Add (name, value);
 		}
 	}
-}
+}    

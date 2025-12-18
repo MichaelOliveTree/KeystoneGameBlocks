@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Keystone.CSG;
 using Keystone.Types;
 using KeyScript.Rules;
@@ -8,14 +8,26 @@ namespace KeyScript.Interfaces
 {
     public interface IGameAPI
     {
-        #region Timing
-        double GetElapsedSeconds(string sceneID);
-        double GetTotalElapsedSeconds(string sceneID);
-
-        double GetJulianDay (string sceneID);
-        double GetTimeScaling (string sceneID);
+        
+        #region Component Storage and Processing
+        // Intrinsic Components
+        //int RegisterIntrinsicComponentsStore<T>(string name, Memory<T> data);
+        // registering of intrinsic component instances could be done for the user?
+        int RegisterComponentInstance<T> (string entityID, T instance);     
+        
+        // User Defined Components (eg. see Game01.Components.UserComponents.cs)
+        int RegisterUserComponentsStore<T>(string name, Memory<T> data);
+        int RegisterUserComponentInstance<T> (string entityID, T instance);
+        
+        
+        
+        
+        // we require all Processors to reside in "user_functions_processors.css" 
+        int RegisterProcessor<T> (string name, KeyCommon.Processors.DataProcessor<T>); // this is just to create it, not Run it
+        
+        
         #endregion
-
+        
         #region Paths
         string Path_GetDataPath();
         string Path_GetModsPath();

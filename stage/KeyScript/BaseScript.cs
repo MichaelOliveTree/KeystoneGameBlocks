@@ -12,7 +12,10 @@ namespace KeyScript
 {
     public class BaseScript
     {
+        // Host object
         protected static IScriptingHost mHost;
+
+        // APIs
         protected static ITimingAPI TimingAPI;
         protected static IDatabaseAPI DatabaseAPI;
         protected static IGameAPI GameAPI;
@@ -23,6 +26,8 @@ namespace KeyScript
         protected static IVisualFXAPI VisualFXAPI;
         protected static IAudioFXAPI AudioFXAPI;
         protected static IAnimationAPI AnimationAPI;
+        protected static IWindowingAPI WindowingAPI;
+        
         
         public static void Initialize(IScriptingHost host)
         {
@@ -41,6 +46,8 @@ namespace KeyScript
             AudioFXAPI = mHost.AudioFXAPI;
             AnimationAPI = mHost.AnimationAPI ;
             
+            WindowingAPI = mHost.WindowingAPI;
+
             Game01.GameObjects.EmissionValue ev;
 
         }

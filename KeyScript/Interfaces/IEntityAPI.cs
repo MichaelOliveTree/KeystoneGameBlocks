@@ -115,7 +115,6 @@ namespace KeyScript.Interfaces
         void CellMap_SetEdgeSegmentState(string entityID, uint edgeID, object segment_state);
         void CellMap_SetEdgeSegmentStyle(string entityID, uint edgeID, object style);
 
-
         void CellMap_SetDataLayerValue(string entityID, string layerName, uint elementIndex, bool value);
         object CellMap_GetDataLayerValue(string entityID, string layerName, uint elementIndex);
 
@@ -142,13 +141,18 @@ namespace KeyScript.Interfaces
         object GetCustomPropertyValue(string entityID, string propertyName);
 
         void SetCustomPropertyValues(string entityID, string[] propertyNames, object[] values, bool raiseEvent = false);
+        
         void SetCustomPropertyValue(string entityID, string propertyName, object value, bool raiseEvent = false);
         void AddRule(string scriptID, string propertyName, Rule rule);
+        
         void PropertyChangedEventAdd(string scriptID, string propertyName, KeyScript.Events.PropertyChangedEventDelegate handler);
+        
         void PropertyChangedEventSubscribe(string subscriberID, string entityThatGeneratesTheEvent, string eventName, KeyScript.Events.PropertyChangedEventDelegate eventHandler);
 
         void EventAdd(string scriptID, string eventName, KeyScript.Events.EventDelegate eventHandler);
+        
         void EventRaise(string entityThatGeneratedTheEvent, string eventName);
+      
         void EventSubscribe(string subscriberID, string entityThatGeneratesTheEvent, string eventName, KeyScript.Events.EventDelegate eventHandler);
 
         void AnimationEventSubscribe(string entityThatGeneratesTheEvent, string subscriberID, string animationName, KeyScript.Events.AnimatioCompletedEventDelegate eventHandler);
@@ -164,6 +168,5 @@ namespace KeyScript.Interfaces
 
         //void CreateTransmitter(string scriptID, string transmitterName, uint flag);
         //void CreateReceiver(string scriptID, string receiverName, uint flag);
-
     }
 }

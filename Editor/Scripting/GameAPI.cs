@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Keystone.Types;
 using KeyScript;
@@ -8,45 +8,83 @@ using Keystone.CSG;
 
 namespace KeyEdit.Scripting
 {
-
 	/// <summary>
 	/// Description of GameAPI.
 	/// </summary>
 	public class GameAPI : IGameAPI
 	{
-		
-		#region Timing
-		public double GetElapsedSeconds(string sceneID)
-		{
-			Keystone.Scene.Scene scene = AppMain._core.SceneManager.GetScene (sceneID);
-			return scene.Simulation.GameTime.ElapsedSeconds;
-		}
-		
-		public double GetTotalElapsedSeconds(string sceneID)
-		{
-			Keystone.Scene.Scene scene = AppMain._core.SceneManager.GetScene (sceneID);
-			return scene.Simulation.GameTime.TotalElapsedSeconds;	
-		}
-		
-		 public double GetJulianDay (string sceneID)
-		 {
- 			Keystone.Scene.Scene scene = AppMain._core.SceneManager.GetScene (sceneID);
-			return scene.Simulation.GameTime.JulianDay;	
-		 }
-		 
-		 /// <summary>
-         /// Equivalent to gameSecondsPerRealLifeSecond.  
-         /// eg. 60 gameSeconds per real life second means 
-         /// every real life minute results in one hour of game time passing
-         /// </summary>
- 		 public double GetTimeScaling (string sceneID)
-		 {
- 			Keystone.Scene.Scene scene = AppMain._core.SceneManager.GetScene (sceneID);
-			return scene.Simulation.GameTime.Scale;	
-		 }
-        #endregion
 
-        #region Paths
+        #region Component Storage and Processing
+        // Intrinsic Components
+        //int RegisterIntrinsicComponentsStore<T>(string name, Memory<T> data);
+        // registering of intrinsic component instances could be done for the user?
+        //int IGameAPI.RegisterComponentInstance<T> (string entityID, T instance)
+        //{
+        //
+        //}
+        
+        // OBSOLETE - When a user script attempts to register a user component instance,
+        //            any ComponentStore<T> will be created by the Repository.StoresCollection
+        //
+        // User Defined Components (eg. see Game01.Components.UserComponents.cs)
+        //int IGameAPI.RegisterUserComponentsStore<T>(string name, Memory<T> data)
+        //{
+        //    
+        //}
+        
+        int IGameAPI.RegisterUserComponentInstance<T> (string entityID, T instance)
+        {
+            Keystone.Entities.Entity e = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get (entityID);
+          
+            const int DEFAULT_STORE_SIZE = 1024;
+            
+             // does this require the UserData already exists? yes, if that is where we store the mem
+             KeyCommon.Data.ComponentStore<T> store = Repository.StoresCollection.CheckOut<T>(DEFAULT_STORE_SIZE);
+             
+             Memory<T> mem = store.CheckOut();
+             
+             System.Diagnostics.Debug.Assert (e.UserData != null);
+             
+             e.UserData.Add(typeof(T).ToString(), mem);
+             
+             
+             
+        }
+        
+        
+        // we require all Processors to reside in "user_functions_processors.css" 
+        // NOTE: Intrinsic Processors could all be created outside of script or within a specific
+        //       script loaded by Keystone.dll at runtime if allowed.  Either way
+        //       we don't need a "RegisterIntrinsicProcessor<T>()" here
+        
+        // "intrinsic_functions_processors.css"
+        // static void Steering()
+        // static void BoidFlockingBehavior()
+        // static void Wander()
+        // static void Newtonian()
+        // static void InterpolatedAnimations()
+        
+        int RegisterProcessor<T> (string name, KeyCommon.Processors.DataProcessor.Processor<Memory<T>> proc) // this is just to create it, not Run it. todo 
+        {
+        
+            Repository.RulesProcessors.Add(name, proc)
+            
+            
+            
+            DataProcessors.Processor p = TestIntrinsicProcessor;
+        
+        //mIntrinsicProcessors = new KeyCommon.Processors.DataProcessors();
+        //mIntrinsicProcessors.Add("STEER", p);
+        // then -> p[i].Invoke(store, parameters, r);
+            
+            
+            
+        }
+        
+        #endregion
+        
+        
+		#region Paths
         public string Path_GetDataPath()
         {
             return AppMain.DATA_PATH;

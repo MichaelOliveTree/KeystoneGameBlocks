@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Keystone.Types;
 using KeyScript;
@@ -14,6 +14,7 @@ namespace KeyEdit.Scripting
     public class ScriptingHost : IScriptingHost
     {
         private IDatabaseAPI mDatabaseAPI;
+        private ITimingAPI mTimingAPI;
     	private IGameAPI mGameAPI;
         private IGraphicsAPI mGraphicsAPI;
         private IEntityAPI mEntityAPI;  // setting & getting properties of an entity
@@ -24,9 +25,10 @@ namespace KeyEdit.Scripting
         private IAnimationAPI mAnimationAPI;
         
 
-        public ScriptingHost(IDatabaseAPI databaseAPI, IGameAPI gameAPI, IGraphicsAPI graphicsAPI, IEntityAPI entityAPI, IPhysicsAPI physicsAPI, IAIAPI aiAPI, IVisualFXAPI visualAPI, IAnimationAPI animationAPI, IAudioFXAPI audioAPI)
+        public ScriptingHost(IDatabaseAPI databaseAPI, ITimingAPI timingAPI, IGameAPI gameAPI, IGraphicsAPI graphicsAPI, IEntityAPI entityAPI, IPhysicsAPI physicsAPI, IAIAPI aiAPI, IVisualFXAPI visualAPI, IAnimationAPI animationAPI, IAudioFXAPI audioAPI)
         {
             mDatabaseAPI = databaseAPI;
+            mTimingAPI = timingAPI;
         	mGameAPI = gameAPI;
             mGraphicsAPI = graphicsAPI;
             mEntityAPI = entityAPI;
@@ -38,6 +40,7 @@ namespace KeyEdit.Scripting
         }
 
         public IDatabaseAPI DatabaseAPI { get { return mDatabaseAPI; } }
+        public ITimingAPI TimingAPI {get {return mTimingAPI;}}
         public IGameAPI GameAPI {get {return mGameAPI;}}
         public IGraphicsAPI GraphicsAPI { get { return mGraphicsAPI; } }
         public IEntityAPI EntityAPI { get { return mEntityAPI; } }

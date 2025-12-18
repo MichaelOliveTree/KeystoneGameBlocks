@@ -162,7 +162,7 @@ namespace KeyScript.Host
         }
 
         //https://stackoverflow.com/questions/3065526/how-to-get-an-enum-value-from-an-assembly-using-late-binding-in-c-sharp
-        // i should probably place COMPONENT_TYPE in game00.dll 
+        // i should probably place COMPONENT_TYPE in game01.dll 
         // user_functions.cs could be helpful, but not for this case
         //public Enum[] GetTest()
         //{ 

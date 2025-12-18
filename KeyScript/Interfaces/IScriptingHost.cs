@@ -14,6 +14,9 @@ namespace KeyScript.Interfaces
         IAudioFXAPI AudioFXAPI { get; }
         IAnimationAPI AnimationAPI {get;}
 	
+        ITimingAPI TimingAPI {get;}
+        IWindowingAPI WindowingAPI {get;}
+        
         // or how about the actual layout's paths are specified for us
         // and handled by whatever is doing localization.  all we care about is the path
         // eg.  data/mods/

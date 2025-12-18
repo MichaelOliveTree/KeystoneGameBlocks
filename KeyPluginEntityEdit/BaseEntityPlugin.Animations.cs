@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
@@ -488,10 +488,6 @@ namespace KeyPlugins
 					case "Position":
 					case "Scale":
 					case "Rotation":
-					case "Diffuse":
-					case "Ambient":
-					case "Specular":
-					case "Emissive":
 					case "Skeletal":
 						
 						string[] clipIDs;
@@ -532,6 +528,12 @@ namespace KeyPlugins
 							AddClip (clipIDs[i], clipTypes[i]);
 						}
 						break;
+					case "Diffuse":
+					case "Ambient":
+					case "Specular":
+					case "Emissive":
+					    break;
+					    
 				}
 			}
 		}
@@ -1025,7 +1027,6 @@ namespace KeyPlugins
                 int row = sender.Position.Row;
                 string id = (string)((SourceGrid.Grid)sender.Grid)[row, 0].Row.Tag;
 
-
                 if (mHost != null && (!(string.IsNullOrEmpty(id))))
                     mHost.Node_ChangeProperty(id, mPropertyName, typeof(string), (string)sender.Value);
             }
@@ -1042,7 +1043,6 @@ namespace KeyPlugins
             {
                 int row = sender.Position.Row;
                 string id = (string)((SourceGrid.Grid)sender.Grid)[row, 0].Row.Tag;
-
 
                 // TODO: when changing the start frame if it's higher than the end, i should increase
                 // the end by same amount, and hten change the min value
@@ -1066,7 +1066,6 @@ namespace KeyPlugins
 
                 string id = (string)grid[row, 0].Row.Tag;
                 if (string.IsNullOrEmpty(id)) return;
-
 
                 Vector3d[] keyframes = new Vector3d[2];
                 keyframes[0] = (Vector3d)grid[row, 0].Value;
@@ -1103,7 +1102,6 @@ namespace KeyPlugins
                  int row = sender.Position.Row;
                 Grid grid = (Grid)sender.Grid;
 
-                
                 // we need to construct an array of EmitterKeyFrame and pass that entire array to Geometry_ChangeGroupProperty()
                 // thus we only need one Controller type for every cell in the gridEmitter and another for gridParticle.  
                 // Even though sending all particle array or emitter array is somewhat expensive, there really shouldn't be too many keyframes for each
@@ -1121,7 +1119,6 @@ namespace KeyPlugins
                     keyframes[i-1].Radius = (float)grid[i, EMITTER_COLUMN_RADIUS].Value;
                     keyframes[i-1].Speed = (float)grid[i, EMITTER_COLUMN_SPEED].Value;
                 }
-
 
                 if (mHost != null && !mHost.PluginChangesSuspended  && (!(string.IsNullOrEmpty(mParticleSystemID))))
                     mHost.Geometry_ChangeGroupProperty(mParticleSystemID, mGroupIndex, mPropertyName, typeof(Keystone.KeyFrames.EmitterKeyframe[]).Name, keyframes);
@@ -1145,13 +1142,11 @@ namespace KeyPlugins
                 int row = sender.Position.Row;
                 Grid grid = (Grid)sender.Grid;
                                
-
                 // we need to construct an array of ParticleKeyframe and pass that entire array to Geometry_ChangeGroupProperty()
                 // thus we only need one Controller type for every cell in the gridEmitter and another for gridParticle.  
                 // Even though sending all particle array or emitter array is somewhat expensive, there really shouldn't be too many keyframes for each
                 int rowCount = grid.RowsCount;
 
-                
                 Keystone.KeyFrames.ParticleKeyframe[] keyframes = new Keystone.KeyFrames.ParticleKeyframe[rowCount-1];
                 for (int i = 1; i < rowCount; i++) // we start at i = 1 since first row is header
                 {
@@ -1161,14 +1156,10 @@ namespace KeyPlugins
                     keyframes[i-1].Size = (Vector3f)grid[i, PARTICLE_COLUMN_SIZE].Value;
                 }
 
-
                 if (mHost != null && (!(string.IsNullOrEmpty(mParticleSystemID))))
                     mHost.Geometry_ChangeGroupProperty(mParticleSystemID, mGroupIndex, mPropertyName, typeof(Keystone.KeyFrames.ParticleKeyframe[]).Name, keyframes);
             }
         }
-
-
         #endregion
-
     }
 }

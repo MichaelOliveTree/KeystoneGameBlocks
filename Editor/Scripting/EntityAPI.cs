@@ -138,6 +138,101 @@ namespace KeyEdit.Scripting
         #endregion
 
 
+        /// <summary>
+        /// AddRule is called by the actual Entity Script csscript module
+        /// to assign the validation rules for properties that are created in the script
+        /// (eg. the validation rule delegate functions are actually written in the script!)
+        /// </summary>
+        /// <param name="scriptID"></param>
+        /// <param name="rule"></param>
+        void IEntityAPI.AddRule(string scriptID, string property, KeyScript.Rules.Rule rule)
+        {
+            Keystone.DomainObjects.DomainObject script = (Keystone.DomainObjects.DomainObject)Keystone.Resource.Repository.Get(scriptID);
+            if (script == null)
+            {
+                System.Diagnostics.Debug.WriteLine("EntityAPI.AddRule() - Script node does not exist in Repository.");
+                return;
+            }
+            script.AddRule(property, rule);
+        }
+
+#region Events
+        void IEntityAPI.EventAdd(string scriptID, string eventName, KeyScript.Events.EventDelegate eventHandler)
+        {
+            Keystone.DomainObjects.DomainObject script = (Keystone.DomainObjects.DomainObject)Keystone.Resource.Repository.Get(scriptID);
+
+            script.EventAdd(eventName, eventHandler);
+        }
+
+        void IEntityAPI.EventSubscribe(string subscriberID, string entityThatGeneratedTheEvent, string eventName, KeyScript.Events.EventDelegate eventHandler)
+        {
+            Keystone.Entities.Entity entity = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(entityThatGeneratedTheEvent);
+            Keystone.DomainObjects.DomainObject script = entity.Script;
+
+            if (!Keystone.Extensions.ArrayExtensions.ArrayContains(script.EventNames, eventName))
+            {
+                System.Diagnostics.Debug.WriteLine("Script '" + script.ResourcePath + "' has not registered an Event named '" + eventName + "'");
+                return;
+            }
+            Keystone.Entities.Entity subscriber = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(subscriberID);
+            entity.EventSubscribe(eventName, subscriber, eventHandler);
+        }
+
+        //void IEntityAPI.EventUnSubscribe (string subscriberID, string entityThatGeneratedTheEvent, string eventName, EventDelegate eventHandler)
+        //{
+        //    Keystone.Entities.Entity entity = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(eventGeneratorID);
+        //    Keystone.DomainObjects.DomainObject script = entity.Script;
+
+        //    Keystone.Entities.Entity subscriber = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(subscriberID);
+
+        //    //script.EventUnSubscribe(eventName, subscriber, eventHandler);
+        //}
+
+        /// <summary>
+        /// EventRaise() is always called by the script of the Entity that is raising the event and always
+        /// invokes handlers of subscribers.  In other words, the Entity that raises the event never raises it to itself because
+        /// it obviously already knows because it is the one calling EventRaise() in the first place.
+        /// </summary>
+        /// <param name="entityThatGeneratedTheEvent"></param>
+        /// <param name="eventName"></param>
+        void IEntityAPI.EventRaise(string entityThatGeneratedTheEvent, string eventName)
+        {
+            // NOTE: Only an Entity that is using a particular Script can raise events owned by that Script
+            Keystone.Entities.Entity entity = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(entityThatGeneratedTheEvent);
+            entity.EventRaise(eventName);
+        }
+
+        /// <summary>
+        /// AddPropertyChangedEvent is called by the actual Entity Script csscript module
+        /// to assign an event for properties that are modified 
+        /// (eg. the event handler functions are actually written in the script!)
+        /// </summary>
+        /// <param name="scriptID"></param>
+        /// <param name="eventArg"></param>
+        void IEntityAPI.PropertyChangedEventAdd(string scriptID, string property, KeyScript.Events.PropertyChangedEventDelegate handler)
+        {
+            Keystone.DomainObjects.DomainObject script = (Keystone.DomainObjects.DomainObject)Keystone.Resource.Repository.Get(scriptID);
+            if (script == null)
+            {
+                System.Diagnostics.Debug.WriteLine("EntityAPI.AddEvent() - Script node does not exist in Repository.");
+                return;
+            }
+            script.AddPropertyChangedEvent(property, handler);
+        }
+
+        void IEntityAPI.PropertyChangedEventSubscribe(string entityThatGeneratesTheEvent, string subscriberID, string eventName, KeyScript.Events.PropertyChangedEventDelegate eventHandler)
+        {
+
+        }
+
+        void IEntityAPI.AnimationEventSubscribe(string entityThatGeneratesTheEvent, string subscriberID, string animationName, KeyScript.Events.AnimatioCompletedEventDelegate eventHandler)
+        {
+            Keystone.Entities.Entity entity = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(entityThatGeneratesTheEvent);
+
+            Keystone.Entities.Entity subscriber = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(subscriberID);
+            entity.AnimationFinishedEventSubscribe(animationName, subscriber, eventHandler);
+        }
+        #endregion
 
         #region CelledRegions
 
@@ -830,103 +925,6 @@ namespace KeyEdit.Scripting
 
         //Keystone.Elements.Group.GetChildIDs 
         //}
-
-        /// <summary>
-        /// AddRule is called by the actual Entity Script csscript module
-        /// to assign the validation rules for properties that are created in the script
-        /// (eg. the validation rule delegate functions are actually written in the script!)
-        /// </summary>
-        /// <param name="scriptID"></param>
-        /// <param name="rule"></param>
-        void IEntityAPI.AddRule(string scriptID, string property, KeyScript.Rules.Rule rule)
-        {
-            Keystone.DomainObjects.DomainObject script = (Keystone.DomainObjects.DomainObject)Keystone.Resource.Repository.Get(scriptID);
-            if (script == null)
-            {
-                System.Diagnostics.Debug.WriteLine("EntityAPI.AddRule() - Script node does not exist in Repository.");
-                return;
-            }
-            script.AddRule(property, rule);
-        }
-
-
-        void IEntityAPI.EventAdd(string scriptID, string eventName, KeyScript.Events.EventDelegate eventHandler)
-        {
-            Keystone.DomainObjects.DomainObject script = (Keystone.DomainObjects.DomainObject)Keystone.Resource.Repository.Get(scriptID);
-
-            script.EventAdd(eventName, eventHandler);
-        }
-
-        void IEntityAPI.EventSubscribe(string subscriberID, string entityThatGeneratedTheEvent, string eventName, KeyScript.Events.EventDelegate eventHandler)
-        {
-            Keystone.Entities.Entity entity = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(entityThatGeneratedTheEvent);
-            Keystone.DomainObjects.DomainObject script = entity.Script;
-
-            if (!Keystone.Extensions.ArrayExtensions.ArrayContains(script.EventNames, eventName))
-            {
-                System.Diagnostics.Debug.WriteLine("Script '" + script.ResourcePath + "' has not registered an Event named '" + eventName + "'");
-                return;
-            }
-            Keystone.Entities.Entity subscriber = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(subscriberID);
-            entity.EventSubscribe(eventName, subscriber, eventHandler);
-        }
-
-        //void IEntityAPI.EventUnSubscribe (string subscriberID, string entityThatGeneratedTheEvent, string eventName, EventDelegate eventHandler)
-        //{
-        //    Keystone.Entities.Entity entity = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(eventGeneratorID);
-        //    Keystone.DomainObjects.DomainObject script = entity.Script;
-
-        //    Keystone.Entities.Entity subscriber = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(subscriberID);
-
-        //    //script.EventUnSubscribe(eventName, subscriber, eventHandler);
-        //}
-
-        /// <summary>
-        /// EventRaise() is always called by the script of the Entity that is raising the event and always
-        /// invokes handlers of subscribers.  In other words, the Entity that raises the event never raises it to itself because
-        /// it obviously already knows because it is the one calling EventRaise() in the first place.
-        /// </summary>
-        /// <param name="entityThatGeneratedTheEvent"></param>
-        /// <param name="eventName"></param>
-        void IEntityAPI.EventRaise(string entityThatGeneratedTheEvent, string eventName)
-        {
-            // NOTE: Only an Entity that is using a particular Script can raise events owned by that Script
-            Keystone.Entities.Entity entity = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(entityThatGeneratedTheEvent);
-            entity.EventRaise(eventName);
-        }
-
-        /// <summary>
-        /// AddPropertyChangedEvent is called by the actual Entity Script csscript module
-        /// to assign an event for properties that are modified 
-        /// (eg. the event handler functions are actually written in the script!)
-        /// </summary>
-        /// <param name="scriptID"></param>
-        /// <param name="eventArg"></param>
-        void IEntityAPI.PropertyChangedEventAdd(string scriptID, string property, KeyScript.Events.PropertyChangedEventDelegate handler)
-        {
-            Keystone.DomainObjects.DomainObject script = (Keystone.DomainObjects.DomainObject)Keystone.Resource.Repository.Get(scriptID);
-            if (script == null)
-            {
-                System.Diagnostics.Debug.WriteLine("EntityAPI.AddEvent() - Script node does not exist in Repository.");
-                return;
-            }
-            script.AddPropertyChangedEvent(property, handler);
-        }
-
-        void IEntityAPI.PropertyChangedEventSubscribe(string entityThatGeneratesTheEvent, string subscriberID, string eventName, KeyScript.Events.PropertyChangedEventDelegate eventHandler)
-        {
-
-        }
-
-        void IEntityAPI.AnimationEventSubscribe(string entityThatGeneratesTheEvent, string subscriberID, string animationName, KeyScript.Events.AnimatioCompletedEventDelegate eventHandler)
-        {
-            Keystone.Entities.Entity entity = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(entityThatGeneratesTheEvent);
-
-            Keystone.Entities.Entity subscriber = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(subscriberID);
-            entity.AnimationFinishedEventSubscribe(animationName, subscriber, eventHandler);
-        }
-
-
 
         string IEntityAPI.GetEntitySceneID(string entityID)
         {

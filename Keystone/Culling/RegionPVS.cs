@@ -306,7 +306,11 @@ namespace Keystone.Culling
 
         /// <summary>
         /// Moves the TV Light within the TVEngine to camera space in preparation for rendering.
-        /// Does NOT move the actual Entity.
+        /// Does NOT move the actual Entity and so no octree or quadtree
+		/// or movement flags are triggered. 
+		/// HOWEVER, you MUST stilll restore the original 
+		/// position within the DX / TV3D light or artifacts will occur 
+		/// and you won't remember why - MichaelOliveTree Dec 19 2025
         /// </summary>
         /// <param name="lightInfo"></param>
         private void MoveTVLightToCameraSpace(LightInfo lightInfo)
@@ -1049,11 +1053,17 @@ namespace Keystone.Culling
                             //System.Diagnostics.Trace.WriteLine("Light " + lightInfo.LightInfo.Light.TVIndex.ToString() + " ENABLED.");
                             using (CoreClient._CoreClient.Profiler.HookUp("RegionPVS.Draw.MoveTVLightToCameraSpace"))
                             {
-                                MoveTVLightToCameraSpace(sortable.LightInfo);
+                                // todo: THIS is our elusive bug!
+								// we need to add each lightInfo struct
+								// to a list so we can reposition them back 
+								// to original position 
+								MoveTVLightToCameraSpace(sortable.LightInfo);
 
                                 DirectionalLight dl = sortable.LightInfo.Light as DirectionalLight;
                                 if (dl != null)
                                 {
+									Vector3d origLightDir = dl Direction;
+									
                                     if (dl.IsBillboard)
                                     {
 
@@ -1063,7 +1073,7 @@ namespace Keystone.Culling
                                         Entity entity = item.Entity;
                                         Appearance appearance = model.Appearance;
                                         
-                                        if (model.DirectionalLightsAsPointLights && appearance.Shader != null) // TODO: add this propery and ability to set it via GUI?
+                                        if (model.UseModelSpaceDirectionalLightDirection && appearance.Shader != null) // TODO: add this propery and ability to set it via GUI?
                                         {
                                             Shader shader = appearance.Shader;
 
@@ -1073,11 +1083,12 @@ namespace Keystone.Culling
                                             // and there's not enough precision to do that with floats in a shader.  So we use Model Space to 
                                             // determine where a shadow is cast on the ring by the sphere, and to do that we translate the 
                                             // light position by the Model's -cameraSpacePosition so that the light is now in model relative space
-                                            // 
-                                            Vector3d lightDir = Vector3d.Normalize(dl.Translation - item.CameraSpacePosition);
+
+											// We use DerivedTranslation whenever we want the region relative position of something 
+                                            Vector3d lightDir = Vector3d.Normalize(dl.DerivedTranslation - item.CameraSpacePosition);
 
 
-                                            shader.SetShaderParameterVector3("lightdirection", lightDir);
+                                            shader.SetShaderParameterVector3("LightDirection_ModelSpace", lightDir);
 
                                             // NOTE: We do NOT need to actually move the light itself... so there is no need to
                                             // worry about re-positioning the light to it's previous position.
@@ -1090,7 +1101,9 @@ namespace Keystone.Culling
                                             // Is there an issue here somehow though we are overlooking?
 
 
-                                        }
+											// WARNING: we need to assign all shader parameters here
+											// since Draw occurs next for this specific model instance
+											
 
                                         // NOTE: This requires that the directional light's camera space position is up to date.
                                         //       Normally a directionallight does not need a position, but it does if we intend
@@ -1205,13 +1218,16 @@ namespace Keystone.Culling
                 }
                 //System.Diagnostics.Debug.WriteLine ("instances count = " + instancedCount.ToString());
 
+				// WARNING: i think the below comment is wrong, 
+				//.         we DO need to restore origLightPosition and origLightDirection
+				
                 // NOTE: We do not have to restore light positions because we never ever permanently
                 // set the camera space position. It is only used direct in the LightEngine.SetLightPosition() call.
                 // and never stored in the Entity.Translation setter
 
             }
             else  // includes Elements\TexturedQuad2D.cs
-            {
+            {w
                 keymath.DataStructures.SingleLinkedList<IRenderable2DItem> bucket2D;
                 bool success = m2DBuckets.TryGetValue(mask, out bucket2D);
                 
@@ -1235,3 +1251,4 @@ namespace Keystone.Culling
         #endregion
     }
 }
+

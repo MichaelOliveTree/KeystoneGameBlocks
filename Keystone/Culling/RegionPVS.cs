@@ -9,9 +9,8 @@ using System.Diagnostics;
 using MTV3D65;
 using Keystone.Lights;
 
-namespace Keystone.Cameras // TODO: rename this namespace to reflect moved location of this file
+namespace Keystone.Culling 
 {
-
 	[Flags]
     public enum BucketMasks
     {
@@ -510,7 +509,7 @@ namespace Keystone.Cameras // TODO: rename this namespace to reflect moved locat
                 	mask |= BucketMasks.Text;
                 	mask |= BucketMasks.SmallFrustum;
                 	
-                	Add(item, mask);
+                	AddToBucket(item, mask);
                 	
                 }
                 else if (item.Model.Geometry is LinesGeometry3D)
@@ -557,13 +556,13 @@ namespace Keystone.Cameras // TODO: rename this namespace to reflect moved locat
                     if (item.Entity is Background3D)
                         mask |= BucketMasks.Background;
 
-                    Add(item, mask);
+                    AddToBucket(item, mask);
                 }
             }
         }
 
 
-        private void Add(VisibleItem item, BucketMasks mask)
+        private void AddToBucket(VisibleItem item, BucketMasks mask)
         {
             // why should there ever be a NON ModeledEntity?
             System.Diagnostics.Debug.Assert(item.Entity != null);
@@ -911,7 +910,9 @@ namespace Keystone.Cameras // TODO: rename this namespace to reflect moved locat
         }
         #endregion 
 
-        // TODO: note that here  the items must be passed in, in camera relative position
+        /// <summary>
+        /// TODO: note that here  the items must be passed in, in camera relative position
+        /// </summary>
         public void Add(IRenderable2DItem[] items, bool addToFarFrustum)
         {
             if (items != null && items.Length > 0)
@@ -1043,7 +1044,8 @@ namespace Keystone.Cameras // TODO: rename this namespace to reflect moved locat
                             SortableLightInfo sortable = item.InfluentialLights[j];
                             sortable.LightInfo.Light.Active = true;
                             // NOTE: recall that specular lighting gets disabled after drawing 2D so we need to make sure it's re-enabled for 3D.  This is a TV3D issue.
-                            sortable.LightInfo.Light.SpecularLightingEnabled = true;
+                            sortable.LightInfo.Light.SpecularLightingEnabled = true; // TODO: this should grab the setting from LIVE SETTINGS
+
                             //System.Diagnostics.Trace.WriteLine("Light " + lightInfo.LightInfo.Light.TVIndex.ToString() + " ENABLED.");
                             using (CoreClient._CoreClient.Profiler.HookUp("RegionPVS.Draw.MoveTVLightToCameraSpace"))
                             {
@@ -1054,6 +1056,41 @@ namespace Keystone.Cameras // TODO: rename this namespace to reflect moved locat
                                 {
                                     if (dl.IsBillboard)
                                     {
+
+                                        //TODO: sphere and disk need to be unit radius geometry
+                                        //     
+                                        Model model = item.Model;
+                                        Entity entity = item.Entity;
+                                        Appearance appearance = model.Appearance;
+                                        
+                                        if (model.DirectionalLightsAsPointLights) // TODO: add this propery and ability to set it via GUI?
+                                        {
+                                            Shader shader = appearance.Shader;
+
+                                            // the light here is in cameraspace already, however for the ring2.fx shader to be able to use it
+                                            // properly to calculate where the World's sphere casts a shadow on the ring mesh, it needs to
+                                            // perform it's calculations in MODEL SPACE because our worlds and rings are at real-life scales 
+                                            // and there's not enough precision to do that with floats in a shader.  So we use Model Space to 
+                                            // determine where a shadow is cast on the ring by the sphere, and to do that we translate the 
+                                            // light position by the Model's -cameraSpacePosition so that the light is now in model relative space
+                                            // 
+                                            Vector3d lightDir = Vector3d.Normalize(dl.Translation - item.CameraSpacePosition);
+
+                                            shader.SetShaderParameterVector3("lightdirection", lightDir);
+
+                                            // NOTE: We do NOT need to actually move the light itself... so there is no need to
+                                            // worry about re-positioning the light to it's previous position.
+
+                                            // TODO: is there a bug with us moving directional lights around and NOT putting them
+                                            // back in the correct position?!  Is this the source of that long-time light flicker bug
+                                            // we've been having?  It really shouldn't be i don't think because don't we always
+                                            // update the light to the calculated "cameraspace" position prior to rendering a mesh
+                                            // that is lit by it?
+                                            // Is there an issue here somehow though we are overlooking?
+
+
+                                        }
+
                                         // NOTE: This requires that the directional light's camera space position is up to date.
                                         //       Normally a directionallight does not need a position, but it does if we intend
                                         //       to simulate a pointlight through billboard rotation towards current renderable item
@@ -1147,7 +1184,7 @@ namespace Keystone.Cameras // TODO: rename this namespace to reflect moved locat
                         mini = null;
                     }
 
-                    // still here? primary draw for non minimeshes
+                    // STILL HERE? THIS IS THE PRIMARY DRAW FOR NON MINI-MESH 3D ITEMS
                     if (mini == null)
                         item.Draw(_context, elapsedSeconds, fxSemantics);
 
@@ -1194,127 +1231,6 @@ namespace Keystone.Cameras // TODO: rename this namespace to reflect moved locat
                 	item.Draw (_context, elapsedSeconds, fxSemantics);
             }
         }
-        #endregion
-
-        // debugdraw doesnt belong in RegionPVS.  Belongs as some plugin to RenderingContext like profiling 
-        #region debugdraw
-//        private void DrawMarkers(Vector3d cameraSpacePosition)
-//        {
-//            // obsolete?
-//            return;
-//            // TODO: Can all of this be done during the _currentRegionSet.Add()
-//            // and then we can test if the item IsSelected
-//            // 
-//            // update things such as selected edge, face, vertex, etc
-//            // now that doesnt require a "Selected" entity... so how do we render those?
-//            // in our Controller we could set in the scene the MouseOverItem as an entire PickResult
-//            // object and grab the data from there.  Then here in the viewport RenderingContext we can skip it
-//            // if rendering those things isn't enabled here
-//            Keystone.Collision.PickResults result = _context.Workspace.MouseOverItem;
-//            if (result == null) return;
-//            
-//            // TODO: i added the following for selected, but 
-//            // 1) it may be broken and not property being placed into camera space
-//            // 2) i may decide that rather than debug lines for this, use 2d image
-//            // so that the selected box is in screenspace... but then, we dont get proper depth sorting
-//            // We could use a mesh though just like we do with our Widgets.  In fact
-//            // all we'd need is 4 instances of 1 corner mesh that we position and scale by distance
-//            // just like all widgets.
-//            if (_context.Workspace.Selected != null)
-//            {
-//                
-//                //Line3d l = new Line3d(_context.Scene.DebugPickLine.Point[0], _context.Scene.DebugPickLine.Point[1]);
-//                //l.Point[0] -= _context.Position; // line must be rendered like everything else in camera space
-//                //l.Point[1] -= _context.Position;
-//
-//                //this.Add(new Line3d[] { l }, CONST_TV_COLORKEY.TV_COLORKEY_MAGENTA);
-//            }
-//
-//            //  if (result.CollidedObjectType != CollidedObjectType.EditableMesh) return;
-//
-//            //// draw the selected polygon
-//            //if (result.FaceID > -1)
-//            //{
-//            if (result.FacePoints != null)
-//            {
-//                // draw the face
-//                // our face points are in model space so we need the camera view matrix
-//                // and we need the polygon's world matrix if we want to draw it in the correct place
-//                //  System.Diagnostics.Debug.WriteLine("Mouse over cell " + result.FaceID.ToString());
-//                //  System.Diagnostics.Debug.WriteLine("Mouse over vertex " + result.VertexID.ToString());
-//                // fortunately, the current Region Info has the correct view/matrix to use for this 
-//                // so we only need to transform the world space coords to region space
-//                Vector3d[] polyPoints = new Vector3d[result.FacePoints.Length];
-//
-//                // we use relativeRegionOffset because the camera offset changes based on the current
-//                // region vs the region that this selected face were drawing is in
-//                // TODO: this MUST use similar code to our culling which takes into account
-//                // player vehicle rotations.  In fact it's the same code required for mouse picking
-//                // to work on an interior that is always at origin technically
-//                // BUT WAIT, isn't this supposed to be set for us in the cached Projection and View matrices
-//                // here in this PVS?!  I should only need to worry about region specific coordinates
-//                
-//                Matrix translationMatrix = Matrix.CreateTranslation(-_context.Position);
-//                Matrix worldMatrix = result.Entity.RegionMatrix * translationMatrix;
-//                polyPoints[0] = Vector3d.TransformCoord(result.FacePoints[0], worldMatrix);
-//                polyPoints[1] = Vector3d.TransformCoord(result.FacePoints[1], worldMatrix);
-//                polyPoints[2] = Vector3d.TransformCoord(result.FacePoints[2], worldMatrix);
-//                polyPoints[3] = Vector3d.TransformCoord(result.FacePoints[3], worldMatrix);
-//
-//                this.Add(polyPoints, CONST_TV_COLORKEY.TV_COLORKEY_GREEN, false);
-//
-//                // debug draw the closest edge 
-//                if (result.EdgeID > -1)
-//                {
-//
-//                    Line3d edge = new Line3d(Vector3d.TransformCoord(result.EdgeOrigin, worldMatrix),
-//                        Vector3d.TransformCoord(result.EdgeDest, worldMatrix));
-//                    this.Add(new Line3d[] { edge }, CONST_TV_COLORKEY.TV_COLORKEY_RED, false);
-//
-//                    //   DrawNeighboringFaces(qeFace);
-//                }
-//            }
-//        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <remarks>
-        /// It's important that this get called with the proper camera matrix and projection
-        /// which is why we test if the current item being culled is also currently selected
-        /// by the mouse, or has mouse rollover 
-        /// </remarks>
-//        private void DrawSelectedDebugInfo(Entity entity, Vector3d cameraSpacePosition)
-//        {
-//            
-//        }
-
-        //private void DrawNeighboringFaces(EditDataStructures.Face face)
-        //{
-        //    // now for testing purposes, lets draw in another color, the neighobring faces
-        //    EditDataStructures.Face[] qeNeighbors = face.Neighbors;
-
-        //    foreach (EditDataStructures.Face f in qeNeighbors)
-        //    {
-        //        // get the vertices
-        //        Vector3d[] vertices = f.Vertices;
-
-        //        Vector3d[] p = new Vector3d[vertices.Length];
-        //        for (int k = 0; k < vertices.Length; k++)
-        //        {
-        //            Vector3f dummy = new Vector3f();
-        //            // just so we can get the temp var to have transformed coordinates
-        //            Microsoft.DirectX.Direct3D.CustomVertex.PositionNormalTextured temp = MakeD3DCustomVertex(vertices[k],
-        //                                                                           dummy, true);
-        //            p[k].x = temp.X;
-        //            p[k].y = temp.Y;
-        //            p[k].z = temp.Z;
-        //        }
-
-        //        // draw them in a new color
-        //        DebugDraw.Draw(new Polygon(p), CONST_TV_COLORKEY.TV_COLORKEY_RED);
-        //    }
-        //}
         #endregion
     }
 }

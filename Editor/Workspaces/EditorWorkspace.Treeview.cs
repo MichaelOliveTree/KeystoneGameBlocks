@@ -422,6 +422,11 @@ namespace KeyEdit.Workspaces
             mDragContext = null;
         }
 
+
+        /// <summary>
+        /// This is called during the treeview event handling procedure at 
+        /// KeyEdit.Workspace.EditorWorkspace.treeEntityBrowser_MouseUp
+        /// <summary> 
         private void SelectContextMenu(IResource resource, Point location)
         {
             ContextMenuStrip menu = null;
@@ -451,7 +456,10 @@ namespace KeyEdit.Workspaces
                 }
                 // TODO: if we have entered a sub-entity, then the "..." might be the parent
                 // if that's the case, then we look at the treeview tag to know the real parent
-                //
+                
+                // NOTE: GetContextMenu() base implementation exists in KeyPlugins.BasePlugiCtl.cs
+                //       and is overridden in KeyPluginEntityEdit.BaseEntityPlugin.cs where the base
+                //       implementation's menu items are retrieved as well.
                 menu = plugin.Instance.GetContextMenu(resource.ID, parentID, location);
             }
 

@@ -203,6 +203,15 @@ namespace KeyPlugins
         }
 
         
+        /// <summary>
+        /// This is called by EditorWorkspace.Treeview.cs.SelectContextMenu()
+        /// which itself is called during the treeview event handling procedure at 
+        /// KeyEdit.Workspace.EditorWorkspace.treeEntityBrowser_MouseUp
+        /// NOTE: Plugins that OVERRIDE this virtual function USUALLY will call
+        ///       ContextMenuStrip menu = base.ContextMenuStrip(...) at the very beginning
+        ///       of the overrided implementation, and then build off the base
+        ///       ContextMenuStrip that is created here.
+        /// </summary>
         public virtual ContextMenuStrip GetContextMenu(string resourceID, string parentID, System.Drawing.Point location)
         {
             contextMenuStrip.Items.Clear();

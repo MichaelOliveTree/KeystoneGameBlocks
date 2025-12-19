@@ -2250,6 +2250,7 @@ namespace Keystone.Cameras
 		}
         #endregion
 
+		// TODO: move this perhaps as static method to BoundTransformGroup?
         private BoundingBox GetBoundingBoxesRecursive(Elements.BoundTransformGroup group, BoundingBox box)
         {
             if (group == null) throw new ArgumentNullException();
@@ -2282,6 +2283,125 @@ namespace Keystone.Cameras
 		}
 
 		#region Debugging
+
+//        private void DrawMarkers(Vector3d cameraSpacePosition)
+//        {
+//            // obsolete?
+//            return;
+//            // TODO: Can all of this be done during the _currentRegionSet.Add()
+//            // and then we can test if the item IsSelected
+//            // 
+//            // update things such as selected edge, face, vertex, etc
+//            // now that doesnt require a "Selected" entity... so how do we render those?
+//            // in our Controller we could set in the scene the MouseOverItem as an entire PickResult
+//            // object and grab the data from there.  Then here in the viewport RenderingContext we can skip it
+//            // if rendering those things isn't enabled here
+//            Keystone.Collision.PickResults result = _context.Workspace.MouseOverItem;
+//            if (result == null) return;
+//            
+//            // TODO: i added the following for selected, but 
+//            // 1) it may be broken and not property being placed into camera space
+//            // 2) i may decide that rather than debug lines for this, use 2d image
+//            // so that the selected box is in screenspace... but then, we dont get proper depth sorting
+//            // We could use a mesh though just like we do with our Widgets.  In fact
+//            // all we'd need is 4 instances of 1 corner mesh that we position and scale by distance
+//            // just like all widgets.
+//            if (_context.Workspace.Selected != null)
+//            {
+//                
+//                //Line3d l = new Line3d(_context.Scene.DebugPickLine.Point[0], _context.Scene.DebugPickLine.Point[1]);
+//                //l.Point[0] -= _context.Position; // line must be rendered like everything else in camera space
+//                //l.Point[1] -= _context.Position;
+//
+//                //this.Add(new Line3d[] { l }, CONST_TV_COLORKEY.TV_COLORKEY_MAGENTA);
+//            }
+//
+//            //  if (result.CollidedObjectType != CollidedObjectType.EditableMesh) return;
+//
+//            //// draw the selected polygon
+//            //if (result.FaceID > -1)
+//            //{
+//            if (result.FacePoints != null)
+//            {
+//                // draw the face
+//                // our face points are in model space so we need the camera view matrix
+//                // and we need the polygon's world matrix if we want to draw it in the correct place
+//                //  System.Diagnostics.Debug.WriteLine("Mouse over cell " + result.FaceID.ToString());
+//                //  System.Diagnostics.Debug.WriteLine("Mouse over vertex " + result.VertexID.ToString());
+//                // fortunately, the current Region Info has the correct view/matrix to use for this 
+//                // so we only need to transform the world space coords to region space
+//                Vector3d[] polyPoints = new Vector3d[result.FacePoints.Length];
+//
+//                // we use relativeRegionOffset because the camera offset changes based on the current
+//                // region vs the region that this selected face were drawing is in
+//                // TODO: this MUST use similar code to our culling which takes into account
+//                // player vehicle rotations.  In fact it's the same code required for mouse picking
+//                // to work on an interior that is always at origin technically
+//                // BUT WAIT, isn't this supposed to be set for us in the cached Projection and View matrices
+//                // here in this PVS?!  I should only need to worry about region specific coordinates
+//                
+//                Matrix translationMatrix = Matrix.CreateTranslation(-_context.Position);
+//                Matrix worldMatrix = result.Entity.RegionMatrix * translationMatrix;
+//                polyPoints[0] = Vector3d.TransformCoord(result.FacePoints[0], worldMatrix);
+//                polyPoints[1] = Vector3d.TransformCoord(result.FacePoints[1], worldMatrix);
+//                polyPoints[2] = Vector3d.TransformCoord(result.FacePoints[2], worldMatrix);
+//                polyPoints[3] = Vector3d.TransformCoord(result.FacePoints[3], worldMatrix);
+//
+//                this.Add(polyPoints, CONST_TV_COLORKEY.TV_COLORKEY_GREEN, false);
+//
+//                // debug draw the closest edge 
+//                if (result.EdgeID > -1)
+//                {
+//
+//                    Line3d edge = new Line3d(Vector3d.TransformCoord(result.EdgeOrigin, worldMatrix),
+//                        Vector3d.TransformCoord(result.EdgeDest, worldMatrix));
+//                    this.Add(new Line3d[] { edge }, CONST_TV_COLORKEY.TV_COLORKEY_RED, false);
+//
+//                    //   DrawNeighboringFaces(qeFace);
+//                }
+//            }
+//        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <remarks>
+        /// It's important that this get called with the proper camera matrix and projection
+        /// which is why we test if the current item being culled is also currently selected
+        /// by the mouse, or has mouse rollover 
+        /// </remarks>
+//        private void DrawSelectedDebugInfo(Entity entity, Vector3d cameraSpacePosition)
+//        {
+//            
+//        }
+
+        //private void DrawNeighboringFaces(EditDataStructures.Face face)
+        //{
+        //    // now for testing purposes, lets draw in another color, the neighobring faces
+        //    EditDataStructures.Face[] qeNeighbors = face.Neighbors;
+
+        //    foreach (EditDataStructures.Face f in qeNeighbors)
+        //    {
+        //        // get the vertices
+        //        Vector3d[] vertices = f.Vertices;
+
+        //        Vector3d[] p = new Vector3d[vertices.Length];
+        //        for (int k = 0; k < vertices.Length; k++)
+        //        {
+        //            Vector3f dummy = new Vector3f();
+        //            // just so we can get the temp var to have transformed coordinates
+        //            Microsoft.DirectX.Direct3D.CustomVertex.PositionNormalTextured temp = MakeD3DCustomVertex(vertices[k],
+        //                                                                           dummy, true);
+        //            p[k].x = temp.X;
+        //            p[k].y = temp.Y;
+        //            p[k].z = temp.Z;
+        //        }
+
+        //        // draw them in a new color
+        //        DebugDraw.Draw(new Polygon(p), CONST_TV_COLORKEY.TV_COLORKEY_RED);
+        //    }
+        //}
+
 		public void RenderDebugText(string text, int offsetX, int offsetY, int color)
 		{
 			// send to the debugDraw static object for queued drawing which gets "commited" in our actual Render() method

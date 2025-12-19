@@ -116,6 +116,174 @@ namespace KeyPlugins
             //this.superTabControlPanel7.Controls.Add(this.treeBehavior);
         }
 
+        /// <summary>
+        /// This is called by EditorWorkspace.Treeview.cs.SelectContextMenu()
+        /// which itself is called during the treeview event handling procedure at 
+        /// KeyEdit.Workspace.EditorWorkspace.treeEntityBrowser_MouseUp
+        /// NOTE: The base class KeyPlugins.BasePlugiCtl.cs creates a menu which we grab
+        ///       at the very beginning in the code below.
+        /// </summary>
+        public override ContextMenuStrip GetContextMenu(string resourceID, string parentID, Point location)
+        {
+            ContextMenuStrip menu = base.GetContextMenu(resourceID, parentID, location);
+
+            // a group attribute cannot be deleted because it is associated with a group in tvactor or tvmesh.
+            // a Group can be deleted if the mesh group is somehow merged or removed.  Maybe we could have
+            // a "Merge Group" or "Delete Group" and when that occurs, make a call to the underlying Mesh3d or Actor3d
+            // to merge or delete the group.
+
+
+
+            // On component based systems
+            // http://www.gamedev.net/community/forums/topic.asp?topic_id=463508
+            //     How does the PhysicsComponent talk to the AnimationComponent?
+            //  So does this always mean that if an entity has a PhysicsComponent is must also have an AnimationComponent, 
+            //what if it didn't?
+            //Remember that things can be set up such that the creation of a PhysicsComponent is the result of the creation
+            //of an AnimationComponent, not the creation of an Entity. So the AnimationComponent is available to 
+            //PhysicsComponent at creation time, and Entities without AnimationComponents aren't visible to the 
+            //PhysicsComponent. (Of course, if you wanted the PhysicsComponent to be able to attach to entities 
+            //without AnimationComponents, you'd listen to World instead of AnimationSubsystem, and on Entity 
+            //addition simply ask AnimationSubsystem if it had a component for that Entity.)
+            // NOTE: with regards to the above, i belive that's why some people's "component" systems aren't just a Controller
+            // added to an Entity, but instead, the creation of a Component class such as an AnimatedGroundWalker that would
+            // then know to have support for physics, IAnimated, etc.  It's definetly more of a hybrid approach to the 
+            // component system i think though.
+            //  And you know,when you analyze it, you realize that this component system is very similar to any SceneGraph
+            // where components combine to form complex visuals... the difference is, we have more node types for handling
+            // complex groups of nodes which we refer to as Entities.
+            // ---
+            //
+            // add the menu items specifically related to Entity editing
+            //  or even the type of Entity
+            //      - GUIControl
+            //      - Component
+            //      - Vehicle
+            //      - PlayerCharacter <-- perhaps only differnece between player and npc is how it's controlled.
+            //                              thus anything can be either NPC or player controlled by replacing the Behavior
+            //      - NPC
+
+
+            // Model  
+            //   physics body 1:1 entity:body (what about joints and range of motion restrictors and such?)
+            //   controller\behavior (a behavior could just be something simple like orbit a position
+            //          such that a behavior can govern how something moves on it's own.  Has nothing to do with physics necessarily
+            //          for instance, the behavior for orbit could use a bezier spline path)
+            //   AI controller
+            //   animation controller?
+            //   script, event handler wiring
+            //   Emitter 
+            // Type t = mHost.ChildTypes();
+
+            // if no physics body already exists, add option to add one
+            // "Add Model"
+            // 
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            // TODO: have option to view xml of the prefab
+            ToolStripMenuItem menuItem = new ToolStripMenuItem("Save Prefab...");
+            menuItem.Name = resourceID;
+            menuItem.Tag = parentID;
+            menuItem.Click += new EventHandler(buttonSavePrefab_Click);
+            menu.Items.Add(menuItem);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            menuItem = new ToolStripMenuItem("Set As Player Controlled");
+            menuItem.Name = resourceID;
+            menuItem.Tag = parentID;
+            menuItem.Checked = mHost.Entity_GetFlagValue(resourceID, "playercontrolled");
+            menuItem.Click += new EventHandler(SetPlayerControlledEntity_Click);
+            menu.Items.Add(menuItem);
+
+            menuItem = new ToolStripMenuItem("Is Viewpoint");
+            menuItem.Name = resourceID;
+            menuItem.Tag = parentID;
+            menuItem.Checked = mHost.Entity_GetFlagValue(resourceID, "hasviewpoint");
+            menuItem.Click += new EventHandler(SetEntityHasViewpoint_Click);
+            menu.Items.Add(menuItem);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            menuItem = new ToolStripMenuItem("Add Empty Entity");
+            menuItem.Name = resourceID;
+            menuItem.Tag = parentID;
+            menuItem.Click += new EventHandler(AddEmptyEntity_Click);
+            menu.Items.Add(menuItem);
+
+            // 
+            menuItem = new ToolStripMenuItem("Add Prefab...");
+            menuItem.Name = resourceID;
+            menuItem.Tag = parentID;
+            menuItem.Click += new EventHandler(AddPrefab_Click);
+            menu.Items.Add(menuItem);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            menuItem = new ToolStripMenuItem("Add physics body");
+            menuItem.Name = resourceID;
+            menuItem.Tag = parentID;
+            menuItem.Click += new EventHandler(addPhysicsBody_Click);
+            menu.Items.Add(menuItem);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            // goto / lookAt/ viewEntity
+            menuItem = new ToolStripMenuItem("Goto Entity");
+            menuItem.Name = resourceID;
+            menuItem.Tag = parentID;
+            menuItem.Click += new EventHandler(goto_Click);
+            menu.Items.Add(menuItem);
+
+            // vehicle orbit celestial body
+            menuItem = new ToolStripMenuItem("Orbit");
+            menuItem.Name = resourceID;
+            menuItem.Tag = parentID;
+            menuItem.Click += new EventHandler(orbit_Click);
+            menu.Items.Add(menuItem);
+
+            // vehicle travel to target
+            menuItem = new ToolStripMenuItem("Travel To");
+            menuItem.Name = resourceID;
+            menuItem.Tag = parentID;
+            menuItem.Click += new EventHandler(travelTo_Click);
+            menu.Items.Add(menuItem);
+
+            // intercept
+            menuItem = new ToolStripMenuItem("Intercept");
+            menuItem.Name = resourceID;
+            menuItem.Tag = parentID;
+            menuItem.Click += new EventHandler(intercept_Click);
+            menu.Items.Add(menuItem);
+
+            // dock
+            menuItem = new ToolStripMenuItem("Dock");
+            menuItem.Name = resourceID;
+            menuItem.Tag = parentID;
+            menuItem.Click += new EventHandler(dock_Click);
+            menu.Items.Add(menuItem);
+
+            //string[] boneNames = mHost.GetBones();
+
+            //if (boneNames != null && boneNames.Length > 0)
+            //{
+            //    // for boned entity, we  dynamically fill the menu with Attach To Bone #
+            //    for (int i = 0; i < boneNames.Length; i++)
+            //    {
+            //        menuItem = new ToolStripMenuItem("Attach to bone '" + boneNames[i] + "'");
+            //        menuItem.Tag = resourceID;
+            //        menuItem.Click += new EventHandler(AttachToBone_Click);
+            //        menu.Items.Add(menuItem);
+            //    }
+            //}
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            return menu;
+        }
+
+
         protected void AutoArrangePanelCards(DevComponents.DotNetBar.SuperTabControlPanel panel)
         {
             System.Diagnostics.Debug.WriteLine("BaseEntityPlugin.AutoArrangePanelCards() - Begin.");
@@ -1057,165 +1225,6 @@ namespace KeyPlugins
             }
         }
 
-        public override ContextMenuStrip GetContextMenu(string resourceID, string parentID, Point location)
-        {
-            ContextMenuStrip menu = base.GetContextMenu(resourceID, parentID, location);
-
-            // a group attribute cannot be deleted because it is associated with a group in tvactor or tvmesh.
-            // a Group can be deleted if the mesh group is somehow merged or removed.  Maybe we could have
-            // a "Merge Group" or "Delete Group" and when that occurs, make a call to the underlying Mesh3d or Actor3d
-            // to merge or delete the group.
-
-
-
-            // On component based systems
-            // http://www.gamedev.net/community/forums/topic.asp?topic_id=463508
-            //     How does the PhysicsComponent talk to the AnimationComponent?
-            //  So does this always mean that if an entity has a PhysicsComponent is must also have an AnimationComponent, 
-            //what if it didn't?
-            //Remember that things can be set up such that the creation of a PhysicsComponent is the result of the creation
-            //of an AnimationComponent, not the creation of an Entity. So the AnimationComponent is available to 
-            //PhysicsComponent at creation time, and Entities without AnimationComponents aren't visible to the 
-            //PhysicsComponent. (Of course, if you wanted the PhysicsComponent to be able to attach to entities 
-            //without AnimationComponents, you'd listen to World instead of AnimationSubsystem, and on Entity 
-            //addition simply ask AnimationSubsystem if it had a component for that Entity.)
-            // NOTE: with regards to the above, i belive that's why some people's "component" systems aren't just a Controller
-            // added to an Entity, but instead, the creation of a Component class such as an AnimatedGroundWalker that would
-            // then know to have support for physics, IAnimated, etc.  It's definetly more of a hybrid approach to the 
-            // component system i think though.
-            //  And you know,when you analyze it, you realize that this component system is very similar to any SceneGraph
-            // where components combine to form complex visuals... the difference is, we have more node types for handling
-            // complex groups of nodes which we refer to as Entities.
-            // ---
-            //
-            // add the menu items specifically related to Entity editing
-            //  or even the type of Entity
-            //      - GUIControl
-            //      - Component
-            //      - Vehicle
-            //      - PlayerCharacter <-- perhaps only differnece between player and npc is how it's controlled.
-            //                              thus anything can be either NPC or player controlled by replacing the Behavior
-            //      - NPC
-
-
-            // Model  
-            //   physics body 1:1 entity:body (what about joints and range of motion restrictors and such?)
-            //   controller\behavior (a behavior could just be something simple like orbit a position
-            //          such that a behavior can govern how something moves on it's own.  Has nothing to do with physics necessarily
-            //          for instance, the behavior for orbit could use a bezier spline path)
-            //   AI controller
-            //   animation controller?
-            //   script, event handler wiring
-            //   Emitter 
-            // Type t = mHost.ChildTypes();
-
-            // if no physics body already exists, add option to add one
-            // "Add Model"
-            // 
-
-            menu.Items.Add(new ToolStripSeparator());
-
-            // TODO: have option to view xml of the prefab
-            ToolStripMenuItem menuItem = new ToolStripMenuItem("Save Prefab...");
-            menuItem.Name = resourceID;
-            menuItem.Tag = parentID;
-            menuItem.Click += new EventHandler(buttonSavePrefab_Click);
-            menu.Items.Add(menuItem);
-
-            menu.Items.Add(new ToolStripSeparator());
-
-            menuItem = new ToolStripMenuItem("Set As Player Controlled");
-            menuItem.Name = resourceID;
-            menuItem.Tag = parentID;
-            menuItem.Checked = mHost.Entity_GetFlagValue(resourceID, "playercontrolled");
-            menuItem.Click += new EventHandler(SetPlayerControlledEntity_Click);
-            menu.Items.Add(menuItem);
-
-            menuItem = new ToolStripMenuItem("Is Viewpoint");
-            menuItem.Name = resourceID;
-            menuItem.Tag = parentID;
-            menuItem.Checked = mHost.Entity_GetFlagValue(resourceID, "hasviewpoint");
-            menuItem.Click += new EventHandler(SetEntityHasViewpoint_Click);
-            menu.Items.Add(menuItem);
-
-            menu.Items.Add(new ToolStripSeparator());
-
-            menuItem = new ToolStripMenuItem("Add Empty Entity");
-            menuItem.Name = resourceID;
-            menuItem.Tag = parentID;
-            menuItem.Click += new EventHandler(AddEmptyEntity_Click);
-            menu.Items.Add(menuItem);
-
-            // 
-            menuItem = new ToolStripMenuItem("Add Prefab...");
-            menuItem.Name = resourceID;
-            menuItem.Tag = parentID;
-            menuItem.Click += new EventHandler(AddPrefab_Click);
-            menu.Items.Add(menuItem);
-
-            menu.Items.Add(new ToolStripSeparator());
-
-            menuItem = new ToolStripMenuItem("Add physics body");
-            menuItem.Name = resourceID;
-            menuItem.Tag = parentID;
-            menuItem.Click += new EventHandler(addPhysicsBody_Click);
-            menu.Items.Add(menuItem);
-
-            menu.Items.Add(new ToolStripSeparator());
-
-            // goto / lookAt/ viewEntity
-            menuItem = new ToolStripMenuItem("Goto Entity");
-            menuItem.Name = resourceID;
-            menuItem.Tag = parentID;
-            menuItem.Click += new EventHandler(goto_Click);
-            menu.Items.Add(menuItem);
-
-            // vehicle orbit celestial body
-            menuItem = new ToolStripMenuItem("Orbit");
-            menuItem.Name = resourceID;
-            menuItem.Tag = parentID;
-            menuItem.Click += new EventHandler(orbit_Click);
-            menu.Items.Add(menuItem);
-
-            // vehicle travel to target
-            menuItem = new ToolStripMenuItem("Travel To");
-            menuItem.Name = resourceID;
-            menuItem.Tag = parentID;
-            menuItem.Click += new EventHandler(travelTo_Click);
-            menu.Items.Add(menuItem);
-
-            // intercept
-            menuItem = new ToolStripMenuItem("Intercept");
-            menuItem.Name = resourceID;
-            menuItem.Tag = parentID;
-            menuItem.Click += new EventHandler(intercept_Click);
-            menu.Items.Add(menuItem);
-
-            // dock
-            menuItem = new ToolStripMenuItem("Dock");
-            menuItem.Name = resourceID;
-            menuItem.Tag = parentID;
-            menuItem.Click += new EventHandler(dock_Click);
-            menu.Items.Add(menuItem);
-
-            //string[] boneNames = mHost.GetBones();
-
-            //if (boneNames != null && boneNames.Length > 0)
-            //{
-            //    // for boned entity, we  dynamically fill the menu with Attach To Bone #
-            //    for (int i = 0; i < boneNames.Length; i++)
-            //    {
-            //        menuItem = new ToolStripMenuItem("Attach to bone '" + boneNames[i] + "'");
-            //        menuItem.Tag = resourceID;
-            //        menuItem.Click += new EventHandler(AttachToBone_Click);
-            //        menu.Items.Add(menuItem);
-            //    }
-            //}
-
-            menu.Items.Add(new ToolStripSeparator());
-
-            return menu;
-        }
 
         #region ContextMenuHandlers
         //edit menu handlers

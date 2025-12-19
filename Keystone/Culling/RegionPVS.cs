@@ -1063,7 +1063,7 @@ namespace Keystone.Culling
                                         Entity entity = item.Entity;
                                         Appearance appearance = model.Appearance;
                                         
-                                        if (model.DirectionalLightsAsPointLights) // TODO: add this propery and ability to set it via GUI?
+                                        if (model.DirectionalLightsAsPointLights && appearance.Shader != null) // TODO: add this propery and ability to set it via GUI?
                                         {
                                             Shader shader = appearance.Shader;
 
@@ -1075,6 +1075,7 @@ namespace Keystone.Culling
                                             // light position by the Model's -cameraSpacePosition so that the light is now in model relative space
                                             // 
                                             Vector3d lightDir = Vector3d.Normalize(dl.Translation - item.CameraSpacePosition);
+
 
                                             shader.SetShaderParameterVector3("lightdirection", lightDir);
 

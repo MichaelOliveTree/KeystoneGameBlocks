@@ -1088,6 +1088,10 @@ namespace Keystone.Cameras
 			}
 		}
 
+
+		// =========================================================================
+		// BEGIN - POTENTIALLY THE FOLLOWING THREE METHODS CAN BE MOVED TO RegionPVS?
+	#region MOVETOREGIONPVS
 		internal void OnVisibleLightFound(RegionPVS pvs, Lights.Light light, Vector3d cameraSpacePosition, IntersectResult intersection, BoundingBox cameraSpaceBoundingBox)
 		{
 			// this function is access by many threads as our culling is threaded
@@ -1146,7 +1150,7 @@ namespace Keystone.Cameras
 		
 		/// <summary>
 		/// After culling has found all visible lights and all visible models,
-		/// we iterate through all buckets of found models and assign the lightInfo's
+		/// we iterate through all buckets of all RegionPVSs' found models and assign the lightInfo's
 		/// </summary>
 		/// <param name="regionPVSList"></param>
 		/// <param name="lightList"></param>
@@ -1177,7 +1181,7 @@ namespace Keystone.Cameras
 		/// <summary>
 		/// test if passed in Light affects any of the Visible Entites in the current bucket
 		/// </summary>
-		/// <param name="bucketItems"></param>
+		/// <param name="bucketItems">A SingleLinkedList<T> of VisibleItem.cs</param>
 		/// <param name="lightInfo"></param>
 		/// <remarks>NOTE: we only test items against lights and assign them AFTER all culling is done and all lights and geometry found.</remarks>
 		private void AssignLightsToBucketItems(keymath.DataStructures.SingleLinkedList<VisibleItem> bucketItems, LightInfo lightInfo)
@@ -1185,7 +1189,6 @@ namespace Keystone.Cameras
             if (lightInfo == null) return; // throw new ArgumentNullException();
 			for (int i = 0; i < bucketItems.Count; i++)
 			{
-
                 //if (bucketItems[i].Entity is Vehicles.Vehicle)
                 //    System.Diagnostics.Debug.WriteLine("assigning lights to hull");
 
@@ -1201,13 +1204,16 @@ namespace Keystone.Cameras
 				sortableInfo.LightInfo = lightInfo;
                 sortableInfo.DistanceToItemSquared = distanceSquared;
 
-				// attempt to add this item to the Item using this distance info
+				// attempt to add this item to the VisibleItem using this distance info
 				// adding may result in an existing light being removed if the max light limit is reached
 				bucketItems[i].AddLight(sortableInfo);
 			}
 		}
+		// END - POTENTIALLY MOVE THE ABOVE 3 METHODS TO REGIONPVS?
+		// =========================================================================
+	#endregion
 
-		
+
 		internal void OnVisibleItemFound(RegionPVS pvs, Entities.Entity entity, Elements.Model model, Vector3d cameraSpacePosition, BoundingBox cameraSpaceBoundingBox)
 		{
 			// TODO: what if it's too far to be rendered yet will be visible as icon?

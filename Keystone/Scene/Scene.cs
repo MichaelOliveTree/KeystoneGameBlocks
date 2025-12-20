@@ -27,6 +27,7 @@ namespace Keystone.Scene
         public EntityRemoved mEntityRemovedHandler;
        
         // internal access - required by Simulation.cs
+        internal List<Light> mLights;
         internal List<Entity> mEntities;
         internal List<Entity> mServerEntities;
         internal List<Entity> mActiveEntities;
@@ -115,6 +116,7 @@ namespace Keystone.Scene
             
             // hrm... could be interesting if we can inherit the gravity setting of the current node.
             mEntities = new List<Entity>();
+            mLights = new List<Light>();
         }
 
         #region ITraverser Members
@@ -338,9 +340,8 @@ namespace Keystone.Scene
 
         public void DisableAllLights()
         {
-            for (int i = 0; i < mEntities.Count; i++)
-                if (mEntities[i] is Lights.Light)
-                    ((Lights.Light)mEntities[i]).Active = false;
+            for (int i = 0; i < mLights.Count; i++)
+                mLights[i].Active = false;
         }
 
         public Entity[] ServerEntities
@@ -867,6 +868,10 @@ namespace Keystone.Scene
             childEntity.Scene = scene;
             
             
+            if (childEntity is Light)
+                // NOTE: lights get added both to a list of Lights and Entities as well
+                mLights.Add ((Lights.Light)childEntity); 
+
             mEntities.Add(childEntity);
                         
 
@@ -1018,9 +1023,10 @@ namespace Keystone.Scene
             if (mSimulation.CurrentMission != null)
                 mSimulation.CurrentMission.EntityDeActivated(childEntity);
 
-            // obsolete - testing for now to see if this really is obsolete
-            //if (childEntity is Lights.Light)
-            //    _lights.Remove((Lights.Light)childEntity);
+            
+            if (childEntity is Lights.Light)
+            // NOTE: lights get removed from both a list of Lights and Entities 
+                mLights.Remove((Lights.Light)childEntity);
 
             mEntities.Remove(childEntity);
 

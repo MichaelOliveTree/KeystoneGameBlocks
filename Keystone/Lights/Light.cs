@@ -494,6 +494,16 @@ namespace Keystone.Lights
         	// (see as example Picker.cs - public object Apply(Light light, object data) {} )
         }
 
+        public virtual void Update(double elapsedSeconds)
+        {
+            throw new NotImplementedException("Light.Update() - Need to apply changes to Lights during Update and not immediately as currently in property setters!!");
+
+            if (TVResourceIsLoaded && mChanged == true)
+            {
+                CoreClient._CoreClient.Light.SetLightRange(_tvfactoryIndex, _range);
+            }
+        }
+
         private TV_LIGHT mInfo;
         public void SetCameraSpaceTranslationForRendering(Vector3d cameraSpacePosition)
         {

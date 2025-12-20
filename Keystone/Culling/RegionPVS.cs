@@ -315,6 +315,9 @@ namespace Keystone.Culling
         /// <param name="lightInfo"></param>
         private void MoveTVLightToCameraSpace(LightInfo lightInfo)
         {
+            // the following call DOES NOT MOVE the Light.Translation
+            // instead it calls against TVLightFactory thusly:
+            // CoreClient._CoreClient.Light.SetLightPosition(_tvfactoryIndex, (float)cameraSpacePosition.x, (float)cameraSpacePosition.y, (float)cameraSpacePosition.z);
             lightInfo.Light.SetCameraSpaceTranslationForRendering(lightInfo.CameraSpacePosition);
         }
         
@@ -982,6 +985,12 @@ namespace Keystone.Culling
         }
         
         #region DRAW
+        private struct LightPositionAndDirection
+        {
+            public Vector3d Position;
+            public Vector3d Direction;
+        }
+
         internal void Draw(BucketMasks mask, double elapsedSeconds, FX.FX_SEMANTICS fxSemantics)
         {
             if ((mask & BucketMasks.Item3D) == BucketMasks.Item3D)
@@ -1024,6 +1033,7 @@ namespace Keystone.Culling
                 //
 
                 keymath.DataStructures.SingleLinkedList<SortableLightInfo> previousInfluentialLights = null;
+                List<LightPositionAndDirection> movedLights; // light index, and original position and direction 
 
                 for (int i = 0; i < numItemsInBucket; i++)
                 {
@@ -1040,29 +1050,38 @@ namespace Keystone.Culling
 
                     count++;
 
+                    // For each item, disable all lights and we will enable only the relevant ones
+                    Core._CoreClient.SceneManager[0].DisableAllLights();
 
+            
                     if (item.InfluentialLights != null && item.InfluentialLights.Count > 0)
                     {
+                        movedLights = new List<LightPositionAndDirection>(item.InfluentialLights.Count);
+
                         for (int j = 0; j < item.InfluentialLights.Count; j++)
                         {
                             SortableLightInfo sortable = item.InfluentialLights[j];
                             sortable.LightInfo.Light.Active = true;
                             // NOTE: recall that specular lighting gets disabled after drawing 2D so we need to make sure it's re-enabled for 3D.  This is a TV3D issue.
                             sortable.LightInfo.Light.SpecularLightingEnabled = true; // TODO: this should grab the setting from LIVE SETTINGS
+                            // todo: I'M PRETTY SURE THIS is our elusive FLICKERING LIGHT bug!
+                            // we need to add each lightInfo struct
+                            // to a list so we can reposition them back 
+                            // to original position 
+                            LightPositionAndDirection original;
+                            original.Position = sortable.LightInfo.CameraSpacePosition;
+                            original.Direction = sortable.LightInfo.Direction;
+                            movedLights.Add(original);
 
                             //System.Diagnostics.Trace.WriteLine("Light " + lightInfo.LightInfo.Light.TVIndex.ToString() + " ENABLED.");
                             using (CoreClient._CoreClient.Profiler.HookUp("RegionPVS.Draw.MoveTVLightToCameraSpace"))
                             {
-                                // todo: THIS is our elusive bug!
-								// we need to add each lightInfo struct
-								// to a list so we can reposition them back 
-								// to original position 
 								MoveTVLightToCameraSpace(sortable.LightInfo);
 
                                 DirectionalLight dl = sortable.LightInfo.Light as DirectionalLight;
                                 if (dl != null)
                                 {
-									Vector3d origLightDir = dl Direction;
+									Vector3d origLightDir = dl.Direction;
 									
                                     if (dl.IsBillboard)
                                     {
@@ -1087,7 +1106,7 @@ namespace Keystone.Culling
 											// We use DerivedTranslation whenever we want the region relative position of something 
                                             Vector3d lightDir = Vector3d.Normalize(dl.DerivedTranslation - item.CameraSpacePosition);
 
-
+                                            // TODO: the shader itself needs to be updated and needs the following var added to it
                                             shader.SetShaderParameterVector3("LightDirection_ModelSpace", lightDir);
 
                                             // NOTE: We do NOT need to actually move the light itself... so there is no need to
@@ -1205,13 +1224,16 @@ namespace Keystone.Culling
                     //System.Diagnostics.Trace.WriteLine("END Render bucket item " + item.Entity.ID);
 
 
+                    // Move the Lights back to original positions 
                     if (previousInfluentialLights != null && previousInfluentialLights.Count > 0)
                     {
                         for (int j = 0; j < previousInfluentialLights.Count; j++)
                         {
                             SortableLightInfo sortable = previousInfluentialLights[j];
-                            sortable.LightInfo.Light.Active = false;
-                           
+                            // we don't need to disable them again right ->  what about re-enable though? -> sortable.LightInfo.Light.Active = false;
+                            sortable.LightInfo.Light.Position = movedLights[j].Position;
+                            sortable.LightInfo.Light.Direction = movedLights[j].Direction;
+
                             //System.Diagnostics.Trace.WriteLine("Light " + lightInfo.LightInfo.Light.TVIndex.ToString() + " DISABLED.");
                         }
                     }
@@ -1226,8 +1248,8 @@ namespace Keystone.Culling
                 // and never stored in the Entity.Translation setter
 
             }
-            else  // includes Elements\TexturedQuad2D.cs
-            {w
+            else  // includes Elements\TexturedQuad2D.cs <- These do not need Lights to Render
+            {
                 keymath.DataStructures.SingleLinkedList<IRenderable2DItem> bucket2D;
                 bool success = m2DBuckets.TryGetValue(mask, out bucket2D);
                 

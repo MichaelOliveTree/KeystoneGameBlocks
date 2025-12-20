@@ -10,10 +10,13 @@ namespace Keystone.Traversers
     // ARTICLE ON USING DX11 MULTITHREADED RENDERING TO TAKE ADVANTAGE OF SLI AND SUCH
     // http://www.rorydriscoll.com/2009/04/21/direct3d-11-multithreading/
 
+
+
+    // TODO: This currently is NOT a traverser...  
     public class ScaleDrawer 
     {        
         // stores info about all lights that are visible in this frame
-        private LightInfo[] mVisibleLightsInfoArray;
+        // obsolete i think? private LightInfo[] mVisibleLightsInfoArray;
 
         public bool mUseScalingFactor = true;
 
@@ -32,74 +35,12 @@ namespace Keystone.Traversers
         	pvs.ClearInFrustumFlag();
         }
         
-        private void DrawBucket(RegionPVS pvs, BucketMasks mask, int frustum, Camera camera, double elapsedSeconds)
-        {
-        	FX_SEMANTICS semantic = FX_SEMANTICS.FX_NONE;
-
-            
-            // disable all lights and we will enable only the relevant ones during pvs.Draw()
-            if ((mask & BucketMasks.Item3D) == BucketMasks.Item3D)
-            {
-                if (mVisibleLightsInfoArray != null)
-                    for (int i = 0; i < mVisibleLightsInfoArray.Length; i++)
-                    {
-                        if (mVisibleLightsInfoArray[i] == null) continue;
-                        CoreClient._CoreClient.Light.EnableLight(mVisibleLightsInfoArray[i].Light.TVIndex, false);
-                        
-                    }
-            }
-            
-            // very important to set the camera matrices such that we're in relative space of current pvs region
-            if (mTempHackDepthPass == false) // <-- this does seem to help, TODO but it could mean that for each RegionPVS, we
-            	                             //     need unique split view/projection matrices. This means that we should do this
-            	                             //     so that the info is already in the RegionPVS stored as SplitVIewMatrices[] and SPlitProjections[]
-            {                               
-            	camera.InverseView = pvs.InverseView;
-            	camera.Projection = pvs.FrustumInfo[frustum].Projection;
-            }
-            else
-            {
-            	// TODO: the camera passed in here isn't the one being used on the ShadowRS... so changing matrices here would have no affect
-            	//       but for now everything works but... it's unclear whether things are rendering across zones? since we're not computing
-            	//       seperate matrices for the other zones when they clearly have different offsets from the other zones
-            	// instruct RegionPVS to only render those visible models that are casting shadows into depth map
-            	semantic = FX_SEMANTICS.FX_SHADOW_DEPTH_PASS;
-            }
-            pvs.Draw(mask, elapsedSeconds, semantic);
-        }
-
-        private bool mTempHackDepthPass = false;
-        
-        public void RenderGeometryIntoDepthMap(Camera camera, List<RegionPVS>regionPVSList)
-        {
-        	if (regionPVSList == null || regionPVSList.Count == 0) return;
-            if (camera == null) return;
-            
-			// NOTE: this method is called from within a RenderSurface.StartRender()/EndRender() 		
-            mVisibleLightsInfoArray = null;
-
-            mTempHackDepthPass = true;
-            // only render small frustum 3d items with no alpha
-            foreach (RegionPVS pvs in regionPVSList)
-            {
-            	// TODO: the camera matrices in each pvs here is wrong.  it needs to be the ones we computed
-            	//       BUT, these matrices can vary with each different RegionPVS!  In our tests, we'll only have the one
-            	//       region, but eventually we'll have more.
-            	//       - seems best way for that is a second regionPVSList that now has our light-centric camera matrices to ue
-            	
-            	// temporarily need to assign shaders, set technique 
-            	DrawBucket(pvs, BucketMasks.SmallFrustum | BucketMasks.Item3D, 0, camera, 0);
-            }
-            
-            mTempHackDepthPass = false;
-            // restore original matrices to camera
-        }
-        
         public void Render (RenderingContext context, List<RegionPVS>regionPVSList, List<LightInfo> lightList, double elapsedSeconds)
         {
             if (regionPVSList == null || regionPVSList.Count == 0) return;
             if (context == null || context.Camera == null) return;
 
+            // TODO: there is no need to convert this List<> to an Array!  
             if (lightList == null || lightList.Count == 0)
             	mVisibleLightsInfoArray = null;
             else
@@ -458,6 +399,56 @@ namespace Keystone.Traversers
             // restore our camera
             camera.InverseView = prevInverseView;
             camera.Projection = prevProjection;
+        }
+
+
+        private void DrawBucket(RegionPVS pvs, BucketMasks mask, int frustum, Camera camera, double elapsedSeconds)
+        {
+        	FX_SEMANTICS semantic = FX_SEMANTICS.FX_NONE;
+
+            // very important to set the camera matrices such that we're in relative space of current pvs region
+            if (mTempHackDepthPass == false) // <-- this does seem to help, TODO but it could mean that for each RegionPVS, we
+            	                             //     need unique split view/projection matrices. This means that we should do this
+            	                             //     so that the info is already in the RegionPVS stored as SplitVIewMatrices[] and SPlitProjections[]
+            {                               
+            	camera.InverseView = pvs.InverseView;
+            	camera.Projection = pvs.FrustumInfo[frustum].Projection;
+            }
+            else
+            {
+            	// TODO: the camera passed in here isn't the one being used on the ShadowRS... so changing matrices here would have no affect
+            	//       but for now everything works but... it's unclear whether things are rendering across zones? since we're not computing
+            	//       seperate matrices for the other zones when they clearly have different offsets from the other zones
+            	// instruct RegionPVS to only render those visible models that are casting shadows into depth map
+            	semantic = FX_SEMANTICS.FX_SHADOW_DEPTH_PASS;
+            }
+            pvs.Draw(mask, elapsedSeconds, semantic);
+        }
+
+        private bool mTempHackDepthPass = false;
+        public void RenderGeometryIntoDepthMap(Camera camera, List<RegionPVS>regionPVSList)
+        {
+        	if (regionPVSList == null || regionPVSList.Count == 0) return;
+            if (camera == null) return;
+            
+			// NOTE: this method is called from within a RenderSurface.StartRender()/EndRender() 		
+            mVisibleLightsInfoArray = null;
+
+            mTempHackDepthPass = true;
+            // only render small frustum 3d items with no alpha
+            foreach (RegionPVS pvs in regionPVSList)
+            {
+            	// TODO: the camera matrices in each pvs here is wrong.  it needs to be the ones we computed
+            	//       BUT, these matrices can vary with each different RegionPVS!  In our tests, we'll only have the one
+            	//       region, but eventually we'll have more.
+            	//       - seems best way for that is a second regionPVSList that now has our light-centric camera matrices to ue
+            	
+            	// temporarily need to assign shaders, set technique 
+            	DrawBucket(pvs, BucketMasks.SmallFrustum | BucketMasks.Item3D, 0, camera, 0);
+            }
+            
+            mTempHackDepthPass = false;
+            // restore original matrices to camera
         }
 
 

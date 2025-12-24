@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Keystone.Traversers;
 using Keystone.Entities;
@@ -52,7 +52,19 @@ namespace Keystone.Elements
     /// is derived from a Transform node it contains state information can NOT 
     /// be shared by multiple entities.  Furthermore, any parent of a Model
     /// which is also a state carrying node cannot be shareable so two reasons
-    /// why ModelSelector nodes cannot be shared.
+    /// why ModelSelector nodes cannot be shared
+    
+    // TODO: this should be an abstract class.
+    
+    
+    // TODO:  maybe this can change in the future.  but for now, because selector nides can cintain children that do have state like Models which can have different apoearances and pos/scaler/rotation, selector nodes cannot be shstef.
+    
+    
+    
+    // KeyCommon.DelegateHelper.SelectorNodeDelegate
+    
+    
+    
     /// </remarks>
     public class ModelSelector : BoundTransformGroup 
     {
@@ -61,7 +73,23 @@ namespace Keystone.Elements
 
         //       protected List<Model> mSelectionResults;
 
-                
+        public delegate int SelectorNodeDelegate(object obj);
+        privater SelectorNodeDelegate mSelectorDelegate;
+
+		// this class should implement ISelectorNode
+		// and they should all use the following struct
+        internal struct SelectorContext 
+        {
+            Node Node;
+			
+        }
+        
+        public SelectorNodeDelegate SelectorDelegate 
+        {
+            get { return mSelectorDelegate;}
+            set { mSelectorDelegate = value;}
+        }
+        
         protected SelectorNodeStyle mStyle;   // these are custom flags that can be set via script
         // These flags determine which selection algorithm is used to determine
         // which children are returned.  For instance, whether we select based on distance
@@ -151,34 +179,51 @@ namespace Keystone.Elements
         #region IGroup members
         protected override void PropogateChangeFlags(Enums.ChangeStates flags, Enums.ChangeSource source)
         {
-        	Keystone.Enums.ChangeStates filter = Keystone.Enums.ChangeStates.GeometryAdded | Keystone.Enums.ChangeStates.GeometryRemoved;
-			// filter out the flags that are _not in_ the filter list
-        	Keystone.Enums.ChangeStates filteredFlags = flags & filter;
+        	Keystone.Enums.ChangeStates filter = Keystone.Enums.ChangeStates.NotifyModelTransformed | 
+        	                                     Keystone.Enums.ChangeStates.GeometryAdded | 
+        	                                     Keystone.Enums.ChangeStates.GeometryRemoved;
+			// filter out the ChangeStates from the variable "flags" that are _not in_ the filter list
+        	Keystone.Enums.ChangeStates foundFlags = flags & filter;
         	
-            if (filteredFlags != 0)
+            if (foundFlags != 0)
             {
+                if ((foundFlags & Keystone.Enums.ChangeStates.NotifyModelTransformed) !=0)
+                {
+                    // if we've been notified that a Model has Transformed (perhaps due to an animation, but irrelevant)
+                    // respond appropriately based on whether the source of the notification is a Child or Parent.
+                    if (source == Enums.ChangeSource.Child)
+                    {
+                        // source is a Child so is a ModelSelector (passing upward this notification from a Model added to a nested ModelSelector) 
+                        // or the actual Model itself 
+                        NotifyParents(Keystone.Enums.ChangeStates.NotifyModelTransformed);
+                    }
+                    // else if (source == Enums.ChangeSource.Parent) // <-- MUST NOT DO.  INFINTE RECURSION CAN RESULT 
+                    
+                    // remove the flag and continue
+                    foundFlags &= ~Keystone.Enums.ChangeStates.NotifyModelTransformed;
+                }
                 // source in this case should only ever be self or a Model that is a child to this ModelSelector 
                 // this assert is obsolete if we're allowing ComplexModels to host child Model's directly to simulate tv mesh groups
                 //  System.Diagnostics.Trace.Assert(source == Enums.ChangeSource.Self); 
-                NotifyParents(filteredFlags);
-                DisableChangeFlags(filteredFlags);
+                NotifyParents(foundFlags);
+                DisableChangeFlags(foundFlags);
             }
 
             filter  = Keystone.Enums.ChangeStates.Translated |
-                Keystone.Enums.ChangeStates.BoundingBox_TranslatedOnly |
-                Keystone.Enums.ChangeStates.BoundingBoxDirty |
-                Keystone.Enums.ChangeStates.KeyFrameUpdated |
-                Keystone.Enums.ChangeStates.MatrixDirty |
-            	Keystone.Enums.ChangeStates.RegionMatrixDirty;
+                      Keystone.Enums.ChangeStates.BoundingBox_TranslatedOnly |
+                      Keystone.Enums.ChangeStates.BoundingBoxDirty |
+                      Keystone.Enums.ChangeStates.KeyFrameUpdated |
+                      Keystone.Enums.ChangeStates.MatrixDirty |
+            	      Keystone.Enums.ChangeStates.RegionMatrixDirty;
             
-        	// filter out different set of flags that are _not in_ the filter list
-    		filteredFlags = flags & filter;
+        	// filter out a different set of ChangeStates from the variable "flags" that are _not in_ the filter list
+    		foundFlags = flags & filter;
         		
-            if (filteredFlags != 0)
+            if (foundFlags != 0)
             {                		
                 // if source of the flag is a child or self (and not a parent), notify parents
                 if (mParents != null && source == Enums.ChangeSource.Child || source == Enums.ChangeSource.Self)
-                    NotifyParents(filteredFlags);
+                    NotifyParents(foundFlags);
 
                 // if source of the flag is a parent or self (and not a child), notify relevant children for relevant flags
                 if (source == Enums.ChangeSource.Parent || source == Enums.ChangeSource.Self)
@@ -192,7 +237,7 @@ namespace Keystone.Elements
                     //       and then by the time we attempt _children.ToArray() it is now suddenly null to do paging out of nodes for example.
                     if (children.Length > 0)
                         for (int i = 0; i < children.Length; i++)
-                            children[i].SetChangeFlags(filteredFlags, Enums.ChangeSource.Parent);
+                            children[i].SetChangeFlags(foundFlags, Enums.ChangeSource.Parent);
                 }
             }
         }

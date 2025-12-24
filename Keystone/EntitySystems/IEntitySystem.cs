@@ -11,6 +11,7 @@ namespace Keystone.EntitySystems
 	/// </summary>
 	public interface IEntitySystem  // IEntitySystem a type of fascade + flyweight pattern?
 	{
+		int Seed {get;}
 		string ID {get; }
 		string TypeName {get;}
 		

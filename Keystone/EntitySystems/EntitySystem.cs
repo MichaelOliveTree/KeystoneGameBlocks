@@ -38,7 +38,24 @@ public namespace Keystone.EntitySystems
   
   		public void Activate (Keystone.Entities.Entity entity);
   		public void DeActivate(Keystone.Entities.Entity entity);
-  
+
+      public Entity[] SelectEntity(SelectionMode pass, double distance)
+        {
+        	using (CoreClient._CoreClient.Profiler.HookUp ("Entity System - Entity Selection"))
+        	{
+	           throw new NotImplementedException("EntitySystem.cs - 'SelectEntity()' not yet implemented");
+        	}
+        }
+
+        // selects single model at specified index
+        public Entity SelectModel (uint index)
+        {
+        	using (CoreClient._CoreClient.Profiler.HookUp ("Entity System - Entity Selection"))
+        	{
+	           throw new NotImplementedException("EntitySystem.cs - 'SelectEntity()' not yet implemented");
+        	}
+        }
+        
   		public void Update (double elapsedSeconds);
   		
   		// TODO: not all systems need to ever store anything... i dont think this should be in the interface

@@ -1224,17 +1224,24 @@ namespace Keystone.Culling
                     //System.Diagnostics.Trace.WriteLine("END Render bucket item " + item.Entity.ID);
 
 
-                    // Move the Lights back to original positions 
+                    // Move the INTERNAL Light position and direction back to previous values that existed at start of this loop 
                     if (previousInfluentialLights != null && previousInfluentialLights.Count > 0)
                     {
                         for (int j = 0; j < previousInfluentialLights.Count; j++)
                         {
                             SortableLightInfo sortable = previousInfluentialLights[j];
                             // we don't need to disable them again right ->  what about re-enable though? -> sortable.LightInfo.Light.Active = false;
-                            sortable.LightInfo.Light.Position = movedLights[j].Position;
-                            sortable.LightInfo.Light.Direction = movedLights[j].Direction;
 
-                            //System.Diagnostics.Trace.WriteLine("Light " + lightInfo.LightInfo.Light.TVIndex.ToString() + " DISABLED.");
+							// the following call DOES NOT MOVE the Light.Translation and thus does not require any Spatial Graph updates
+							// or CHANGE_STATE flags to occur for boundingbox calcs, etc.  This is PURELY INTERNAL for DX9 rendering in this function.
+            				// instead it calls against TVLightFactory thusly:
+            				
+							// todo: SetDirectionForRendering() not yet implemented
+            				sortable.LightInfo.Light.SetCameraSpaceTranslationForRendering( movedLights[j].Position);
+							// CoreClient._CoreClient.Light.SetLightPosition(_tvfactoryIndex, (float)movedLights[j].Position.x, (float)movedLights[j].Position.y, (float)movedLights[j].Position.z);
+							sortable.LightInfo.Light.SetDirectionForRendering( movedLights[j].Direction);
+							// CoreClient._CoreClient.Light.SetLightDirection(_tvfactoryIndex, (float)movedLights[j].Direction.x, (float)movedLights[j].Direction.y, (float)movedLights[j].Direction.z);
+
                         }
                     }
                 }
@@ -1273,4 +1280,5 @@ namespace Keystone.Culling
         #endregion
     }
 }
+
 

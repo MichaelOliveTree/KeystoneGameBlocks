@@ -1,17 +1,12 @@
 public namespace Keystone.EntitySystems
 {
 
-  public EntitySystem : IEntitySystem
+  public EntitySystem : Entity, IEntitySystem
   {
-      private string ID {get; }
-  		private string TypeName {get;}
+  		private int mSeed;
+
+		
   		
-  		// TODO: not all systems need to ever store anything... i dont think this should be in the interface
-  		// Based on file extension, database loading strategy changes.
-  		private string DatabasePath {get;}
-  		private double UpdateFrequency {get; set;}
-  		
-  		private DigestRecord[] Records {get;}
   
   		// TODO: a digest must be able to re-store serialized records and then to
   		//       match those with subscribers that are brought in.  Further, simulation dones in the iEntitySystem
@@ -27,19 +22,37 @@ public namespace Keystone.EntitySystems
 
       public EntitySystem (string id) : Entity
         base(id)
-      {
-      
-      }
+	      {
+	      
+	      }
+	
+	    public int Seed {get;}
+  		
+  		// TODO: not all systems need to ever store anything... i dont think this should be in the interface
+  		// Based on file extension, database loading strategy changes.
+  		public string DatabasePath {get;}
+  		  		
+  		public DigestRecord[] Records {get;}
 
-      
-  		// this call assigns the IEntitySystem ID to the entity
+		public double UpdateFrequency {get; set;}
+
+		// TODO: I think if an Entity belongs to an EntitySystem it should have that set
+		//       as an Entity.Attribute eg.  'Entity.Attributes.EntitySystemMemeber' flag
+
+		// TODO: i think we need to store the path to each Entity prefab for each member?
+		//       this will probably be part of a digest "record?"
+		
+		// this call assigns the IEntitySystem ID to the entity
   		public void Register (Keystone.Entities.Entity entity);
   		public void UnRegister (Keystone.Entities.Entity entity);
-  
+
+  		// 
   		public void Activate (Keystone.Entities.Entity entity);
   		public void DeActivate(Keystone.Entities.Entity entity);
 
-      public Entity[] SelectEntity(SelectionMode pass, double distance)
+
+		// TODO: we need to implement similar system for LOD where we can "Select" based on a rule that the user can define
+      	public Entity[] SelectEntity(SelectionMode pass, double distance)
         {
         	using (CoreClient._CoreClient.Profiler.HookUp ("Entity System - Entity Selection"))
         	{
@@ -47,8 +60,8 @@ public namespace Keystone.EntitySystems
         	}
         }
 
-        // selects single model at specified index
-        public Entity SelectModel (uint index)
+        // selects single Entity at specified index
+        public Entity SelectEntity (uint index)
         {
         	using (CoreClient._CoreClient.Profiler.HookUp ("Entity System - Entity Selection"))
         	{

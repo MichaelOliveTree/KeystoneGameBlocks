@@ -18,8 +18,10 @@ public namespace Keystone.EntitySystems
   		//       So subscription is something that occurs and adds a record if necessary.  But when paging out, the entity
   		//       is not unsubscribing, it is just allowing the IES to take over simulating that object.
   		//
-  		// records should be as lightweight as possible, potentially records may exist as really simple pointers to storage (db or the xml)
-  		//
+  		// records should be as lightweight as possible, potentially records may exist as really simple pointers to storage (memory mapped files, db, xml, etc)
+  		//     - records should use struct EntityRecord{}  because we will likely use Memory<T> to host all the data.
+		//       - more than on "view" of this entire EntitySystem can be created so that just certain parts of the entire Entity system are viewable.
+		
   		// TODO: a physics system in many ways is similar in that it may simulate planet orbits and such in a more low frequency way
   		//       until entity live instance is loaded and not digested version... 
 

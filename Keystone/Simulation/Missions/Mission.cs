@@ -3,6 +3,9 @@
 
 namespace Keystone.Simulation.Missions
 {
+    ///<summary>
+    /// A mission is on the same "rank" as a Scene.
+    ///</summary>
     public class Mission
     {
         public enum MissionState
@@ -316,3 +319,4 @@ namespace Keystone.Simulation.Missions
 
     }
 }
+

@@ -4,10 +4,14 @@ public namespace Keystone.EntitySystems
   public EntitySystem : Entity, IEntitySystem
   {
   		private int mSeed;
-
+		private List<Int> mModifiedEntities; // some Entities in the System may have special modifications that must be set after they are restored via procedural generation
 		
   		
-  
+  		// TODO: some digests may only need to re-store those records that have been modified and which
+		//       have been "observed" (as in Quantum Mechanics) such that they must now appear in an area
+		//       where player previously observed them.
+
+		
   		// TODO: a digest must be able to re-store serialized records and then to
   		//       match those with subscribers that are brought in.  Further, simulation dones in the iEntitySystem
   		//       should then be used to update those actual entities.

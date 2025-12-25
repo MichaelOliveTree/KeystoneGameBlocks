@@ -66,7 +66,7 @@ namespace Keystone.Elements
     
     
     /// </remarks>
-    public class ModelSelector : BoundTransformGroup 
+    public class ModelSelector : BoundTransformGroup, ISelectorNode 
     {
         private const int MAX_SELECTOR_CHILD_COUNT = 32; // 32 for 32 bitflags in mChildrenEnabledFlags.  To have >32, we'd need a different type of enabledFlags var
          protected int mChildrenEnabledFlags; // 32 bits to indicate which of up to 32 children are enabled
@@ -603,3 +603,4 @@ namespace Keystone.Elements
         #endregion 
     }
 }
+

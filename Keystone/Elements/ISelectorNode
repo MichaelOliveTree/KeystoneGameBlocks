@@ -1,0 +1,80 @@
+using System;
+using System.Collections.Generic;
+using Keystone.Traversers;
+using Keystone.Entities;
+using Keystone.Animation;
+using Keystone.Types;
+using Keystone.Extensions;
+
+namespace Keystone.Elements
+{
+    // perhaps a SelectNode can have arbitrary hashtable of custom 'fields'
+    // these fields can contain an "lod distance" or a 
+    // "damage level" 
+    // or even something like "on" vs "off" state selector
+    // Then we must call a custom select function to use against the Select node
+    // If provided by the entity.DomainObject.Script[select_render, debug | collision]
+    // perhaps?
+
+    /// <summary>
+    /// These nodes are NOT shareable.  Thus they can be Transformable and maintain state information about
+    /// frame to frame selections.  The reason they are unshareable is they host child models
+    /// which can contain different appearances each.  Change the appearance on one instance and
+    /// it requires every parent up the chain from that appearance to be unique.
+    /// </summary>
+    public interface ISelectorNode
+    {
+    //    protected SelectorNodeFlags mFlags;   // these are custom flags that can be set via script
+    //                            // These flags determine which selection algorithm is used to determine
+    //                            // which children are returned.
+    //                            // These flags can also be set via the plugin 
+
+    //    // selects between models or other child Selector nodes
+        public delegate int SelectorNodeDelegate(object obj);
+        privater SelectorNodeDelegate mSelectorDelegate;
+
+		// this class should implement ISelectorNode
+		// and they should all use the following struct
+        internal struct SelectorContext 
+        {
+            Node Node;
+			
+        }
+        
+        public SelectorNodeDelegate SelectorDelegate 
+        {
+            get { return mSelectorDelegate;}
+            set { mSelectorDelegate = value;}
+        }
+    //    public abstract Model[] Select(SwitchNodeOptions options);
+    //    //public abstract Model[] Select(SwitchNodeOptions options, out int[] selections);
+    //    public abstract Model[] Select(SelectPass pass, double distanceSqrd); 
+    }
+    
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <remarks>
+    /// Because ModelSelector's is derived from Transform node
+    /// it can be made a target for an Entity's Animation.  Also because it
+    /// is derived from a Transform node it contains state information can NOT 
+    /// be shared by multiple entities.  Furthermore, any parent of a Model
+    /// which is also a state carrying node cannot be shareable so two reasons
+    /// why ModelSelector nodes cannot be shared
+    
+    // TODO: this should be an abstract class.
+    
+    
+    // TODO:  maybe this can change in the future.  but for now, because selector nides can cintain children that do have state like Models which can have different apoearances and pos/scaler/rotation, selector nodes cannot be shstef.
+    
+    
+    
+    // KeyCommon.DelegateHelper.SelectorNodeDelegate
+    
+    
+    
+    /// </remarks>
+    
+        
+}

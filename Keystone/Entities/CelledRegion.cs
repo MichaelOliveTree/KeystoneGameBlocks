@@ -10,7 +10,7 @@ using Keystone.Extensions;
 using Keystone.IO;
 using Keystone.Types;
 
-namespace Keystone.Portals
+namespace Keystone.Entities
 {
     // On Fallout 3
     //      - from what i gather on fallout 1 & 2 vs 3, people liked that 1 & 2 were not 

@@ -8,7 +8,7 @@ using Keystone.Extensions;
 using Keystone.Interfaces;
 using Keystone.IO;
 
-namespace Keystone.Portals
+namespace Keystone.SceneNodes
 {
     public class CellMap 
     {

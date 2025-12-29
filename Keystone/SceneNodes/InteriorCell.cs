@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using Keystone.Entities;
 
-namespace Keystone.Portals
+namespace Keystone.SceneNodes
 {
     
     // Let's rethink this from ground up and consider a few factors

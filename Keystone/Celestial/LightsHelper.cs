@@ -5,6 +5,7 @@ using System.Collections.Generic;
 
 namespace Keystone.Celestial
 {
+    // TODO: all these need to be moved out of Keystone.Celestial
     public class LightsHelper
     {
         public static Keystone.Lights.DirectionalLight LoadDirectionalLight(float range)

@@ -4,7 +4,7 @@ using Keystone.Elements;
 using Keystone.CSG;
 
 
-namespace Keystone.Portals
+namespace Keystone.SceneNodes
 {
 	
     // TODO: could be nice if we had a special type of MinimeshMap object that could contain

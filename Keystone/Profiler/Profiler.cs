@@ -72,6 +72,8 @@ namespace Keystone.Profiler
 	        mProfiles = new SortedList<string, Profile>();
 	        mCategories = new SortedList<string, SortedList<string, Profile>>();
 	
+			// TODO: THis updated code that uses StopWatch is actually in HelloBoids!!!  Duh!
+			
 	        mDebugText = new List<Profiler.DebugText>();
 	        
 	        Register(PROFILER_DISPLAY_PROFILE, DEBUGGING_CATEGORY);
@@ -124,7 +126,8 @@ namespace Keystone.Profiler
 	    {
 	        if (ProfilerEnabled)
 	        {
-	            mStartTime = Time.Counter;
+				// TODO: THis updated code that uses StopWatch is actually in HelloBoids!!!  Duh!
+	            mStartTime = Keystone.Timers.Time.Counter;
 	        }
 	    }
 	
@@ -139,7 +142,9 @@ namespace Keystone.Profiler
 	        {
 	        	// accumulate mTotalElapsedTime for UPDATE_INTERVAL 
 	            //mTotalElapsedTime += (float)(Time.Counter - mStartTime) / Time.Frequency;
-	            mTotalElapsedTime += Time.ElapsedSeconds (mStartTime); // Hypnotron Feb.12.2015 - added conversion to milliseconds since seconds and milliseconds  
+
+				// TODO: THis updated code that uses StopWatch is actually in HelloBoids!!!  Duh!
+	            mTotalElapsedTime += Keystone.Timers.Time.ElapsedSeconds (mStartTime); // Hypnotron Feb.12.2015 - added conversion to milliseconds since seconds and milliseconds  
 	            
 	            mLoopCount++;
 	            

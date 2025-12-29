@@ -15,6 +15,35 @@ namespace Keystone.Utilities
 			return RandomNumber (0,1) == 1;
 		}
 		
+        ///////////////////////////////////////////////////////////////////
+        // TODO: merge below which used to be old from Keystone.Math2.Math2
+        public static Vector3d RandomRotation (Random random)
+        {
+            return new Vector3d(RandomNumber(random,0d, 360d)*DEGREES_TO_RADIANS, RandomNumber(random,0d, 360d)*DEGREES_TO_RADIANS,
+                                RandomNumber(random, 0d, 360d)*DEGREES_TO_RADIANS);
+        }
+        public static Vector3d RandomVector (Random random, Vector3d min, Vector3d max)
+        {
+            Vector3d v;
+            v.x = RandomNumber(random,min.x, max.x);
+            v.y = RandomNumber(random,min.y, max.y);
+            v.z = RandomNumber(random,min.z, max.z); 
+            return v;   
+        }
+
+        public static double Clamp (double value, double min, double max)
+        {
+            if (value < min ) return min;
+            return value > max ? max : value;
+        }
+        
+        public static double RandomNumber(Random random, double min, double max)
+        {
+            return (max - min) * random.NextDouble() + min;
+        }
+        // TODO: merge above which used to be old from Keystone.Math2.Math2
+         ///////////////////////////////////////////////////////////////////
+
 		
 		public static int RandomNumber (int min, int max)
 		{

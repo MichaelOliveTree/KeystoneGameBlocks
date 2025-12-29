@@ -4,7 +4,7 @@
 //using Keystone.Entities;
 //using KeyCommon.Helpers;
 
-//namespace Keystone.Portals
+//namespace Keystone.SceneNodes
 //{
 //    /// <summary>
 //    /// All cells during build mode are instantiated.  During simulation/play

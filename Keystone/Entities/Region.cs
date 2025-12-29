@@ -12,7 +12,7 @@ using Keystone.Traversers;
 using Keystone.Types;
 using MTV3D65;
 
-namespace Keystone.Portals
+namespace Keystone.Entities
 {
     // *NOTE: Insides of ships are also contained in Regions.  
     // In effect, a Region is any place that has it's own unique local coordinate system.

@@ -18,7 +18,8 @@ namespace Keystone.Profiler
         	if (Hook == null) throw new ArgumentNullException ("ProfileHook.ctor() - Hook cannot be null.");
             this.HookedProfile = Hook;
 
-            mStartCounter = Keystone.Profiler.Time.Counter; 
+            // TODO: THis updated code that uses StopWatch is actually in HelloBoids!!!  Duh!
+            mStartCounter = Keystone.Timers.Time.Counter; 
           
         }
 
@@ -28,7 +29,8 @@ namespace Keystone.Profiler
         {
             if (!this.disposedValue)
             {
-            	HookedProfile.Update ((float)Time.ElapsedSeconds (mStartCounter));
+                // TODO: THis updated code that uses StopWatch is actually in HelloBoids!!!  Duh!
+            	HookedProfile.Update ((float)Keystone.Timers.Time.ElapsedSeconds (mStartCounter));
                 HookedProfile = null;
             }
             this.disposedValue = true;

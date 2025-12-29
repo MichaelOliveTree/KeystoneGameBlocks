@@ -1,4 +1,4 @@
-namespace Keystone.Portals
+namespace Keystone.Entities
 {
     public class Teleport
     {

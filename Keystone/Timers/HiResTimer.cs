@@ -1,6 +1,10 @@
 using System;
 using System.Runtime.InteropServices;
 
+// WARNING: This code is not necessary.
+// 1) - it's not portable 
+// 2) - it's already used by the built in StopWatch class 
+//      (see Keystone.Profiler)
 namespace Keystone.Timers
 {
     /// <summary>

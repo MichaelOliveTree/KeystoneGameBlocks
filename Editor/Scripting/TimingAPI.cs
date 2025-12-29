@@ -42,6 +42,13 @@ namespace KeyEdit.Scripting
 			return scene.Simulation.GameTime.Scale;	
 		 }
 		 
+
+// TODO: All timers registered here must TICK each frame... those will exist in Keystone.Timers.IntervalTimers
+		 public void Register_Interval(string entityID, string name, int intervalInSeconds, bool activateImmediately = true, bool repeating = false); 
+		 {
+
+		 }
+
 		 public void Interval_Reset (string nodeID, string name)
 		 {
 		     

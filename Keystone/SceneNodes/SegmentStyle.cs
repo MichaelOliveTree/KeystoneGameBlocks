@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Keystone.Portals
+namespace Keystone.SceneNodes
 {
 
     /// <summary>

@@ -1,6 +1,6 @@
 using System;
 
-namespace Keystone.Simulation
+namespace Keystone.Timers
 {
 	// NOTE: GameTime does not utilize any Windows Timer.  The "elapsedSeconds" is passed in from 
 	//       an instance of Keystone.Timers.Timer.cs from within the gameloop in AppMain.cs
@@ -18,7 +18,7 @@ namespace Keystone.Simulation
         private long mTicks;
 		private float _julianDay;
 
-
+        // TODO: use Stopwatch here!!!  
 
         /// <summary>
         /// 

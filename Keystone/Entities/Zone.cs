@@ -4,7 +4,7 @@ using Keystone.Types;
 using Keystone.Entities;
 
 
-namespace Keystone.Portals
+namespace Keystone.Entities
 {
     /// <summary>
     /// A type of Region that neighbors other Zones and exist only one child deep under

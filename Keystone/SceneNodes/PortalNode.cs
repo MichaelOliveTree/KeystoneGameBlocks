@@ -2,7 +2,7 @@ using System;
 using Keystone.Traversers;
 using Keystone.Elements;
 
-namespace Keystone.Portals
+namespace Keystone.SceneNodes
 {
     public class PortalNode : EntityNode 
     {

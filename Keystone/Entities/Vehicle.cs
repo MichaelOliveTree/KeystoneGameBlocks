@@ -4,7 +4,7 @@ using Keystone.Elements;
 using Keystone.Controllers;
 using KeyCommon.Flags;
 
-namespace Keystone.Vehicles
+namespace Keystone.Entities
 {
     //http://www.simswiki.info/wiki.php?title=TS3PR/Sims3GameplayObjects
     // http://geck.bethsoft.com/index.php/Weapons

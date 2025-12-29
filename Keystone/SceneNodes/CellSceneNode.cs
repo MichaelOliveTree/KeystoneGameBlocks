@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Keystone.Traversers;
 
 
-namespace Keystone.Portals
+namespace Keystone.SceneNodes
 {
     /// <summary>
     /// the idea here that a CelLSceneNode replaces EntityNode for entities added to

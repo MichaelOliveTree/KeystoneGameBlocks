@@ -5,7 +5,7 @@ using Keystone.Traversers;
 
 namespace Keystone.Portals
 {
-    public class GUINode : EntityNode 
+    public class GUINode : SceneNodes 
     {
 
         public GUINode(Controls.Control2D control)

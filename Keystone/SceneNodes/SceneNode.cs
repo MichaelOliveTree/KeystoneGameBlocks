@@ -6,7 +6,7 @@ using Keystone.Traversers;
 using Keystone.Types;
 using Keystone.Extensions;
 
-namespace Keystone.Elements
+namespace Keystone.SceneNodes
 {
     /// <summary>
     /// A sceneNode represents the _hierarchical_ spatial information about an Entity

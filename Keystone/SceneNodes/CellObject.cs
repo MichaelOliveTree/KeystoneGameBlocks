@@ -1,7 +1,7 @@
 ﻿using System;
 using Keystone.Entities;
 
-namespace Keystone.Portals
+namespace Keystone.SceneNodes
 {
     // http://www.isogenicengine.com/engine/documentation/root/IgeEntity.html
     internal class CellObject  // like PhysicsObject only this is for Cell operations on the Entity

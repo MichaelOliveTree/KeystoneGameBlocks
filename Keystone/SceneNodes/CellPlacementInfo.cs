@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Keystone.Portals
+namespace Keystone.SceneNodes
 {
     ///// <summary>
     ///// PlacementLocations govern editor placing of components and it governs NPC

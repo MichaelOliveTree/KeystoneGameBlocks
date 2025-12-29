@@ -1,9 +1,9 @@
 using System;
-using Core.Animation;
-using Core.Elements;
-using MTV3D65;
+using Keystone.Animation;
+using Keystone.Elements;
 
-namespace Core.Entities
+
+namespace Keystone.Entities
 {
     public class BonedEntity : ModeledEntity
     {

@@ -5,7 +5,7 @@ using Keystone.Types;
 using Keystone.Elements;
 using System.Collections.Generic;
 
-namespace Keystone.Portals
+namespace Keystone.SceneNodes
 {
     /// <summary>
     /// Hierarchical spatial bounds information.  Unlike the Entity it hosts which has only 

@@ -8,7 +8,7 @@ using Keystone.Extensions;
 using Keystone.Resource;
 using Keystone.Types;
 
-namespace Keystone.Portals
+namespace Keystone.SceneNodes
 {
     /// <summary>
     /// Shareable node with ID = the encoded string of the footprint data.

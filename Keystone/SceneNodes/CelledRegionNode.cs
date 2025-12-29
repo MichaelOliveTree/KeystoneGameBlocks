@@ -6,7 +6,7 @@ using Keystone.Collision;
 using Keystone.Elements;
 using keymath.Primitives;
 
-namespace Keystone.Portals
+namespace Keystone.SceneNodes
 {
     // TODO: July.7.2011 - actually, im going to experiment with moving the cell arrays from CelledRegion
     // to this CelledRegionNode.  

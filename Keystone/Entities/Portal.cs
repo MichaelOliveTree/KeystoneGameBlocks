@@ -34,7 +34,7 @@ namespace Keystone.Portals
     //}
 
     
-    public class Portal : Entities.Entity 
+    public class Portal : Entity 
     {
         private Region _destination;
         private string _destinationName; // required for paging

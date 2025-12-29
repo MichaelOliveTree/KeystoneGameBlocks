@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using Keystone.Entities;
-using Keystone.Portals;
+using Keystone.SceneNodes;
 
-namespace Keystone.Elements
+namespace Keystone.SceneNodes
 {
     // SceneNode's can contain other SceneNode's withotu containing any entity or region can't they?  
     // hrm... actually ihave that as abstract SceneNode now

@@ -59,12 +59,14 @@ public class Tactical : BaseScript
 		KeyCommon.Data.UserData data = new KeyCommon.Data.UserData(); 
 		
 		data.SetBool("cache_required", true);
-		
-		TimingAPI.Register_Interval(entityID, "fire", 5000); // time is in milliseconds
-		bool repeating = true;
-		TimingAPI.Register_Interval(entityID, "prune_sensor_contacts", 5d, repeating); // time is in Hz (times per second)
 		bool active = false;
-		TimingAPI.Register_Interval(entityID, "last_contacts_prune", 0d, active); // time is in Hz (times per second)
+		bool repeating = false;
+
+		TimingAPI.Register_Interval(entityID, "fire", 5d, active, repeating); // time is in seconds
+		repeating = true;
+		TimingAPI.Register_Interval(entityID, "prune_sensor_contacts", 5d, active, repeating); 
+		
+		
 
 		EntityAPI.SetAIBlackboardData(entityID, data);
 	}

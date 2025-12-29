@@ -6,6 +6,15 @@ namespace Keystone.Utilities
 {
     public class MathHelper
     {
+
+
+
+
+
+
+
+
+
         public const float Epsilon = float.Epsilon; // 1.0e-5f;
                                                     // Epsilon: A constant representing the lower threshold of single-precision accuracy.
 
@@ -13,6 +22,152 @@ namespace Keystone.Utilities
         public const double RADIANS_TO_DEGREES = 180d / Math.PI;
         public const double PI_OVER_2 = Math.PI / 2d;
         public const double TWO_PI = Math.PI * 2d;
+
+
+
+
+
+
+
+
+
+
+
+        public const float Epsilon = 1.0e-5f;
+                // Epsilon: A constant representing the lower threshold of single-precision accuracy.
+
+
+        public static double PiOver2
+        {
+            get { return PI_OVER_2; }
+        }
+
+    //    ''' <summary>
+    //''' Simple quad mesh useful for FIXED 2d billboards (i.e. billboards that dont rotate to face the camera)
+    //''' </summary>
+    //''' <param name="height"></param>
+    //''' <param name="width"></param>
+    //''' <returns></returns>
+    //''' <remarks></remarks>
+    //Public Shared Function CreateQuadMesh(ByVal height As Single, ByVal width As Single) As MTV3D65.TVMesh
+    //    Dim quadmesh As MTV3D65.TVMesh
+    //    quadmesh = _Scene.CreateMeshBuilder()
+
+    //    ' 6 vertices for our quad
+    //    quadmesh.AddVertex(-width, 0, 0, 0, 1, 0, 0, 1)
+    //    quadmesh.AddVertex(width, height, 0, 0, 1, 0, 1, 0)
+    //    quadmesh.AddVertex(-width, height, 0, 0, 1, 0, 0, 0)
+
+    //    quadmesh.AddVertex(-width, 0, 0, 0, 1, 0, 0, 1)
+    //    quadmesh.AddVertex(width, 0, 0, 0, 1, 0, 1, 1)
+    //    quadmesh.AddVertex(width, height, 0, 0, 1, 0, 1, 0)
+
+    //    'Dim height, width As Single
+    //    'height = 10 : width = 5
+
+    //    'width = width * 0.5!
+    //    'Dim quadmesh As MTV3D65.TVMesh = CreateQuadMesh(height, width)
+
+    //    '' to give our grass depth, we will cross two more grass planes to make a single 18 vertex grass clump
+    //    'Dim depth As Single = width
+    //    '' this grass plane crosses perpendicular to the previous
+    //    'quadmesh.AddVertex(0, 0, depth, 0, 1, 0, 0, 1)
+    //    'quadmesh.AddVertex(0, height, -depth, 0, 1, 0, 1, 0)
+    //    'quadmesh.AddVertex(0, height, depth, 0, 1, 0, 0, 0)
+    //    'quadmesh.AddVertex(0, 0, depth, 0, 1, 0, 0, 1)
+    //    'quadmesh.AddVertex(0, 0, -depth, 0, 1, 0, 1, 1)
+    //    'quadmesh.AddVertex(0, height, -depth, 0, 1, 0, 1, 0)
+
+    //    '' this one crosses at 45 degree angle to both the others
+    //    'quadmesh.AddVertex(-width * 0.5!, 0, depth * 0.5!, 0, 1, 0, 0, 1)
+    //    'quadmesh.AddVertex(width * 0.5!, height, -depth * 0.5!, 0, 1, 0, 1, 0)
+    //    'quadmesh.AddVertex(-width * 0.5!, height, depth * 0.5!, 0, 1, 0, 0, 0)
+    //    'quadmesh.AddVertex(-width * 0.5!, 0, depth * 0.5!, 0, 1, 0, 0, 1)
+    //    'quadmesh.AddVertex(width * 0.5!, 0, -depth * 0.5!, 0, 1, 0, 1, 1)
+    //    'quadmesh.AddVertex(width * 0.5!, height, -depth * 0.5!, 0, 1, 0, 1, 0)
+
+
+    //    'quadmesh.WeldVertices()
+    //    'm.CreateFromMesh(quadmesh)
+    //    'quadmesh.Destroy()
+    //    Return quadmesh
+    //End Function
+
+        public static float Lerp(float start, float end, float weight)
+        {
+            return start * (1.0f - weight) + weight * end;
+        }
+
+        public static double Lerp(double start, double end, double weight)
+        {
+            return start * (1.0d - weight) + weight * end;
+        }
+
+        //http://www.truevision3d.com/forums/showcase/procedural_terrain_heightmap_generation_with_erosion-t18085.0.html
+        //You can mess around with the Pi and the 0.5 number for different results too
+        // todo: MPJ -but why is he using Acos here and not Cos?
+        public double Cosine_Interpolate(float a, float b, float x)
+        {
+            double ft = x * 3.1415927;
+            double f = (1.0d - Math.Acos(ft)) * 0.5d;
+
+            return a * (1.0d - f) + b * f;
+        }
+
+//http://www.truevision3d.com/forums/tv3d_sdk_65/rotation_and_normals-t18209.0.html
+//        public TV_3DMATRIX BindMatrixToLand(TV_3DMATRIX InMatrix, TV_3DVECTOR Scale, TV_3DVECTOR Position)
+//                {
+//                    {
+//                        TV_3DVECTOR TopVector = World.Landscape.GetNormal(InMatrix.m41, InMatrix.m43);
+//                        TV_3DVECTOR TentativeForwardVector = new TV_3DVECTOR(InMatrix.m31, InMatrix.m32, InMatrix.m33);
+//                        TV_3DVECTOR RightVector = new TV_3DVECTOR();
+//                        TV_3DVECTOR ForwardVector = new TV_3DVECTOR();
+//                        TVMathLibrary MathLibrary = new TVMathLibrary();
+//                        MathLibrary.TVVec3Cross(ref RightVector, TopVector, TentativeForwardVector);
+//                        MathLibrary.TVVec3Cross(ref ForwardVector, RightVector, TopVector);
+//                        MathLibrary.TVVec3Normalize(ref RightVector, RightVector);
+//                        MathLibrary.TVVec3Normalize(ref ForwardVector, ForwardVector);
+//                        InMatrix.m11 = RightVector.x * Scale.x;
+//                        InMatrix.m12 = RightVector.y * Scale.x;
+//                        InMatrix.m13 = RightVector.z * Scale.x;
+//                        InMatrix.m21 = TopVector.x * Scale.y;
+//                        InMatrix.m22 = TopVector.y * Scale.y;
+//                        InMatrix.m23 = TopVector.z * Scale.y;
+//                        InMatrix.m31 = ForwardVector.x * Scale.z;
+//                        InMatrix.m32 = ForwardVector.y * Scale.z;
+//                        InMatrix.m33 = ForwardVector.z * Scale.z;
+//                        InMatrix.m41 = Position.x;
+//                        InMatrix.m42 = Position.y;
+//                        InMatrix.m43 = Position.z;
+
+//                    }
+
+//I store the matrix information returned this routine and I apply teh matrix to the mesh with setmatrix array: _MiniMesh.SetMatrixArray(_DisplayAmount, FoilageMatrix);
+
+        public static double DegreesToRadians(double degrees)
+        {
+            return degrees*DEGREES_TO_RADIANS;
+        }
+
+        public static double RadiansToDegrees(double radians)
+        {
+            return radians*RADIANS_TO_DEGREES;
+        }
+
+        public static double Heading2DRadians(Vector3d vec)
+        {
+            // .NET already handles the various cases so we dont need to compensate using -vec.x or anything
+            //double angle = (double)System.Math.Atan2(-vec.x, vec.z);
+            //return -1 * angle;
+            return (double) Math.Atan2(vec.x, vec.z);
+        }
+
+        public static double Heading2DDegrees(Vector3d vec)
+        {
+            return RadiansToDegrees(Heading2DRadians(vec));
+        }
+
+
 
 
         public static double Lerp(double a, double b, double t)
@@ -378,6 +533,9 @@ namespace Keystone.Utilities
         }
   
 
+
+
+
         public static void BarycentricCoordinate(Triangle tri, Vector3d point, out double u, out double v, out double w)
         {
             BarycentricCoordinate(tri.Points[0], tri.Points[1], tri.Points[2], point, out u, out v, out w);
@@ -442,6 +600,9 @@ namespace Keystone.Utilities
             return results;
         }
 
+
+  
+
         // MoveAroundPoint mimics TV's function of the same name
         public static Vector3d MoveAroundPoint(Vector3d origin, Vector3d pivot, double radius, double horzAngleRadians, double vertAngleRadians)
         {
@@ -451,6 +612,9 @@ namespace Keystone.Utilities
         }
 
         // MoveAroundPoint mimics TV's function of the same name
+        /// <summary>
+        /// Returns a 3D point around the origin with desired radius and with specified horizontal and verticle angels
+        /// </summary>
         public static Vector3d MoveAroundPoint (Vector3d origin, double radius, double horzAngleRadians, double vertAngleRadians)
         {
 

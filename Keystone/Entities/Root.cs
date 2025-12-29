@@ -8,7 +8,7 @@ using Keystone.Types;
 using Keystone.Elements;
 using Keystone.Entities;
 
-namespace Keystone.Portals
+namespace Keystone.Entities
 {
     /// <summary>
     /// This particular Root Region is not for Zoned worlds. (see ZoneRoot).

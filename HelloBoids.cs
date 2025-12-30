@@ -623,32 +623,31 @@ namespace HelloBoids
                     neighbors.Add(found[j].Index);
                 }
             }
-#else      // NEIGHBOR SEARCH                         
+#else      // NEIGHBOR SEARCH USING DISTANCE CHECK                       
             {
                 
-                Console.WriteLine("wtf?");
-#if USE_MEMORY_T
+	#if USE_MEMORY_T
 					//neighbors = Boid.FindNeighbors(store, numBoids, largestDistance, currentIndex, findNeighborsFunc);
 					neighbors = Boid.FindNeighbors(this.Boids, largestDistanceSquared, currentBoid.Index, ff);
-#else
-#if USE_MEMORY_T == false
-					List<Boid> found = Boid.FindNeighbors(this.Boids, largestDistance, currentBoid.Index, ff);
+	#else
+		#if USE_MEMORY_T == false
+						List<Boid> found = Boid.FindNeighbors(this.Boids, largestDistance, currentBoid.Index, ff);
 
-					if (found == null || found.Count == 0) return null;
-					neighbors = new List<int>(found.Count);
-					for (int j = 0; j < found.Count; j++)
-					{
-						neighbors.Add(found[j].Index);
-					}
-#else // NO NEIGHBOR FINDING FUNCTION, JUST BRUTE FORCE ALL BOIDS
-				{
-					
-					// WARNING: iterating through ALL boids
-					// for each CURRENT boid is O(n^2) and is too expensive
-					// neighors = allBoids;
-				}
-#endif
-#endif
+						if (found == null || found.Count == 0) return null;
+						neighbors = new List<int>(found.Count);
+						for (int j = 0; j < found.Count; j++)
+						{
+							neighbors.Add(found[j].Index);
+						}
+		#else // DO NOT USE A NEIGHBOR FINDING FUNCTION, JUST BRUTE FORCE ALL BOIDS
+						{
+
+							// WARNING: iterating through ALL boids
+							// for each CURRENT boid is O(n^2) and is too expensive
+							// neighors = allBoids;
+						}
+		#endif
+	#endif
 #endif
             // END NEIGHBOR SEARCH
             return neighbors;
@@ -6217,7 +6216,7 @@ namespace HelloBoids
     {
 
         #region Static variables
-
+        //public static BoundingBox WorldBox;
         public static uint MaxDepth;
         public static uint SplitThreshHold;
 
@@ -7288,10 +7287,20 @@ namespace HelloBoids
             get { return mMemStore.Span[0].Pivot; }
             set { mMemStore.Span[0].Pivot = value; }
         }*/
+		Vector3d mSpanAccessTest;
         public Vector3d Translation
         {
-            get { return mMemStore.Span[0].Translation; }
-            set { mMemStore.Span[0].Translation = value; }
+            get 
+			{ 
+				// https://www.codemag.com/Article/2207031/Writing-High-Performance-Code-Using-SpanT-and-MemoryT-in-C
+				return mSpanAccessTest; // NOTE: <-- this line is much faster than returning the Translation from the below line!  
+				return mMemStore.Span[0].Translation; 
+			}
+            set 
+			{ 
+				mSpanAccessTest = value; 
+				mMemStore.Span[0].Translation = value; 
+			}
         }
         /*
         public Vector3d DerivedTranslation

@@ -6217,7 +6217,7 @@ namespace HelloBoids
     {
 
         #region Static variables
-        //public static BoundingBox WorldBox;
+
         public static uint MaxDepth;
         public static uint SplitThreshHold;
 

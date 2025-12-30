@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Keystone.Portals;
@@ -18,11 +18,11 @@ namespace Keystone.Octree
     {
 
         #region Static variables
-        public static BoundingBox WorldBox;
-        public static uint MaxDepth;
-        public static uint SplitThreshHold;
 
-        private static Vector3d[] BoundsOffsetTable = new Vector3d[] 
+        public uint MaxDepth;
+        public uint SplitThreshHold;
+
+        private static Vector3d[] BoundsOffsetTable = new Vector3d[]
         {
                 new Vector3d(-0.5, -0.5, -0.5),
                 new Vector3d(+0.5, -0.5, -0.5),
@@ -41,7 +41,7 @@ namespace Keystone.Octree
         private const int MAX_CHILD_COUNT = 8;
 
         private BoundingBox mBox;
-        private OctreeOctant mParent;  
+        private OctreeOctant mParent;
         private OctreeOctant[] mChildOctants;
 
         // TODO: switch to linked list?
@@ -67,16 +67,19 @@ namespace Keystone.Octree
         {
         }
 
-
+        
         #region ITraversable Members
         public object Traverse(ITraverser target, object data)
         {
             return target.Apply(this, data);
         }
         #endregion
+        
+
+        private bool IsRoot { get { return mParent == null; } }
 
         private OctreeOctant Parent { get { return mParent; } set { mParent = value; } }
-        
+
         public bool IsLeaf { get { return mChildOctants == null; } }
 
         public int Index
@@ -105,25 +108,24 @@ namespace Keystone.Octree
 
         internal int LocalVectorToIndex(int[] v)
         {
-	        int index = 0;	
-            
+            int index = 0;
+
             if (v[0] >= 0) index |= 1;
-	        if (v[1] >= 0) index |= 2;
-	        if (v[2] >= 0) index |= 4;	
+            if (v[1] >= 0) index |= 2;
+            if (v[2] >= 0) index |= 4;
 
             return index;
         }
 
         internal Vector3d Radius
         {
-            get 
+            get
             {
-                Vector3d radius;
-                double denominator = 2 ^ (Depth + 1); 
                 
-                radius.x = WorldBox.Width / denominator;
-                radius.y = WorldBox.Height / denominator;
-                radius.z = WorldBox.Depth / denominator;
+				Vector3d radius;
+                radius.x = mBox.Width * 0.5d;
+                radius.y = mBox.Height * 0.5d;
+                radius.z = mBox.Depth* 0.5d;
                 return radius;
             }
         }
@@ -143,7 +145,7 @@ namespace Keystone.Octree
 
         public EntityNode[] EntityNodes
         {
-            get 
+            get
             {
                 if (mEntityNodesCollection == null) return null;
                 return mEntityNodesCollection.ToArray();
@@ -159,8 +161,8 @@ namespace Keystone.Octree
             }
             else
             {
-            	this.Add(entityNode);
-            	//System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName);
+                this.Add(entityNode);
+                //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName);
             }
         }
 
@@ -172,10 +174,10 @@ namespace Keystone.Octree
             entityNode.SpatialNode = this;
             mEntityNodesCollection.Add(entityNode);
         }
-                
+
         public void Add(EntityNode entityNode)
         {
-            System.Diagnostics.Debug.Assert (this.BoundingBox != null, "OctreeOctant.Add() - BoundingBox is null.");
+            System.Diagnostics.Debug.Assert(this.BoundingBox != null, "OctreeOctant.Add() - BoundingBox is null.");
 #if DEBUG
             // only support square octree octants for performance
 //            // TODO: we are going to see if this "performance" concern is no longer valid.  non square octrees are useful 
@@ -184,15 +186,6 @@ namespace Keystone.Octree
 //            this.BoundingBox.Max.x - this.BoundingBox.Min.x == 
 //            this.BoundingBox.Max.z - this.BoundingBox.Min.z);
 #endif
-            // note: we intentionally compute a radius without taking into account hypotenuse.
-            // note: if allowiing non square octants, we take the smallest octant radius and we'll compare that against largest radius of entity being inserted
-            double octantRadius = this.BoundingBox.Max.x - this.BoundingBox.Min.x;
-            octantRadius = Math.Min (this.BoundingBox.Max.y - this.BoundingBox.Min.y, octantRadius);
-            octantRadius = Math.Min (this.BoundingBox.Max.z - this.BoundingBox.Min.z, octantRadius);
-            octantRadius /= 2d;
-            
-            double childOctantRadius = octantRadius * 0.5d;
-            double entityRadius = entityNode.BoundingBox.Radius;
 
             int count;
 
@@ -206,28 +199,50 @@ namespace Keystone.Octree
             //          no depth.
             if (count >= OctreeOctant.SplitThreshHold || _depth >= OctreeOctant.MaxDepth)
             {
+                // add to this octant immmediately
                 // Non Recursive Add
                 this.AddEntityNodeToCollection((EntityNode)entityNode);
                 //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName);
                 return;
             }
-            // insert using tightbox, but we must cull with loose box
-            else if (childOctantRadius < entityRadius)
+
+            // note: we intentionally compute a radius without taking into account hypotenuse.
+            // note: if allowiing non square octants, we take the smallest octant radius and we'll compare that against largest radius of entity being inserted
+            double octantRadius = this.BoundingBox.Max.x - this.BoundingBox.Min.x;
+            octantRadius = Math.Min(this.BoundingBox.Max.y - this.BoundingBox.Min.y, octantRadius);
+            octantRadius = Math.Min(this.BoundingBox.Max.z - this.BoundingBox.Min.z, octantRadius);
+            octantRadius *= 0.5d;
+
+            double childOctantRadius = octantRadius * 0.5d;
+            double entityRadius = entityNode.BoundingBox.Radius;
+
+            // attempt to insert using tightbox, but we must cull with loose box
+            if (entityRadius > childOctantRadius)
             {
-                // this entity won't fit in any children of this octant so will it fit here?
+                // this entity won't fit in any children of this octant 
+                // so what about the parent octant?
                 if (entityRadius > octantRadius)
                 {
-                    // it wont fit, can we try to move up to a parent?
+                    // wont fit, can we try to move up to a parent?
                     if (this.IsRoot == false)
                     {
-                        // Recurse
+                        // Recurse UPWARDS
                         mParent.Add(entityNode);
                         return;
                     }
                 }
-                // Non Recursive Add because we're still here, so it either fits or we're at root and there's no other place to put it
-                this.AddEntityNodeToCollection(entityNode);  
+                // Non Recursive Add because we're still here, 
+                // so it either fits or we're at root and there's
+                // no other place to put it
+                this.AddEntityNodeToCollection(entityNode);
                 //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName);
+                return;
+            }
+
+            // can't go further, add entitynode here
+            if (this.Split() == false)
+            {
+                this.AddEntityNodeToCollection(entityNode);
                 return;
             }
 
@@ -241,21 +256,14 @@ namespace Keystone.Octree
             if (entityCenter.z > octantCenter.z)
                 code |= 4;
 
-            // can't go further, add entitynode here
-            if (this.Split() == false)
-            {
-                this.AddEntityNodeToCollection(entityNode);
-                return;
-            }
-
             for (int i = 0; i < MAX_CHILD_COUNT; i++)
             {
-            	// if this bitflag cobmination is not set
+                // if this bitflag cobmination is not set
                 if (code != i) continue;
 
                 Vector3d offset = OctreeOctant.BoundsOffsetTable[i] * octantRadius;
                 Vector3d center = octantCenter + offset;
-                
+
                 BoundingBox childOctantBox = new BoundingBox(center, (float)childOctantRadius);
 
                 if (mChildOctants[i] == null)
@@ -266,7 +274,6 @@ namespace Keystone.Octree
                 mChildOctants[i].Add(entityNode);
             }
         }
-
 
         public void RemoveEntityNode(EntityNode entityNode)
         {
@@ -280,14 +287,14 @@ namespace Keystone.Octree
             OnEntityNode_Removed(entityNode);
         }
 
-        
+
         public void OnEntityNode_Moved(EntityNode entityNode)
-        { 
+        {
             // is the entity still in this bounds?
             // we dont have to test the radius of the entityNode because
             // we already know it fits.
-             
-            if (mBox.Contains (entityNode.BoundingBox.Center)) return;
+            //    System.Console.WriteLine("m");
+            if (mBox.Contains(entityNode.BoundingBox.Center)) return;
 
             // inform the parent that the entity in this octant no longer fits
             // NOTE: we do not add/remove the entityNode here.  The parent must do it
@@ -296,10 +303,10 @@ namespace Keystone.Octree
             if (this.IsRoot == false)
                 mParent.Move(this, entityNode); // calls on Parent
         }
-        
+
         private void Move(OctreeOctant childOctant, EntityNode entityNode)
         {
-        	//System.Diagnostics.Debug.WriteLine ("OctreeOctant.Move() - " + entityNode.Entity.TypeName);
+            //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Move() - " + entityNode.Entity.TypeName);
             // NOTE: Here we clear the .SpatialNode first but we must not call OnEntityNode_Removed()
             //       until AFTER .Add() is called.
             entityNode.SpatialNode = null;
@@ -325,6 +332,7 @@ namespace Keystone.Octree
                 newOctant = newOctant.Parent;
             }
 
+            //System.Console.WriteLine("Moved to new octant");
             newOctant.Add(entityNode);// Add must always occur before Remove() because we dont want to collapse branches before we've had a chance to determine if the child will move there!
             childOctant.OnEntityNode_Removed(entityNode);
         }
@@ -334,7 +342,7 @@ namespace Keystone.Octree
             // does this entityNode still fit in this octant?
             // we must test against entire box since this entity may now be too big to fit
             if (mBox.Contains(entityNode.BoundingBox)) return;
-            
+
             if (this.IsRoot == false)
                 mParent.Resize(this, entityNode);
         }
@@ -348,7 +356,7 @@ namespace Keystone.Octree
             // and instead must do .Contains(box) to see if this entity still fits within this octant
             OctreeOctant newOctant = this;
             BoundingBox box = entityNode.BoundingBox;
-            
+
 
             while (newOctant.Parent != null)
             {
@@ -373,7 +381,7 @@ namespace Keystone.Octree
             if (mEntityNodesCollection == null) return;
 
             mEntityNodesCollection.Remove(entityNode);
-           
+
             // can we collapse this octant?
             if (mEntityNodesCollection.Count == 0)
             {
@@ -388,7 +396,7 @@ namespace Keystone.Octree
             }
         }
 
-        private void OnChildOctant_Empty(OctreeOctant childOctant )
+        private void OnChildOctant_Empty(OctreeOctant childOctant)
         {
             int nullCount = 0;
             for (int i = 0; i < mChildOctants.Length; i++)
@@ -412,7 +420,6 @@ namespace Keystone.Octree
         }
         #endregion
 
-        private bool IsRoot { get { return mParent == null;  } }
         //public void Add(EntityNode element)
         //{
         //    int x = 0;
@@ -527,11 +534,10 @@ namespace Keystone.Octree
         //    return octant;
         //}
 
-
         private bool Split()
         {
             // cannot split because we're at max depth
-            if (_depth == OctreeOctant.MaxDepth) 
+            if (_depth == OctreeOctant.MaxDepth)
                 return false;
 
             // we are already split
@@ -543,33 +549,81 @@ namespace Keystone.Octree
             return true;
         }
 
+        // TODO: I should implement an overloaded version of Query that traverses for Entities that lay within a bounding box or sphere with potential also of matching a "match" predicate.
+        //       Multi-threading of the query would be ideal.
+        /// <summary>
+        /// Looks for Regions/Entities that are in descendant RegionNodes or EntityNodes 
+        /// that match the specified predicate.
+        /// </summary>
+        /// <param name="recurse"></param>
+        /// <param name="match"></param>
+        /// <returns></returns>
+        public virtual List<EntityNode> Query(EntityNode refEnt, bool recurse, BoundingBox searchArea, Func<EntityNode, EntityNode, bool> match)
+        {
+            if (match == null) throw new ArgumentNullException("SceneNode.Query() - match cannot be null.");
+
+            if (!this.mBox.Intersects(searchArea))
+                return null;
+            //Console.WriteLine ("Query B");
+
+            List<EntityNode> results = new List<EntityNode>();
+
+            if (mEntityNodesCollection != null)
+                for (int i = 0; i < mEntityNodesCollection.Count; i++)
+                {
+                    if (match(mEntityNodesCollection[i], refEnt))
+                        results.Add(mEntityNodesCollection[i]);
+                }
+
+            if (recurse)
+            {
+                if (mChildOctants != null)
+                {
+                    // NOTE: We recurse the child OctreeOctants, not EntityNodes
+                    for (int j = 0; j < mChildOctants.Length; j++)
+                    {
+                        List<EntityNode> nestedResults = mChildOctants[j].Query(refEnt, recurse, searchArea, match);
+                        if (nestedResults != null)
+                            results.AddRange(nestedResults);
+
+                    }
+                }
+            }
+
+            if (results.Count == 0) return null;
+            return results;
+        }
+
 
         #region IBoundVolume Members
         /// <summary>
         /// Public bbox used for culling tests
         /// </summary>
-        public BoundingBox BoundingBox  
+        public BoundingBox BoundingBox
         {
-            get 
+            get
             {
                 return mBox;
             }
         }
 
+        
         public BoundingSphere BoundingSphere
         {
             get { return new BoundingSphere(mBox); } // TODO: compute center from x,y,z index, then return sphere new BoundingSphere(center, _radius); }
         }
+        
 
         public bool BoundVolumeIsDirty
         {
-            get { return false; } // octree bounds are fixed.
+            // octree bounds are fixed.
+            get { return false; }
         }
 
 
         protected void UpdateBoundVolume()
         {
-            
+
         }
         #endregion
     }

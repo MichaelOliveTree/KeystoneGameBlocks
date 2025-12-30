@@ -4,19 +4,18 @@ using System.Diagnostics;
 namespace Keystone.Profiler
 {
 	/// <summary>
-	/// Description of Profile.
-	/// </summary>
-	internal class Profile : IProfile
+    /// Description of Profile.
+    /// </summary>
+    internal class Profile : IProfile
     {
-
         private string ProfileName;
         private string ProfileCategory;
 
-     //   private long StartTime;
-        private float TotalTime;
-        private float LastTotal;
-       // private bool HookedUp; // TODO: HookedUp var is never used. might be useful for re-entrant sync, but so far it's not used
-        //private Stopwatch _watch;
+        //   private long StartTime;
+        private double TotalTime;
+        private double LastTotal;
+        // private bool HookedUp; // TODO: HookedUp var is never used. might be useful for re-entrant sync, but so far it's not used
+
 
         public Profile(string Name)
         {
@@ -28,10 +27,11 @@ namespace Keystone.Profiler
             this.ProfileCategory = Category;
         }
 
-        
-        public void Update (float elapsed)
+
+        public void Update(double elapsed)
         {
-        	TotalTime += elapsed;
+            LastTotal = TotalTime;
+            TotalTime += elapsed;
         }
 
         public void ResetTimer()
@@ -42,12 +42,12 @@ namespace Keystone.Profiler
 
         // we cache the last elapsed since we will only update the display every x interval.
         // thus, our display isn't erratic
-        public float ElapsedSeconds
+        public double ElapsedSeconds
         {
             get { return LastTotal; }
         }
-        
-        public float ElapsedMilliseconds { get {return LastTotal * 1000f;}}
+
+        public double ElapsedMilliseconds { get { return LastTotal * 1000d; } }
 
         public bool Categorized
         {

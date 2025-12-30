@@ -8,13 +8,13 @@ namespace Keystone.Types
 {
     public struct BoundingBox
     {
-    	private static Vector3d MIN_INIT = new Vector3d (float.MaxValue * .5f, float.MaxValue * .5f, float.MaxValue * .5f);
-    	private static Vector3d MAX_INIT = new Vector3d (float.MinValue * .5f, float.MinValue * .5f, float.MinValue * .5f);
-        
-    	//private Vector3d[] _parameters;
-    	private Vector3d _min;
-    	private Vector3d _max;
-    	
+        private static Vector3d MIN_INIT = new Vector3d(float.MaxValue * .5f, float.MaxValue * .5f, float.MaxValue * .5f);
+        private static Vector3d MAX_INIT = new Vector3d(float.MinValue * .5f, float.MinValue * .5f, float.MinValue * .5f);
+
+        //private Vector3d[] _parameters;
+        private Vector3d _min;
+        private Vector3d _max;
+
         public static BoundingBox Parse(string delimitedString)
         {
             if (string.IsNullOrEmpty(delimitedString)) throw new ArgumentNullException();
@@ -31,19 +31,29 @@ namespace Keystone.Types
             max.y = double.Parse(values[4]);
             max.z = double.Parse(values[5]);
 
-            return new BoundingBox(min, max); 
+            return new BoundingBox(min, max);
         }
 
         public static BoundingBox Initialized()
         {
-        	BoundingBox box;
-        	box._min = MIN_INIT;
-        	box._max = MAX_INIT;
-        	
-        	return box;
+            BoundingBox box;
+            box._min = MIN_INIT;
+            box._max = MAX_INIT;
+
+            return box;
         }
-        
-        public static BoundingBox FromBoundingRect (BoundingRect rect)
+
+        public bool IsNullOrEmpty()
+        {
+            return (_min.x == 0d &&
+                    _min.y == 0d &&
+                    _min.z == 0d &&
+                    _max.x == 0d &&
+                    _max.y == 0d &&
+                     _max.z == 0d);
+        }
+
+        public static BoundingBox FromBoundingRect(BoundingRect rect)
         {
             Vector3d min, max;
             min.x = rect.Min.x;
@@ -57,20 +67,20 @@ namespace Keystone.Types
 
             return result;
         }
-
+       
         public override string ToString()
         {
             string delimiter = keymath.ParseHelper.English.XMLAttributeDelimiter;
-            string s = string.Format("{0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}", Min.x, delimiter, 
+            string s = string.Format("{0}{1}{2}{3}{4}{5}{6}{7}{8}{9}{10}", Min.x, delimiter,
                                                                 Min.y, delimiter,
                                                                 Min.z, delimiter,
                                                                 Max.x, delimiter,
-                                                                Max.y, delimiter, 
+                                                                Max.y, delimiter,
                                                                 Max.z);
             return s;
         }
 
-        public BoundingBox (double minX, double minY, double minZ, double maxX, double maxY, double maxZ) 
+        public BoundingBox(double minX, double minY, double minZ, double maxX, double maxY, double maxZ)
         {
             Vector3d min, max;
             min.x = minX;
@@ -83,7 +93,7 @@ namespace Keystone.Types
             _min = min;
             _max = max;
         }
-        
+
         public BoundingBox(Vector3d min, Vector3d max)
         {
             // TODO: assert if width/height/depth of this box is > double.MaxValue 
@@ -92,9 +102,24 @@ namespace Keystone.Types
             _max = max;
         }
 
-        // construct a square bounding box who's ceter is at "position" and who's
-        // center points on each face are "radius" distance from the center.
-        // This type of box will always full encompass a sphere of the same radius.  
+
+        ///<summary>
+        /// construct a square bounding box who's ceter is at "position" and who's
+        /// center points on each face are "radius" distance from the center.
+        /// This type of box will always full encompass a sphere of the same radius.  
+        ///</summary>
+        public BoundingBox(Vector3d position, double radius)
+            :
+                this(position.x - radius, position.y - radius, position.z - radius,
+                     position.x + radius, position.y + radius, position.z + radius)
+        {
+        }
+
+        ///<summary>
+        /// construct a square bounding box who's ceter is at "position" and who's
+        /// center points on each face are "radius" distance from the center.
+        /// This type of box will always full encompass a sphere of the same radius.  
+        ///</summary>
         public BoundingBox(Vector3d position, float radius)
             :
                 this(position.x - radius, position.y - radius, position.z - radius,
@@ -102,38 +127,38 @@ namespace Keystone.Types
         {
         }
         // we use * .5f because if we try to take width of these it returns infinity since double overlows
-//        public BoundingBox()
-//            : this(MIN_INIT, MAX_INIT)
-//        {
-//        }
+        //        public BoundingBox()
+        //            : this(MIN_INIT, MAX_INIT)
+        //        {
+        //        }
 
         //http://www.truevision3d.com/forums/tv3d_sdk_65/why_not_mesh_group_bounding_boxes-t17758.0.html
         // jviper's boundingbox for mesh groups
-//Function GetBoundingBox(MshTV as TVMesh,intGroup as integer,Transformed as boolean) as Box3D
-//    dim TVIO as TVInternalObjects
-//    dim TmpMesh as Microsoft.DirectX.Direct3D.Mesh
-//    dim Attr() as Mircrosoft.DirectX.Direct3D.AttributeRange
-//    dim Vec as Vector3d
-//    dim Ret as Box3D
+        //Function GetBoundingBox(MshTV as TVMesh,intGroup as integer,Transformed as boolean) as Box3D
+        //    dim TVIO as TVInternalObjects
+        //    dim TmpMesh as Microsoft.DirectX.Direct3D.Mesh
+        //    dim Attr() as Mircrosoft.DirectX.Direct3D.AttributeRange
+        //    dim Vec as Vector3d
+        //    dim Ret as Box3D
 
-//    TmpMsh = New Microsoft.DirectX.Direct3D.Mesh(TVIO.GetD3DMesh(MshTV.GetIndex))
-//    Attr = TmpMsh.GetAttributeTable()
-//    Ret.Min=new Vector3d(single.maxvalue,single.maxvalue,single.maxvalue)   
-//    Ret.Max=new Vector3d(single.minvalue,single.minvalue,single.minvalue)   
-//    For i as integer=Attr(intGroup).VertexStart to Attr(intGroup).VertexStart+Attr(intGroup).VertexCount-1
-//        mshTV.GetVertex(i,Vec.x,Vec.y,Vec.z,0,0,0,0,0,0,0,0)
-//        if Transformed then vec=tvvec3transformcoord(vec,mshTV.GetMatrix)
-//        Ret.Min.x = min(Ret.Min.x,Vec.x)
-//        Ret.Min.y = min(Ret.Min.y,Vec.y)
-//        Ret.Min.z = min(Ret.Min.z,Vec.z)
-//        Ret.Max.x = max(Ret.Max.x,Vec.x)
-//        Ret.Max.y = max(Ret.Max.y,Vec.y)
-//        Ret.Max.z = max(Ret.Max.z,Vec.z)
-//    Next i
-//    Return Ret
-//End Function
+        //    TmpMsh = New Microsoft.DirectX.Direct3D.Mesh(TVIO.GetD3DMesh(MshTV.GetIndex))
+        //    Attr = TmpMsh.GetAttributeTable()
+        //    Ret.Min=new Vector3d(single.maxvalue,single.maxvalue,single.maxvalue)   
+        //    Ret.Max=new Vector3d(single.minvalue,single.minvalue,single.minvalue)   
+        //    For i as integer=Attr(intGroup).VertexStart to Attr(intGroup).VertexStart+Attr(intGroup).VertexCount-1
+        //        mshTV.GetVertex(i,Vec.x,Vec.y,Vec.z,0,0,0,0,0,0,0,0)
+        //        if Transformed then vec=tvvec3transformcoord(vec,mshTV.GetMatrix)
+        //        Ret.Min.x = min(Ret.Min.x,Vec.x)
+        //        Ret.Min.y = min(Ret.Min.y,Vec.y)
+        //        Ret.Min.z = min(Ret.Min.z,Vec.z)
+        //        Ret.Max.x = max(Ret.Max.x,Vec.x)
+        //        Ret.Max.y = max(Ret.Max.y,Vec.y)
+        //        Ret.Max.z = max(Ret.Max.z,Vec.z)
+        //    Next i
+        //    Return Ret
+        //End Function
 
-        
+
         public Vector3d[] Vertices
         {
             get
@@ -180,7 +205,7 @@ namespace Keystone.Types
         /// </summary>
         public double Radius
         {
-            get 
+            get
             {
                 return Diameter * .5;
             }
@@ -188,7 +213,7 @@ namespace Keystone.Types
 
         public double RadiusSquared
         {
-            get 
+            get
             {
                 double radius = Diameter * .5;
                 return radius * radius;
@@ -201,12 +226,12 @@ namespace Keystone.Types
         /// </summary>
         public double Diameter
         {
-            get 
+            get
             {
                 double axisLength = _max.x - _min.x;
                 axisLength = Math.Max(axisLength, _max.y - _min.y);
                 return Math.Max(axisLength, _max.z - _min.z);
-                
+
 
                 //return (Max - Min).Length;
             }
@@ -214,54 +239,54 @@ namespace Keystone.Types
 
         public Vector3d Center
         {
-            get 
+            get
             {
                 Vector3d result;
                 result.x = Min.x + (Width * 0.5d);
                 result.y = Min.y + (Height * 0.5d);
                 result.z = Min.z + (Depth * 0.5d);
-                return result;   
+                return result;
             }
         }
 
-		public void Translate(double translationX, double translationY, double translationZ)
+        public void Translate(double translationX, double translationY, double translationZ)
         {
             _min.x += translationX;
             _min.y += translationY;
             _min.z += translationZ;
-            
+
             _max.x += translationX;
             _max.y += translationY;
             _max.z += translationZ;
         }
-        
+
         public void Translate(Vector3d translation)
         {
             Min += translation;
             Max += translation;
         }
-        
-        public void Scale (Vector3d scale)
+
+        public void Scale(Vector3d scale)
         {
-        	Min *= scale;
-        	Max *= scale;
+            Min *= scale;
+            Max *= scale;
         }
 
-        public static BoundingBox Scale (BoundingBox box, Vector3d scale)
+        public static BoundingBox Scale(BoundingBox box, Vector3d scale)
         {
-        	Vector3d min = box.Min * scale;
-        	Vector3d max = box.Max * scale;
-        	return new BoundingBox (min, max);
+            Vector3d min = box.Min * scale;
+            Vector3d max = box.Max * scale;
+            return new BoundingBox(min, max);
         }
-                
-        public static BoundingBox Transform1 (BoundingBox box, Matrix m)
+
+        public static BoundingBox Transform1(BoundingBox box, Matrix m)
         {
             // If we're empty, then bail
-            
+
 
             // Start with the translation portion
             Vector3d min, max;
-            min = max = new Vector3d( m.M41 , m.M42 , m.M43);
+            min = max = new Vector3d(m.M41, m.M42, m.M43);
 
             // Examine each of the 9 matrix elements
             // and compute the new AABB
@@ -369,23 +394,23 @@ namespace Keystone.Types
             m.M11 = Math.Abs(xform.M11);
             m.M12 = Math.Abs(xform.M12);
             m.M13 = Math.Abs(xform.M13);
-            m.M14 =  0.0f;
-            
-            m.M21 =      Math.Abs(xform.M21);
+            m.M14 = 0.0f;
+
+            m.M21 = Math.Abs(xform.M21);
             m.M22 = Math.Abs(xform.M22);
             m.M23 = Math.Abs(xform.M23);
             m.M24 = 0.0f;
-            
-            m.M31 =Math.Abs(xform.M31);
-            m.M32 =  Math.Abs(xform.M32);
+
+            m.M31 = Math.Abs(xform.M31);
+            m.M32 = Math.Abs(xform.M32);
             m.M33 = Math.Abs(xform.M33);
             m.M34 = 0.0f;
-            
+
             m.M41 = 0.0f;
             m.M42 = 0.0f;
             m.M43 = 0.0f;
             m.M44 = 1.0f;
-            
+
             // use transform normal to 
             e = Vector3d.TransformNormal(e, m);
 
@@ -398,7 +423,7 @@ namespace Keystone.Types
             // do not attempt to transform a box that is not initialized.  Instead
             // return the original box
             if (box.Min == MIN_INIT && box.Max == MAX_INIT)
-            	return box;
+                return box;
             // when transforming a local box to world, you cannot (unfortunately) simply
             // transform the min and max coords.  You have to transform all 8 and then take the min,max of those.
             //Vector3d worldMax = new Vector3d(double.MinValue , double.MinValue , double.MinValue  );
@@ -410,13 +435,13 @@ namespace Keystone.Types
             worldMin.x = double.MaxValue;
             worldMin.y = double.MaxValue;
             worldMin.z = double.MaxValue;
-            
+
             Vector3d v2;
 
             Vector3d[] verts = box.Vertices;
             for (int i = 0; i < verts.Length; i++)
             {
-            	v2 = Vector3d.TransformCoord(verts[i], matrix);
+                v2 = Vector3d.TransformCoord(verts[i], matrix);
                 worldMax.x = Math.Max(worldMax.x, v2.x);
                 worldMax.y = Math.Max(worldMax.y, v2.y);
                 worldMax.z = Math.Max(worldMax.z, v2.z);
@@ -424,21 +449,21 @@ namespace Keystone.Types
                 worldMin.y = Math.Min(worldMin.y, v2.y);
                 worldMin.z = Math.Min(worldMin.z, v2.z);
             }
-            
-//          // TODO: http://dev.theomader.com/transform-bounding-boxes/ ?
-//          var xa = m.Right * boundingBox.Min.X;
-//		    var xb = m.Right * boundingBox.Max.X;
-//		 
-//		    var ya = m.Up * boundingBox.Min.Y;
-//		    var yb = m.Up * boundingBox.Max.Y;
-//		 
-//		    var za = m.Backward * boundingBox.Min.Z;
-//		    var zb = m.Backward * boundingBox.Max.Z;
-//		 
-//		    return new BoundingBox(
-//		        Vector3.Min(xa, xb) + Vector3.Min(ya, yb) + Vector3.Min(za, zb) + m.Translation,
-//		        Vector3.Max(xa, xb) + Vector3.Max(ya, yb) + Vector3.Max(za, zb) + m.Translation
-        
+
+            //          // TODO: http://dev.theomader.com/transform-bounding-boxes/ ?
+            //          var xa = m.Right * boundingBox.Min.X;
+            //		    var xb = m.Right * boundingBox.Max.X;
+            //		 
+            //		    var ya = m.Up * boundingBox.Min.Y;
+            //		    var yb = m.Up * boundingBox.Max.Y;
+            //		 
+            //		    var za = m.Backward * boundingBox.Min.Z;
+            //		    var zb = m.Backward * boundingBox.Max.Z;
+            //		 
+            //		    return new BoundingBox(
+            //		        Vector3.Min(xa, xb) + Vector3.Min(ya, yb) + Vector3.Min(za, zb) + m.Translation,
+            //		        Vector3.Max(xa, xb) + Vector3.Max(ya, yb) + Vector3.Max(za, zb) + m.Translation
+
             return new BoundingBox(worldMin, worldMax);
         }
 
@@ -460,8 +485,8 @@ namespace Keystone.Types
             // min/max of the bounding box such that there is no collision with any plane?  In that way, the box "contains"
             // the ray but never intersects it.
 
-   //         distance1 = tXmin;
-   //         distance2 = tXmax;
+            //         distance1 = tXmin;
+            //         distance2 = tXmax;
 
             if ((tXmin > tymax) || (tymin > tXmax)) return false;
             // consolidate min/max into txmin and txmax respectively
@@ -522,47 +547,47 @@ namespace Keystone.Types
             //https://tavianator.com/2011/ray_box.html
             // http://www.scratchapixel.com/lessons/3d-basic-lessons/lesson-7-intersecting-simple-shapes/ray-box-intersection/
             Vector3d[] parameters = new Vector3d[2];
-			parameters[0] = _min;
-			parameters[1] = _max;
+            parameters[0] = _min;
+            parameters[1] = _max;
             double tXmin = (parameters[r.Sign[0]].x - r.Origin.x) * r.InverseDirection.x;
             double tXmax = (parameters[1 - r.Sign[0]].x - r.Origin.x) * r.InverseDirection.x;
             double tymin = (parameters[r.Sign[1]].y - r.Origin.y) * r.InverseDirection.y;
             double tymax = (parameters[1 - r.Sign[1]].y - r.Origin.y) * r.InverseDirection.y;
-            
+
             // TODO: is there an issue in this method of failing to collide when the t0 and t1 are both inside the 
             // min/max of the bounding box such that there is no collision with any plane?  In that way, the box "contains"
             // the ray but never intersects it.
-            
-            
-            if ((tXmin > tymax) || (tymin > tXmax))  return false;
+
+
+            if ((tXmin > tymax) || (tymin > tXmax)) return false;
             // consolidate min/max into txmin and txmax respectively
             if (tymin > tXmin)
                 tXmin = tymin;
             if (tymax < tXmax)
                 tXmax = tymax;
-            
+
             double tzmin = (parameters[r.Sign[2]].z - r.Origin.z) * r.InverseDirection.z;
             double tzmax = (parameters[1 - r.Sign[2]].z - r.Origin.z) * r.InverseDirection.z;
-            
+
             if ((tXmin > tzmax) || (tzmin > tXmax)) return false;
             // consolidate min/max into txmin and txmax respectively
             if (tzmin > tXmin)
                 tXmin = tzmin;
             if (tzmax < tXmax)
                 tXmax = tzmax;
-            
+
             // The code from this lesson returns intersections with the box which are in front or behind 
             // the origin of the ray. For instance, if the ray's origin is inside the box (like in the 
             // image on the right), there will be two intersections: one in front of the ray and one behind.
-			// We know that an intersection is "behind" the origin of the ray when the value for t is negative.
-			// When t is positive, the intersection is in front of the origin of the ray. If your algorithm
-			// is not interested in intersections for values of t lower than 0, then you will have to carefully
-			// deal with these cases when you return from the ray-box intersection box (as it is often a source 
-			// of bugs).
+            // We know that an intersection is "behind" the origin of the ray when the value for t is negative.
+            // When t is positive, the intersection is in front of the origin of the ray. If your algorithm
+            // is not interested in intersections for values of t lower than 0, then you will have to carefully
+            // deal with these cases when you return from the ray-box intersection box (as it is often a source 
+            // of bugs).
 
-			// if -1 for t0 and t1, no min/max range testing wanted
+            // if -1 for t0 and t1, no min/max range testing wanted
             if (t0 == -1d || t1 == -1d) return true;
-            
+
             // return true if any part of collision segmewnt overlaps the min/max range
             return ((tXmin < t1) && (tXmax > t0));
         }
@@ -582,11 +607,13 @@ namespace Keystone.Types
         //size_t direction = std::distance(dist, std::min_element(dist, dist + 4));
 
         //switch (direction) {
-        //    case 0: /* Move box1 along -x by dist[0] */ break;
-        //    case 1: /* Move box1 along +x by dist[1] */ break;
-        //    case 2: /* Move box1 along -y by dist[2] */ break;
-        //    case 3: /* Move box1 along +y by dist[3] */ break;
-        //}
+        //    case 0: /* Move box1 along -x by dist[0] */ // break;
+                                                        //    case 1: /* Move box1 along +x by dist[1] */ break;
+                                                        //    case 2: /* Move box1 along -y by dist[2] */ break;
+                                                        //    case 3: /* Move box1 along +y by dist[3] */ break;
+                                                        //}
+
+
 
         //returns if the passed inbox is contained in whole or in part with the existing box
         //NOTE: We must test both boxes against each other because if one box totally encompasses the other
@@ -629,7 +656,9 @@ namespace Keystone.Types
         /// <returns></returns>
         public bool Contains(BoundingBox box)
         {
+            //Console.WriteLine("Contains");
             return Contains(box.Vertices);
+
         }
 
         // returns true if _all_ points are contained
@@ -649,13 +678,13 @@ namespace Keystone.Types
                     point.z >= Min.z && point.z <= Max.z);
         }
 
-    	public bool Contains(double pointX, double pointY, double pointZ)
+        public bool Contains(double pointX, double pointY, double pointZ)
         {
             return (pointX >= Min.x && pointX <= Max.x &&
                     pointY >= Min.y && pointY <= Max.y &&
                     pointZ >= Min.z && pointZ <= Max.z);
         }
-                
+
         ///// <summary>
         ///// performs intersection testing based on the separating axis theorem. As soon as a separating axis is found, the function returns.
         ///// </summary>
@@ -710,30 +739,30 @@ namespace Keystone.Types
         //    return true;
         //}
 
-        
+
         public void Reset()
         {
-        	_min= MIN_INIT;
-        	_max = MAX_INIT;
+            _min = MIN_INIT;
+            _max = MAX_INIT;
         }
-        
+
         public void Resize(float minX, float minY, float minZ, float maxX, float maxY, float maxZ)
         {
-        	_min.x = minX;
-        	_min.y = minY;
-        	_min.z = minZ;
-        	_max.x = maxX;
-        	_max.y = maxY;
-        	_max.z = maxZ;
+            _min.x = minX;
+            _min.y = minY;
+            _min.z = minZ;
+            _max.x = maxX;
+            _max.y = maxY;
+            _max.z = maxZ;
         }
-        
+
         /// <summary>
         /// Combines the dimensions of the parameter box to this existing box.
         /// </summary>
         /// <param name="target"></param>
-        public void Combine (BoundingBox target)
+        public void Combine(BoundingBox target)
         {
-        	Vector3d min, max;
+            Vector3d min, max;
             min.x = Math.Min(_min.x, target._min.x);
             min.y = Math.Min(_min.y, target._min.y);
             min.z = Math.Min(_min.z, target._min.z);
@@ -741,11 +770,11 @@ namespace Keystone.Types
             max.x = Math.Max(_max.x, target._max.x);
             max.y = Math.Max(_max.y, target._max.y);
             max.z = Math.Max(_max.z, target._max.z);
-            
+
             _min = min;
             _max = max;
         }
-        
+
         //When combining bounding volumes, an uninitialized box will have 0,0,0 for both min & max vectors
         //This is usually unintional so make sure your bounding boxes are initialized with proper min/max vectors.
         public static BoundingBox Combine(BoundingBox b1, BoundingBox b2)
@@ -766,7 +795,7 @@ namespace Keystone.Types
         //TODO: I really should make these regular NON static methods
         public static Vector3d[,] GetQuadFaceVertices(BoundingBox box)
         {
-            Vector3d[,] vertices = new Vector3d[6,4];
+            Vector3d[,] vertices = new Vector3d[6, 4];
             // NOTE: for AABB the first subscript 0 to 5 indices correspond with 
             //the CUBEMAP_FACE enumeration such that
             // face 0 is the PositiveX = 0
@@ -818,6 +847,7 @@ namespace Keystone.Types
 
         public static Vector3d[] GetVertices(BoundingBox box)
         {
+           //Console.WriteLine("Get Vertices");
             Vector3d[] vertices = new Vector3d[8];
 
             // NOTE: Default DirectX winding order is CLOCKWISE vertices for
@@ -827,11 +857,11 @@ namespace Keystone.Types
             // |    |
             // 4 ___ 5
             //  \    \
-             //   2 ___ 3
-             //   |    |
-             //   0 ___ 1
-             // is our layout
-             
+            //   2 ___ 3
+            //   |    |
+            //   0 ___ 1
+            // is our layout
+
             vertices[0].x = box.Min.x;
             vertices[0].y = box.Min.y;
             vertices[0].z = box.Min.z;
@@ -859,6 +889,7 @@ namespace Keystone.Types
             return vertices;
         }
 
+        
         /// <summary>
         /// Constructs the 12 edges of the bouding box
         /// </summary>
@@ -897,10 +928,10 @@ namespace Keystone.Types
             // |    |
             // 4 ___ 5
             //  \    \
-             //   2 ___ 3
-             //   |    |
-             //   0 ___ 1
-             // is our layout     
+            //   2 ___ 3
+            //   |    |
+            //   0 ___ 1
+            // is our layout     
             Triangle[] tris = new Triangle[12];
             Vector3d[] v = box.Vertices;
 
@@ -926,7 +957,7 @@ namespace Keystone.Types
             tris[9] = new Triangle(v[7], v[1], v[5]); // right
             return tris;
         }
-        
+
         public static Polygon[] GetPolyFaces(BoundingBox box)
         {
             // NOTE: Default DirectX winding order is CLOCKWISE vertices for
@@ -936,19 +967,19 @@ namespace Keystone.Types
             // |    |
             // 4 ___ 5
             //  \    \
-             //   2 ___ 3
-             //   |    |
-             //   0 ___ 1
-             // is our layout      
-            
+            //   2 ___ 3
+            //   |    |
+            //   0 ___ 1
+            // is our layout      
+
             Polygon[] polys = new Polygon[6];
             Vector3d[] v = box.Vertices;
-            
+
             // bottom face
-            polys[0] = new Polygon(v[0], v[1], v[3], v[2]); 
-            
+            polys[0] = new Polygon(v[0], v[1], v[3], v[2]);
+
             // top face
-            polys[5] = new Polygon(v[4], v[6], v[7], v[5]); 
+            polys[5] = new Polygon(v[4], v[6], v[7], v[5]);
 
             // the side faces
             polys[1] = new Polygon(v[0], v[2], v[6], v[4]); // left 
@@ -962,7 +993,7 @@ namespace Keystone.Types
         // one good thing is this code can be used for our imposter code too
         // find the minimum and maximum distance needed to enclose that box on the supplied axis.
         public static void GetProjectedDistances(BoundingBox box, Vector3d OnVector, out double NearDistance,
-                                                 out double FarDistance)
+                                                    out double FarDistance)
         {
             double FarAssociatedNear = double.MinValue;
             NearDistance = double.MaxValue;
@@ -985,7 +1016,7 @@ namespace Keystone.Types
                     CurrentNear += ProjectedVector;
 
                 NearDistance = Math.Min(NearDistance, CurrentNear);
-                double CurrentFar = ProjectedVector*Math.Sign(ProjectedVector);
+                double CurrentFar = ProjectedVector * Math.Sign(ProjectedVector);
 
                 if (CurrentNear + CurrentFar > FarAssociatedNear + FarDistance)
                 {
@@ -999,20 +1030,33 @@ namespace Keystone.Types
             NearDistance -= DEPTH_BIAS;
         }
         
-        // Equality operator. Returns dbNull if either operand is dbNull, 
-		// otherwise returns dbTrue or dbFalse:
-		public static bool operator ==(BoundingBox a, BoundingBox b) 
+
+		public override bool Equals (object bb)
 		{
-			if (a.Min == b.Min && a.Max == b.Max) return true;
-			return false;
+			if (bb is BoundingBox == false) return false;
+			
+			return this == (BoundingBox)bb;
 		}
 		
-		// Inequality operator. Returns dbNull if either operand is
-		// dbNull, otherwise returns dbTrue or dbFalse:
-		public static bool operator !=(BoundingBox a, BoundingBox b) 
+		public override int GetHashCode()
 		{
-			if (a.Min != b.Min || a.Max != b.Max) return true;
-			return false;
+			return this.Min.GetHashCode() + this.Max.GetHashCode();
 		}
+		
+        // Equality operator. Returns dbNull if either operand is dbNull, 
+        // otherwise returns dbTrue or dbFalse:
+        public static bool operator ==(BoundingBox a, BoundingBox b)
+        {
+            if (a.Min == b.Min && a.Max == b.Max) return true;
+            return false;
+        }
+
+        // Inequality operator. Returns dbNull if either operand is
+        // dbNull, otherwise returns dbTrue or dbFalse:
+        public static bool operator !=(BoundingBox a, BoundingBox b)
+        {
+            if (a.Min != b.Min || a.Max != b.Max) return true;
+            return false;
+        }
     }
 }

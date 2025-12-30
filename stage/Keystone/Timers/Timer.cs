@@ -4,7 +4,7 @@ using System.Security;
 using System.Collections.Generic;
 
 // TODO: TimerAPI will reference this Timer which will be hosted by Core.cs
-
+//        TODO: Take a look at MMTimer though because it uses asynchronous timing methods with callbacks and not just polling
 namespace Keystone.Timers
 {
     public class Timer : TimerBase

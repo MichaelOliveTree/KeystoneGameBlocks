@@ -436,7 +436,7 @@ namespace HelloMemoryT
     {
         private uint STARTING_SIZE = 64;
         private const uint MIN_SIZE = 64;
-        private const uint MAX_SIZE = 1024 * 1000;
+        private const uint MAX_SIZE = 1024 * 64;
         private uint EXPAND_INCREMENT = MIN_SIZE; // expand by this amount when needed.  if 0, it will double the size of Components
         private object mSync;
         private Dictionary<string, bool[]> mViews;

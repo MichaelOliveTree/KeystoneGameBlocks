@@ -1,12 +1,155 @@
+#define USE_STRUCT
+
+
 using System;
 
 namespace Keystone.Types
 {
-	// http://msdn.microsoft.com/en-au/library/bb206269%28VS.85%29.aspx
+    // http://msdn.microsoft.com/en-au/library/bb206269%28VS.85%29.aspx
+#if USE_STRUCT
+    public struct Matrix
+#else
     public class Matrix
+#endif
     {
         private double[,] _mat;
-        private double _determinant = 0d;
+        private double _determinant;
+
+        //* The zero-based row-column position:
+        //      o _m00, _m01, _m02, _m03
+        //      o _m10, _m11, _m12, _m13
+        //      o _m20, _m21, _m22, _m23
+        //      o _m30, _m31, _m32, _m33
+        //* The one-based row-column position:
+        //      o _11, _12, _13, _14
+        //      o _21, _22, _23, _24
+        //      o _31, _32, _33, _34
+        //      o _41, _42, _43, _44
+
+        //A matrix can also be accessed using array access notation, which is a zero-based set of indices. 
+        //Each index is inside of square brackets. A 4x4 matrix is accessed with the following indices:
+        //* [0][0], [0][1], [0][2], [0][3]
+        //* [1][0], [1][1], [1][2], [1][3]
+        //* [2][0], [2][1], [2][2], [2][3]
+        //* [3][0], [3][1], [3][2], [3][3]
+        public Matrix(bool identity)
+        {
+            _mat = new double[4, 4];
+            _determinant = 0d;
+            if (identity)
+            {
+                _mat[0, 0] = 1.0d;
+                _mat[1, 1] = 1.0d;
+                _mat[2, 2] = 1.0d;
+                _mat[3, 3] = 1.0d;
+            }
+        }
+
+        /// <summary>
+        /// Matrix from orientation quaternion.
+        /// </summary>
+        /// <param name="quat">Unit quaternion</param>
+        public Matrix(Quaternion quat) : this()
+        {
+            //Matrix matrix = Matrix.Identity(); // new Matrix(); //
+
+            double xx = quat.X * quat.X;
+            double yy = quat.Y * quat.Y;
+            double zz = quat.Z * quat.Z;
+            double xy = quat.X * quat.Y;
+            double xz = quat.X * quat.Z;
+            double yz = quat.Y * quat.Z;
+            double wx = quat.W * quat.X;
+            double wy = quat.W * quat.Y;
+            double wz = quat.W * quat.Z;
+
+            _mat[0, 0] = 1.0 - 2.0 * (yy + zz);
+            _mat[1, 0] = 2.0 * (xy - wz);
+            _mat[2, 0] = 2.0 * (xz + wy);
+
+            _mat[0, 1] = 2.0 * (xy + wz);
+            _mat[1, 1] = 1.0 - 2.0 * (xx + zz);
+            _mat[2, 1] = 2.0 * (yz - wx);
+
+            _mat[0, 2] = 2.0 * (xz - wy);
+            _mat[1, 2] = 2.0 * (yz + wx);
+            _mat[2, 2] = 1.0 - 2.0 * (xx + yy);
+
+            _mat[3, 0] = _mat[3, 1] = _mat[3, 2] = 0.0d;
+            _mat[0, 3] = _mat[1, 3] = _mat[2, 3] = 0.0d;
+            _mat[3, 3] = 1.0d;
+
+
+
+            //
+            //            double single9 = quat.X * quat.X;
+            //            double single8 = quat.Y * quat.Y;
+            //            double single7 = quat.Z * quat.Z;
+            //            double single6 = quat.X * quat.Y;
+            //            double single5 = quat.Z * quat.W;
+            //            double single4 = quat.Z * quat.X;
+            //            double single3 = quat.Y * quat.W;
+            //            double single2 = quat.Y * quat.Z;
+            //            double single1 = quat.X * quat.W;
+            //            _mat[0, 0] = 1.0 - (2.0 * (single8 + single7));
+            //            _mat[0, 1] = 2.0 * (single6 + single5);
+            //            _mat[0, 2] = 2.0 * (single4 - single3);
+            //            _mat[0, 3] = 0.0;
+            //            _mat[1, 0] = 2.0 * (single6 - single5);
+            //            _mat[1, 1] = 1.0 - (2.0 * (single7 + single9));
+            //            _mat[1, 2] = 2.0 * (single2 + single1);
+            //            _mat[1, 3] = 0.0;
+            //            _mat[2, 0] = 2.0 * (single4 + single3);
+            //            _mat[2, 1] = 2.0 * (single2 - single1);
+            //            _mat[2, 2] = 1.0 - (2.0 * (single8 + single9));
+            //            _mat[2, 3] = 0.0;
+            //            _mat[3, 0] = 0.0;
+            //            _mat[3, 1] = 0.0;
+            //            _mat[3, 2]= 0.0;
+            //            _mat[3, 3] = 1.0;
+        }
+
+        public Matrix(double m11, double m12, double m13, double m14,
+            double m21, double m22, double m23, double m24,
+            double m31, double m32, double m33, double m34,
+            double m41, double m42, double m43, double m44) : this()
+        {
+            _mat[0, 0] = m11;
+            _mat[0, 1] = m12;
+            _mat[0, 2] = m13;
+            _mat[0, 3] = m14;
+            _mat[1, 0] = m21;
+            _mat[1, 1] = m22;
+            _mat[1, 2] = m23;
+            _mat[1, 3] = m24;
+            _mat[2, 0] = m31;
+            _mat[2, 1] = m32;
+            _mat[2, 2] = m33;
+            _mat[2, 3] = m34;
+            _mat[3, 0] = m41;
+            _mat[3, 1] = m42;
+            _mat[3, 2] = m43;
+            _mat[3, 3] = m44;
+        }
+        public Matrix(Matrix m) : this()
+        {
+            _mat[0, 0] = m.M11;
+            _mat[0, 1] = m.M12;
+            _mat[0, 2] = m.M13;
+            _mat[0, 3] = m.M14;
+            _mat[1, 0] = m.M21;
+            _mat[1, 1] = m.M22;
+            _mat[1, 2] = m.M23;
+            _mat[1, 3] = m.M24;
+            _mat[2, 0] = m.M31;
+            _mat[2, 1] = m.M32;
+            _mat[2, 2] = m.M33;
+            _mat[2, 3] = m.M34;
+            _mat[3, 0] = m.M41;
+            _mat[3, 1] = m.M42;
+            _mat[3, 2] = m.M43;
+            _mat[3, 3] = m.M44;
+        }
 
         public double Determinant { get { return _determinant; } }
         public double M11
@@ -108,35 +251,35 @@ namespace Keystone.Types
         //http://www.euclideanspace.com/maths/algebra/matrix/orthogonal/index.htm
         public Vector3d Right
         {
-            get 
+            get
             {
-            	Vector3d result;
-            	result.x = _mat[0,0];
-            	result.y = _mat[1,0];
-            	result.z = _mat[2,0];
-            	return result;
+                Vector3d result;
+                result.x = _mat[0, 0];
+                result.y = _mat[1, 0];
+                result.z = _mat[2, 0];
+                return result;
             }
         }
         public Vector3d Up
         {
-            get 
-            { 
-            	Vector3d result;
-            	result.x = _mat[0,1];
-            	result.y = _mat[1,1];
-            	result.z = _mat[2,1];
-            	return result;
+            get
+            {
+                Vector3d result;
+                result.x = _mat[0, 1];
+                result.y = _mat[1, 1];
+                result.z = _mat[2, 1];
+                return result;
             }
         }
         public Vector3d Backward
         {
-            get 
-            { 
-            	Vector3d result;
-            	result.x = _mat[0,2];
-            	result.y = _mat[1,2];
-            	result.z = _mat[2,2];
-            	return result;
+            get
+            {
+                Vector3d result;
+                result.x = _mat[0, 2];
+                result.y = _mat[1, 2];
+                result.z = _mat[2, 2];
+                return result;
             }
         }
 
@@ -164,139 +307,10 @@ namespace Keystone.Types
             _mat[3, 1] = translation.y;
             _mat[3, 2] = translation.z;
         }
-        
-        //* The zero-based row-column position:
-        //      o _m00, _m01, _m02, _m03
-        //      o _m10, _m11, _m12, _m13
-        //      o _m20, _m21, _m22, _m23
-        //      o _m30, _m31, _m32, _m33
-        //* The one-based row-column position:
-        //      o _11, _12, _13, _14
-        //      o _21, _22, _23, _24
-        //      o _31, _32, _33, _34
-        //      o _41, _42, _43, _44
-
-        //A matrix can also be accessed using array access notation, which is a zero-based set of indices. 
-        //Each index is inside of square brackets. A 4x4 matrix is accessed with the following indices:
-        //* [0][0], [0][1], [0][2], [0][3]
-        //* [1][0], [1][1], [1][2], [1][3]
-        //* [2][0], [2][1], [2][2], [2][3]
-        //* [3][0], [3][1], [3][2], [3][3]
-        public Matrix()
-        {
-            _mat = new double[4,4];
-        }
-
-        /// <summary>
-        /// Matrix from orientation quaternion.
-        /// </summary>
-        /// <param name="quat">Unit quaternion</param>
-        public Matrix (Quaternion quat) : this()
-        {
-            //Matrix matrix = Matrix.Identity(); // new Matrix(); //
-            
-            double xx = quat.X * quat.X;
-            double yy = quat.Y * quat.Y;
-            double zz = quat.Z * quat.Z;
-            double xy = quat.X * quat.Y;
-            double xz = quat.X * quat.Z;
-            double yz = quat.Y * quat.Z;
-            double wx = quat.W * quat.X;
-            double wy = quat.W * quat.Y;
-            double wz = quat.W * quat.Z;
-
-            _mat[0, 0] = 1.0 - 2.0 * (yy + zz);
-            _mat[1, 0] = 2.0 * (xy - wz);
-            _mat[2, 0] = 2.0 * (xz + wy);
-
-            _mat[0, 1] = 2.0 * (xy + wz);
-            _mat[1, 1] = 1.0 - 2.0 * (xx + zz);
-            _mat[2, 1] = 2.0 * (yz - wx);
-
-            _mat[0, 2] = 2.0 * (xz - wy);
-            _mat[1, 2] = 2.0 * (yz + wx);
-            _mat[2, 2] = 1.0 - 2.0 * (xx + yy);
-
-            _mat[3, 0] = _mat[3, 1] = _mat[3, 2] = 0.0d;
-            _mat[0, 3] = _mat[1, 3] = _mat[2, 3] = 0.0d;
-            _mat[3, 3] = 1.0d;
-
-
-
-//
-//            double single9 = quat.X * quat.X;
-//            double single8 = quat.Y * quat.Y;
-//            double single7 = quat.Z * quat.Z;
-//            double single6 = quat.X * quat.Y;
-//            double single5 = quat.Z * quat.W;
-//            double single4 = quat.Z * quat.X;
-//            double single3 = quat.Y * quat.W;
-//            double single2 = quat.Y * quat.Z;
-//            double single1 = quat.X * quat.W;
-//            _mat[0, 0] = 1.0 - (2.0 * (single8 + single7));
-//            _mat[0, 1] = 2.0 * (single6 + single5);
-//            _mat[0, 2] = 2.0 * (single4 - single3);
-//            _mat[0, 3] = 0.0;
-//            _mat[1, 0] = 2.0 * (single6 - single5);
-//            _mat[1, 1] = 1.0 - (2.0 * (single7 + single9));
-//            _mat[1, 2] = 2.0 * (single2 + single1);
-//            _mat[1, 3] = 0.0;
-//            _mat[2, 0] = 2.0 * (single4 + single3);
-//            _mat[2, 1] = 2.0 * (single2 - single1);
-//            _mat[2, 2] = 1.0 - (2.0 * (single8 + single9));
-//            _mat[2, 3] = 0.0;
-//            _mat[3, 0] = 0.0;
-//            _mat[3, 1] = 0.0;
-//            _mat[3, 2]= 0.0;
-//            _mat[3, 3] = 1.0;
-        }
-
-        public Matrix (double  m11, double m12, double m13, double m14,
-            double m21, double m22, double m23, double m24, 
-            double m31, double m32, double m33, double m34,
-            double m41, double m42, double m43, double m44): this()
-        {
-            _mat[0, 0] = m11;
-            _mat[0, 1] = m12;
-            _mat[0, 2] = m13;
-            _mat[0, 3] = m14;
-            _mat[1, 0] = m21;
-            _mat[1, 1] = m22;
-            _mat[1, 2] = m23;
-            _mat[1, 3] = m24;
-            _mat[2, 0] = m31;
-            _mat[2, 1] = m32;
-            _mat[2, 2] = m33;
-            _mat[2, 3] = m34;
-            _mat[3, 0] = m41;
-            _mat[3, 1] = m42;
-            _mat[3, 2] = m43;
-            _mat[3, 3] = m44;
-        }
-        public Matrix  (Matrix m): this()
-        {
-            _mat[0, 0] = m.M11;
-            _mat[0, 1] = m.M12;
-            _mat[0, 2] = m.M13;
-            _mat[0, 3] = m.M14;
-            _mat[1, 0] = m.M21;
-            _mat[1, 1] = m.M22;
-            _mat[1, 2] = m.M23;
-            _mat[1, 3] = m.M24;
-            _mat[2, 0] = m.M31;
-            _mat[2, 1] = m.M32;
-            _mat[2, 2] = m.M33;
-            _mat[2, 3] = m.M34;
-            _mat[3, 0] = m.M41;
-            _mat[3, 1] = m.M42;
-            _mat[3, 2] = m.M43;
-            _mat[3, 3] = m.M44;
-        }
-       
 
         public static Matrix Identity()
         {
-            Matrix m = new Matrix();
+            Matrix m = new Matrix(true);
             m._mat[0, 0] = 1.0f;
             m._mat[0, 1] = 0.0f;
             m._mat[0, 2] = 0.0f;
@@ -319,8 +333,8 @@ namespace Keystone.Types
 
             return m;
         }
-           
-		/// <summary>
+
+        /// <summary>
         /// Creates a Translation Matrix that is first initialized to Identity.
         /// </summary>
         /// <param name="v"></param>
@@ -345,8 +359,8 @@ namespace Keystone.Types
         {
             return CreateScaling(v.x, v.y, v.z);
         }
-        
-        
+
+
         // NOTE: The following offset rotation is not really useful because instead we are computing
         // the RegoinMatrix already taking into account a .Pivot value.
         // http://www.ogre3d.org/forums/viewtopic.php?f=5&t=11088&start=25
@@ -370,7 +384,7 @@ namespace Keystone.Types
             double sin = Math.Sin(angleRadians);
             double invcos = 1.0d - cos;
 
-            Matrix m = new Matrix ();
+            Matrix m = new Matrix();
 
             m.M11 = cos + rotationAxis.x * rotationAxis.x * invcos;
             m.M12 = rotationAxis.x * rotationAxis.y * invcos + (rotationAxis.z * sin);
@@ -432,7 +446,7 @@ namespace Keystone.Types
             // Assuming the angle is in radians. 
             double cos_x = Math.Cos(angleRadians);
             double sin_x = Math.Sin(angleRadians);
-            Matrix tmp = Types.Matrix.Identity();
+            Matrix tmp = Matrix.Identity();
             tmp.M11 = 1.0D;
             tmp.M12 = 0.0D;
             tmp.M13 = 0.0D;
@@ -457,7 +471,7 @@ namespace Keystone.Types
             // Assuming the angle is in radians.
             double c = Math.Cos(angleRadians);
             double s = Math.Sin(angleRadians);
-            Matrix tmp = Types.Matrix.Identity();
+            Matrix tmp = Matrix.Identity();
             tmp.M11 = c;
             tmp.M12 = 0.0D;
             tmp.M13 = -s;
@@ -482,7 +496,7 @@ namespace Keystone.Types
             // Assuming the angle is in radians. 
             double c = Math.Cos(angleRadians);
             double s = Math.Sin(angleRadians);
-            Matrix tmp = Types.Matrix.Identity();
+            Matrix tmp = Matrix.Identity();
             tmp.M11 = c;
             tmp.M12 = s;
             tmp.M13 = 0.0;
@@ -501,7 +515,7 @@ namespace Keystone.Types
             tmp.M44 = 1;
             return tmp;
         }
-        
+
         // http://stackoverflow.com/questions/349050/calculating-a-lookat-matrix
         // this is a left handed view matrix.  to use as a rotation for a model, take it's inverse.
         public static Matrix CreateLookAt(Vector3d position, Vector3d target, Vector3d up)
@@ -531,18 +545,18 @@ namespace Keystone.Types
             //matrix1.M42 = -Vector3d.DotProduct(right, position);
             //matrix1.M43 = -Vector3d.DotProduct(forward, position);
             matrix1.M44 = 1.00d;
-            return matrix1;   
+            return matrix1;
         }
-        
+
         public static Matrix PerspectiveFOVLH(double near, double far, double fovRadians, int viewportWidth, int viewportHeight, ref double aspectRatio)
         {
             Matrix proj = new Matrix();
-          
+
             double cot = 1d / Math.Tan(fovRadians * 0.5d);
 
             aspectRatio = (double)viewportWidth / (double)viewportHeight; // floating point divide
 
-            proj.M11 = cot / aspectRatio; 
+            proj.M11 = cot / aspectRatio;
             proj.M22 = cot;
             proj.M33 = far / (far - near);
             proj.M34 = 1d;
@@ -572,7 +586,7 @@ namespace Keystone.Types
             //result.M43 = -near * far / (far - near);
             //return result;
         }
-        
+
         /// <summary>
         /// http://www.codeguru.com/Cpp/misc/misc/math/article.php/c10123__2/    <-- deriving projection matrices
         /// src : http://www.ogre3d.org/forums/viewtopic.php?f=2&t=26244&start=0
@@ -637,7 +651,7 @@ namespace Keystone.Types
         {
             Matrix rotationMatrix = new Matrix(); // Types.Matrix.Identity();
 
-            Vector3d r = Vector3d.CrossProduct (cameraUp, cameraLook);
+            Vector3d r = Vector3d.CrossProduct(cameraUp, cameraLook);
             r.Normalize();
             rotationMatrix.M11 = r.x;
             rotationMatrix.M12 = r.y;
@@ -670,31 +684,29 @@ namespace Keystone.Types
         // note: using 8 triangles and not just sandwhiching 2 x 2 triangle quads looks better at all angles... in case wondering why not just use two quads instead of 4.
 
 
-            /// <summary>
-            /// Creates a world matrix in camera space NOT a local space matrix.  NOTE that the billboard position is in camera space position or world position if cameraPosition is in world space.
-            /// In otherwords, there is no need to multiply this returned matrix with a derivedRotation.
-            /// </summary>
-            /// <param name="up">This is the rotation axis of the Mesh perhaps?  
-            /// This should probably NOT be the derivedRotation but just the default Up vector?</param>
-            /// <param name="billboardPosition"></param>
-            /// <param name="cameraPosition"></param>
-            /// <returns></returns>
+        /// <summary>
+        /// Creates a world matrix in camera space NOT a local space matrix.  NOTE that the billboard position is in camera space position or world position if cameraPosition is in world space.
+        /// In otherwords, there is no need to multiply this returned matrix with a derivedRotation.
+        /// </summary>
+        /// <param name="up"></param>
+        /// <param name="billboardPosition"></param>
+        /// <param name="cameraPosition"></param>
+        /// <returns></returns>
         public static Matrix CreateAxialBillboardRotationMatrix(Vector3d up, Vector3d billboardPosition, Vector3d cameraPosition)
         {
             // https://www.flipcode.com/archives/Billboarding-Excerpt_From_iReal-Time_Renderingi_2E.shtml
             // https://forum.unity.com/threads/billboard-script-flat-spherical-arbitrary-axis-aligned.539481/
 
             // https://gamedev.stackexchange.com/questions/188636/cylindrical-billboarding-around-an-arbitrary-axis-in-geometry-shader
+            up = Vector3d.Up(); // Hypnotron Dec.18.2025 // TODO: verify this fixes the issue and then we can modifiy what we pass into this function            
             
-            Vector3d up = Vector3d.Up(); // Hypnotron Dec.18.2025 // TODO: verify this fixes the issue and then we can modifiy what we pass into this function
-
             // look == forward vector
             Vector3d look = Vector3d.Normalize(billboardPosition - cameraPosition);
 
             Vector3d right = Vector3d.Normalize(Vector3d.CrossProduct(up, look));
 
             // March.11.2024 - up is actually our axis and should not be recomputed. This fixes the issue with billboard not appearing to point towards it target at certain angles
- //           up = Vector3d.Normalize(Vector3d.CrossProduct(look, right));
+            //           up = Vector3d.Normalize(Vector3d.CrossProduct(look, right));
 
             // recompute a new Up() vector. // Hypnotron Dec.18.2025
             // todo: test the following now that we think we understand that the initial up vector is that of the Billboard which is always 0,1,0?
@@ -723,7 +735,7 @@ namespace Keystone.Types
                                                        Vector3d cameraPosition)
         {
             return
-                CreateAxialBillboardRotationMatrix(new Vector3d(rotationMatrix.M21, rotationMatrix.M22, rotationMatrix.M23), billboardPosition , cameraPosition);
+                CreateAxialBillboardRotationMatrix(new Vector3d(rotationMatrix.M21, rotationMatrix.M22, rotationMatrix.M23), billboardPosition, cameraPosition);
         }
 
 
@@ -768,80 +780,80 @@ namespace Keystone.Types
         //
         //}
 
-//        private static Matrix InverseTV3D (Matrix m)
-//        {
-//
-//            // TVMatrixInverse() works for picking and culling and everything but
-//            // 1) we don't want the MTV3D65 dependancy in keystone.dll or keymath.dll since server shouldn't require windows and DX
-//            // 2) the loss of precision when using single floating point precision matrices are bad for space sim
-//            MTV3D65.TV_3DMATRIX tvmat = Keystone.Types. Matrix.ToTV3DMatrix(m);
-//            MTV3D65.TV_3DMATRIX inv = new MTV3D65.TV_3DMATRIX();
-//            float det = 0;
-//
-//            CoreClient._Core.Maths.TVMatrixInverse(ref inv, ref det, tvmat);
-//            return new Matrix(inv);
-//        }
+        //        private static Matrix InverseTV3D (Matrix m)
+        //        {
+        //
+        //            // TVMatrixInverse() works for picking and culling and everything but
+        //            // 1) we don't want the MTV3D65 dependancy in keystone.dll or keymath.dll since server shouldn't require windows and DX
+        //            // 2) the loss of precision when using single floating point precision matrices are bad for space sim
+        //            MTV3D65.TV_3DMATRIX tvmat = Keystone.Types. Matrix.ToTV3DMatrix(m);
+        //            MTV3D65.TV_3DMATRIX inv = new MTV3D65.TV_3DMATRIX();
+        //            float det = 0;
+        //
+        //            CoreClient._Core.Maths.TVMatrixInverse(ref inv, ref det, tvmat);
+        //            return new Matrix(inv);
+        //        }
 
-private static Matrix InvertSlimDX (Matrix value)
-{
-	double b0 = (value.M31 * value.M42) - (value.M32 * value.M41);
-	double b1 = (value.M31 * value.M43) - (value.M33 * value.M41);
-	double b2 = (value.M34 * value.M41) - (value.M31 * value.M44);
-	double b3 = (value.M32 * value.M43) - (value.M33 * value.M42);
-	double b4 = (value.M34 * value.M42) - (value.M32 * value.M44);
-	double b5 = (value.M33 * value.M44) - (value.M34 * value.M43);
-	
-	double d11 = value.M22 * b5 + value.M23 * b4 + value.M24 * b3;
-	double d12 = value.M21 * b5 + value.M23 * b2 + value.M24 * b1;
-	double d13 = value.M21 * -b4 + value.M22 * b2 + value.M24 * b0;
-	double d14 = value.M21 * b3 + value.M22 * -b1 + value.M23 * b0;
-	
-	double det = value.M11 * d11 - value.M12 * d12 + value.M13 * d13 - value.M14 * d14;
-    if (Math.Abs(det) <= 00.0000001d) // the epsilon used here could fail if a very large model is scaled down sufficiently much. For now this value works.
-    {
-              
-        return new Matrix();;
-    }
+        private static Matrix InvertSlimDX(Matrix value)
+        {
+            double b0 = (value.M31 * value.M42) - (value.M32 * value.M41);
+            double b1 = (value.M31 * value.M43) - (value.M33 * value.M41);
+            double b2 = (value.M34 * value.M41) - (value.M31 * value.M44);
+            double b3 = (value.M32 * value.M43) - (value.M33 * value.M42);
+            double b4 = (value.M34 * value.M42) - (value.M32 * value.M44);
+            double b5 = (value.M33 * value.M44) - (value.M34 * value.M43);
 
-    det = 1d / det;
-	
-	double a0 = (value.M11 * value.M22) - (value.M12 * value.M21);
-	double a1 = (value.M11 * value.M23) - (value.M13 * value.M21);
-	double a2 = (value.M14 * value.M21) - (value.M11 * value.M24);
-	double a3 = (value.M12 * value.M23) - (value.M13 * value.M22);
-	double a4 = (value.M14 * value.M22) - (value.M12 * value.M24);
-	double a5 = (value.M13 * value.M24) - (value.M14 * value.M23);
-	
-	double d21 = value.M12 * b5 + value.M13 * b4 + value.M14 * b3;
-	double d22 = value.M11 * b5 + value.M13 * b2 + value.M14 * b1;
-	double d23 = value.M11 * -b4 + value.M12 * b2 + value.M14 * b0;
-	double d24 = value.M11 * b3 + value.M12 * -b1 + value.M13 * b0;
-	
-	double d31 = value.M42 * a5 + value.M43 * a4 + value.M44 * a3;
-	double d32 = value.M41 * a5 + value.M43 * a2 + value.M44 * a1;
-	double d33 = value.M41 * -a4 + value.M42 * a2 + value.M44 * a0;
-	double d34 = value.M41 * a3 + value.M42 * -a1 + value.M43 * a0;
-	
-	double d41 = value.M32 * a5 + value.M33 * a4 + value.M34 * a3;
-	double d42 = value.M31 * a5 + value.M33 * a2 + value.M34 * a1;
-	double d43 = value.M31 * -a4 + value.M32 * a2 + value.M34 * a0;
-	double d44 = value.M31 * a3 + value.M32 * -a1 + value.M33 * a0;
-	
-	Matrix result = Matrix.Identity();
-	result.M11 = +d11 * det; result.M12 = -d21 * det; result.M13 = +d31 * det; result.M14 = -d41 * det;
-	result.M21 = -d12 * det; result.M22 = +d22 * det; result.M23 = -d32 * det; result.M24 = +d42 * det;
-	result.M31 = +d13 * det; result.M32 = -d23 * det; result.M33 = +d33 * det; result.M34 = -d43 * det;
-	result.M41 = -d14 * det; result.M42 = +d24 * det; result.M43 = -d34 * det; result.M44 = +d44 * det;	
+            double d11 = value.M22 * b5 + value.M23 * b4 + value.M24 * b3;
+            double d12 = value.M21 * b5 + value.M23 * b2 + value.M24 * b1;
+            double d13 = value.M21 * -b4 + value.M22 * b2 + value.M24 * b0;
+            double d14 = value.M21 * b3 + value.M22 * -b1 + value.M23 * b0;
 
-	return result;
-}
+            double det = value.M11 * d11 - value.M12 * d12 + value.M13 * d13 - value.M14 * d14;
+            if (Math.Abs(det) <= 00.0000001d) // the epsilon used here could fail if a very large model is scaled down sufficiently much. For now this value works.
+            {
 
-		// 4 x 4 matrix transform
+                return new Matrix();
+            }
+
+            det = 1d / det;
+
+            double a0 = (value.M11 * value.M22) - (value.M12 * value.M21);
+            double a1 = (value.M11 * value.M23) - (value.M13 * value.M21);
+            double a2 = (value.M14 * value.M21) - (value.M11 * value.M24);
+            double a3 = (value.M12 * value.M23) - (value.M13 * value.M22);
+            double a4 = (value.M14 * value.M22) - (value.M12 * value.M24);
+            double a5 = (value.M13 * value.M24) - (value.M14 * value.M23);
+
+            double d21 = value.M12 * b5 + value.M13 * b4 + value.M14 * b3;
+            double d22 = value.M11 * b5 + value.M13 * b2 + value.M14 * b1;
+            double d23 = value.M11 * -b4 + value.M12 * b2 + value.M14 * b0;
+            double d24 = value.M11 * b3 + value.M12 * -b1 + value.M13 * b0;
+
+            double d31 = value.M42 * a5 + value.M43 * a4 + value.M44 * a3;
+            double d32 = value.M41 * a5 + value.M43 * a2 + value.M44 * a1;
+            double d33 = value.M41 * -a4 + value.M42 * a2 + value.M44 * a0;
+            double d34 = value.M41 * a3 + value.M42 * -a1 + value.M43 * a0;
+
+            double d41 = value.M32 * a5 + value.M33 * a4 + value.M34 * a3;
+            double d42 = value.M31 * a5 + value.M33 * a2 + value.M34 * a1;
+            double d43 = value.M31 * -a4 + value.M32 * a2 + value.M34 * a0;
+            double d44 = value.M31 * a3 + value.M32 * -a1 + value.M33 * a0;
+
+            Matrix result = Matrix.Identity();
+            result.M11 = +d11 * det; result.M12 = -d21 * det; result.M13 = +d31 * det; result.M14 = -d41 * det;
+            result.M21 = -d12 * det; result.M22 = +d22 * det; result.M23 = -d32 * det; result.M24 = +d42 * det;
+            result.M31 = +d13 * det; result.M32 = -d23 * det; result.M33 = +d33 * det; result.M34 = -d43 * det;
+            result.M41 = -d14 * det; result.M42 = +d24 * det; result.M43 = -d34 * det; result.M44 = +d44 * det;
+
+            return result;
+        }
+
+        // 4x4 Matrix Inverse
         public static Matrix Inverse(Matrix m)
         {
-        	// return InverseTV3D (m);
-        	return InvertSlimDX(m);
-        	
+            // return InverseTV3D (m);
+            return InvertSlimDX(m);
+
             //double e;
             //Matrix m1 = new Matrix(m);
 
@@ -926,7 +938,9 @@ private static Matrix InvertSlimDX (Matrix value)
             result.M34 = -(((single5 * single28) - (single4 * single26)) + (single2 * single24)) * single1;
             result.M44 = (((single5 * single27) - (single4 * single25)) + (single3 * single24)) * single1;
             return result;
+
         }
+
 
         // a simple inverse to work with View matrix and is used by Picking
         // http://www.gamedev.net/community/forums/topic.asp?topic_id=288155
@@ -984,7 +998,7 @@ private static Matrix InvertSlimDX (Matrix value)
             transposed._mat[3, 3] = m._mat[3, 3];
             return transposed;
         }
-        
+
         /// <summary>
         /// 
         /// </summary>
@@ -992,12 +1006,12 @@ private static Matrix InvertSlimDX (Matrix value)
         /// <param name="dest">the destination coordinate system we want to transform the source to</param>
         /// <returns></returns>
         public static Matrix Source2Dest(Matrix source, Matrix dest)
-        {    	
-            Matrix root2dest = dest; 
+        {
+            Matrix root2dest = dest;
             Matrix source2root = Matrix.Inverse(source);  // NOTE: fails on 4x4 matrix such as view
-            Matrix source2dest = root2dest * source2root; 
-            
-            #if DEBUG
+            Matrix source2dest = root2dest * source2root;
+
+#if DEBUG
         	// TODO: verify that we can first subtract the relative difference in positions from both matrices to cancel those out before we 
         	//       start matrix multiplication?  <-- Feb.4.2014 - i think the below actually proves this does work, however if there is no difference
         	//       then there's no need to do it because it's a bit more expensive
@@ -1011,10 +1025,10 @@ private static Matrix InvertSlimDX (Matrix value)
 			Vector3d diff = dstTranslation - srcTranslation;
 			Vector3d s2dTranslation = source2dest.GetTranslation();
 	//		System.Diagnostics.Debug.Assert (s2dTranslation.Equals (diff));
-            #endif
+#endif
             return source2dest;
         }
-        
+
         // TODO: looks like Sylvain has finally added TVMath.TVEulerAnglesFromMatrix(Rot, Matx)
         // if i have any problems with this, i can try switching to tv's version
         public static void Decompose(Matrix mx, out Vector3d outPosition, out Vector3d outRotation,
@@ -1123,7 +1137,7 @@ private static Matrix InvertSlimDX (Matrix value)
             return result;
         }
 
-        public static Matrix Subtract (Matrix m1, Matrix m2)
+        public static Matrix Subtract(Matrix m1, Matrix m2)
         {
             Matrix result = new Matrix();
             result._mat[0, 0] = m1.M11 - m2.M11;
@@ -1184,10 +1198,10 @@ private static Matrix InvertSlimDX (Matrix value)
         /// <param name="m"></param>
         /// <param name="scalar"></param>
         /// <returns></returns>
-        public static Matrix Multiply (Matrix m, double scalar)
+        public static Matrix Multiply(Matrix m, double scalar)
         {
             Matrix result = new Matrix();
-            result._mat[0, 0] = m.M11 * scalar; 
+            result._mat[0, 0] = m.M11 * scalar;
             result._mat[0, 1] = m.M12 * scalar;
             result._mat[0, 2] = m.M13 * scalar;
             result._mat[0, 3] = m.M14 * scalar;
@@ -1232,7 +1246,6 @@ private static Matrix InvertSlimDX (Matrix value)
         //    }
         //    return result;
         //}
-
         public static Matrix Multiply4x4(Matrix matrix1, Matrix matrix2)
         {
             Matrix result = new Matrix();
@@ -1266,7 +1279,7 @@ private static Matrix InvertSlimDX (Matrix value)
 
         public static Matrix operator *(Matrix m1, Matrix m2)
         {
-            return Matrix.Multiply(m1,m2);
+            return Matrix.Multiply(m1, m2);
         }
 
         public static Matrix operator *(Matrix m, double scalar)
@@ -1275,160 +1288,188 @@ private static Matrix InvertSlimDX (Matrix value)
         }
 
         public override bool Equals(object obj)
-		{
-        	if (obj == null) return false;
-        	if (obj is Matrix == false) return false;
-        	
-        	return this.Equals ((Matrix)obj);
-		}
- 
-        public bool Equals (Matrix m)
         {
-        	return 
-        		_mat[0, 0] == m.M11 &&  
-            	_mat[0, 1] == m.M12 && 
-	            _mat[0, 2] == m.M13 && 
-	            _mat[0, 3] == m.M14 && 
-	
-	            _mat[1, 0] == m.M21 && 
-	            _mat[1, 1] == m.M22 && 
-	            _mat[1, 2] == m.M23 && 
-	            _mat[1, 3] == m.M24 && 
-	
-	            _mat[2, 0] == m.M31 && 
-	            _mat[2, 1] == m.M32 && 
-	            _mat[2, 2] == m.M33 && 
-	            _mat[2, 3] == m.M34 && 
-	
-	            _mat[3, 0] == m.M41 && 
-	            _mat[3, 1] == m.M42 && 
-	            _mat[3, 2] == m.M43 && 
-	            _mat[3, 3] == m.M44;
+            if (obj == null) return false;
+            if (obj is Matrix == false) return false;
+
+            return this.Equals((Matrix)obj);
         }
-   
 
-//// src http://www.idevgames.com/forum/archive/index.php/t-10866.html
-////    >>Original post by jyk
-////    >>Here's another option to consider. You can get the same interpolation as you would with quaternion slerp (albeit at greater expense) by finding the matrix that rotates from A to B, extracting the axis and angle from this matrix, scaling the angle, and then recomposing the matrix from the axis and angle and multiplying with A.
-////    >>I'm at work now, but if you're interested in this method I can post details later (or perhaps someone else will in the meantime).
-        
+        public bool Equals(Matrix m)
+        {
+            return
+                _mat[0, 0] == m.M11 &&
+                _mat[0, 1] == m.M12 &&
+                _mat[0, 2] == m.M13 &&
+                _mat[0, 3] == m.M14 &&
 
-////Linear interpolation (Vectors, scalars):
-////delta = b - a;
-////// alpha = [0..1]
-////c = a + delta*alpha
+                _mat[1, 0] == m.M21 &&
+                _mat[1, 1] == m.M22 &&
+                _mat[1, 2] == m.M23 &&
+                _mat[1, 3] == m.M24 &&
 
-////3x3 rotation matrix form (right-hand element evaluated first):
+                _mat[2, 0] == m.M31 &&
+                _mat[2, 1] == m.M32 &&
+                _mat[2, 2] == m.M33 &&
+                _mat[2, 3] == m.M34 &&
 
-////delta = b * transpose(a) // transpose(a) followed by b.
-////delta.getAxisAngle(axis,deltaAngle)
-////// alpha = [0..1]
-////c = axisAngleToMatrix(axis,deltaAngle*alpha) * a
+                _mat[3, 0] == m.M41 &&
+                _mat[3, 1] == m.M42 &&
+                _mat[3, 2] == m.M43 &&
+                _mat[3, 3] == m.M44;
+        }
 
-//public void interpolate(Matrix a, Matrix b, float alpha, Matrix c) 
-//{
-//  Matrix delta = b ^ !a; // ^ = matrix product, ! = matrix transpose.
-//  Vector3d axis;
-//    float deltaAngle;
-//  delta.AxisAngle(ref axis, ref deltaAngle);
-//  Matrix rm = Matrix.Rotation(axis,deltaAngle*alpha);
-//  c = rm ^ a;
-//} // interpolate
+        public bool IsNullOrEmpty()
+        {
+            return _mat[0, 0] == 0d &&
+                _mat[0, 1] == 0d &&
+                _mat[0, 2] == 0d &&
+                _mat[0, 3] == 0d &&
 
-//        public Matrix AxisAngle(Vector3d axis, float deltaAngle)
-//        {
-            
-//        }
+                _mat[1, 0] == 0d &&
+                _mat[1, 1] == 0d &&
+                _mat[1, 2] == 0d &&
+                _mat[1, 3] == 0d &&
+
+                _mat[2, 0] == 0d &&
+                _mat[2, 1] == 0d &&
+                _mat[2, 2] == 0d &&
+                _mat[2, 3] == 0d &&
+
+                _mat[3, 0] == 0d &&
+                _mat[3, 1] == 0d &&
+                _mat[3, 2] == 0d &&
+                _mat[3, 3] == 0d;
+        }
+
+        public override int GetHashCode()
+        {
+            throw new NotImplementedException();
+            return base.GetHashCode();
+        }
+
+        //// src http://www.idevgames.com/forum/archive/index.php/t-10866.html
+        ////    >>Original post by jyk
+        ////    >>Here's another option to consider. You can get the same interpolation as you would with quaternion slerp (albeit at greater expense) by finding the matrix that rotates from A to B, extracting the axis and angle from this matrix, scaling the angle, and then recomposing the matrix from the axis and angle and multiplying with A.
+        ////    >>I'm at work now, but if you're interested in this method I can post details later (or perhaps someone else will in the meantime).
 
 
-// void Matrix::setInverseTranslation( const float *translation )
-//{
-//    m_matrix[12] = -translation[0];
-//    m_matrix[13] = -translation[1];
-//    m_matrix[14] = -translation[2];
-//}
+        ////Linear interpolation (Vectors, scalars):
+        ////delta = b - a;
+        ////// alpha = [0..1]
+        ////c = a + delta*alpha
 
-//void Matrix::setRotationDegrees( const float *angles )
-//{
-//    float vec[3];
-//    vec[0] = ( float )( angles[0]*180.0/PI );
-//    vec[1] = ( float )( angles[1]*180.0/PI );
-//    vec[2] = ( float )( angles[2]*180.0/PI );
-//    setRotationRadians( vec );
-//}
+        ////3x3 rotation matrix form (right-hand element evaluated first):
 
-//void Matrix::setInverseRotationDegrees( const float *angles )
-//{
-//    float vec[3];
-//    vec[0] = ( float )( angles[0]*180.0/PI );
-//    vec[1] = ( float )( angles[1]*180.0/PI );
-//    vec[2] = ( float )( angles[2]*180.0/PI );
-//    setInverseRotationRadians( vec );
-//}
+        ////delta = b * transpose(a) // transpose(a) followed by b.
+        ////delta.getAxisAngle(axis,deltaAngle)
+        ////// alpha = [0..1]
+        ////c = axisAngleToMatrix(axis,deltaAngle*alpha) * a
 
-//void Matrix::setRotationRadians( const float *angles )
-//{
-//    double cr = cos( angles[0] );
-//    double sr = sin( angles[0] );
-//    double cp = cos( angles[1] );
-//    double sp = sin( angles[1] );
-//    double cy = cos( angles[2] );
-//    double sy = sin( angles[2] );
+        //public void interpolate(Matrix a, Matrix b, float alpha, Matrix c) 
+        //{
+        //  Matrix delta = b ^ !a; // ^ = matrix product, ! = matrix transpose.
+        //  Vector3d axis;
+        //    float deltaAngle;
+        //  delta.AxisAngle(ref axis, ref deltaAngle);
+        //  Matrix rm = Matrix.Rotation(axis,deltaAngle*alpha);
+        //  c = rm ^ a;
+        //} // interpolate
 
-//    m_matrix[0] = ( float )( cp*cy );
-//    m_matrix[1] = ( float )( cp*sy );
-//    m_matrix[2] = ( float )( -sp );
+        //        public Matrix AxisAngle(Vector3d axis, float deltaAngle)
+        //        {
 
-//    double srsp = sr*sp;
-//    double crsp = cr*sp;
+        //        }
 
-//    m_matrix[4] = ( float )( srsp*cy-cr*sy );
-//    m_matrix[5] = ( float )( srsp*sy+cr*cy );
-//    m_matrix[6] = ( float )( sr*cp );
 
-//    m_matrix[8] = ( float )( crsp*cy+sr*sy );
-//    m_matrix[9] = ( float )( crsp*sy-sr*cy );
-//    m_matrix[10] = ( float )( cr*cp );
-//}
+        // void Matrix::setInverseTranslation( const float *translation )
+        //{
+        //    m_matrix[12] = -translation[0];
+        //    m_matrix[13] = -translation[1];
+        //    m_matrix[14] = -translation[2];
+        //}
 
-//void Matrix::setInverseRotationRadians( const float *angles )
-//{
-//    double cr = cos( angles[0] );
-//    double sr = sin( angles[0] );
-//    double cp = cos( angles[1] );
-//    double sp = sin( angles[1] );
-//    double cy = cos( angles[2] );
-//    double sy = sin( angles[2] );
+        //void Matrix::setRotationDegrees( const float *angles )
+        //{
+        //    float vec[3];
+        //    vec[0] = ( float )( angles[0]*180.0/PI );
+        //    vec[1] = ( float )( angles[1]*180.0/PI );
+        //    vec[2] = ( float )( angles[2]*180.0/PI );
+        //    setRotationRadians( vec );
+        //}
 
-//    m_matrix[0] = ( float )( cp*cy );
-//    m_matrix[4] = ( float )( cp*sy );
-//    m_matrix[8] = ( float )( -sp );
+        //void Matrix::setInverseRotationDegrees( const float *angles )
+        //{
+        //    float vec[3];
+        //    vec[0] = ( float )( angles[0]*180.0/PI );
+        //    vec[1] = ( float )( angles[1]*180.0/PI );
+        //    vec[2] = ( float )( angles[2]*180.0/PI );
+        //    setInverseRotationRadians( vec );
+        //}
 
-//    double srsp = sr*sp;
-//    double crsp = cr*sp;
+        //void Matrix::setRotationRadians( const float *angles )
+        //{
+        //    double cr = cos( angles[0] );
+        //    double sr = sin( angles[0] );
+        //    double cp = cos( angles[1] );
+        //    double sp = sin( angles[1] );
+        //    double cy = cos( angles[2] );
+        //    double sy = sin( angles[2] );
 
-//    m_matrix[1] = ( float )( srsp*cy-cr*sy );
-//    m_matrix[5] = ( float )( srsp*sy+cr*cy );
-//    m_matrix[9] = ( float )( sr*cp );
+        //    m_matrix[0] = ( float )( cp*cy );
+        //    m_matrix[1] = ( float )( cp*sy );
+        //    m_matrix[2] = ( float )( -sp );
 
-//    m_matrix[2] = ( float )( crsp*cy+sr*sy );
-//    m_matrix[6] = ( float )( crsp*sy-sr*cy );
-//    m_matrix[10] = ( float )( cr*cp );
-//}
+        //    double srsp = sr*sp;
+        //    double crsp = cr*sp;
 
-//void Matrix::setRotationQuaternion( const Quaternion& quat )
-//{
-//    m_matrix[0] = ( float )( 1.0 - 2.0*quat[1]*quat[1] - 2.0*quat[2]*quat[2] );
-//    m_matrix[1] = ( float )( 2.0*quat[0]*quat[1] + 2.0*quat[3]*quat[2] );
-//    m_matrix[2] = ( float )( 2.0*quat[0]*quat[2] - 2.0*quat[3]*quat[1] );
+        //    m_matrix[4] = ( float )( srsp*cy-cr*sy );
+        //    m_matrix[5] = ( float )( srsp*sy+cr*cy );
+        //    m_matrix[6] = ( float )( sr*cp );
 
-//    m_matrix[4] = ( float )( 2.0*quat[0]*quat[1] - 2.0*quat[3]*quat[2] );
-//    m_matrix[5] = ( float )( 1.0 - 2.0*quat[0]*quat[0] - 2.0*quat[2]*quat[2] );
-//    m_matrix[6] = ( float )( 2.0*quat[1]*quat[2] + 2.0*quat[3]*quat[0] );
+        //    m_matrix[8] = ( float )( crsp*cy+sr*sy );
+        //    m_matrix[9] = ( float )( crsp*sy-sr*cy );
+        //    m_matrix[10] = ( float )( cr*cp );
+        //}
 
-//    m_matrix[8] = ( float )( 2.0*quat[0]*quat[2] + 2.0*quat[3]*quat[1] );
-//    m_matrix[9] = ( float )( 2.0*quat[1]*quat[2] - 2.0*quat[3]*quat[0] );
-//    m_matrix[10] = ( float )( 1.0 - 2.0*quat[0]*quat[0] - 2.0*quat[1]*quat[1] );
-//}
+        //void Matrix::setInverseRotationRadians( const float *angles )
+        //{
+        //    double cr = cos( angles[0] );
+        //    double sr = sin( angles[0] );
+        //    double cp = cos( angles[1] );
+        //    double sp = sin( angles[1] );
+        //    double cy = cos( angles[2] );
+        //    double sy = sin( angles[2] );
+
+        //    m_matrix[0] = ( float )( cp*cy );
+        //    m_matrix[4] = ( float )( cp*sy );
+        //    m_matrix[8] = ( float )( -sp );
+
+        //    double srsp = sr*sp;
+        //    double crsp = cr*sp;
+
+        //    m_matrix[1] = ( float )( srsp*cy-cr*sy );
+        //    m_matrix[5] = ( float )( srsp*sy+cr*cy );
+        //    m_matrix[9] = ( float )( sr*cp );
+
+        //    m_matrix[2] = ( float )( crsp*cy+sr*sy );
+        //    m_matrix[6] = ( float )( crsp*sy-sr*cy );
+        //    m_matrix[10] = ( float )( cr*cp );
+        //}
+
+        //void Matrix::setRotationQuaternion( const Quaternion& quat )
+        //{
+        //    m_matrix[0] = ( float )( 1.0 - 2.0*quat[1]*quat[1] - 2.0*quat[2]*quat[2] );
+        //    m_matrix[1] = ( float )( 2.0*quat[0]*quat[1] + 2.0*quat[3]*quat[2] );
+        //    m_matrix[2] = ( float )( 2.0*quat[0]*quat[2] - 2.0*quat[3]*quat[1] );
+
+        //    m_matrix[4] = ( float )( 2.0*quat[0]*quat[1] - 2.0*quat[3]*quat[2] );
+        //    m_matrix[5] = ( float )( 1.0 - 2.0*quat[0]*quat[0] - 2.0*quat[2]*quat[2] );
+        //    m_matrix[6] = ( float )( 2.0*quat[1]*quat[2] + 2.0*quat[3]*quat[0] );
+
+        //    m_matrix[8] = ( float )( 2.0*quat[0]*quat[2] + 2.0*quat[3]*quat[1] );
+        //    m_matrix[9] = ( float )( 2.0*quat[1]*quat[2] - 2.0*quat[3]*quat[0] );
+        //    m_matrix[10] = ( float )( 1.0 - 2.0*quat[0]*quat[0] - 2.0*quat[1]*quat[1] );
+        //}
     }
 }

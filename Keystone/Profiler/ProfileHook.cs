@@ -4,23 +4,21 @@ using System.Diagnostics;
 namespace Keystone.Profiler
 {
 	/// <summary>
-	/// Description of ProfileHook.
-	/// </summary>
-	internal class ProfileHook : IProfileHook
+    /// Description of ProfileHook.
+    /// </summary>
+    internal class ProfileHook : IProfileHook
     {
 
-        private IProfile HookedProfile;
+        private IProfile mHookedProfile;
+        private Stopwatch mStopwatch;
 
-		private long mStartCounter;
-		
-        public ProfileHook(IProfile Hook)
+        public ProfileHook(IProfile profile)
         {
-        	if (Hook == null) throw new ArgumentNullException ("ProfileHook.ctor() - Hook cannot be null.");
-            this.HookedProfile = Hook;
+            if (profile == null) throw new ArgumentNullException("ProfileHook.ctor() - 'profile' argument cannot be null.");
+            mHookedProfile = profile;
 
-            // TODO: THis updated code that uses StopWatch is actually in HelloBoids!!!  Duh!
-            mStartCounter = Keystone.Timers.Time.Counter; 
-          
+            mStopwatch = new Stopwatch();
+            mStopwatch.Start();
         }
 
         private bool disposedValue = false;
@@ -29,9 +27,10 @@ namespace Keystone.Profiler
         {
             if (!this.disposedValue)
             {
-                // TODO: THis updated code that uses StopWatch is actually in HelloBoids!!!  Duh!
-            	HookedProfile.Update ((float)Keystone.Timers.Time.ElapsedSeconds (mStartCounter));
-                HookedProfile = null;
+                mStopwatch.Stop();
+                mHookedProfile.Update(mStopwatch.Elapsed.TotalSeconds);
+                mHookedProfile = null;
+                //mStopwatch.Dispose();
             }
             this.disposedValue = true;
         }
@@ -42,4 +41,5 @@ namespace Keystone.Profiler
             GC.SuppressFinalize(this);
         }
     }
+
 }

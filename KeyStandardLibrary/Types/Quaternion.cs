@@ -1,10 +1,17 @@
-﻿
+
+#define USE_STRUCT
+
 using System;
 using System.Diagnostics;
 
 namespace Keystone.Types
 {
-    public class Quaternion // TODO: why not a struct?
+
+#if USE_STRUCT
+    public struct Quaternion
+#else
+    public class Quaternion 
+#endif
     {
         private double[] _quat;  // subscripts 0 = x, 1=y, 2=z, 3=w
 
@@ -52,11 +59,13 @@ namespace Keystone.Types
         //q.y = sin(theta/2) * axis.y
         //q.z = sin(theta/2) * axis.z
         //q.w = cos(theta/2)
-        public Quaternion()
+        public Quaternion(bool identity)
         {
             // subscripts 0 = x, 1=y, 2=z, 3=w
             _quat = new double[4];
-            _quat[3] = 1.0; // for no rotation, w = 1 typically
+            if (identity)
+                _quat[3] = 1.0; // for no rotation, w = 1 typically
+                                // else it's "Empty"
         }
 
 
@@ -514,7 +523,7 @@ namespace Keystone.Types
             else
             {
                 // return an invalid result to flag the error
-                return new Quaternion (0d, 0d, 0d, 0d);
+                return new Quaternion(0d, 0d, 0d, 0d);
             }
 
         }
@@ -629,7 +638,7 @@ namespace Keystone.Types
         }
 
         public static Quaternion RotateTowards(Quaternion from, Quaternion to, double maxDegreesDelta)
-        { 
+        {
             double angle = Quaternion.Angle(from, to);
             if (angle == 0.0d) return to;
             return Slerp(from, to, Math.Min(1.0d, maxDegreesDelta / angle));
@@ -649,7 +658,7 @@ namespace Keystone.Types
         }
 
 
-        public Vector3d  GetAxisAngle( ref double angleRadians) 
+        public Vector3d GetAxisAngle(ref double angleRadians)
         {
             Vector3d axis;
             angleRadians = 2.0 * Math.Acos(_quat[3]);
@@ -719,88 +728,88 @@ namespace Keystone.Types
         /// TODO: this is buggy and does not work correctly in all cases.  converting quat
         /// to euler should be avoided i think.
         /// Returns euler angle representation of the quat in radians
-         /// http://forums.create.msdn.com/forums/p/4574/62520.aspx //<-- TODO: this site has alternatives starting at ed022's 17th post
+        /// http://forums.create.msdn.com/forums/p/4574/62520.aspx //<-- TODO: this site has alternatives starting at ed022's 17th post
         /// </summary>
         /// <returns></returns>
-         public Vector3d GetEulerAnglesOLD(bool degrees)
-         {
-             Vector3d angles; 
-             const double case1 = Math.PI / 2.0d;
-             const double case2 = -Math.PI / 2.0d;
-             // quat must be normalized
-             angles.z = Math.Atan2(2.0d * (_quat[0] * _quat[1] + 
-                 _quat[3] * _quat[2]), 
-                 (_quat[3] * _quat[3] + 
-                 _quat[0] * _quat[0] - 
-                 _quat[1] * _quat[1] - 
-                 _quat[2] * _quat[2]));
-             double sine = -2.0d * (_quat[0] * _quat[2] - _quat[3] * _quat[1]);
+        public Vector3d GetEulerAnglesOLD(bool degrees)
+        {
+            Vector3d angles;
+            const double case1 = Math.PI / 2.0d;
+            const double case2 = -Math.PI / 2.0d;
+            // quat must be normalized
+            angles.z = Math.Atan2(2.0d * (_quat[0] * _quat[1] +
+                _quat[3] * _quat[2]),
+                (_quat[3] * _quat[3] +
+                _quat[0] * _quat[0] -
+                _quat[1] * _quat[1] -
+                _quat[2] * _quat[2]));
+            double sine = -2.0d * (_quat[0] * _quat[2] - _quat[3] * _quat[1]);
 
-             if (sine >= 1d)     //cases where value is 1 or -1 cause NAN
-                 angles.y = case1;
-             else if (sine <= -1d)
-                 angles.y = case2;
-             else
-                 angles.y = Math.Asin(sine);
+            if (sine >= 1d)     //cases where value is 1 or -1 cause NAN
+                angles.y = case1;
+            else if (sine <= -1d)
+                angles.y = case2;
+            else
+                angles.y = Math.Asin(sine);
 
-             angles.x = Math.Atan2(2.0d * (_quat[3] * _quat[0] + _quat[1] * _quat[2]), (_quat[3] * _quat[3] - _quat[0] * _quat[0] - _quat[1] * _quat[1] + _quat[2] * _quat[2]));
+            angles.x = Math.Atan2(2.0d * (_quat[3] * _quat[0] + _quat[1] * _quat[2]), (_quat[3] * _quat[3] - _quat[0] * _quat[0] - _quat[1] * _quat[1] + _quat[2] * _quat[2]));
 
-             if (degrees)
-             {
-                 angles.x *= Keystone.Utilities.MathHelper.RADIANS_TO_DEGREES;
-                 angles.y *= Keystone.Utilities.MathHelper.RADIANS_TO_DEGREES;
-                 angles.z *= Keystone.Utilities.MathHelper.RADIANS_TO_DEGREES;
-             }
-             return angles;
-         }
+            if (degrees)
+            {
+                angles.x *= Keystone.Utilities.MathHelper.RADIANS_TO_DEGREES;
+                angles.y *= Keystone.Utilities.MathHelper.RADIANS_TO_DEGREES;
+                angles.z *= Keystone.Utilities.MathHelper.RADIANS_TO_DEGREES;
+            }
+            return angles;
+        }
 
-         //public static Vector3d ToEulerAngles(Quaternion q)
-         //{
-         //    // Store the Euler angles in radians
-         //    Vector3d pitchYawRoll = new Vector3d();
+        //public static Vector3d ToEulerAngles(Quaternion q)
+        //{
+        //    // Store the Euler angles in radians
+        //    Vector3d pitchYawRoll = new Vector3d();
 
-         //    double sqx = q.X * q.X;
-         //    double sqy = q.Y * q.Y;
-         //    double sqz = q.Z * q.Z;
-         //    double sqw = q.W * q.W;
+        //    double sqx = q.X * q.X;
+        //    double sqy = q.Y * q.Y;
+        //    double sqz = q.Z * q.Z;
+        //    double sqw = q.W * q.W;
 
-         //    // If quaternion is normalised the unit is one, otherwise it is the correction factor
-         //    double unit = sqx + sqy + sqz + sqw;
+        //    // If quaternion is normalised the unit is one, otherwise it is the correction factor
+        //    double unit = sqx + sqy + sqz + sqw;
 
-         //    double test = q.X * q.Y + q.Z * q.W;
-         //    //double test = q.X * q.Z - q.W * q.Y;
+        //    double test = q.X * q.Y + q.Z * q.W;
+        //    //double test = q.X * q.Z - q.W * q.Y;
 
-         //    if (test > 0.4999f * unit)                              // 0.4999f OR 0.5f - EPSILON
-         //    {
-         //        // Singularity at north pole
-         //        pitchYawRoll.y = 2f * (float)Math.Atan2(q.X, q.W);  // Yaw
-         //        pitchYawRoll.x = PIOVER2;                           // Pitch
-         //        pitchYawRoll.z = 0f;                                // Roll
-         //        return pitchYawRoll;
-         //    }
-         //    else if (test < -0.4999f * unit)                        // -0.4999f OR -0.5f + EPSILON
-         //    {
-         //        // Singularity at south pole
-         //        pitchYawRoll.y = -2f * (float)Math.Atan2(q.X, q.W); // Yaw
-         //        pitchYawRoll.x = -PIOVER2;                          // Pitch
-         //        pitchYawRoll.z = 0f;                                // Roll
-         //        return pitchYawRoll;
-         //    }
-         //    else
-         //    {
-         //        pitchYawRoll.y = (float)Math.Atan2(2f * q.Y * q.W - 2f * q.X * q.Z, sqx - sqy - sqz + sqw);       // Yaw
-         //        pitchYawRoll.x = (float)Math.Asin(2f * test / unit);                                              // Pitch
-         //        pitchYawRoll.z = (float)Math.Atan2(2f * q.X * q.W - 2f * q.Y * q.Z, -sqx + sqy - sqz + sqw);      // Roll
+        //    if (test > 0.4999f * unit)                              // 0.4999f OR 0.5f - EPSILON
+        //    {
+        //        // Singularity at north pole
+        //        pitchYawRoll.y = 2f * (float)Math.Atan2(q.X, q.W);  // Yaw
+        //        pitchYawRoll.x = PIOVER2;                           // Pitch
+        //        pitchYawRoll.z = 0f;                                // Roll
+        //        return pitchYawRoll;
+        //    }
+        //    else if (test < -0.4999f * unit)                        // -0.4999f OR -0.5f + EPSILON
+        //    {
+        //        // Singularity at south pole
+        //        pitchYawRoll.y = -2f * (float)Math.Atan2(q.X, q.W); // Yaw
+        //        pitchYawRoll.x = -PIOVER2;                          // Pitch
+        //        pitchYawRoll.z = 0f;                                // Roll
+        //        return pitchYawRoll;
+        //    }
+        //    else
+        //    {
+        //        pitchYawRoll.y = (float)Math.Atan2(2f * q.Y * q.W - 2f * q.X * q.Z, sqx - sqy - sqz + sqw);       // Yaw
+        //        pitchYawRoll.x = (float)Math.Asin(2f * test / unit);                                              // Pitch
+        //        pitchYawRoll.z = (float)Math.Atan2(2f * q.X * q.W - 2f * q.Y * q.Z, -sqx + sqy - sqz + sqw);      // Roll
 
-         //        //pitchYawRoll.Y = (float)Math.Atan2(2f * q.X * q.W + 2f * q.Y * q.Z, 1 - 2f * (sqz + sqw));      // Yaw 
-         //        //pitchYawRoll.X = (float)Math.Asin(2f * (q.X * q.Z - q.W * q.Y));                                // Pitch 
-         //        //pitchYawRoll.Z = (float)Math.Atan2(2f * q.X * q.Y + 2f * q.Z * q.W, 1 - 2f * (sqy + sqz));      // Roll 
-         //    }
+        //        //pitchYawRoll.Y = (float)Math.Atan2(2f * q.X * q.W + 2f * q.Y * q.Z, 1 - 2f * (sqz + sqw));      // Yaw 
+        //        //pitchYawRoll.X = (float)Math.Asin(2f * (q.X * q.Z - q.W * q.Y));                                // Pitch 
+        //        //pitchYawRoll.Z = (float)Math.Atan2(2f * q.X * q.Y + 2f * q.Z * q.W, 1 - 2f * (sqy + sqz));      // Roll 
+        //    }
 
-         //    return pitchYawRoll;
-         //}
+        //    return pitchYawRoll;
+        //}
 
-         public byte GetComponentYRotationIndex()
+        public byte GetComponentYRotationIndex()
         {
             Vector3d anglesRadians = GetEulerAngles(false);
             int snapLimit = 90; // for v1.0 we dont allow 45 degree increments.  Only 90
@@ -826,13 +835,13 @@ namespace Keystone.Types
             // 192 = 270 degrees
             // 224 = 315 degrees // not used
         }
-               
-		// TODO: Slerp2 is being used in some places and Slerp in others.  I think all
-		//       should use Slerp2		
+
+        // TODO: Slerp2 is being used in some places and Slerp in others.  I think all
+        //       should use Slerp2		
         // Slerp - spherical interpolation of quaternions
         public static Quaternion Slerp(Quaternion start, Quaternion end, double t)
         {
-        	// NOTE: start and end must be normalized rotations
+            // NOTE: start and end must be normalized rotations
             double costheta = Quaternion.DotProduct(start, end);
             const double epsilon = 0.001d;
             double sclp, sclq;
@@ -852,36 +861,36 @@ namespace Keystone.Types
             // http://www.cs.wisc.edu/graphics/Courses/cs-838-1999/Students/thorek/final/Quatern.cpp
             // Make sure the two quaternions are not exactly opposite? (within a little slop).
 
-                if (1.0d - costheta > epsilon)
-                {
-                    // Standard case (slerp)
-                    double omega = Math.Acos(costheta);
-                    double sinom = Math.Sin(omega);
-                    sclp = Math.Sin((1.0d - t) *omega) / sinom;
-                    sclq = Math.Sin(t * omega) / sinom;
-                }
-                else
-                {
-                    // very close. linear interpolation will be faster
-                    sclp = 1.0d - t;
-                    sclq = t;
-                }
+            if (1.0d - costheta > epsilon)
+            {
+                // Standard case (slerp)
+                double omega = Math.Acos(costheta);
+                double sinom = Math.Sin(omega);
+                sclp = Math.Sin((1.0d - t) * omega) / sinom;
+                sclq = Math.Sin(t * omega) / sinom;
+            }
+            else
+            {
+                // very close. linear interpolation will be faster
+                sclp = 1.0d - t;
+                sclq = t;
+            }
 
-                return new Quaternion(sclp * start.X + sclq * end.X,
-                                      sclp * start.Y + sclq * end.Y,
-                                      sclp * start.Z + sclq * end.Z,
-                                      sclp * start.W + sclq * end.W);
-            
+            return new Quaternion(sclp * start.X + sclq * end.X,
+                                  sclp * start.Y + sclq * end.Y,
+                                  sclp * start.Z + sclq * end.Z,
+                                  sclp * start.W + sclq * end.W);
+
             // TODO: i never properly finished this function or tested it
-                // Still here? Then the quaternions are nearly opposite so to avoid a divided by zero error
-                // Calculate a perpendicular quaternion and slerp that direction
-                sclp = Math.Sin((1.0d - t) * Math.PI);
-                sclq = Math.Sin(t * Math.PI);
-                return new Quaternion(
-                    sclp * start.W + sclq * end.Z,
-                    sclp * start.X + sclq * -end.Y,
-                    sclp * start.Y + sclq * end.X,
-                    sclp * start.Z + sclq * -end.W);
+            // Still here? Then the quaternions are nearly opposite so to avoid a divided by zero error
+            // Calculate a perpendicular quaternion and slerp that direction
+            sclp = Math.Sin((1.0d - t) * Math.PI);
+            sclq = Math.Sin(t * Math.PI);
+            return new Quaternion(
+                sclp * start.W + sclq * end.Z,
+                sclp * start.X + sclq * -end.Y,
+                sclp * start.Y + sclq * end.X,
+                sclp * start.Z + sclq * -end.W);
 
         }
 
@@ -911,35 +920,35 @@ namespace Keystone.Types
                    (inverse * start.W) + (opposite * end.W));
         }
 
-		// xna lerp
+        // xna lerp
         public static Quaternion Lerp(Quaternion start, Quaternion end, double amount)
-		{
-			double num = 1f - amount;
-			Quaternion result = new Quaternion();
-			double num2 = start.X * end.X + start.Y * end.Y + start.Z * end.Z + start.W * end.W;
-			if (num2 >= 0f)
-			{
-				result.X = num * start.X + amount * end.X;
-				result.Y = num * start.Y + amount * end.Y;
-				result.Z = num * start.Z + amount * end.Z;
-				result.W = num * start.W + amount * end.W;
-			}
-			else
-			{
-				result.X = num * start.X - amount * end.X;
-				result.Y = num * start.Y - amount * end.Y;
-				result.Z = num * start.Z - amount * end.Z;
-				result.W = num * start.W - amount * end.W;
-			}
-			
-			double num3 = result.X * result.X + result.Y * result.Y + result.Z * result.Z + result.W * result.W;
-			double num4 = 1d / Math.Sqrt(num3);
-			result.X *= num4;
-			result.Y *= num4;
-			result.Z *= num4;
-			result.W *= num4;
-			return result;
-		}
+        {
+            double num = 1f - amount;
+            Quaternion result = new Quaternion();
+            double num2 = start.X * end.X + start.Y * end.Y + start.Z * end.Z + start.W * end.W;
+            if (num2 >= 0f)
+            {
+                result.X = num * start.X + amount * end.X;
+                result.Y = num * start.Y + amount * end.Y;
+                result.Z = num * start.Z + amount * end.Z;
+                result.W = num * start.W + amount * end.W;
+            }
+            else
+            {
+                result.X = num * start.X - amount * end.X;
+                result.Y = num * start.Y - amount * end.Y;
+                result.Z = num * start.Z - amount * end.Z;
+                result.W = num * start.W - amount * end.W;
+            }
+
+            double num3 = result.X * result.X + result.Y * result.Y + result.Z * result.Z + result.W * result.W;
+            double num4 = 1d / Math.Sqrt(num3);
+            result.X *= num4;
+            result.Y *= num4;
+            result.Z *= num4;
+            result.W *= num4;
+            return result;
+        }
 
         // -------------------------------------------------------------
         // SLERP: Spherical Linear Interpolation
@@ -952,10 +961,10 @@ namespace Keystone.Types
         //    Quat result = new Quat();
         //    float[] to1 = new float[4];
         //    float omega, cos_omega, sin_omega, scale0, scale1;
-        
+
         //    // calc cosine
         //    cos_omega = q1.r * q2.r + q1.x * q2.x + q1.y * q2.y + q1.z * q2.z;
-        
+
         //    // adjust signs (if necessary)
         //    if (cos_omega < 0.0)
         //    {
@@ -1003,36 +1012,36 @@ namespace Keystone.Types
         //    return result;
         //}
 
-        
-// http://physicsforgames.blogspot.com/2010/02/quaternions.html
-//        How to Integrate a Quaternion:
-//
-//Updating the dynamical state of a rigid body is referred to as integration. If you represent the orientation of this body with a quaternion, you will need to know how to update it. This is done with the following quaternion formula.
-//
-//q' = Δq q
-//
-//We calculate Δq using a 3D vector ω whose magnitude represents the angular velocity, and whose direction represents the axis of the angular velocity. We also use the time step Δt over which the velocity should be applied. Δq is still a rotation quaternion, and has the same form involving sines and cosines of a half angle. We use the angular velocity and time step to construct a vector θ, whose magnitude is the half angle, and whose direction is the axis.
-//
-//θ = ωΔt/2
-//
-//Note: I've included the factor of 1/2, which shows up inside the trig functions of the rotation quaternion. Expressing the rotation quaternion in terms of this vector you have
-//
-//Δq = ( cos(θ), (θ/|θ|) sin(θ) )
-//
-//This works well, however this formula becomes numerically unstable as |θ| approaches zero. If we can detect that |θ| is small, we can safely use the Taylor series expansion of the sin and cos functions. The "low angle" version of this formula is
-//
-//Δq = (1 - |θ|2/2, θ - θ|θ|2/6)
-//
-//We use the first 3 terms of the Taylor series expansion, so we should ensure that the fourth term is less than machine precision before we use the "low angle" version. The fourth term of the expansion is
-//
-//|θ|4/24 < ε
-//
-//Here is a sample function for integrating a quaternion with a given angular velocity and time step
-//
-//Quat QuatIntegrate(const Quat& q, const Vector& omega, float deltaT) { Quat deltaQ; Vector theta = VecScale(omega, deltaT * 0.5f); float thetaMagSq = VecMagnitudeSq(theta); float s; if(thetaMagSq * thetaMagSq / 24.0f < MACHINE_SMALL_FLOAT) { deltaQ.w = 1.0f - thetaMagSq / 2.0f; s = 1.0f - thetaMagSq / 6.0f; } else { float thetaMag = sqrt(thetaMagSq); deltaQ.w = cos(thetaMag); s = sin(thetaMag) / thetaMag; } deltaQ.x = theta.x * s; deltaQ.y = theta.y * s; deltaQ.z = theta.z * s; return QuatMultiply(deltaQ, q); }
-//
 
-        
+        // http://physicsforgames.blogspot.com/2010/02/quaternions.html
+        //        How to Integrate a Quaternion:
+        //
+        //Updating the dynamical state of a rigid body is referred to as integration. If you represent the orientation of this body with a quaternion, you will need to know how to update it. This is done with the following quaternion formula.
+        //
+        //q' = Δq q
+        //
+        //We calculate Δq using a 3D vector ω whose magnitude represents the angular velocity, and whose direction represents the axis of the angular velocity. We also use the time step Δt over which the velocity should be applied. Δq is still a rotation quaternion, and has the same form involving sines and cosines of a half angle. We use the angular velocity and time step to construct a vector θ, whose magnitude is the half angle, and whose direction is the axis.
+        //
+        //θ = ωΔt/2
+        //
+        //Note: I've included the factor of 1/2, which shows up inside the trig functions of the rotation quaternion. Expressing the rotation quaternion in terms of this vector you have
+        //
+        //Δq = ( cos(θ), (θ/|θ|) sin(θ) )
+        //
+        //This works well, however this formula becomes numerically unstable as |θ| approaches zero. If we can detect that |θ| is small, we can safely use the Taylor series expansion of the sin and cos functions. The "low angle" version of this formula is
+        //
+        //Δq = (1 - |θ|2/2, θ - θ|θ|2/6)
+        //
+        //We use the first 3 terms of the Taylor series expansion, so we should ensure that the fourth term is less than machine precision before we use the "low angle" version. The fourth term of the expansion is
+        //
+        //|θ|4/24 < ε
+        //
+        //Here is a sample function for integrating a quaternion with a given angular velocity and time step
+        //
+        //Quat QuatIntegrate(const Quat& q, const Vector& omega, float deltaT) { Quat deltaQ; Vector theta = VecScale(omega, deltaT * 0.5f); float thetaMagSq = VecMagnitudeSq(theta); float s; if(thetaMagSq * thetaMagSq / 24.0f < MACHINE_SMALL_FLOAT) { deltaQ.w = 1.0f - thetaMagSq / 2.0f; s = 1.0f - thetaMagSq / 6.0f; } else { float thetaMag = sqrt(thetaMagSq); deltaQ.w = cos(thetaMag); s = sin(thetaMag) / thetaMag; } deltaQ.x = theta.x * s; deltaQ.y = theta.y * s; deltaQ.z = theta.z * s; return QuatMultiply(deltaQ, q); }
+        //
+
+
         public static Quaternion operator +(Quaternion q1, Quaternion q2)
         {
             return new Quaternion(q1.X + q2.X, q1.Y + q2.Y, q1.Z + q2.Z, q1.W + q2.W);
@@ -1042,7 +1051,7 @@ namespace Keystone.Types
         //{
         //    // nVidia SDK implementation
         //    Vector3d uv, uuv;
-                 
+
         //    Vector3d qvec;
         //    qvec.x = q.X;
         //    qvec.y = q.Y;
@@ -1056,32 +1065,33 @@ namespace Keystone.Types
 
         // http://www.java-gaming.org/index.php?PHPSESSID=dkpq2dfr89eks0atgndch2cjm3&topic=25517.msg220313#msg220313
         public static Vector3d operator *(Quaternion q, Vector3d v)
-        {  
-            double  k0 = q.W * q.W - 0.5;  
-            double  k1;  
-            double  rx, ry, rz;  
-            
+        {
+            double k0 = q.W * q.W - 0.5;
+            double k1;
+            double rx, ry, rz;
+
             // k1 = Q.V  
-            k1    = v.x * q.X;  
-            k1   += v.y * q.Y;  
-            k1   += v.z * q.Z;  
-            
+            k1 = v.x * q.X;
+            k1 += v.y * q.Y;
+            k1 += v.z * q.Z;
+
             // (qq-1/2)V+(Q.V)Q  
-            rx  = v.x*k0 + q.X * k1;  
-            ry  = v.y*k0 + q.Y * k1;  
-            rz  = v.z*k0 + q.Z * k1;  
-            
+            rx = v.x * k0 + q.X * k1;
+            ry = v.y * k0 + q.Y * k1;
+            rz = v.z * k0 + q.Z * k1;
+
             // (Q.V)Q+(qq-1/2)V+q(QxV)  
-            rx += q.W *(q.Y * v.z-q.Z * v.y);  
-            ry += q.W *(q.Z * v.x-q.X * v.z);  
-            rz += q.W *(q.X * v.y-q.Y * v.x);  
-            
+            rx += q.W * (q.Y * v.z - q.Z * v.y);
+            ry += q.W * (q.Z * v.x - q.X * v.z);
+            rz += q.W * (q.X * v.y - q.Y * v.x);
+
             //  2((Q.V)Q+(qq-1/2)V+q(QxV))  
-            rx += rx;  
-            ry += ry;  
-            rz += rz;  
-            
-            return new Vector3d(rx,ry,rz);}
+            rx += rx;
+            ry += ry;
+            rz += rz;
+
+            return new Vector3d(rx, ry, rz);
+        }
 
         public static Quaternion operator *(Quaternion q1, double scale)
         {
@@ -1104,17 +1114,23 @@ namespace Keystone.Types
         //}
 
         public override bool Equals(object obj)
-		{
-        	if (obj is Quaternion == false)
-				return false;
-        	
-        	Quaternion arg = (Quaternion)obj;
-        	return _quat[0] == arg._quat[0] &&
-        		_quat[1] == arg._quat[1] &&
-        		_quat[2] == arg._quat[2] &&
-        		_quat[3] == arg._quat[3];
-		}
- 
+        {
+            if (obj is Quaternion == false)
+                return false;
+
+            Quaternion arg = (Quaternion)obj;
+            return _quat[0] == arg._quat[0] &&
+                _quat[1] == arg._quat[1] &&
+                _quat[2] == arg._quat[2] &&
+                _quat[3] == arg._quat[3];
+        }
+
+        public override int GetHashCode()
+        {
+            throw new NotImplementedException();
+            return 0;
+        }
+
         public override string ToString()
         {
             string delimiter = keymath.ParseHelper.English.XMLAttributeDelimiter;

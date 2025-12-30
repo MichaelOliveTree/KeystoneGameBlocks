@@ -124,7 +124,7 @@ namespace Keystone.Types
         }
         
         /// <summary>
-        /// RGBA is same as System.Drawing.Color.ToArgb
+        /// ToInt32() is same as RGBA(float r, float g, float b, float a) which is also same as System.Drawing.Color.ToArgb
         /// The byte-ordering of the 32-bit ARGB value is AARRGGBB. 
         /// The most significant byte (MSB), represented by AA, is the alpha component value. 
         /// The second, third, and fourth bytes, represented by RR, GG, and BB, respectively, 
@@ -132,6 +132,19 @@ namespace Keystone.Types
         /// </summary>
         /// <returns></returns>
         public int ToInt32()
+        {
+            return RGBA(r, g, b, a);
+        }
+
+        /// <summary>
+        /// RGBA is same as System.Drawing.Color.ToArgb
+        /// The byte-ordering of the 32-bit ARGB value is AARRGGBB. 
+        /// The most significant byte (MSB), represented by AA, is the alpha component value. 
+        /// The second, third, and fourth bytes, represented by RR, GG, and BB, respectively, 
+        /// are the color components red, green, and blue.
+        /// </summary>
+        /// <returns></returns>
+        public static int RGBA(float r, float g, float b, float a)
         {
             int A = (int)(255 * a);
             int R = (int)(255 * r);
@@ -143,6 +156,8 @@ namespace Keystone.Types
             G = G << 8;
 
             return A | R | G | B;
+        }
+
 
             //// To integer
             //int iCol = (color.A << 24) | (color.R << 16) | (color.G << 8) | color.B;

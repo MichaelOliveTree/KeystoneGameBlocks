@@ -5797,7 +5797,7 @@ namespace HelloBoids
         /// <returns></returns>
         public bool Contains(BoundingBox box)
         {
-            Console.WriteLine("Contains");
+            //Console.WriteLine("Contains");
             return Contains(box.Vertices);
 
         }
@@ -5988,7 +5988,7 @@ namespace HelloBoids
 
         public static Vector3d[] GetVertices(BoundingBox box)
         {
-            Console.WriteLine("Get Vertices");
+            //Console.WriteLine("Get Vertices");
             Vector3d[] vertices = new Vector3d[8];
 
             // NOTE: Default DirectX winding order is CLOCKWISE vertices for

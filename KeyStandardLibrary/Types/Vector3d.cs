@@ -8,7 +8,7 @@ namespace Keystone.Types
     // This attribute is not required at least for the PropertyGrid using PropertyBags
     // because you can specify the converter to use for each PropertySpec item in the bag.
     // But it is needed for KeyPluginEntityEdit.Animations for modifying keyframe values in the plugin GUI interface
-    [TypeConverter(typeof (Keystone.TypeConverters.Vector3dConverter))] 
+    [TypeConverter(typeof(Keystone.TypeConverters.Vector3dConverter))]
     public struct Vector3d
     {
         public double x;
@@ -68,7 +68,7 @@ namespace Keystone.Types
 
         public Vector3d(Quaternion axisAngle)
         {
-            
+
             double angleRadians = 0; // this value will be lost, only the axis is kept
             Vector3d result = axisAngle.GetAxisAngle(ref angleRadians);
             x = result.x;
@@ -85,7 +85,7 @@ namespace Keystone.Types
 
         public static Vector3d MaxValue
         {
-            get 
+            get
             {
                 Vector3d v;
                 v.x = v.y = v.z = double.MaxValue;
@@ -137,10 +137,10 @@ namespace Keystone.Types
 
         public static void OrthoNormalize(ref Vector3d normal, ref Vector3d tangent)
         {
-            normal = Normalize (normal);
-            Vector3d proj = Scale (DotProduct (tangent, normal));
-            tangent = tangent - proj;  
-            tangent = Normalize (tangent); 
+            normal = Normalize(normal);
+            Vector3d proj = Scale(DotProduct(tangent, normal));
+            tangent = tangent - proj;
+            tangent = Normalize(tangent);
         }
 
         public double Normalize()
@@ -193,7 +193,7 @@ namespace Keystone.Types
         public static Vector3d TransformNormal(Vector3d v, Matrix m)
         {
             Vector3d result;
-            if (m == null)
+            if (m.IsNullOrEmpty())
             {
                 result.x = v.x;
                 result.y = v.y;
@@ -208,7 +208,7 @@ namespace Keystone.Types
 
         public static Vector3d TransformNormal(Vector3d v, Quaternion q)
         {
-            if ((q == null) || (q.IsNullOrEmpty()) || (v.IsNullOrEmpty()))
+            if (q.Equals(Quaternion.Identity()) || q.IsNullOrEmpty() || v.IsNullOrEmpty())
                 return v;
 
             return TransformNormal(v, Quaternion.ToMatrix(q));
@@ -222,7 +222,7 @@ namespace Keystone.Types
         /// <returns></returns>
         public static Vector3d TransformCoord(Vector3d v, Matrix m)
         {
-            if (m == null || (v.IsNullOrEmpty()))
+            if (m.Equals(Matrix.Identity()) || m.IsNullOrEmpty() || v.IsNullOrEmpty())
                 return v;
 
             Vector3d result;
@@ -247,7 +247,7 @@ namespace Keystone.Types
         public static Vector3d TransformCoord(Vector3d v, Quaternion q)
         {
 
-            if ((q == null) || (q.IsNullOrEmpty()) || (v.IsNullOrEmpty()))
+            if (q.IsNullOrEmpty() || v.IsNullOrEmpty())
                 return v;
 
             return TransformCoord(v, Quaternion.ToMatrix(q));
@@ -385,6 +385,32 @@ namespace Keystone.Types
             return result;
         }
 
+        public Vector3d ProjectOnToPlane(Vector3d planeNormal)
+        {
+            Vector3d result = this;
+
+            double sqrMag = Vector3d.DotProduct(planeNormal, planeNormal);
+            if (sqrMag > double.Epsilon)
+            {
+                double dot = Vector3d.DotProduct(this, planeNormal);
+                result.x = this.x - planeNormal.x * dot / sqrMag;
+                result.y = this.y - planeNormal.y * dot / sqrMag;
+                result.z = this.z - planeNormal.z * dot / sqrMag;
+            }
+
+            return result;
+        }
+
+        public static Vector3d FromTV3DVector(Vector3d v)
+        {
+            Vector3d result;
+            result.x = v.x;
+            result.y = v.y;
+            result.z = v.z;
+            return result;
+        }
+
+#region move to KeyStandardLibrary.Utilities.InterpolationHelper.cs and .MathHelper.cs
         // clamp the vector's magnitude (length) to the limit length
         public static Vector3d Limit(Vector3d vec, double limit)
         {
@@ -394,12 +420,12 @@ namespace Keystone.Types
             return vec;
         }
 
-        
+
         // yes you can do spherical interpolation between two vectors
         // http://keithmaggio.wordpress.com/2011/02/15/math-magician-lerp-slerp-and-nlerp/
         public static Vector3d Slerp(Vector3d start, Vector3d end, float weight)
         {
-            // Dot product - the cosine of the angle between 2 vectors.
+           // Dot product - the cosine of the angle between 2 vectors.
             double dot = Vector3d.DotProduct(start, end);
             // Clamp it to be in the range of Acos()
             Utilities.MathHelper.Clamp(dot, -1.0f, 1.0f);
@@ -414,13 +440,13 @@ namespace Keystone.Types
         }
 
         // http://keithmaggio.wordpress.com/2011/02/15/math-magician-lerp-slerp-and-nlerp/
-        // Nlerp: Nlerp is our solution to Slerp’s computational cost. Nlerp also handles 
-        // rotation and is much less computationally expensive, however it, too has it’s drawbacks.
+        // Nlerp: Nlerp is our solution to Slerpï¿½s computational cost. Nlerp also handles 
+        // rotation and is much less computationally expensive, however it, too has itï¿½s drawbacks.
         // Both travel a torque-minimal path, but Nlerp is commutative where Slerp is not, and 
         // Nlerp aslo does not maintain a constant velocity, which, in some cases, may be a 
         // desired effect. Implementing Nlerp in place of some Slerp calls may produce the same 
         // effect and even save on some FPS. However, with every optimization, using this improperly
-        // may cause undesired effects. Nlerp should be used more, but it doesn’t mean cut out Slerp 
+        // may cause undesired effects. Nlerp should be used more, but it doesnï¿½t mean cut out Slerp 
         // all together. Nlerp is very easy, too. Just normalize the result from Lerp()!
         public static Vector3d NLerp(Vector3d start, Vector3d end, double weight)
         {
@@ -453,7 +479,7 @@ namespace Keystone.Types
         {
             return Lerp(start, end, step / maxSteps);
         }
-                              
+
         /// <summary>
         /// Accelerates from start and slows down towards end.
         /// http://sol.gfxile.net/interpolation/
@@ -462,24 +488,24 @@ namespace Keystone.Types
         /// <returns></returns>
         public static Vector3d LerpSmoothStep(Vector3d start, Vector3d end, double step, double maxSteps)
         {
-        	return Lerp(start, end, SmoothStep(step / maxSteps));
+            return Lerp(start, end, SmoothStep(step / maxSteps));
         }
 
         public static Vector3d LerpSmoothStep(Vector3d start, Vector3d end, double weight)
         {
-        	return Lerp(start, end, SmoothStep(weight));
+            return Lerp(start, end, SmoothStep(weight));
         }
-                
+
         public static Vector3d LerpSmoothAcceleration(Vector3d start, Vector3d end, double weight)
         {
-        	return Lerp(start, end, SmoothAcceleration(weight));
+            return Lerp(start, end, SmoothAcceleration(weight));
         }
-                   
+
         public static Vector3d LerpSmoothDeceleration(Vector3d start, Vector3d end, double weight)
         {
-        	return Lerp(start, end, SmoothDeceleration(weight));
+            return Lerp(start, end, SmoothDeceleration(weight));
         }
-                
+
         /// <summary>
         /// Adds acceleration and deceleration to the interpolation
         /// </summary>
@@ -489,7 +515,7 @@ namespace Keystone.Types
         {
             return (weight * weight * (3d - 2d * weight));
         }
-     
+
         /// <summary>
         /// Adds acceleration but no deceleration
         /// </summary>
@@ -499,7 +525,7 @@ namespace Keystone.Types
         {
             return weight * weight;
         }
-                
+
         /// <summary>
         /// Adds deceleration but no acceleration
         /// </summary>
@@ -509,10 +535,15 @@ namespace Keystone.Types
         {
             return 1d - (1d - weight) * (1d - weight) * (1d - weight);
         }
-        
+
         /// <summary>
-        /// One rather handy algorithm, especially when you don't necessarily know how the target will behave in the future (such as a camera tracking the player's character), is to apply weighted average to the value.
-        /// where 'weight' is the current value, w is the value towards which we want to move, and N is the slowdown factor. The higher N, the slower 'weight' approaches w.
+        /// One rather handy algorithm, especially when you don't necessarily
+        /// know how the target will behave in the future (such as a camera
+        /// tracking the player's character), is to apply weighted average
+        /// to the value.
+        /// where 'weight' is the current value, w is the value towards which
+        /// we want to move, and N is the slowdown factor. The higher N, the
+        /// slower 'weight' approaches w.
         /// http://sol.gfxile.net/interpolation/
         /// </summary>
         /// <param name="weight"></param>
@@ -522,31 +553,7 @@ namespace Keystone.Types
             // TODO: return ((weight* (N - 1)) + w) / N; 
             return 0;
         }
-
-        public Vector3d ProjectOnToPlane(Vector3d planeNormal)
-        {
-            Vector3d result = this;
-
-            double sqrMag = Vector3d.DotProduct(planeNormal, planeNormal);
-            if (sqrMag > double.Epsilon)
-            {
-                double dot = Vector3d.DotProduct(this, planeNormal);
-                result.x = this.x - planeNormal.x * dot / sqrMag;
-                result.y = this.y - planeNormal.y * dot / sqrMag;
-                result.z = this.z - planeNormal.z * dot / sqrMag;
-            }
-
-            return result;
-        }
-
-        public static Vector3d FromTV3DVector(Vector3d v)
-        {
-            Vector3d result;
-            result.x = v.x;
-            result.y = v.y;
-            result.z = v.z;
-            return result;
-        }
+#endregion
 
         public static Vector3d operator -(Vector3d v1)
         {
@@ -564,18 +571,18 @@ namespace Keystone.Types
         }
 
         // Multiplying a quaternion q with a vector v applies the q-rotation to v
-		public static Vector3d operator *(Vector3d vec, Quaternion quat) 
-		{
-			// http://content.gpwiki.org/index.php/OpenGL%3aTutorials%3aUsing_Quaternions_to_represent_rotation#Rotating_vectors
-			Vector3d vn = Vector3d.Normalize (vec);
-					 
-			Quaternion vecQuat = new Quaternion (vn.x, vn.y, vn.z, 0.0d);
-			Quaternion resultQuat = vecQuat * Quaternion.Conjugate ( quat);
-			
-			resultQuat = quat * resultQuat;
-		 
-			return new Vector3d(resultQuat.X, resultQuat.Y, resultQuat.Z);
-		}
+        public static Vector3d operator *(Vector3d vec, Quaternion quat)
+        {
+            // http://content.gpwiki.org/index.php/OpenGL%3aTutorials%3aUsing_Quaternions_to_represent_rotation#Rotating_vectors
+            Vector3d vn = Vector3d.Normalize(vec);
+
+            Quaternion vecQuat = new Quaternion(vn.x, vn.y, vn.z, 0.0d);
+            Quaternion resultQuat = vecQuat * Quaternion.Conjugate(quat);
+
+            resultQuat = quat * resultQuat;
+
+            return new Vector3d(resultQuat.X, resultQuat.Y, resultQuat.Z);
+        }
 
         public static Vector3d operator *(Vector3d v1, Vector3d v2)
         {
@@ -597,14 +604,14 @@ namespace Keystone.Types
         }
         public static Vector3d operator /(Vector3d v1, double value)
         {
-        	if (value == 0) return Vector3d.Zero();
-        
-			Vector3d result;        	
-        	result.x = v1.x / value;
-        	result.y = v1.y / value;
-        	result.z = v1.z / value;
-        	
-        	return result;
+            if (value == 0) return Vector3d.Zero();
+
+            Vector3d result;
+            result.x = v1.x / value;
+            result.y = v1.y / value;
+            result.z = v1.z / value;
+
+            return result;
         }
 
         // March.11.2024 - this was only ever used by Ray.css for finding the inverse direction vector.
@@ -615,12 +622,12 @@ namespace Keystone.Types
         //{
 
         //	Vector3d result;
-        	
+
         //    // July.10.2012 to avoid divide by zero use ternary ?: to assign 0 or 1 / v 
         //	result.x = (v1.x == 0d) ? 0d : value / v1.x;
         //	result.y = (v1.y == 0d) ? 0d : value / v1.y;
         //	result.z = (v1.z == 0d) ? 0d : value / v1.z;
-        	
+
         //	return result;
         //}
 
@@ -633,20 +640,20 @@ namespace Keystone.Types
         {
             return !(v1 == v2);
         }
-        
+
         public override bool Equals(object obj)
         {
-        	if (obj == null || !(obj is Vector3d))
+            if (obj == null || !(obj is Vector3d))
                 return false;
-            
+
             return (this == (Vector3d)obj);
         }
 
         public bool Equals(Vector3d v)
         {
-           return this.x == v.x && this.y == v.y && this.z == v.z;
+            return this.x == v.x && this.y == v.y && this.z == v.z;
         }
-        
+
         public bool IsNullOrEmpty()
         {
             return (x == 0 && y == 0 && z == 0);
@@ -656,6 +663,7 @@ namespace Keystone.Types
         {
             return base.GetHashCode();
         }
+
         public override string ToString()
         {
             string delimiter = keymath.ParseHelper.English.XMLAttributeDelimiter;
@@ -665,26 +673,26 @@ namespace Keystone.Types
         }
 
         public static string ToString(Vector3d[] vecArray)
-        {
+         {
 
-            if (vecArray == null || vecArray.Length == 0) return null;
+             if (vecArray == null || vecArray.Length == 0) return null;
 
-            string delimiter = keymath.ParseHelper.English.XMLAttributeDelimiter;
-            string result = string.Empty;
-            System.Text.StringBuilder sb = new System.Text.StringBuilder(result);
+             string delimiter = keymath.ParseHelper.English.XMLAttributeDelimiter;
+             string result = string.Empty;
+             System.Text.StringBuilder sb = new System.Text.StringBuilder(result);
 
-            for (int i = 0; i < vecArray.Length; i++)
-            {
-                sb.Append(vecArray[i].ToString());
-                if (i != vecArray.Length - 1)
-                    // append delimiter. NOTE: same delimiter is used even between vectors and not just their elements
-                    sb.Append(delimiter); 
-            }
-            result = sb.ToString();
-
-            return result;
-        }
-
+             for (int i = 0; i < vecArray.Length; i++)
+             {
+                 sb.Append(vecArray[i].ToString());
+                 if (i != vecArray.Length - 1)
+                     // append delimiter. NOTE: same delimiter is used even between vectors and not just their elements
+                     sb.Append(delimiter);
+             }
+             result = sb.ToString();
+ 
+             return result;
+         }
+        
         // TODO: i think the thing to do is move this out from here and into the PropertyBags
         //#region ICustomTypeDescriptor Members
         //PropertyDescriptorCollection ICustomTypeDescriptor.GetProperties(Attribute[] attributes)
@@ -1117,5 +1125,4 @@ namespace Keystone.Types
 
     //    #endregion
     //}
-
 }

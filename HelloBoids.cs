@@ -610,6 +610,8 @@ namespace HelloBoids
                 Func<EntityNode, EntityNode, bool> match = (neighbor, current) =>
                 {
                     if (neighbor == current) return false;
+                    // TODO: WE MUST CACHE span<T> and not access neighbor.Translation and current.Translation... we need to directly
+                    //        access the indices of the Span<T> here... otherwise its TOO SLOW
                     if (Vector3d.GetDistance3dSquared(neighbor.Translation, current.Translation) <= largestDistanceSquared) return true;
                     return false;
                 };
@@ -7294,6 +7296,8 @@ namespace HelloBoids
 			{ 
 				// https://www.codemag.com/Article/2207031/Writing-High-Performance-Code-Using-SpanT-and-MemoryT-in-C
 				return mSpanAccessTest; // NOTE: <-- this line is much faster than returning the Translation from the below line!  
+                // / What we want to do is cache/grab the entire Span[0] once for this Entity/Boid and then directly just modify IT and not this accessor!!!
+                //
 				return mMemStore.Span[0].Translation; 
 			}
             set 

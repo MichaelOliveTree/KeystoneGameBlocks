@@ -28,7 +28,7 @@ namespace HelloBoids
     {
         public static HelloBoids.ComponentStoreCollection mCStoreCol = new HelloBoids.ComponentStoreCollection();
         public static uint NUM_ENTRIES = 768;
-        public static uint NUM_ITERATIONS = 500;
+        public static uint NUM_ITERATIONS = 200;
         public static double WIDTH = 800d;
         public static double HEIGHT = 600d;
 
@@ -617,7 +617,7 @@ namespace HelloBoids
                 };
 
                 //List<EntityNode> found = currentBoid.SpatialNode.Query(currentBoid, true, searchArea, match);
-				List<EntityNode> found = SpatialQueryLocal(currentBoid, true, searchArea, match);
+				List<EntityNode> found = SpatialQueryLocal(Store.Span, currentBoid.SpatialNode, currentBoid.SpanIndex, largestDistanceSquared, true, searchArea);
 	
 	
                 if (found == null || found.Count == 0) return null;
@@ -658,43 +658,84 @@ namespace HelloBoids
             return neighbors;
         }
 
-		private List<EntityNode> SpatialQueryLocal(EntityNode refEnt, bool recurse, BoundingBox searchArea, Func<EntityNode, EntityNode, bool> match)
+#if USE_MEMORY_T
+		private List<EntityNode> SpatialQueryLocal(Span<Transform.Transform_Struct> memSpan, OctreeOctant refSpatialNode, int refIndex, double distance, bool recurse, BoundingBox searchArea)
 		{
-            if (match == null) throw new ArgumentNullException("SpatialQueryLocal() - match cannot be null.");
-
-            if (!refEnt.SpatialNode.BoundingBox.Intersects(searchArea))
-                return null;
-
+            if (refSpatialNode == null) throw new ArgumentNullException("SpatialQueryLocal() - reference Entity cannot be null.");
+			if (!refSpatialNode.BoundingBox.Intersects(searchArea)) return null; // early exit
+	
+			// TODO: // TODO: https://daeken.dev/a-stupidly-simple-fast-octree-traversal-for-ray-intersection
+	
             List<EntityNode> results = new List<EntityNode>();
-
-            if ( refEnt.SpatialNode.EntityNodes != null)
-                for (int i = 0; i < refEnt.SpatialNode.EntityNodes.Length; i++)
+	
+			// ITERATIVE DEPTH-FIRST TRAVERSAL
+			Stack<OctreeOctant> stack = new Stack<OctreeOctant>();
+			stack.Push(refSpatialNode);
+	
+			while (stack.Count > 0)
+			{
+				OctreeOctant current = stack.Pop();
+								
+				if ( current.EntityNodes != null)
+				{
+					for (int i = 0; i < current.EntityNodes.Length; i++)
+					{
+						if (current.EntityNodes[i].SpanIndex == refIndex) continue;
+						// TODO: WE MUST CACHE span<T> and not access neighbor.Translation and current.Translation... we need to directly
+						//        access the indices of the Span<T> here... otherwise its TOO SLOW
+						double calc = Vector3d.GetDistance3dSquared(memSpan[current.EntityNodes[i].SpanIndex].Translation, memSpan[refIndex].Translation);
+						//System.Diagnostics.Debug.WriteLine("Calculated distance = " + calc.ToString());
+						if (calc <= distance) 
+							results.Add(current.EntityNodes[i]);
+					}
+				}
+				
+				if (current.Children != null)
                 {
-					// TODO: "match" delegate needs to be rewritten to support an index into mem.Span[]
-					//       so that we do not have to keep accessing refEnt.Translation which puts a new
-					//       Span<T> on the stack everytime and thus is very slow.  So we need to have a single
-					//       Span<T> passed in here and then Query without recursion and using ent.SpanIndex into that Span<T>
-                    if (match(refEnt.SpatialNode.EntityNodes[i].SpanIndex, refEnt.SpanIndex))
-                        results.Add(refEnt.SpatialNode.EntityNodes[i]);
+					 for (int i = 0; i < current.Children.Length; i++)
+						 // NOTE: Each OctreeOctant's BoundingBox needs to be in World Space.
+            			if (current.Children[i].BoundingBox.Intersects(searchArea))
+					 		stack.Push(current.Children[i]);
+				}
+			}
+     		
+
+	
+			/*
+			// RECURSIVE DEPTH-FIRST TRAVERSAL
+			// NOTE: Each OctreeOctant's BoundingBox needs to be in World Space.
+            if (!refSpatialNode.BoundingBox.Intersects(searchArea))
+                return null;
+				
+			// compare the distance of all Entities within this Octant
+            if ( refSpatialNode.EntityNodes != null)
+                for (int i = 0; i < refSpatialNode.EntityNodes.Length; i++)
+                {
+					if (refSpatialNode.EntityNodes[i].SpanIndex == refIndex) continue;
+                    // TODO: WE MUST CACHE span<T> and not access neighbor.Translation and current.Translation... we need to directly
+                    //        access the indices of the Span<T> here... otherwise its TOO SLOW
+                    if (Vector3d.GetDistance3dSquared(memSpan[refSpatialNode.EntityNodes[i].SpanIndex].Translation, memSpan[refIndex].Translation) <= distance) 
+						results.Add(refSpatialNode.EntityNodes[i]);
                 }
 
             if (recurse)
             {
-                if (refEnt.SpatialNode.Children != null)
+                if (refSpatialNode.Children != null)
                 {
-                    // NOTE: We recurse the child OctreeOctants, not EntityNodes
-                    for (int j = 0; j < refEnt.SpatialNode.Children.Length; j++)
-                    {
-                        List<EntityNode> nestedResults = refEnt.SpatialNode.Children[j].Query(refEnt, recurse, searchArea, match);
+                    for (int j = 0; j < refSpatialNode.Children.Length; j++)
+                    {						
+                        List<EntityNode> nestedResults = SpatialQueryLocal(memSpan, refSpatialNode.Children[j], refIndex, distance, recurse, searchArea);
                         if (nestedResults != null)
                             results.AddRange(nestedResults);
                     }
                 }
             }
+			*/
 
             if (results.Count == 0) return null;
             return results;
 		}
+#endif
 			
 #if USE_MEMORY_T == false
         public void Update(double elapsedSeconds, List<Boid> allBoids, double separationDistance, double separationFactor, double alignmentDistance, double alignmentFactor, double cohesionDistance, double cohesionFactor, double maxSpeed, double turnFactor)
@@ -1437,8 +1478,1708 @@ namespace HelloBoids
         }
 #endif
     }
+
+    // to set flags use  Parent.ChangeState = ChangeStates.Moved | ChangeStates.Rotated | ChangeStates.Scaled
+    // to check the status of a flag you would use a property "ChangeStates node.ChangeState" and then
+    // the statement if (node.ChangeState & ChangeStates.Translated) == ChangeStates.Translated
+    [Flags]
+    public enum ChangeStates : int
+    {
+        // IMPORTANT: I thought about using some persistant flags here but that is a mistake.
+        // ChangeStates should ONLY include those states which are only important at runtime.
+        None = 0,
+        ChildNodeAdded = 1 << 1,
+        ChildNodeRemoved = 1 << 2,
+        GeometryAdded = 1 << 3 | ChildNodeAdded, // WARNING! MUST be careful with combining '|' other flags here like GeometryAdded = 1 << 3 | ChildNodeAdded | BoundingBox_Dirty because when you clear the flag for ChildNodeAdded it will also clear the BoundingBox_Dirty when you dont intend to
+        GeometryRemoved = 1 << 4 | ChildNodeRemoved, // TODO: In fact I should ban the practice altogether 
+
+        ViewpointAdded = 1 << 5 | ChildNodeAdded,
+        ViewpointRemoved = 1 << 6 | ChildNodeRemoved,
+
+
+        BoundingBoxDirty = 1 << 7,
+        BoundingBox_TranslatedOnly = 1 << 8,
+        MatrixDirty = 1 << 9,
+        RegionMatrixDirty = 1 << 10,
+        GlobalMatrixDirty = 1 << 11,
+        Translated = 1 << 12,
+        Rotated = 1 << 13,
+        Scaled = 1 << 14,
+
+        // NOTE: we don't combine flags because when we DisableChangeStates, it also disables ALL the relevant bits in the flag
+        // Translated = 1 << 12 | BoundingBox_TranslatedOnly | MatrixDirty,
+        // Rotated = 1 << 13 | BoundingBoxDirty  | MatrixDirty,
+        // Scaled = 1 << 14 | BoundingBoxDirty | MatrixDirty,
+        KeyFrameUpdated = 1 << 15,  // AnimationUpdated same thing
+        AppearanceNodeChanged = 1 << 28, // MaterialNodeChanged, TextureNodeChanged
+        AppearanceParameterChanged = 1 << 16,  // when Appearance parameters are changed 
+        ShaderParameterValuesChanged = 1 << 17,
+        ShaderFXLoaded = 1 << 18,
+        ShaderFXUnloaded = 1 << 19,
+        EntityScriptLoaded = 1 << 20,    // scripts paged in or paged out (NOT just added/removed)
+        DomainScriptUnloaded = 1 << 21,
+        BehaviorScriptLoaded = 1 << 22,
+        BehaviorScriptUnloaded = 1 << 23,
+        TargetChanged = 1 << 24,  // typically used by animations which are directly parented to Entity so Entity will be only receiver
+        EventHandlerChanged = 1 << 25,
+
+        EntityMoved = 1 << 26,  // required only for scene listener
+        EntityResized = 1 << 27, // required only for scene listener
+        PhysicsNodeAdded = 1 << 28,
+        PhysicsNodeRemoved = 1 << 29,
+        All = int.MaxValue
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    // BEGIN NODES
+    // Transform node type. Entities and Models inherit this type.
+    // NOTE: The global variables are almost exclusively as they relate to Zones.
+    //       Otherwise the mDerived* vars are our worldspace variables.  Adjacent Zones
+    //       get oriented with respect to the camera's Region/Zone. This means
+    //       only globalTranslation is used and globalscale and globalrotation are Identity.
+    //
+    // TODO: should we derive a PhysicalTransform node for PhysicsBodies?
+    // that can host our mOldTransform and mPreviousStepTransform vars?
+    public class Transform
+#if USE_MEMORY_T
+            : IDisposable
+#endif
+    {
+        private ChangeStates mChangeStates = ChangeStates.None;
+
+        // TODO: currently inheritScale and inheritRotation are treated as
+        // bools since a bool can potentially take up just 1 bit instead of 32
+        // so no need to merge these into a single 32bit flag.
+        //private const int INHERIT_ROTATION = 1 << 0;
+        //private const int INHERIT_SCALE = 1 << 1;
+
+        private bool mInheritScale;
+        private bool mInheritRotation;
+
+        public int AttachedToBoneID;
+
+        protected Vector3d mPivot;
+        protected Vector3d mPreviousTranslation;
+
+#if USE_MEMORY_T == false
+        // local scale, translation and rotation
+        protected Vector3d mScale, mTranslation;
+        protected Quaternion mRotation;
+
+        // region centric translation, scale, and rotation 
+        protected Quaternion mDerivedRotation;
+        protected Vector3d mDerivedTranslation;
+        protected Vector3d mDerivedScale;
+
+        // global scale, rotation and translation (note: translation includes zone translations)
+        protected Vector3d mGlobalScale, mGlobalTranslation;
+        protected Quaternion mGlobalRotation;
+
+
+        // cached matrix will automatically include derived versions if enabled
+        protected Matrix mMatrix; // RegionMatrix
+        protected Matrix mLocalMatrix;
+        protected Matrix mGlobalMatrix;
+#endif
+
+        // different in translation between current and previous
+        protected Vector3d mTranslationDelta;
+
+#if USE_MEMORY_T
+		public Memory<Transform_Struct> mMemStore; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
+		public int SpanIndex = -1;
+				
+        //[StructLayout(LayoutKind.Sequential)]
+        public struct Transform_Struct
+        {
+            //public string EntityID;
+            public Vector3d Velocity;
+
+
+            //public Vector3d Pivot;
+
+            public Vector3d Translation;
+            //public Vector3d DerivedTranslation;
+            //public Vector3d GlobalTranslation;
+
+            public Vector3d Scale;
+            //public Vector3d DerivedScale;
+            //public Vector3d GlobalScale;
+
+            public Quaternion Rotation;
+            //public Quaternion DerivedRotation;
+            //public Quaternion GlobalRotation;
+
+            //public Matrix RegionMatrix;
+
+        }
+
+        
+
+#endif
+
+        protected Transform()
+        {
+
+#if USE_MEMORY_T
+
+            ComponentStore<Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
+            int index = -1;
+            mMemStore = store.CheckOut(out index);
+            SpanIndex = index;
+            //initialize the memory store
+
+            // todo do we need destuuctor for Repository.CheckIn mMemstore?
+
+
+#else
+            mMatrix = Matrix.Identity();
+            mScale.x = 1;
+            mScale.y = 1;
+            mScale.z = 1;
+            mTranslation.x = 0;
+            mTranslation.y = 0;
+            mTranslation.z = 0;
+            mRotation = new Quaternion();
+            //_rotation.X = 0;
+            //_rotation.Y = 0;
+            //_rotation.Z = 0;
+            //_rotation.W = 1;
+            mPivot.x = 0;
+            mPivot.y = 0;
+            mPivot.z = 0;
+
+
+
+
+#endif
+
+            AttachedToBoneID = -1;
+
+            //SetChangeFlags(Enums.ChangeStates.Translated |
+            //               Enums.ChangeStates.Scaled |
+            //               Enums.ChangeStates.Rotated |
+            //               Enums.ChangeStates.MatrixDirty |
+            //               Enums.ChangeStates.RegionMatrixDirty |
+            //               Enums.ChangeStates.GlobalMatrixDirty | 
+            //              Enums.ChangeStates.BoundingBoxDirty, Enums.ChangeSource.Self);
+
+            // by default we inherit rotations however
+            // stellar system components like stars, planets, moons, asteroids do not
+            // Currently what we do is in our ProceduralHelper.cs is to manually
+            // set these two flags to false.
+            mInheritRotation = true;
+
+            // In a hierarchical scene, Transform derived nodes should always inherit scale.  The variable
+            // is available however if for certain elements such as GUI Widgets, HUD root elements, etc
+            // where we always want independant scaling.  But for things like Engine nacelles, we want
+            // them to inherit scale of Vehicle they are attached to.
+            mInheritScale = true;
+            // If we don't intend for a scale set on an Entity to pass to a child Entity, then we should 
+            // set that scale on the Parent entity's child Model instead. 
+            //  Entity         <-- don't set scale here
+            //		|___Model   <-- set scale on Model instead
+            //		|__Entity   <-- child Entity will now not inherit scale
+            //			|__Model
+
+            //Shareable = false; // Transform nodes and derived can never be shared.
+        }
+
+        #region ResourceBase members
+
+        /*/// <summary>
+        /// 
+        /// </summary>
+        /// <param name="specOnly">True returns the properties without any values assigned</param>
+        /// <returns></returns>
+        public override Settings.PropertySpec[] GetProperties(bool specOnly)
+        {
+            Settings.PropertySpec[] tmp = base.GetProperties(specOnly);
+            Settings.PropertySpec[] properties = new Settings.PropertySpec[10 + tmp.Length];
+            tmp.CopyTo(properties, 10);
+
+	    properties[0] = new Settings.PropertySpec("inheritscale", mInheritScale.GetType().Name);
+            properties[1] = new Settings.PropertySpec("inheritrotation", mInheritRotation.GetType().Name);
+
+            properties[2] = new Settings.PropertySpec("position", mTranslation.GetType().Name);
+            properties[3] = new Settings.PropertySpec("scale", mScale.GetType().Name);
+            properties[4] = new Settings.PropertySpec("rotation", mRotation.GetType().Name);
+            
+            properties[5] = new Settings.PropertySpec("velocity", mVelocity.GetType().Name);
+            properties[6] = new Settings.PropertySpec("acceleration", mAcceleration.GetType().Name);
+            properties[7] = new Settings.PropertySpec("force", mForce.GetType().Name);
+            properties[8] = new Settings.PropertySpec("angularforce", mAngularForce.GetType().Name);
+            properties[9] = new Settings.PropertySpec("angularvelocity", mAngularVelocity.GetType().Name);
+
+            if (!specOnly)
+            {
+                properties[0].DefaultValue = mInheritScale;
+                properties[1].DefaultValue = mInheritRotation;
+
+
+                properties[2].DefaultValue = mTranslation;
+                properties[3].DefaultValue = mScale;
+                properties[4].DefaultValue = mRotation;
+
+
+                properties[5].DefaultValue = mVelocity;
+                properties[6].DefaultValue = mAcceleration;
+                properties[7].DefaultValue = mForce;
+                properties[8].DefaultValue = mAngularForce;
+                properties[9].DefaultValue = mAngularVelocity;
+            }
+
+            return properties;
+        }
+
+        public override void SetProperties(Settings.PropertySpec[] properties)
+        {
+            if (properties == null) return;
+            base.SetProperties(properties);
+
+            for (int i = 0; i < properties.Length; i++)
+            {
+                if (properties[i].DefaultValue == null) continue;
+                // use of a switch allows us to pass in all or a few of the propspecs depending
+                // on whether we're loading from xml or changing a single property via server directive
+                switch (properties[i].Name)
+                {
+                    case "inheritscale":
+                        InheritScale = (bool)properties[i].DefaultValue;
+                        break;
+                    case "inheritrotation":
+                        InheritRotation = (bool)properties[i].DefaultValue;
+                        break;
+
+
+
+                    case "position":
+                        Translation = (Vector3d)properties[i].DefaultValue;
+                        break;
+                    case "scale":
+                        Scale = (Vector3d)properties[i].DefaultValue;
+                        break;
+                    case "rotation":
+                        Rotation = (Quaternion)properties[i].DefaultValue;
+                        break;
+
+
+		    // Physics will be moved to Entity.PhysicsBody which will implement IPhysicsBody (as will RigidBody.cs)
+                    case "velocity":
+                        mVelocity = (Vector3d)properties[i].DefaultValue;
+                        break;
+                    case "acceleration":
+                        mAcceleration = (Vector3d)properties[i].DefaultValue;
+                        break;
+                    case "force":
+                        mForce = (Vector3d)properties[i].DefaultValue;
+                        break;
+                    case "angularforce":
+                        mAngularForce = (Vector3d)properties[i].DefaultValue;
+                        break;
+                    case "angularvelocity":
+                        mAngularVelocity = (Vector3d)properties[i].DefaultValue;
+                        break;
+                }
+            }
+
+            // NOTE: the following flags are set in the property Settors
+//            SetChangeFlags(Enums.ChangeStates.BoundingBoxDirty |
+//                Enums.ChangeStates.GlobalMatrixDirty |
+//                Enums.ChangeStates.MatrixDirty |
+//                Enums.ChangeStates.RegionMatrixDirty, Enums.ChangeSource.Self);
+        }
+		*/
+        #endregion
+
+
+
+        /// <summary>
+        /// In a hierarchical scene, Transform derived nodes shoudl always inherit scale.  The variable
+        /// is available however if for certain elements such as GUI Widgets, HUD root elements, etc
+        /// where we always want independant scaling.
+        /// </summary>
+        public bool InheritScale
+        {
+            get { return mInheritScale; }
+            set
+            {
+                mInheritScale = value;
+                /*SetChangeFlags(
+                    Enums.ChangeStates.MatrixDirty | 
+                    Enums.ChangeStates.RegionMatrixDirty |
+                    Enums.ChangeStates.GlobalMatrixDirty | 
+                    Enums.ChangeStates.BoundingBoxDirty, Enums.ChangeSource.Self);
+            	*/
+            }
+        }
+
+        public bool InheritRotation
+        {
+            get { return mInheritRotation; }
+            set
+            {
+                mInheritRotation = value;
+                /*SetChangeFlags(
+                    Enums.ChangeStates.MatrixDirty |
+                    Enums.ChangeStates.RegionMatrixDirty |
+                    Enums.ChangeStates.GlobalMatrixDirty |
+                    Enums.ChangeStates.BoundingBoxDirty, Enums.ChangeSource.Self);
+				*/
+            }
+        }
+
+
+
+        #region PHYSICS - MOVES ALL THIS TO Entity.PhysicsBody which implements IPhysicsBody
+
+        // TODO: Dynamic physics items aren't related to Transform, but... how should we track our physics?
+        // do we use the traditional PhysicsBody composite object?
+        // These could maybe be moved to the new RigidBody class we've added (July.17.2019)
+        // TODO: but if these exist in the RigidBody node, how do we apply results to the Entity itself?
+        //  SHouldn't the RigidBody apply only the velocities (angular and linear)?  The RigidBody as needed
+        //  could grab any Transform info it needs from the Entity.
+        // Upon polling the events each physics step, we can update the relevant velocities on the Entity?
+        protected Vector3d mPreviousStepTranslation;
+        protected Vector3d mPreviousStepScale;
+        protected Quaternion mPreviousStepRotation;
+
+        protected Vector3d mVelocity = Vector3d.Zero();
+        protected Vector3d mAcceleration = Vector3d.Zero();
+        protected Vector3d mForce = Vector3d.Zero();
+
+        protected Vector3d mAngularVelocity = Vector3d.Zero();
+        protected Vector3d mAngularAcceleration = Vector3d.Zero();
+        protected Vector3d mAngularForce = Vector3d.Zero();
+
+        public virtual Vector3d Force
+        {
+            get { return mForce; }
+            set { mForce = value; }
+        }
+
+        public virtual Vector3d Acceleration
+        {
+            get { return mAcceleration; }
+            set { mAcceleration = value; }
+        }
+
+        // NOTE: Velocity may be overriden by SteerableEntity.cs 
+        public virtual Vector3d Velocity
+        {
+            get
+            {
+                return mVelocity;
+            }
+            set
+            {
+                mVelocity = value;
+            }
+        }
+
+        /// <summary>
+        /// torque
+        /// </summary>
+        public virtual Vector3d AngularForce
+        {
+            get { return mAngularForce; }
+            set { mAngularForce = value; }
+        }
+
+        public virtual Vector3d AngularAcceleration
+        {
+            get { return mAngularAcceleration; }
+            set { mAngularAcceleration = value; }
+        }
+
+        public virtual Vector3d AngularVelocity
+        {
+            get { return mAngularVelocity; }
+            set { mAngularVelocity = value; }
+        }
+        #endregion
+
+
+
+        /// <summary>
+        /// Previous translation from previous frame
+        /// </summary>
+        public Vector3d PreviousTranslation { get { return mPreviousTranslation; } }
+
+        // TODO: don't all these previous step versions end up needing
+        //       to compute a matrix for rendering ?  because
+        // well, we need to use this in model.Render() to compute the matrix
+        // to set on the geometry.  We compute the interpolated value and render 
+        // with that.
+        public Vector3d LatestStepTranslation
+        {
+            get { return mPreviousStepTranslation; }
+            set { mPreviousStepTranslation = value; }
+        }
+
+        public Vector3d LatestStepScale
+        {
+            get { return mPreviousStepScale; }
+            set { mPreviousStepScale = value; }
+        }
+
+        public Quaternion LatestStepRotation
+        {
+            get { return mPreviousStepRotation; }
+            set { mPreviousStepRotation = value; }
+        }
+
+
+#if USE_MEMORY_T
+        // variables stored in contiguous array of structs via Memory<T>
+        //public string GetEntityID { get { return mMemStore.Span[0].EntityID; } }
+
+        /*public Vector3d Pivot
+        {
+            get { return mMemStore.Span[0].Pivot; }
+            set { mMemStore.Span[0].Pivot = value; }
+        }*/
+		Vector3d mSpanAccessTest;
+        public Vector3d Translation
+        {
+            get 
+			{ 
+				// https://www.codemag.com/Article/2207031/Writing-High-Performance-Code-Using-SpanT-and-MemoryT-in-C
+				return mSpanAccessTest; // NOTE: <-- this line is much faster than returning the Translation from the below line!  
+                // / What we want to do is cache/grab the entire Span[0] once for this Entity/Boid and then directly just modify IT and not this accessor!!!
+                //
+				return mMemStore.Span[0].Translation; 
+			}
+            set 
+			{ 
+				mSpanAccessTest = value; 
+				mMemStore.Span[0].Translation = value; 
+			}
+        }
+        /*
+        public Vector3d DerivedTranslation
+        {
+            get { return mMemStore.Span[0].DerivedTranslation; }
+        }
+        public Vector3d GlobalTranslation
+        {
+            get { return mMemStore.Span[0].GlobalTranslation; }
+            set { mMemStore.Span[0].GlobalTranslation = value; }
+        }*/
+
+        public Vector3d Scale
+        {
+            get { return mMemStore.Span[0].Scale; }
+            set { mMemStore.Span[0].Scale = value; }
+        }
+        /*
+        public Vector3d DerivedScale
+        {
+            get { return mMemStore.Span[0].DerivedScale; }
+        }
+        public Vector3d GlobalScale
+        {
+            get { return mMemStore.Span[0].GlobalScale; }
+        }*/
+        public Quaternion Rotation
+        {
+            get { return mMemStore.Span[0].Rotation; }
+            set { mMemStore.Span[0].Rotation = value; }
+        }
+        /*
+        public Quaternion DerivedRotation
+        {
+            get { return mMemStore.Span[0].DerivedRotation; }
+        }
+        public Quaternion GlobalRotation
+        {
+            get { return mMemStore.Span[0].GlobalRotation; }
+        }*/
+
+#else
+        /// <summary>
+        /// Local Space Position
+        /// </summary>
+        public virtual Vector3d Translation
+        {
+            get { return mTranslation; }
+            set
+            {
+                //            	if (this is Model && ((Model)this).Geometry is MinimeshGeometry && value == Vector3d.Zero())
+                //            		System.Diagnostics.Debug.WriteLine ("err");
+                //            	
+                mTranslationDelta = value - mTranslation;
+                // May.16.2017 - even if mTranslationDelta equals Vector3d.Zero() we can't "return". We need to SetChangeFlags
+                //               or the Viewpoint used by ViewpointController will jitter.  Maybe it's because we need
+                //               mPreviousStepTranslation to update.  Eitherway, the following line must remain commented out.
+                //if (mTranslationDelta.Equals(Vector3d.Zero())) return;
+
+                mTranslation = value;
+                // TODO: arg, this previoussteptranslation crap oct.9.2014 temp hack as we implement steering 
+                // behaviors again with Dynamic flag to true.  We need to solve this long term where modifying 
+                // Translation through script or API or plugin will also update the previousStep if 
+                // Dynamic == true, or when enabling Dynamic, it initializes previousStepTranslation to Translation
+                mPreviousStepTranslation = Translation;
+
+                //if (this is Entities.Entity && ((Entities.Entity)this).Name == "helm")
+                //    System.Diagnostics.Debug.WriteLine("helm translation because it had EntityAttributes.Dynamic set");
+
+                //SetChangeFlags(
+                //	Enums.ChangeStates.Translated |
+                //    Enums.ChangeStates.MatrixDirty | 
+                //    Enums.ChangeStates.RegionMatrixDirty |
+                //   Enums.ChangeStates.GlobalMatrixDirty | 
+                //   Enums.ChangeStates.BoundingBox_TranslatedOnly, Enums.ChangeSource.Self);
+            }
+        }
+
+        public virtual Vector3d Scale
+        {
+            get { return mScale; }
+            set
+            {
+#if DEBUG
+                if (value == Vector3d.Zero()) throw new ArgumentOutOfRangeException("Transform.Scale cannot be 0,0,0");
+#endif
+                if (value == mScale) return; // some thigns have their scale altered all the time such as for percentage screenspace scaling and if the scale value doesnt change, no need to alter
+
+                //if (this is Entities.Entity && ((Entities.Entity)this).Name == "helm")
+                //    System.Diagnostics.Debug.WriteLine("helm scale err");
+
+                mScale = value;
+                //SetChangeFlags(
+                //     Enums.ChangeStates.Scaled |
+                //    Enums.ChangeStates.MatrixDirty |
+                //    Enums.ChangeStates.RegionMatrixDirty |
+                //   Enums.ChangeStates.GlobalMatrixDirty |
+                //   Enums.ChangeStates.BoundingBoxDirty, Enums.ChangeSource.Self);
+            }
+        }
+
+        /// <summary>
+        /// Local Space Rotation
+        /// </summary>
+        public virtual Quaternion Rotation
+        {
+            get { return mRotation; }
+            set
+            {
+                if (value.IsNullOrEmpty()) return;
+                if (value.Equals(mRotation)) return; // some things have their rotaton altered all the time but never actually change, no need to set change flags here
+                mRotation = value;
+
+
+                //  SetChangeFlags(
+                // 	Enums.ChangeStates.Rotated |
+                //    Enums.ChangeStates.MatrixDirty |
+                //    Enums.ChangeStates.RegionMatrixDirty |
+                //   Enums.ChangeStates.GlobalMatrixDirty |
+                //   Enums.ChangeStates.BoundingBoxDirty, Enums.ChangeSource.Self);
+            }
+        }
+
+        public Vector3d Pivot
+        {
+            get { return mPivot; }
+            set
+            {
+                mPivot = value;
+                if (value == mPivot) return;
+                //   SetChangeFlags(
+                //       Enums.ChangeStates.MatrixDirty |
+                //      Enums.ChangeStates.RegionMatrixDirty |
+                //      Enums.ChangeStates.GlobalMatrixDirty |
+                //      Enums.ChangeStates.BoundingBoxDirty, Enums.ChangeSource.Self);
+            }
+        }
+
+        public Vector3d DerivedTranslation
+        {
+            get
+            {
+                // NOTE: translation can be altered by parent scale as well as translation from parent or self
+                if ((mChangeStates & (ChangeStates.Translated | ChangeStates.Scaled)) != 0)
+                    UpdateRegional();
+
+                return mDerivedTranslation;
+            }
+        }
+
+        public Vector3d DerivedScale
+        {
+            get
+            {
+                if ((mChangeStates & ChangeStates.Scaled) == ChangeStates.Scaled)
+                    UpdateRegional();
+
+                return mDerivedScale;
+            }
+        }
+
+        public Quaternion DerivedRotation
+        {
+            get
+            {
+                if ((mChangeStates & ChangeStates.Rotated) == ChangeStates.Rotated)
+                    UpdateRegional();
+                return mDerivedRotation;
+            }
+        }
+
+        public virtual Vector3d GlobalTranslation
+        {
+            get
+            {
+                // global translation is dirty whenever a) this node translates b) it's parent node translates c) it's parent node's Global translation has changed,
+                // but we dont always need to know the most up to date value 
+                // so maybe we need more flags for these so we can clear Translated flag after local update, but still know that
+                // global still needs to be updated (is dirty) if we should try to grab it's value
+                // global values aren't requested very often.  We try to do most calcs in Region space.  I think mostly it's camera and Regions which use these
+                if ((mChangeStates & ChangeStates.GlobalMatrixDirty) == ChangeStates.GlobalMatrixDirty)
+                    UpdateGlobal();
+
+                Vector3d result = GlobalMatrix.GetTranslation();
+                //System.Diagnostics.Debug.Assert (result == mGlobalTranslation);
+
+                return mGlobalTranslation;
+            }
+            set
+            {
+                mGlobalTranslation = value;
+                /*
+            	if (mParents == null || mParents[0] == null)
+	            {
+	                // there is no parent so GlobalTranslation is same as local
+	                Translation = mGlobalTranslation; // calling public property setter instead of private var will trigger appropriate SetChangeFlags
+	                return;
+	            }
+
+            	Transform parent = (Transform)mParents[0];
+            
+            	// we want to transform coordinate from (src) global to (dest) local identity space
+	           	Matrix source2dest = Matrix.Inverse (parent.GlobalMatrix); // Matrix.Source2Dest(parent.GlobalMatrix, Matrix.Identity());
+        		Matrix locallyTransformedMatrix = Matrix.Multiply4x4(source2dest, Matrix.CreateTranslation (value));
+        		Vector3d result = locallyTransformedMatrix.GetTranslation();
+
+        		// TODO: for Zones this is wrong.  Not even sure for other Entity types because we dont use it much but my recollection
+        		//       is that it is also wrong when trying to place entities in multi-zone region with asset placement tool.
+            	Translation = result; // calling public property setter instead of private var will trigger appropriate SetChangeFlags
+				*/
+            }
+        }
+
+        public Vector3d GlobalScale
+        {
+            get
+            {
+                // global scale is dirty whenever a) this node re-scales b) it's parent node's scales c) it's parent node's Global scale has changed
+                // so maybe we need more flags for these?
+                // global values aren't requested very often.  We try to do most calcs in Region space.  I think mostly it's camera and Regions which use these
+                if ((mChangeStates & ChangeStates.GlobalMatrixDirty) == ChangeStates.GlobalMatrixDirty)
+                    UpdateGlobal();
+
+                return mGlobalScale;
+            }
+        }
+
+        public Quaternion GlobalRotation
+        {
+            get
+            {
+                // global rotation is dirty whenever a) this node rotates b) it's parent node's rotated c) it's parent node's Global rotation has changed
+                // so maybe we need more flags for these?
+                // global values aren't requested very often.  We try to do most calcs in Region space.  I think mostly it's camera and Regions which use these
+                if ((mChangeStates & ChangeStates.GlobalMatrixDirty) == ChangeStates.GlobalMatrixDirty)
+                    UpdateGlobal();
+                return mGlobalRotation;
+            }
+        }
+
+
+        /// <summary>
+        /// Local Matrix is nearly obsolete because what we primarily store are LOCAL translation, 
+        /// scale, and orientation quaternion. 
+        /// 
+        /// This is only used by MoveTool/RotateTool/ScaleTool and ScaleDrawer _all_ for
+        /// EditableMesh which is edited in modelspace and not in the coordinate system of the current 
+        /// Region
+        ///
+        ///  Local matrix is cached primarily so that we can properly compare differences in
+        /// translation to the position elements already in the matrix when translation is the only thing
+        /// that has changed.
+        /// Even setting a local matrix just result in the diffferent vector components being created. 
+        /// 
+        /// Local Matrix is always relative to the parent.
+        /// </summary>
+        public Matrix LocalMatrix
+        {
+            get
+            {
+                // this override of the get{} performs a lazy update of the WorldMatrix
+                // if it's dirty.  It's exactly like what happens with the getter on BoundingBox()
+                // When trying to access the RelativeMatrix, if the position, scale, translation
+                // has changed for this Model, the appropriate flags will get set and we must
+                // compute  a new one.
+                if (mLocalMatrix.IsNullOrEmpty() || (mChangeStates & ChangeStates.MatrixDirty) == ChangeStates.MatrixDirty)
+                {
+                    // update local matrix
+                    Matrix tmat = Matrix.CreateTranslation(mTranslation);
+                    Matrix smat = Matrix.CreateScaling(mScale);
+                    Matrix rmat = new Matrix(mRotation);
+                    //Matrix Rx = Matrix.RotationX(_rotation.x * Utilities.MathHelper.DEGREES_TO_RADIANS);
+                    //Matrix Ry = Matrix.RotationY(_rotation.y * Utilities.MathHelper.DEGREES_TO_RADIANS);
+                    //Matrix Rz = Matrix.RotationZ(_rotation.z * Utilities.MathHelper.DEGREES_TO_RADIANS);
+                    // The order these rotations are performed to match TV3D is: Yaw(y), Pitch(x), then Roll (z). 
+                    //_localMatrix = S*Ry*Rx*Rz*T;
+                    //                Usually, its;
+                    //// scale * rotation * translation
+                    ////But if you want the object to rotate (orbit) around a certain point, then:
+                    ////scale* translationToCertainPoint * rotation * translationToObjectPosition
+                    ////_localMatrix = smat * RotationMatrix * tmat;
+                    if (mPivot == Vector3d.Zero())
+                        mLocalMatrix = smat * rmat * tmat;
+                    else
+                    {
+                        Matrix offsetMat = Matrix.CreateTranslation(mPivot);
+                        Matrix negativeOffsetMat = Matrix.CreateTranslation(-mPivot);
+                        mLocalMatrix = smat * offsetMat * rmat * negativeOffsetMat * tmat;
+                    }
+
+                    // DisableChangeFlags(Enums.ChangeStates.MatrixDirty);
+                }
+                return mLocalMatrix;
+            }
+        }
+
+        //// RegionMatrix is an entity's transform in relation to the Region it's in.  
+        //// Since we only render in Region space with camera space offset, this makes our RegionMatrix
+        //// akin to our WorldMatrix since this is the resulting value we plug into the d3d device
+        //// To render across Regions, we still use this RegionMatrix however we compute a transform
+        //// for the camera view to transform an entity that lies in one region, to be relative to the
+        //// current camera's region.
+        //private Matrix result;
+        public virtual Matrix RegionMatrix
+        {
+            get
+            {
+                if ((mChangeStates & ChangeStates.RegionMatrixDirty) != 0)
+                {
+                    UpdateRegional();
+
+                    Matrix tmat = Matrix.CreateTranslation(mDerivedTranslation);
+                    Matrix smat = Matrix.CreateScaling(mDerivedScale);
+                    Matrix rmat = new Matrix(mDerivedRotation);
+
+                    //Matrix Rx = Matrix.RotationX(_rotation.x * Utilities.MathHelper.DEGREES_TO_RADIANS);
+                    //Matrix Ry = Matrix.RotationY(_rotation.y * Utilities.MathHelper.DEGREES_TO_RADIANS);
+                    //Matrix Rz = Matrix.RotationZ(_rotation.z * Utilities.MathHelper.DEGREES_TO_RADIANS);
+                    // The order these rotations are performed to match TV3D is: Yaw(y), Pitch(x), then Roll (z). 
+                    //_matrix = S*Ry*Rx*Rz*T;
+                    //                Usually, its;
+                    //// scale * rotation * translation
+                    ////But if you want the object to rotate (orbit) around a certain point, then:
+                    ////scale* translationToCertainPoint * rotation * translationToObjectPosition
+                    ////_matrix = smat * RotationMatrix * tmat;
+
+
+                    // NOTE: smat * rmat * tmat is evaluated as (smat * rmat) * tmat
+                    // http://msdn.microsoft.com/en-us/library/ms173145.aspx
+                    // When two or more operators that have the same precedence are present in an 
+                    // expression, they are evaluated based on associativity. Left-associative 
+                    // operators are evaluated in order from left to right. For example, 
+                    // x * y / z is evaluated as (x * y) / z. Right-associative operators are 
+                    // evaluated in order from right to left. For example, the assignment operator
+                    // is right associative. 
+                    //          _matrix = smat * rmat * tmat;
+
+
+                    if (mPivot == Vector3d.Zero())
+                        mMatrix = smat * rmat * tmat;
+                    else
+                    {
+                        Matrix offsetMat = Matrix.CreateTranslation(mPivot);
+                        Matrix negativeOffsetMat = Matrix.CreateTranslation(-mPivot);
+                        mMatrix = smat * offsetMat * rmat * negativeOffsetMat * tmat;
+                    }
+
+                    //DisableChangeFlags(Enums.ChangeStates.RegionMatrixDirty);
+                }
+                return mMatrix;
+            }
+        }
+
+
+        public virtual Matrix GlobalMatrix
+        {
+            get
+            {
+                if (mGlobalMatrix.IsNullOrEmpty() || (mChangeStates & ChangeStates.GlobalMatrixDirty) != 0)
+                {
+                    UpdateGlobal();
+                    Matrix tmat = Matrix.CreateTranslation(mGlobalTranslation);
+                    Matrix smat = Matrix.CreateScaling(mGlobalScale);
+                    Matrix rmat = new Matrix(mGlobalRotation);
+                    mGlobalMatrix = smat * rmat * tmat;
+                    //DisableChangeFlags(Enums.ChangeStates.GlobalMatrixDirty);
+                }
+
+                return mGlobalMatrix;
+            }
+        }
+#endif
+
+        /// <summary>
+        /// This is a translation amount to apply to the current world view position.
+        /// </summary>
+        /// <param name="x"></param>
+        /// <param name="y"></param>
+        /// <param name="z"></param>
+        /// <param name="skipBoundsCheck" ></param>
+        public void Translate(double deltaX, double deltaY, double deltaZ, bool skipBoundsCheck)
+        {
+            // TODO: Rather than just have option to restrict a viewpoint via it's Region's bounds
+            // we should be able to restrict Viewpoints here (or also via an Entity script to be called
+            // upon Translate...?)  
+            // The idea is that we can create say a security cam viewpoint that can rotate, but not translate
+            // Or restrict a Viewpoint with a bounding volume (sphere or box) for editing interior
+            // celledregion of a vehicle.  
+            Vector3d delta;
+            delta.x = deltaX;
+            delta.y = deltaY;
+            delta.z = deltaZ;
+            //System.Diagnostics.Debug.WriteLine(delta.ToString());
+            Translation = Translation + delta;
+        }
+
+
+        /// <summary>
+        /// This is a translation amount to apply to the current camera position.
+        /// </summary>
+        /// <param name="x"></param>
+        /// <param name="y"></param>
+        /// <param name="z"></param>
+        public void deltaZ(double deltaX, double deltaY, double deltaZ)
+        {
+            Translate(deltaX, deltaY, deltaZ, false);
+        }
+
+        public void Translate(Vector3d delta)
+        {
+            Translate(delta.x, delta.y, delta.z, false);
+        }
+
+        public void Translate(Vector3d delta, bool skipBoundsCheck)
+        {
+            Translate(delta.x, delta.y, delta.z, skipBoundsCheck);
+        }
+
+        public void SetRotation(double yawDegrees, double pitchDegrees, double rollDegrees)
+        {
+            Rotation = new Quaternion(yawDegrees * 57.2958d, //Utilities.MathHelper.DEGREES_TO_RADIANS, 
+                                       pitchDegrees * 57.2958d, //Utilities.MathHelper.DEGREES_TO_RADIANS,
+                                       rollDegrees * 57.2958);//Utilities.MathHelper.DEGREES_TO_RADIANS);
+        }
+
+#if USE_MEMORY_T == false
+        #region UPDATES
+        private void UpdateGlobal()
+        {
+            /*
+            // there is no parent                
+            if (mParents == null || mParents[0] == null)
+            {
+                if (this is Portals.Zone)
+                    mGlobalTranslation = ((Portals.Zone)this).ZoneTranslation;
+                else
+                    mGlobalTranslation = mTranslation;
+
+                mGlobalRotation = mRotation;
+                mGlobalScale = mScale;
+                return;
+            }
+
+            Transform mParent = (Transform)mParents[0];
+
+            // Update orientation             
+            Quaternion parentOrientation = mParent.GlobalRotation;
+            if (mInheritRotation)
+            {
+                // Combine orientation with that of parent     
+                if (AttachedToBoneID >= 0)
+                {
+                    // TODO: no way to just get the goddamn rotation... grr...
+                    //((Keystone.Entities.BonedEntity)_parents[0])._actor._actor.getbone. GetBoneMatrix(AttachedToBoneID, true);
+                    //mGlobalRotation = parentOrientation * boneRotation * _rotation;
+                }
+                else
+                    mGlobalRotation = parentOrientation * mRotation;
+            }
+            else
+            {
+                // No inheritence                 
+                mGlobalRotation = mRotation;
+            }
+            // Update scale             
+            Vector3d parentScale = mParent.GlobalScale;
+            if (mInheritScale)
+            {
+                // Scale own position by parent scale, NB just combine                 
+                // as equivalent axes, no shearing                 
+                mGlobalScale = parentScale * mScale;
+            }
+            else
+            {
+                // No inheritence                 
+                mGlobalScale = mScale;
+            }
+            if (mInheritScale)
+            {
+                // Change position vector based on parent's orientation & scale             
+                if (this is Portals.Zone)
+                    mGlobalTranslation = parentOrientation * (parentScale * ((Portals.Zone)this).ZoneTranslation);
+                else
+                    mGlobalTranslation = parentOrientation * (parentScale * mTranslation);
+            }
+            else
+            {
+                // Change position vector based on parent's orientation & scale             
+                if (this is Portals.Zone)
+                    mGlobalTranslation = ((Portals.Zone)this).ZoneTranslation;
+                else
+                    mGlobalTranslation = mTranslation;
+            }
+
+
+            // Add altered position vector to parents 
+            mGlobalTranslation += mParent.GlobalTranslation;
+            */
+        }
+
+        private void UpdateRegional()
+        {
+            /*
+            // DisableChangeFlags(
+            //     Enums.ChangeStates.Translated |
+            //     Enums.ChangeStates.Scaled |
+            //     Enums.ChangeStates.Rotated);
+
+             if (mParents == null || mParents[0] == null || this is Portals.Region)
+             {
+                 // Region node's derived matrix is always identity.  
+                 // _rotation, _translation and _scale are all guaranteed to be default starting values.
+                 mDerivedRotation = mRotation;
+                 mDerivedTranslation = mTranslation;
+                 mDerivedScale = mScale;
+                 return;
+             }
+
+
+             Transform parentTransform = (Transform)mParents[0];
+
+             // Update orientation             
+             Quaternion parentOrientation = parentTransform.DerivedRotation;
+             if (mInheritRotation)
+             {
+                 if (AttachedToBoneID >= 0)
+                 {
+                     // TODO: no way to just get the goddamn rotation... grr...
+                     //((Keystone.Entities.BonedEntity)_parents[0])._actor._actor.getbone. GetBoneMatrix(AttachedToBoneID, true);
+                     //mDerivedRotation = parentOrientation * boneRotation * _rotation;
+                     throw new NotImplementedException();
+                 }
+                 else
+                 {
+                     // Combine orientation with that of parent                 
+                     mDerivedRotation = parentOrientation * mRotation;
+                 }
+             }
+             else
+             {
+                 // No rotation inheritence                 
+                 mDerivedRotation = mRotation;
+             }
+             // Update scale             
+             Vector3d parentScale = parentTransform.DerivedScale;
+             if (mInheritScale)
+             {
+                 // Scale own position by parent scale, NB just combine                 
+                 // as equivalent axes, no shearing                 
+                 mDerivedScale = parentScale * mScale;
+             }
+             else
+             {
+                 // No inheritence                 
+                 mDerivedScale = mScale;
+             }
+
+             if (mInheritScale)
+                 // Change position vector based on parent's orientation & scale                
+                 mDerivedTranslation = parentOrientation * (parentScale * mTranslation);
+             // reverse the parameters to the * operator so second overload op version is used 
+             //mDerivedTranslation = (parentScale * mTranslation) * parentOrientation;
+             else
+                 mDerivedTranslation = mTranslation;
+
+             // Add altered position vector to parents             
+             mDerivedTranslation += parentTransform.DerivedTranslation;
+
+
+             if (mTranslation.x == double.NaN)
+                 System.Diagnostics.Debug.WriteLine("Transform.Update() - NaN");
+		   */
+        }
+
+
+        #endregion */ // UPDATES
+#endif
+
+        #region Disposable members
+#if USE_MEMORY_T
+        public void Dispose()
+        { }
+
+        public void DisposeManagedResources()
+        {
+            // todo
+            //store.CheckIn();
+            //BoidSimulation.mCStoreCol.CheckIn<Transform_Struct>(typeof(Transform_Struct), mMemStore);
+        }
+#endif
+
+        #endregion
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    // END NODES
+
 		
 		
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    // BEGIN OCTREE 
+
+    // http://www.flipcode.com/archives/Octree_Implementation.shtml
+    /// <summary>
+    /// A dynamic + loose octree implementation. 
+    /// Dynamic = children are only added up to the depth that is first deepest enough to accomodate the bounds of the items being inserted into the tree.
+    /// </summary>
+    public class OctreeOctant //: ISpatialNode //, ITraversable, IBoundVolume
+    {
+
+        #region Static variables
+        //public static BoundingBox WorldBox;
+        public static uint MaxDepth;
+        public static uint SplitThreshHold;
+
+        private static Vector3d[] BoundsOffsetTable = new Vector3d[]
+        {
+                new Vector3d(-0.5, -0.5, -0.5),
+                new Vector3d(+0.5, -0.5, -0.5),
+                new Vector3d(-0.5, +0.5, -0.5),
+                new Vector3d(+0.5, +0.5, -0.5),
+                new Vector3d(-0.5, -0.5, +0.5),
+                new Vector3d(+0.5, -0.5, +0.5),
+                new Vector3d(-0.5, +0.5, +0.5),
+                new Vector3d(+0.5, +0.5, +0.5)
+        };
+
+        #endregion
+
+        private int _depth;
+        private int _index;   // index is specific to each depth and contains x,y,z offset at that depth and is useful for finding neighbors (which we may never do and just always move EntityNodes by re-inserting starting at root)
+        private const int MAX_CHILD_COUNT = 8;
+
+        private BoundingBox mBox;
+        private OctreeOctant mParent;
+        private OctreeOctant[] mChildOctants;
+
+        // TODO: switch to linked list?
+        private List<EntityNode> mEntityNodesCollection;
+
+
+        public OctreeOctant(int index, int depth, BoundingBox box, OctreeOctant parent)
+            : this()
+        {
+            _index = index;
+            _depth = depth;
+            mBox = box;
+            mParent = parent;
+            //System.Diagnostics.Debug.WriteLine("OctreeOctant() -- Created at index " + index.ToString());
+        }
+
+        public OctreeOctant()
+        {
+            Visible = true;
+        }
+
+        ~OctreeOctant()
+        {
+        }
+
+        /*
+                #region ITraversable Members
+                public object Traverse(ITraverser target, object data)
+                {
+                    return target.Apply(this, data);
+                }
+                #endregion
+        */
+
+        private bool IsRoot { get { return mParent == null; } }
+
+        private OctreeOctant Parent { get { return mParent; } set { mParent = value; } }
+
+        public bool IsLeaf { get { return mChildOctants == null; } }
+
+        public int Index
+        {
+            get { return _index; }
+        }
+
+        internal int[] LocalIndexToVector(int index)
+        {
+
+            // divide the index by  2 ^ depth
+            // 
+
+            int[] v = new int[3];
+            if ((index & 1) > 0) v[0] = 1;
+            else v[0] = -1;
+
+            if ((index & 2) > 0) v[1] = 1;
+            else v[1] = -1;
+
+            if ((index & 4) > 0) v[2] = 1;
+            else v[2] = -1;
+
+            return v;
+        }
+
+        internal int LocalVectorToIndex(int[] v)
+        {
+            int index = 0;
+
+            if (v[0] >= 0) index |= 1;
+            if (v[1] >= 0) index |= 2;
+            if (v[2] >= 0) index |= 4;
+
+            return index;
+        }
+
+        internal Vector3d Radius
+        {
+            get
+            {
+                
+				Vector3d radius;
+                radius.x = mBox.Width * 0.5d;
+                radius.y = mBox.Height * 0.5d;
+                radius.z = mBox.Depth* 0.5d;
+                return radius;
+            }
+        }
+
+        internal int Depth
+        {
+            get { return _depth; }
+        }
+
+        public OctreeOctant[] Children
+        {
+            get { return mChildOctants; }
+        }
+
+        #region ISpatialNode
+        public bool Visible { get; set; }
+
+        public EntityNode[] EntityNodes
+        {
+            get
+            {
+                if (mEntityNodesCollection == null) return null;
+                return mEntityNodesCollection.ToArray();
+            }
+        }
+
+        public void Add(EntityNode entityNode, bool forceRoot)
+        {
+            if (forceRoot)
+            {
+                this.AddEntityNodeToCollection((EntityNode)entityNode);
+                //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - "  + entityNode.Entity.TypeName + " Forced into Root");
+            }
+            else
+            {
+                this.Add(entityNode);
+                //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName);
+            }
+        }
+
+        private void AddEntityNodeToCollection(EntityNode entityNode)
+        {
+            if (mEntityNodesCollection == null)
+                mEntityNodesCollection = new List<EntityNode>();
+
+            entityNode.SpatialNode = this;
+            mEntityNodesCollection.Add(entityNode);
+        }
+
+        public void Add(EntityNode entityNode)
+        {
+            System.Diagnostics.Debug.Assert(this.BoundingBox != null, "OctreeOctant.Add() - BoundingBox is null.");
+#if DEBUG
+            // only support square octree octants for performance
+//            // TODO: we are going to see if this "performance" concern is no longer valid.  non square octrees are useful 
+//            System.Diagnostics.Debug.Assert(this.BoundingBox.Max.x - this.BoundingBox.Min.x ==
+//                this.BoundingBox.Max.y - this.BoundingBox.Min.y &&
+//            this.BoundingBox.Max.x - this.BoundingBox.Min.x == 
+//            this.BoundingBox.Max.z - this.BoundingBox.Min.z);
+#endif
+
+			// TODO: // TODO: https://daeken.dev/a-stupidly-simple-fast-octree-traversal-for-ray-intersection
+	
+            int count;
+
+            if (mEntityNodesCollection == null)
+                count = 0;
+            else
+                count = mEntityNodesCollection.Count;
+
+            //    NOTE: We specifically use ">=" for the depth comparison so that we
+            //          can set the maximumDepth depth to 0 if we want a tree with
+            //          no depth.
+            if (count >= OctreeOctant.SplitThreshHold || _depth >= OctreeOctant.MaxDepth)
+            {
+                // add to this octant immmediately
+                // Non Recursive Add
+                this.AddEntityNodeToCollection((EntityNode)entityNode);
+                //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName);
+                return;
+            }
+
+            // note: we intentionally compute a radius without taking into account hypotenuse.
+            // note: if allowiing non square octants, we take the smallest octant radius and we'll compare that against largest radius of entity being inserted
+            double octantRadius = this.BoundingBox.Max.x - this.BoundingBox.Min.x;
+            octantRadius = Math.Min(this.BoundingBox.Max.y - this.BoundingBox.Min.y, octantRadius);
+            octantRadius = Math.Min(this.BoundingBox.Max.z - this.BoundingBox.Min.z, octantRadius);
+            octantRadius *= 0.5d;
+
+            double childOctantRadius = octantRadius * 0.5d;
+            double entityRadius = entityNode.BoundingBox.Radius;
+
+            // attempt to insert using tightbox, but we must cull with loose box
+            if (entityRadius > childOctantRadius)
+            {
+                // this entity won't fit in any children of this octant 
+                // so what about the parent octant?
+                if (entityRadius > octantRadius)
+                {
+                    // wont fit, can we try to move up to a parent?
+                    if (this.IsRoot == false)
+                    {
+                        // Recurse UPWARDS
+                        mParent.Add(entityNode);
+                        return;
+                    }
+                }
+                // Non Recursive Add because we're still here, 
+                // so it either fits or we're at root and there's
+                // no other place to put it
+                this.AddEntityNodeToCollection(entityNode);
+                //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName);
+                return;
+            }
+
+            // can't go further, add entitynode here
+            if (this.Split() == false)
+            {
+                this.AddEntityNodeToCollection(entityNode);
+                return;
+            }
+
+            Vector3d octantCenter = this.BoundingBox.Center;
+            Vector3d entityCenter = entityNode.BoundingBox.Center; // TODO: is the entityNode box initialized at this point?
+            int code = 0;
+            if (entityCenter.x > octantCenter.x)
+                code |= 1;
+            if (entityCenter.y > octantCenter.y)
+                code |= 2;
+            if (entityCenter.z > octantCenter.z)
+                code |= 4;
+
+            for (int i = 0; i < MAX_CHILD_COUNT; i++)
+            {
+                // if this bitflag cobmination is not set
+                if (code != i) continue;
+
+                Vector3d offset = OctreeOctant.BoundsOffsetTable[i] * octantRadius;
+                Vector3d center = octantCenter + offset;
+
+                BoundingBox childOctantBox = new BoundingBox(center, (float)childOctantRadius);
+
+                if (mChildOctants[i] == null)
+                    mChildOctants[i] =
+                        new OctreeOctant(0, _depth + 1, childOctantBox, this);
+
+                // Recursive Add() until max depth is reached or the entity's radius > octant's loose radius
+                mChildOctants[i].Add(entityNode);
+            }
+        }
+
+        public void RemoveEntityNode(EntityNode entityNode)
+        {
+            // NOTE: The reason for this function as opposed to just using OnEntityNode_Removed()
+            // is that when a node is moving, then we directly call OnEntityNode_Removed() instead
+            // so that the .SpatialNode = null can occur before we call OnEntityNode_Removed() 
+            // and yet so we dont have to make the OnEntityNode_Removed() before we .Add to the new
+            // destination.  This is important to avoid collapsing of empty branches before we've
+            // had a chance to find the correct new parent.
+            entityNode.SpatialNode = null;
+            OnEntityNode_Removed(entityNode);
+        }
+
+
+        public void OnEntityNode_Moved(EntityNode entityNode)
+        {
+            // is the entity still in this bounds?
+            // we dont have to test the radius of the entityNode because
+            // we already know it fits.
+            //    System.Console.WriteLine("m");
+            if (mBox.Contains(entityNode.BoundingBox.Center)) return;
+
+            // inform the parent that the entity in this octant no longer fits
+            // NOTE: we do not add/remove the entityNode here.  The parent must do it
+            // so that we don't trigger collapse of all 8 of it's children before parent can 
+            // have a chance to fit it into one of its other 7 children
+            if (this.IsRoot == false)
+                mParent.Move(this, entityNode); // calls on Parent
+        }
+
+        private void Move(OctreeOctant childOctant, EntityNode entityNode)
+        {
+            //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Move() - " + entityNode.Entity.TypeName);
+            // NOTE: Here we clear the .SpatialNode first but we must not call OnEntityNode_Removed()
+            //       until AFTER .Add() is called.
+            entityNode.SpatialNode = null;
+
+            // we cannot simply attempt to add to this parent because
+            // if the entityNode has moved beyond this parent's own bounds
+            // our fast Add() (which avoids having to do a Box.Contains() call 
+            // will not be able to determine this and will simply force insert
+            // the entityNode into itself.
+
+            // so we can easily avoid that by recursing til we find the first parent
+            // that contains the entityNode.. and provided the entityNode has not changed size
+            // (particularly has not gotten larger) we are guaranteed that the parent octant
+            // is large enought to contain it if the entityNode's center is with in it.
+
+            OctreeOctant newOctant = this;
+            Vector3d entityCenter = entityNode.BoundingBox.Center;
+            while (newOctant.Parent != null)
+            {
+                if (newOctant.BoundingBox.Contains(entityCenter))
+                    break;
+
+                newOctant = newOctant.Parent;
+            }
+
+            System.Console.WriteLine("Moved to new octant");
+            newOctant.Add(entityNode);// Add must always occur before Remove() because we dont want to collapse branches before we've had a chance to determine if the child will move there!
+            childOctant.OnEntityNode_Removed(entityNode);
+        }
+
+        public void OnEntityNode_Resized(EntityNode entityNode)
+        {
+            // does this entityNode still fit in this octant?
+            // we must test against entire box since this entity may now be too big to fit
+            if (mBox.Contains(entityNode.BoundingBox)) return;
+
+            if (this.IsRoot == false)
+                mParent.Resize(this, entityNode);
+        }
+
+        private void Resize(OctreeOctant childOctant, EntityNode entityNode)
+        {
+            //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Resize() - " + entityNode.Entity.TypeName);
+            entityNode.SpatialNode = null;
+
+            // if the entity itself has resized, we cannot do the quick .Contains(point)
+            // and instead must do .Contains(box) to see if this entity still fits within this octant
+            OctreeOctant newOctant = this;
+            BoundingBox box = entityNode.BoundingBox;
+
+
+            while (newOctant.Parent != null)
+            {
+                if (newOctant.BoundingBox.Contains(box))
+                    break;
+
+                newOctant = newOctant.Parent;
+            }
+
+            // once we've found a parent that fully contains the box, we can do an a normal
+            // Add() to recurse downwards again.
+            // Add must always occur before Remove() because we dont want to collapse branches 
+            // before we've had a chance to determine if the child will move there!
+            newOctant.Add(entityNode);
+            childOctant.OnEntityNode_Removed(entityNode);
+        }
+
+
+        internal void OnEntityNode_Removed(EntityNode entityNode)
+        {
+            // remove the entityNode
+            if (mEntityNodesCollection == null) return;
+
+            mEntityNodesCollection.Remove(entityNode);
+
+            // can we collapse this octant?
+            if (mEntityNodesCollection.Count == 0)
+            {
+                mEntityNodesCollection = null;
+                // must now notify the parent that this octant can be destroyed
+                // TODO: nov.27.2012 - i think when an entityNode is added to octree root node, there is no parent
+                //       so how do we prevent this?  should i just return if null?  will do for now
+                // TODO: however i also think part of the problem this seems to keep being called for non moving
+                //       think like a manually place directional light is our physics update
+                if (mParent == null) return;
+                mParent.OnChildOctant_Empty(this);
+            }
+        }
+
+        private void OnChildOctant_Empty(OctreeOctant childOctant)
+        {
+            int nullCount = 0;
+            for (int i = 0; i < mChildOctants.Length; i++)
+                if (mChildOctants[i] == childOctant)
+                {
+                    mChildOctants[i].Parent = null; // or mChildOctants[i].Dispose() ?
+                    mChildOctants[i] = null;
+                    nullCount++;
+                }
+                else if (mChildOctants[i] == null)
+                    nullCount++;
+
+            // if all child octants are null, we can delete the entire child array
+            // and potentially it's parents too
+            if (nullCount == MAX_CHILD_COUNT)
+            {
+                mChildOctants = null;
+                if (IsRoot == false && mEntityNodesCollection == null)
+                    mParent.OnChildOctant_Empty(this); // recurse upwards
+            }
+        }
+        #endregion
+
+        //public void Add(EntityNode element)
+        //{
+        //    int x = 0;
+        //    int y = 0;
+        //    int z = 0;
+        //    int depth = FindIdealInsertion(element.Position, element.BoundingBox.Radius, ref x, ref y, ref z);
+
+        //    OctreeOctant foundOctant = FindBestFittingOctant(x, y, z, depth);
+        //    System.Diagnostics.Debug.WriteLine(string.Format("OctreeOctant.Add () - Adding entityNode to node {0} at {1},{2},{3} depth {4}", foundOctant.Index, x,y,z,depth ));
+        //    foundOctant.AddEntityNode((EntityNode)element);
+
+        //    if (foundOctant == null) throw new Exception();
+        //}
+
+        //private int FindIdealInsertion(Vector3d objectPosition, double objectRadius, ref int x, ref int y, ref int z)
+        //{
+        //    // TODO: if we enforce cubic octree, we dont need a box, just a diameter
+        //    // and this shoudl be desireable because insertions is complicated if we need to test 3 axis 
+        //    // radius
+        //    if (objectRadius < 0)
+        //    {
+        //        System.Diagnostics.Debug.WriteLine("OctreeOctant.FindIdealInsertion() - Entity has negative radius.");
+        //        return 0;
+        //    }
+
+        //    double octantDiameter = OctreeOctant.WorldBox.Diameter;
+        //    int depth = 0;
+        //    double k = .5;
+
+
+        //    // iterate downwards in depth until the octant's loose radius is finally smaller than
+        //    // the object's radius
+        //    while(depth <= OctreeOctant.MaxDepth)
+        //    {
+        //        octantDiameter /= 2;
+        //        depth++;
+
+        //        if(octantDiameter * (1- k ) / 2 < objectRadius)
+        //            break;
+        //    }
+
+        //    //we're off by one
+        //    depth--;
+        //    octantDiameter *= 2;
+
+        //    //get the x,y,z index of the node at this level in the tree
+        //    x = (int) (objectPosition.x / octantDiameter);
+        //    y = (int) (objectPosition.y / octantDiameter);
+        //    z = (int) (objectPosition.z / octantDiameter);
+
+
+        //    return depth ;
+        //}
+
+        //private OctreeOctant FindBestFittingOctant(int x, int y, int z, int depth)
+        //{
+        //    OctreeOctant octant = RootOctant;
+        //    BoundingBox box = OctreeOctant.WorldBox;
+
+        //    for (int currentDepth = 0; currentDepth != depth; ++currentDepth)
+        //    {
+        //        if (!octant.Split())  // if the octant cannot be split, this is as far as we can go
+        //            return octant;
+        //        else
+        //        {
+        //            /*
+        //                We can find the exact child without any comparisons
+        //                For example, we're looking for an octant at depth 2 with x,y,z = (2,1,3)
+        //                This will be a child of the octant at depth 1 with x,y,z = (1,0,1)
+
+        //                We take the convention that childOctants are layed out as:
+
+        //                local index                1D index
+        //                [(0,1,0) (1,1,0)]        [2 3]
+        //                [(0,0,0) (1,0,0)]        [0 1]
+        //                                    =
+        //                [(0,1,0) (1,1,0)]        [6 7]
+        //                [(0,0,0) (1,0,0)]        [4 5]
+
+        //                To find the local index of an octant in the frame of it's direct parent, 
+        //                we have to divide the index by two.
+        //                To find the local index of an octant in the frame of it's  parent x times up,
+        //                we have to divide the index by 2^x
+
+        //            */
+        //            //this generates the local index of the child octant at (currentDepth - 1)
+        //            int currentDepthX = x >> (depth - (currentDepth + 1));
+        //            int currentDepthY = y >> (depth - (currentDepth + 1));
+        //            int currentDepthZ = z >> (depth - (currentDepth + 1));
+        //            int globalIndex = currentDepthX + currentDepthY << 1 + currentDepthZ << 2;
+
+        //            int localIndex = LocalVectorToIndex(new int[] { currentDepthX, currentDepthY, currentDepthZ});
+
+        //            if (octant.Children[localIndex] == null) 
+        //            {
+        //                // create a box with half the diameter and offset to the parent's center
+        //                // according to it's octant index
+        //                Vector3d offset = OctreeOctant.BoundsOffsetTable[localIndex] * box.Radius;
+        //                Vector3d center = box.Center + offset;
+        //                double radius = box.Radius / 2;
+
+        //                box = new BoundingBox(center, (float)radius);
+
+        //                octant.Children[localIndex] =
+        //                    new OctreeOctant(globalIndex, currentDepth + 1, box);
+        //            }
+        //            octant = octant.Children[localIndex];
+        //        }
+        //    }
+
+        //    //if we make it here, we're at the minimum depth. and we found our octant
+        //    return octant;
+        //}
+
+        private bool Split()
+        {
+            // cannot split because we're at max depth
+            if (_depth == OctreeOctant.MaxDepth)
+                return false;
+
+            // we are already split
+            if (this.mChildOctants != null)
+                return true;
+
+            // initialize the array but do not instance or assign an Octant
+            this.mChildOctants = new OctreeOctant[8];
+            return true;
+        }
+
+        // TODO: I should implement an overloaded version of Query that traverses for Entities that lay within a bounding box or sphere with potential also of matching a "match" predicate.
+        //       Multi-threading of the query would be ideal.
+        /// <summary>
+        /// Looks for Regions/Entities that are in descendant RegionNodes or EntityNodes 
+        /// that match the specified predicate.
+        /// </summary>
+        /// <param name="recurse"></param>
+        /// <param name="match"></param>
+        /// <returns></returns>
+        public virtual List<EntityNode> Query(EntityNode refEnt, bool recurse, BoundingBox searchArea, Func<EntityNode, EntityNode, bool> match)
+        {
+            if (match == null) throw new ArgumentNullException("SceneNode.Query() - match cannot be null.");
+
+            if (!this.mBox.Intersects(searchArea))
+                return null;
+            //Console.WriteLine ("Query B");
+
+            List<EntityNode> results = new List<EntityNode>();
+
+            if (mEntityNodesCollection != null)
+                for (int i = 0; i < mEntityNodesCollection.Count; i++)
+                {
+                    if (match(mEntityNodesCollection[i], refEnt))
+                        results.Add(mEntityNodesCollection[i]);
+                }
+
+            if (recurse)
+            {
+                if (mChildOctants != null)
+                {
+                    // NOTE: We recurse the child OctreeOctants, not EntityNodes
+                    for (int j = 0; j < mChildOctants.Length; j++)
+                    {
+                        List<EntityNode> nestedResults = mChildOctants[j].Query(refEnt, recurse, searchArea, match);
+                        if (nestedResults != null)
+                            results.AddRange(nestedResults);
+
+                    }
+                }
+            }
+
+            if (results.Count == 0) return null;
+            return results;
+        }
+
+
+        #region IBoundVolume Members
+        /// <summary>
+        /// Public bbox used for culling tests
+        /// </summary>
+        public BoundingBox BoundingBox
+        {
+            get
+            {
+                return mBox;
+            }
+        }
+
+        /*
+        public BoundingSphere BoundingSphere
+        {
+            get { return new BoundingSphere(mBox); } // TODO: compute center from x,y,z index, then return sphere new BoundingSphere(center, _radius); }
+        }
+        */
+
+        public bool BoundVolumeIsDirty
+        {
+            // octree bounds are fixed.
+            get { return false; }
+        }
+
+
+        protected void UpdateBoundVolume()
+        {
+
+        }
+        #endregion
+    }
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    // END OCTREE
+
 		
 		
 		
@@ -6244,1708 +7985,6 @@ namespace HelloBoids
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // END PRIMITIVES
-
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    // BEGIN OCTREE 
-
-    // http://www.flipcode.com/archives/Octree_Implementation.shtml
-    /// <summary>
-    /// A dynamic + loose octree implementation. 
-    /// Dynamic = children are only added up to the depth that is first deepest enough to accomodate the bounds of the items being inserted into the tree.
-    /// </summary>
-    public class OctreeOctant //: ISpatialNode //, ITraversable, IBoundVolume
-    {
-
-        #region Static variables
-        //public static BoundingBox WorldBox;
-        public static uint MaxDepth;
-        public static uint SplitThreshHold;
-
-        private static Vector3d[] BoundsOffsetTable = new Vector3d[]
-        {
-                new Vector3d(-0.5, -0.5, -0.5),
-                new Vector3d(+0.5, -0.5, -0.5),
-                new Vector3d(-0.5, +0.5, -0.5),
-                new Vector3d(+0.5, +0.5, -0.5),
-                new Vector3d(-0.5, -0.5, +0.5),
-                new Vector3d(+0.5, -0.5, +0.5),
-                new Vector3d(-0.5, +0.5, +0.5),
-                new Vector3d(+0.5, +0.5, +0.5)
-        };
-
-        #endregion
-
-        private int _depth;
-        private int _index;   // index is specific to each depth and contains x,y,z offset at that depth and is useful for finding neighbors (which we may never do and just always move EntityNodes by re-inserting starting at root)
-        private const int MAX_CHILD_COUNT = 8;
-
-        private BoundingBox mBox;
-        private OctreeOctant mParent;
-        private OctreeOctant[] mChildOctants;
-
-        // TODO: switch to linked list?
-        private List<EntityNode> mEntityNodesCollection;
-
-
-        public OctreeOctant(int index, int depth, BoundingBox box, OctreeOctant parent)
-            : this()
-        {
-            _index = index;
-            _depth = depth;
-            mBox = box;
-            mParent = parent;
-            //System.Diagnostics.Debug.WriteLine("OctreeOctant() -- Created at index " + index.ToString());
-        }
-
-        public OctreeOctant()
-        {
-            Visible = true;
-        }
-
-        ~OctreeOctant()
-        {
-        }
-
-        /*
-                #region ITraversable Members
-                public object Traverse(ITraverser target, object data)
-                {
-                    return target.Apply(this, data);
-                }
-                #endregion
-        */
-
-        private bool IsRoot { get { return mParent == null; } }
-
-        private OctreeOctant Parent { get { return mParent; } set { mParent = value; } }
-
-        public bool IsLeaf { get { return mChildOctants == null; } }
-
-        public int Index
-        {
-            get { return _index; }
-        }
-
-        internal int[] LocalIndexToVector(int index)
-        {
-
-            // divide the index by  2 ^ depth
-            // 
-
-            int[] v = new int[3];
-            if ((index & 1) > 0) v[0] = 1;
-            else v[0] = -1;
-
-            if ((index & 2) > 0) v[1] = 1;
-            else v[1] = -1;
-
-            if ((index & 4) > 0) v[2] = 1;
-            else v[2] = -1;
-
-            return v;
-        }
-
-        internal int LocalVectorToIndex(int[] v)
-        {
-            int index = 0;
-
-            if (v[0] >= 0) index |= 1;
-            if (v[1] >= 0) index |= 2;
-            if (v[2] >= 0) index |= 4;
-
-            return index;
-        }
-
-        internal Vector3d Radius
-        {
-            get
-            {
-                
-				Vector3d radius;
-                radius.x = mBox.Width * 0.5d;
-                radius.y = mBox.Height * 0.5d;
-                radius.z = mBox.Depth* 0.5d;
-                return radius;
-            }
-        }
-
-        internal int Depth
-        {
-            get { return _depth; }
-        }
-
-        public OctreeOctant[] Children
-        {
-            get { return mChildOctants; }
-        }
-
-        #region ISpatialNode
-        public bool Visible { get; set; }
-
-        public EntityNode[] EntityNodes
-        {
-            get
-            {
-                if (mEntityNodesCollection == null) return null;
-                return mEntityNodesCollection.ToArray();
-            }
-        }
-
-        public void Add(EntityNode entityNode, bool forceRoot)
-        {
-            if (forceRoot)
-            {
-                this.AddEntityNodeToCollection((EntityNode)entityNode);
-                //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - "  + entityNode.Entity.TypeName + " Forced into Root");
-            }
-            else
-            {
-                this.Add(entityNode);
-                //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName);
-            }
-        }
-
-        private void AddEntityNodeToCollection(EntityNode entityNode)
-        {
-            if (mEntityNodesCollection == null)
-                mEntityNodesCollection = new List<EntityNode>();
-
-            entityNode.SpatialNode = this;
-            mEntityNodesCollection.Add(entityNode);
-        }
-
-        public void Add(EntityNode entityNode)
-        {
-            System.Diagnostics.Debug.Assert(this.BoundingBox != null, "OctreeOctant.Add() - BoundingBox is null.");
-#if DEBUG
-            // only support square octree octants for performance
-//            // TODO: we are going to see if this "performance" concern is no longer valid.  non square octrees are useful 
-//            System.Diagnostics.Debug.Assert(this.BoundingBox.Max.x - this.BoundingBox.Min.x ==
-//                this.BoundingBox.Max.y - this.BoundingBox.Min.y &&
-//            this.BoundingBox.Max.x - this.BoundingBox.Min.x == 
-//            this.BoundingBox.Max.z - this.BoundingBox.Min.z);
-#endif
-
-            int count;
-
-            if (mEntityNodesCollection == null)
-                count = 0;
-            else
-                count = mEntityNodesCollection.Count;
-
-            //    NOTE: We specifically use ">=" for the depth comparison so that we
-            //          can set the maximumDepth depth to 0 if we want a tree with
-            //          no depth.
-            if (count >= OctreeOctant.SplitThreshHold || _depth >= OctreeOctant.MaxDepth)
-            {
-                // add to this octant immmediately
-                // Non Recursive Add
-                this.AddEntityNodeToCollection((EntityNode)entityNode);
-                //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName);
-                return;
-            }
-
-            // note: we intentionally compute a radius without taking into account hypotenuse.
-            // note: if allowiing non square octants, we take the smallest octant radius and we'll compare that against largest radius of entity being inserted
-            double octantRadius = this.BoundingBox.Max.x - this.BoundingBox.Min.x;
-            octantRadius = Math.Min(this.BoundingBox.Max.y - this.BoundingBox.Min.y, octantRadius);
-            octantRadius = Math.Min(this.BoundingBox.Max.z - this.BoundingBox.Min.z, octantRadius);
-            octantRadius *= 0.5d;
-
-            double childOctantRadius = octantRadius * 0.5d;
-            double entityRadius = entityNode.BoundingBox.Radius;
-
-            // attempt to insert using tightbox, but we must cull with loose box
-            if (entityRadius > childOctantRadius)
-            {
-                // this entity won't fit in any children of this octant 
-                // so what about the parent octant?
-                if (entityRadius > octantRadius)
-                {
-                    // wont fit, can we try to move up to a parent?
-                    if (this.IsRoot == false)
-                    {
-                        // Recurse UPWARDS
-                        mParent.Add(entityNode);
-                        return;
-                    }
-                }
-                // Non Recursive Add because we're still here, 
-                // so it either fits or we're at root and there's
-                // no other place to put it
-                this.AddEntityNodeToCollection(entityNode);
-                //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName);
-                return;
-            }
-
-            // can't go further, add entitynode here
-            if (this.Split() == false)
-            {
-                this.AddEntityNodeToCollection(entityNode);
-                return;
-            }
-
-            Vector3d octantCenter = this.BoundingBox.Center;
-            Vector3d entityCenter = entityNode.BoundingBox.Center; // TODO: is the entityNode box initialized at this point?
-            int code = 0;
-            if (entityCenter.x > octantCenter.x)
-                code |= 1;
-            if (entityCenter.y > octantCenter.y)
-                code |= 2;
-            if (entityCenter.z > octantCenter.z)
-                code |= 4;
-
-            for (int i = 0; i < MAX_CHILD_COUNT; i++)
-            {
-                // if this bitflag cobmination is not set
-                if (code != i) continue;
-
-                Vector3d offset = OctreeOctant.BoundsOffsetTable[i] * octantRadius;
-                Vector3d center = octantCenter + offset;
-
-                BoundingBox childOctantBox = new BoundingBox(center, (float)childOctantRadius);
-
-                if (mChildOctants[i] == null)
-                    mChildOctants[i] =
-                        new OctreeOctant(0, _depth + 1, childOctantBox, this);
-
-                // Recursive Add() until max depth is reached or the entity's radius > octant's loose radius
-                mChildOctants[i].Add(entityNode);
-            }
-        }
-
-        public void RemoveEntityNode(EntityNode entityNode)
-        {
-            // NOTE: The reason for this function as opposed to just using OnEntityNode_Removed()
-            // is that when a node is moving, then we directly call OnEntityNode_Removed() instead
-            // so that the .SpatialNode = null can occur before we call OnEntityNode_Removed() 
-            // and yet so we dont have to make the OnEntityNode_Removed() before we .Add to the new
-            // destination.  This is important to avoid collapsing of empty branches before we've
-            // had a chance to find the correct new parent.
-            entityNode.SpatialNode = null;
-            OnEntityNode_Removed(entityNode);
-        }
-
-
-        public void OnEntityNode_Moved(EntityNode entityNode)
-        {
-            // is the entity still in this bounds?
-            // we dont have to test the radius of the entityNode because
-            // we already know it fits.
-            //    System.Console.WriteLine("m");
-            if (mBox.Contains(entityNode.BoundingBox.Center)) return;
-
-            // inform the parent that the entity in this octant no longer fits
-            // NOTE: we do not add/remove the entityNode here.  The parent must do it
-            // so that we don't trigger collapse of all 8 of it's children before parent can 
-            // have a chance to fit it into one of its other 7 children
-            if (this.IsRoot == false)
-                mParent.Move(this, entityNode); // calls on Parent
-        }
-
-        private void Move(OctreeOctant childOctant, EntityNode entityNode)
-        {
-            //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Move() - " + entityNode.Entity.TypeName);
-            // NOTE: Here we clear the .SpatialNode first but we must not call OnEntityNode_Removed()
-            //       until AFTER .Add() is called.
-            entityNode.SpatialNode = null;
-
-            // we cannot simply attempt to add to this parent because
-            // if the entityNode has moved beyond this parent's own bounds
-            // our fast Add() (which avoids having to do a Box.Contains() call 
-            // will not be able to determine this and will simply force insert
-            // the entityNode into itself.
-
-            // so we can easily avoid that by recursing til we find the first parent
-            // that contains the entityNode.. and provided the entityNode has not changed size
-            // (particularly has not gotten larger) we are guaranteed that the parent octant
-            // is large enought to contain it if the entityNode's center is with in it.
-
-            OctreeOctant newOctant = this;
-            Vector3d entityCenter = entityNode.BoundingBox.Center;
-            while (newOctant.Parent != null)
-            {
-                if (newOctant.BoundingBox.Contains(entityCenter))
-                    break;
-
-                newOctant = newOctant.Parent;
-            }
-
-            System.Console.WriteLine("Moved to new octant");
-            newOctant.Add(entityNode);// Add must always occur before Remove() because we dont want to collapse branches before we've had a chance to determine if the child will move there!
-            childOctant.OnEntityNode_Removed(entityNode);
-        }
-
-        public void OnEntityNode_Resized(EntityNode entityNode)
-        {
-            // does this entityNode still fit in this octant?
-            // we must test against entire box since this entity may now be too big to fit
-            if (mBox.Contains(entityNode.BoundingBox)) return;
-
-            if (this.IsRoot == false)
-                mParent.Resize(this, entityNode);
-        }
-
-        private void Resize(OctreeOctant childOctant, EntityNode entityNode)
-        {
-            //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Resize() - " + entityNode.Entity.TypeName);
-            entityNode.SpatialNode = null;
-
-            // if the entity itself has resized, we cannot do the quick .Contains(point)
-            // and instead must do .Contains(box) to see if this entity still fits within this octant
-            OctreeOctant newOctant = this;
-            BoundingBox box = entityNode.BoundingBox;
-
-
-            while (newOctant.Parent != null)
-            {
-                if (newOctant.BoundingBox.Contains(box))
-                    break;
-
-                newOctant = newOctant.Parent;
-            }
-
-            // once we've found a parent that fully contains the box, we can do an a normal
-            // Add() to recurse downwards again.
-            // Add must always occur before Remove() because we dont want to collapse branches 
-            // before we've had a chance to determine if the child will move there!
-            newOctant.Add(entityNode);
-            childOctant.OnEntityNode_Removed(entityNode);
-        }
-
-
-        internal void OnEntityNode_Removed(EntityNode entityNode)
-        {
-            // remove the entityNode
-            if (mEntityNodesCollection == null) return;
-
-            mEntityNodesCollection.Remove(entityNode);
-
-            // can we collapse this octant?
-            if (mEntityNodesCollection.Count == 0)
-            {
-                mEntityNodesCollection = null;
-                // must now notify the parent that this octant can be destroyed
-                // TODO: nov.27.2012 - i think when an entityNode is added to octree root node, there is no parent
-                //       so how do we prevent this?  should i just return if null?  will do for now
-                // TODO: however i also think part of the problem this seems to keep being called for non moving
-                //       think like a manually place directional light is our physics update
-                if (mParent == null) return;
-                mParent.OnChildOctant_Empty(this);
-            }
-        }
-
-        private void OnChildOctant_Empty(OctreeOctant childOctant)
-        {
-            int nullCount = 0;
-            for (int i = 0; i < mChildOctants.Length; i++)
-                if (mChildOctants[i] == childOctant)
-                {
-                    mChildOctants[i].Parent = null; // or mChildOctants[i].Dispose() ?
-                    mChildOctants[i] = null;
-                    nullCount++;
-                }
-                else if (mChildOctants[i] == null)
-                    nullCount++;
-
-            // if all child octants are null, we can delete the entire child array
-            // and potentially it's parents too
-            if (nullCount == MAX_CHILD_COUNT)
-            {
-                mChildOctants = null;
-                if (IsRoot == false && mEntityNodesCollection == null)
-                    mParent.OnChildOctant_Empty(this); // recurse upwards
-            }
-        }
-        #endregion
-
-        //public void Add(EntityNode element)
-        //{
-        //    int x = 0;
-        //    int y = 0;
-        //    int z = 0;
-        //    int depth = FindIdealInsertion(element.Position, element.BoundingBox.Radius, ref x, ref y, ref z);
-
-        //    OctreeOctant foundOctant = FindBestFittingOctant(x, y, z, depth);
-        //    System.Diagnostics.Debug.WriteLine(string.Format("OctreeOctant.Add () - Adding entityNode to node {0} at {1},{2},{3} depth {4}", foundOctant.Index, x,y,z,depth ));
-        //    foundOctant.AddEntityNode((EntityNode)element);
-
-        //    if (foundOctant == null) throw new Exception();
-        //}
-
-        //private int FindIdealInsertion(Vector3d objectPosition, double objectRadius, ref int x, ref int y, ref int z)
-        //{
-        //    // TODO: if we enforce cubic octree, we dont need a box, just a diameter
-        //    // and this shoudl be desireable because insertions is complicated if we need to test 3 axis 
-        //    // radius
-        //    if (objectRadius < 0)
-        //    {
-        //        System.Diagnostics.Debug.WriteLine("OctreeOctant.FindIdealInsertion() - Entity has negative radius.");
-        //        return 0;
-        //    }
-
-        //    double octantDiameter = OctreeOctant.WorldBox.Diameter;
-        //    int depth = 0;
-        //    double k = .5;
-
-
-        //    // iterate downwards in depth until the octant's loose radius is finally smaller than
-        //    // the object's radius
-        //    while(depth <= OctreeOctant.MaxDepth)
-        //    {
-        //        octantDiameter /= 2;
-        //        depth++;
-
-        //        if(octantDiameter * (1- k ) / 2 < objectRadius)
-        //            break;
-        //    }
-
-        //    //we're off by one
-        //    depth--;
-        //    octantDiameter *= 2;
-
-        //    //get the x,y,z index of the node at this level in the tree
-        //    x = (int) (objectPosition.x / octantDiameter);
-        //    y = (int) (objectPosition.y / octantDiameter);
-        //    z = (int) (objectPosition.z / octantDiameter);
-
-
-        //    return depth ;
-        //}
-
-        //private OctreeOctant FindBestFittingOctant(int x, int y, int z, int depth)
-        //{
-        //    OctreeOctant octant = RootOctant;
-        //    BoundingBox box = OctreeOctant.WorldBox;
-
-        //    for (int currentDepth = 0; currentDepth != depth; ++currentDepth)
-        //    {
-        //        if (!octant.Split())  // if the octant cannot be split, this is as far as we can go
-        //            return octant;
-        //        else
-        //        {
-        //            /*
-        //                We can find the exact child without any comparisons
-        //                For example, we're looking for an octant at depth 2 with x,y,z = (2,1,3)
-        //                This will be a child of the octant at depth 1 with x,y,z = (1,0,1)
-
-        //                We take the convention that childOctants are layed out as:
-
-        //                local index                1D index
-        //                [(0,1,0) (1,1,0)]        [2 3]
-        //                [(0,0,0) (1,0,0)]        [0 1]
-        //                                    =
-        //                [(0,1,0) (1,1,0)]        [6 7]
-        //                [(0,0,0) (1,0,0)]        [4 5]
-
-        //                To find the local index of an octant in the frame of it's direct parent, 
-        //                we have to divide the index by two.
-        //                To find the local index of an octant in the frame of it's  parent x times up,
-        //                we have to divide the index by 2^x
-
-        //            */
-        //            //this generates the local index of the child octant at (currentDepth - 1)
-        //            int currentDepthX = x >> (depth - (currentDepth + 1));
-        //            int currentDepthY = y >> (depth - (currentDepth + 1));
-        //            int currentDepthZ = z >> (depth - (currentDepth + 1));
-        //            int globalIndex = currentDepthX + currentDepthY << 1 + currentDepthZ << 2;
-
-        //            int localIndex = LocalVectorToIndex(new int[] { currentDepthX, currentDepthY, currentDepthZ});
-
-        //            if (octant.Children[localIndex] == null) 
-        //            {
-        //                // create a box with half the diameter and offset to the parent's center
-        //                // according to it's octant index
-        //                Vector3d offset = OctreeOctant.BoundsOffsetTable[localIndex] * box.Radius;
-        //                Vector3d center = box.Center + offset;
-        //                double radius = box.Radius / 2;
-
-        //                box = new BoundingBox(center, (float)radius);
-
-        //                octant.Children[localIndex] =
-        //                    new OctreeOctant(globalIndex, currentDepth + 1, box);
-        //            }
-        //            octant = octant.Children[localIndex];
-        //        }
-        //    }
-
-        //    //if we make it here, we're at the minimum depth. and we found our octant
-        //    return octant;
-        //}
-
-        private bool Split()
-        {
-            // cannot split because we're at max depth
-            if (_depth == OctreeOctant.MaxDepth)
-                return false;
-
-            // we are already split
-            if (this.mChildOctants != null)
-                return true;
-
-            // initialize the array but do not instance or assign an Octant
-            this.mChildOctants = new OctreeOctant[8];
-            return true;
-        }
-
-        // TODO: I should implement an overloaded version of Query that traverses for Entities that lay within a bounding box or sphere with potential also of matching a "match" predicate.
-        //       Multi-threading of the query would be ideal.
-        /// <summary>
-        /// Looks for Regions/Entities that are in descendant RegionNodes or EntityNodes 
-        /// that match the specified predicate.
-        /// </summary>
-        /// <param name="recurse"></param>
-        /// <param name="match"></param>
-        /// <returns></returns>
-        public virtual List<EntityNode> Query(EntityNode refEnt, bool recurse, BoundingBox searchArea, Func<EntityNode, EntityNode, bool> match)
-        {
-            if (match == null) throw new ArgumentNullException("SceneNode.Query() - match cannot be null.");
-
-            if (!this.mBox.Intersects(searchArea))
-                return null;
-            //Console.WriteLine ("Query B");
-
-            List<EntityNode> results = new List<EntityNode>();
-
-            if (mEntityNodesCollection != null)
-                for (int i = 0; i < mEntityNodesCollection.Count; i++)
-                {
-                    if (match(mEntityNodesCollection[i], refEnt))
-                        results.Add(mEntityNodesCollection[i]);
-                }
-
-            if (recurse)
-            {
-                if (mChildOctants != null)
-                {
-                    // NOTE: We recurse the child OctreeOctants, not EntityNodes
-                    for (int j = 0; j < mChildOctants.Length; j++)
-                    {
-                        List<EntityNode> nestedResults = mChildOctants[j].Query(refEnt, recurse, searchArea, match);
-                        if (nestedResults != null)
-                            results.AddRange(nestedResults);
-
-                    }
-                }
-            }
-
-            if (results.Count == 0) return null;
-            return results;
-        }
-
-
-        #region IBoundVolume Members
-        /// <summary>
-        /// Public bbox used for culling tests
-        /// </summary>
-        public BoundingBox BoundingBox
-        {
-            get
-            {
-                return mBox;
-            }
-        }
-
-        /*
-        public BoundingSphere BoundingSphere
-        {
-            get { return new BoundingSphere(mBox); } // TODO: compute center from x,y,z index, then return sphere new BoundingSphere(center, _radius); }
-        }
-        */
-
-        public bool BoundVolumeIsDirty
-        {
-            // octree bounds are fixed.
-            get { return false; }
-        }
-
-
-        protected void UpdateBoundVolume()
-        {
-
-        }
-        #endregion
-    }
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    // END OCTREE
-
-
-    // to set flags use  Parent.ChangeState = ChangeStates.Moved | ChangeStates.Rotated | ChangeStates.Scaled
-    // to check the status of a flag you would use a property "ChangeStates node.ChangeState" and then
-    // the statement if (node.ChangeState & ChangeStates.Translated) == ChangeStates.Translated
-    [Flags]
-    public enum ChangeStates : int
-    {
-        // IMPORTANT: I thought about using some persistant flags here but that is a mistake.
-        // ChangeStates should ONLY include those states which are only important at runtime.
-        None = 0,
-        ChildNodeAdded = 1 << 1,
-        ChildNodeRemoved = 1 << 2,
-        GeometryAdded = 1 << 3 | ChildNodeAdded, // WARNING! MUST be careful with combining '|' other flags here like GeometryAdded = 1 << 3 | ChildNodeAdded | BoundingBox_Dirty because when you clear the flag for ChildNodeAdded it will also clear the BoundingBox_Dirty when you dont intend to
-        GeometryRemoved = 1 << 4 | ChildNodeRemoved, // TODO: In fact I should ban the practice altogether 
-
-        ViewpointAdded = 1 << 5 | ChildNodeAdded,
-        ViewpointRemoved = 1 << 6 | ChildNodeRemoved,
-
-
-        BoundingBoxDirty = 1 << 7,
-        BoundingBox_TranslatedOnly = 1 << 8,
-        MatrixDirty = 1 << 9,
-        RegionMatrixDirty = 1 << 10,
-        GlobalMatrixDirty = 1 << 11,
-        Translated = 1 << 12,
-        Rotated = 1 << 13,
-        Scaled = 1 << 14,
-
-        // NOTE: we don't combine flags because when we DisableChangeStates, it also disables ALL the relevant bits in the flag
-        // Translated = 1 << 12 | BoundingBox_TranslatedOnly | MatrixDirty,
-        // Rotated = 1 << 13 | BoundingBoxDirty  | MatrixDirty,
-        // Scaled = 1 << 14 | BoundingBoxDirty | MatrixDirty,
-        KeyFrameUpdated = 1 << 15,  // AnimationUpdated same thing
-        AppearanceNodeChanged = 1 << 28, // MaterialNodeChanged, TextureNodeChanged
-        AppearanceParameterChanged = 1 << 16,  // when Appearance parameters are changed 
-        ShaderParameterValuesChanged = 1 << 17,
-        ShaderFXLoaded = 1 << 18,
-        ShaderFXUnloaded = 1 << 19,
-        EntityScriptLoaded = 1 << 20,    // scripts paged in or paged out (NOT just added/removed)
-        DomainScriptUnloaded = 1 << 21,
-        BehaviorScriptLoaded = 1 << 22,
-        BehaviorScriptUnloaded = 1 << 23,
-        TargetChanged = 1 << 24,  // typically used by animations which are directly parented to Entity so Entity will be only receiver
-        EventHandlerChanged = 1 << 25,
-
-        EntityMoved = 1 << 26,  // required only for scene listener
-        EntityResized = 1 << 27, // required only for scene listener
-        PhysicsNodeAdded = 1 << 28,
-        PhysicsNodeRemoved = 1 << 29,
-        All = int.MaxValue
-    }
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    // BEGIN NODES
-    // Transform node type. Entities and Models inherit this type.
-    // NOTE: The global variables are almost exclusively as they relate to Zones.
-    //       Otherwise the mDerived* vars are our worldspace variables.  Adjacent Zones
-    //       get oriented with respect to the camera's Region/Zone. This means
-    //       only globalTranslation is used and globalscale and globalrotation are Identity.
-    //
-    // TODO: should we derive a PhysicalTransform node for PhysicsBodies?
-    // that can host our mOldTransform and mPreviousStepTransform vars?
-    public class Transform
-#if USE_MEMORY_T
-            : IDisposable
-#endif
-    {
-        private ChangeStates mChangeStates = ChangeStates.None;
-
-        // TODO: currently inheritScale and inheritRotation are treated as
-        // bools since a bool can potentially take up just 1 bit instead of 32
-        // so no need to merge these into a single 32bit flag.
-        //private const int INHERIT_ROTATION = 1 << 0;
-        //private const int INHERIT_SCALE = 1 << 1;
-
-        private bool mInheritScale;
-        private bool mInheritRotation;
-
-        public int AttachedToBoneID;
-
-        protected Vector3d mPivot;
-        protected Vector3d mPreviousTranslation;
-
-#if USE_MEMORY_T == false
-        // local scale, translation and rotation
-        protected Vector3d mScale, mTranslation;
-        protected Quaternion mRotation;
-
-        // region centric translation, scale, and rotation 
-        protected Quaternion mDerivedRotation;
-        protected Vector3d mDerivedTranslation;
-        protected Vector3d mDerivedScale;
-
-        // global scale, rotation and translation (note: translation includes zone translations)
-        protected Vector3d mGlobalScale, mGlobalTranslation;
-        protected Quaternion mGlobalRotation;
-
-
-        // cached matrix will automatically include derived versions if enabled
-        protected Matrix mMatrix; // RegionMatrix
-        protected Matrix mLocalMatrix;
-        protected Matrix mGlobalMatrix;
-#endif
-
-        // different in translation between current and previous
-        protected Vector3d mTranslationDelta;
-
-#if USE_MEMORY_T
-		public Memory<Transform_Struct> mMemStore; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
-		public int SpanIndex = -1;
-				
-        //[StructLayout(LayoutKind.Sequential)]
-        public struct Transform_Struct
-        {
-            //public string EntityID;
-            public Vector3d Velocity;
-
-
-            //public Vector3d Pivot;
-
-            public Vector3d Translation;
-            //public Vector3d DerivedTranslation;
-            //public Vector3d GlobalTranslation;
-
-            public Vector3d Scale;
-            //public Vector3d DerivedScale;
-            //public Vector3d GlobalScale;
-
-            public Quaternion Rotation;
-            //public Quaternion DerivedRotation;
-            //public Quaternion GlobalRotation;
-
-            //public Matrix RegionMatrix;
-
-        }
-
-        
-
-#endif
-
-        protected Transform()
-        {
-
-#if USE_MEMORY_T
-
-            ComponentStore<Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
-            int index = -1;
-            mMemStore = store.CheckOut(out index);
-            SpanIndex = index;
-            //initialize the memory store
-
-            // todo do we need destuuctor for Repository.CheckIn mMemstore?
-
-
-#else
-            mMatrix = Matrix.Identity();
-            mScale.x = 1;
-            mScale.y = 1;
-            mScale.z = 1;
-            mTranslation.x = 0;
-            mTranslation.y = 0;
-            mTranslation.z = 0;
-            mRotation = new Quaternion();
-            //_rotation.X = 0;
-            //_rotation.Y = 0;
-            //_rotation.Z = 0;
-            //_rotation.W = 1;
-            mPivot.x = 0;
-            mPivot.y = 0;
-            mPivot.z = 0;
-
-
-
-
-#endif
-
-            AttachedToBoneID = -1;
-
-            //SetChangeFlags(Enums.ChangeStates.Translated |
-            //               Enums.ChangeStates.Scaled |
-            //               Enums.ChangeStates.Rotated |
-            //               Enums.ChangeStates.MatrixDirty |
-            //               Enums.ChangeStates.RegionMatrixDirty |
-            //               Enums.ChangeStates.GlobalMatrixDirty | 
-            //              Enums.ChangeStates.BoundingBoxDirty, Enums.ChangeSource.Self);
-
-            // by default we inherit rotations however
-            // stellar system components like stars, planets, moons, asteroids do not
-            // Currently what we do is in our ProceduralHelper.cs is to manually
-            // set these two flags to false.
-            mInheritRotation = true;
-
-            // In a hierarchical scene, Transform derived nodes should always inherit scale.  The variable
-            // is available however if for certain elements such as GUI Widgets, HUD root elements, etc
-            // where we always want independant scaling.  But for things like Engine nacelles, we want
-            // them to inherit scale of Vehicle they are attached to.
-            mInheritScale = true;
-            // If we don't intend for a scale set on an Entity to pass to a child Entity, then we should 
-            // set that scale on the Parent entity's child Model instead. 
-            //  Entity         <-- don't set scale here
-            //		|___Model   <-- set scale on Model instead
-            //		|__Entity   <-- child Entity will now not inherit scale
-            //			|__Model
-
-            //Shareable = false; // Transform nodes and derived can never be shared.
-        }
-
-        #region ResourceBase members
-
-        /*/// <summary>
-        /// 
-        /// </summary>
-        /// <param name="specOnly">True returns the properties without any values assigned</param>
-        /// <returns></returns>
-        public override Settings.PropertySpec[] GetProperties(bool specOnly)
-        {
-            Settings.PropertySpec[] tmp = base.GetProperties(specOnly);
-            Settings.PropertySpec[] properties = new Settings.PropertySpec[10 + tmp.Length];
-            tmp.CopyTo(properties, 10);
-
-	    properties[0] = new Settings.PropertySpec("inheritscale", mInheritScale.GetType().Name);
-            properties[1] = new Settings.PropertySpec("inheritrotation", mInheritRotation.GetType().Name);
-
-            properties[2] = new Settings.PropertySpec("position", mTranslation.GetType().Name);
-            properties[3] = new Settings.PropertySpec("scale", mScale.GetType().Name);
-            properties[4] = new Settings.PropertySpec("rotation", mRotation.GetType().Name);
-            
-            properties[5] = new Settings.PropertySpec("velocity", mVelocity.GetType().Name);
-            properties[6] = new Settings.PropertySpec("acceleration", mAcceleration.GetType().Name);
-            properties[7] = new Settings.PropertySpec("force", mForce.GetType().Name);
-            properties[8] = new Settings.PropertySpec("angularforce", mAngularForce.GetType().Name);
-            properties[9] = new Settings.PropertySpec("angularvelocity", mAngularVelocity.GetType().Name);
-
-            if (!specOnly)
-            {
-                properties[0].DefaultValue = mInheritScale;
-                properties[1].DefaultValue = mInheritRotation;
-
-
-                properties[2].DefaultValue = mTranslation;
-                properties[3].DefaultValue = mScale;
-                properties[4].DefaultValue = mRotation;
-
-
-                properties[5].DefaultValue = mVelocity;
-                properties[6].DefaultValue = mAcceleration;
-                properties[7].DefaultValue = mForce;
-                properties[8].DefaultValue = mAngularForce;
-                properties[9].DefaultValue = mAngularVelocity;
-            }
-
-            return properties;
-        }
-
-        public override void SetProperties(Settings.PropertySpec[] properties)
-        {
-            if (properties == null) return;
-            base.SetProperties(properties);
-
-            for (int i = 0; i < properties.Length; i++)
-            {
-                if (properties[i].DefaultValue == null) continue;
-                // use of a switch allows us to pass in all or a few of the propspecs depending
-                // on whether we're loading from xml or changing a single property via server directive
-                switch (properties[i].Name)
-                {
-                    case "inheritscale":
-                        InheritScale = (bool)properties[i].DefaultValue;
-                        break;
-                    case "inheritrotation":
-                        InheritRotation = (bool)properties[i].DefaultValue;
-                        break;
-
-
-
-                    case "position":
-                        Translation = (Vector3d)properties[i].DefaultValue;
-                        break;
-                    case "scale":
-                        Scale = (Vector3d)properties[i].DefaultValue;
-                        break;
-                    case "rotation":
-                        Rotation = (Quaternion)properties[i].DefaultValue;
-                        break;
-
-
-		    // Physics will be moved to Entity.PhysicsBody which will implement IPhysicsBody (as will RigidBody.cs)
-                    case "velocity":
-                        mVelocity = (Vector3d)properties[i].DefaultValue;
-                        break;
-                    case "acceleration":
-                        mAcceleration = (Vector3d)properties[i].DefaultValue;
-                        break;
-                    case "force":
-                        mForce = (Vector3d)properties[i].DefaultValue;
-                        break;
-                    case "angularforce":
-                        mAngularForce = (Vector3d)properties[i].DefaultValue;
-                        break;
-                    case "angularvelocity":
-                        mAngularVelocity = (Vector3d)properties[i].DefaultValue;
-                        break;
-                }
-            }
-
-            // NOTE: the following flags are set in the property Settors
-//            SetChangeFlags(Enums.ChangeStates.BoundingBoxDirty |
-//                Enums.ChangeStates.GlobalMatrixDirty |
-//                Enums.ChangeStates.MatrixDirty |
-//                Enums.ChangeStates.RegionMatrixDirty, Enums.ChangeSource.Self);
-        }
-		*/
-        #endregion
-
-
-
-        /// <summary>
-        /// In a hierarchical scene, Transform derived nodes shoudl always inherit scale.  The variable
-        /// is available however if for certain elements such as GUI Widgets, HUD root elements, etc
-        /// where we always want independant scaling.
-        /// </summary>
-        public bool InheritScale
-        {
-            get { return mInheritScale; }
-            set
-            {
-                mInheritScale = value;
-                /*SetChangeFlags(
-                    Enums.ChangeStates.MatrixDirty | 
-                    Enums.ChangeStates.RegionMatrixDirty |
-                    Enums.ChangeStates.GlobalMatrixDirty | 
-                    Enums.ChangeStates.BoundingBoxDirty, Enums.ChangeSource.Self);
-            	*/
-            }
-        }
-
-        public bool InheritRotation
-        {
-            get { return mInheritRotation; }
-            set
-            {
-                mInheritRotation = value;
-                /*SetChangeFlags(
-                    Enums.ChangeStates.MatrixDirty |
-                    Enums.ChangeStates.RegionMatrixDirty |
-                    Enums.ChangeStates.GlobalMatrixDirty |
-                    Enums.ChangeStates.BoundingBoxDirty, Enums.ChangeSource.Self);
-				*/
-            }
-        }
-
-
-
-        #region PHYSICS - MOVES ALL THIS TO Entity.PhysicsBody which implements IPhysicsBody
-
-        // TODO: Dynamic physics items aren't related to Transform, but... how should we track our physics?
-        // do we use the traditional PhysicsBody composite object?
-        // These could maybe be moved to the new RigidBody class we've added (July.17.2019)
-        // TODO: but if these exist in the RigidBody node, how do we apply results to the Entity itself?
-        //  SHouldn't the RigidBody apply only the velocities (angular and linear)?  The RigidBody as needed
-        //  could grab any Transform info it needs from the Entity.
-        // Upon polling the events each physics step, we can update the relevant velocities on the Entity?
-        protected Vector3d mPreviousStepTranslation;
-        protected Vector3d mPreviousStepScale;
-        protected Quaternion mPreviousStepRotation;
-
-        protected Vector3d mVelocity = Vector3d.Zero();
-        protected Vector3d mAcceleration = Vector3d.Zero();
-        protected Vector3d mForce = Vector3d.Zero();
-
-        protected Vector3d mAngularVelocity = Vector3d.Zero();
-        protected Vector3d mAngularAcceleration = Vector3d.Zero();
-        protected Vector3d mAngularForce = Vector3d.Zero();
-
-        public virtual Vector3d Force
-        {
-            get { return mForce; }
-            set { mForce = value; }
-        }
-
-        public virtual Vector3d Acceleration
-        {
-            get { return mAcceleration; }
-            set { mAcceleration = value; }
-        }
-
-        // NOTE: Velocity may be overriden by SteerableEntity.cs 
-        public virtual Vector3d Velocity
-        {
-            get
-            {
-                return mVelocity;
-            }
-            set
-            {
-                mVelocity = value;
-            }
-        }
-
-        /// <summary>
-        /// torque
-        /// </summary>
-        public virtual Vector3d AngularForce
-        {
-            get { return mAngularForce; }
-            set { mAngularForce = value; }
-        }
-
-        public virtual Vector3d AngularAcceleration
-        {
-            get { return mAngularAcceleration; }
-            set { mAngularAcceleration = value; }
-        }
-
-        public virtual Vector3d AngularVelocity
-        {
-            get { return mAngularVelocity; }
-            set { mAngularVelocity = value; }
-        }
-        #endregion
-
-
-
-        /// <summary>
-        /// Previous translation from previous frame
-        /// </summary>
-        public Vector3d PreviousTranslation { get { return mPreviousTranslation; } }
-
-        // TODO: don't all these previous step versions end up needing
-        //       to compute a matrix for rendering ?  because
-        // well, we need to use this in model.Render() to compute the matrix
-        // to set on the geometry.  We compute the interpolated value and render 
-        // with that.
-        public Vector3d LatestStepTranslation
-        {
-            get { return mPreviousStepTranslation; }
-            set { mPreviousStepTranslation = value; }
-        }
-
-        public Vector3d LatestStepScale
-        {
-            get { return mPreviousStepScale; }
-            set { mPreviousStepScale = value; }
-        }
-
-        public Quaternion LatestStepRotation
-        {
-            get { return mPreviousStepRotation; }
-            set { mPreviousStepRotation = value; }
-        }
-
-
-#if USE_MEMORY_T
-        // variables stored in contiguous array of structs via Memory<T>
-        //public string GetEntityID { get { return mMemStore.Span[0].EntityID; } }
-
-        /*public Vector3d Pivot
-        {
-            get { return mMemStore.Span[0].Pivot; }
-            set { mMemStore.Span[0].Pivot = value; }
-        }*/
-		Vector3d mSpanAccessTest;
-        public Vector3d Translation
-        {
-            get 
-			{ 
-				// https://www.codemag.com/Article/2207031/Writing-High-Performance-Code-Using-SpanT-and-MemoryT-in-C
-				return mSpanAccessTest; // NOTE: <-- this line is much faster than returning the Translation from the below line!  
-                // / What we want to do is cache/grab the entire Span[0] once for this Entity/Boid and then directly just modify IT and not this accessor!!!
-                //
-				return mMemStore.Span[0].Translation; 
-			}
-            set 
-			{ 
-				mSpanAccessTest = value; 
-				mMemStore.Span[0].Translation = value; 
-			}
-        }
-        /*
-        public Vector3d DerivedTranslation
-        {
-            get { return mMemStore.Span[0].DerivedTranslation; }
-        }
-        public Vector3d GlobalTranslation
-        {
-            get { return mMemStore.Span[0].GlobalTranslation; }
-            set { mMemStore.Span[0].GlobalTranslation = value; }
-        }*/
-
-        public Vector3d Scale
-        {
-            get { return mMemStore.Span[0].Scale; }
-            set { mMemStore.Span[0].Scale = value; }
-        }
-        /*
-        public Vector3d DerivedScale
-        {
-            get { return mMemStore.Span[0].DerivedScale; }
-        }
-        public Vector3d GlobalScale
-        {
-            get { return mMemStore.Span[0].GlobalScale; }
-        }*/
-        public Quaternion Rotation
-        {
-            get { return mMemStore.Span[0].Rotation; }
-            set { mMemStore.Span[0].Rotation = value; }
-        }
-        /*
-        public Quaternion DerivedRotation
-        {
-            get { return mMemStore.Span[0].DerivedRotation; }
-        }
-        public Quaternion GlobalRotation
-        {
-            get { return mMemStore.Span[0].GlobalRotation; }
-        }*/
-
-#else
-        /// <summary>
-        /// Local Space Position
-        /// </summary>
-        public virtual Vector3d Translation
-        {
-            get { return mTranslation; }
-            set
-            {
-                //            	if (this is Model && ((Model)this).Geometry is MinimeshGeometry && value == Vector3d.Zero())
-                //            		System.Diagnostics.Debug.WriteLine ("err");
-                //            	
-                mTranslationDelta = value - mTranslation;
-                // May.16.2017 - even if mTranslationDelta equals Vector3d.Zero() we can't "return". We need to SetChangeFlags
-                //               or the Viewpoint used by ViewpointController will jitter.  Maybe it's because we need
-                //               mPreviousStepTranslation to update.  Eitherway, the following line must remain commented out.
-                //if (mTranslationDelta.Equals(Vector3d.Zero())) return;
-
-                mTranslation = value;
-                // TODO: arg, this previoussteptranslation crap oct.9.2014 temp hack as we implement steering 
-                // behaviors again with Dynamic flag to true.  We need to solve this long term where modifying 
-                // Translation through script or API or plugin will also update the previousStep if 
-                // Dynamic == true, or when enabling Dynamic, it initializes previousStepTranslation to Translation
-                mPreviousStepTranslation = Translation;
-
-                //if (this is Entities.Entity && ((Entities.Entity)this).Name == "helm")
-                //    System.Diagnostics.Debug.WriteLine("helm translation because it had EntityAttributes.Dynamic set");
-
-                //SetChangeFlags(
-                //	Enums.ChangeStates.Translated |
-                //    Enums.ChangeStates.MatrixDirty | 
-                //    Enums.ChangeStates.RegionMatrixDirty |
-                //   Enums.ChangeStates.GlobalMatrixDirty | 
-                //   Enums.ChangeStates.BoundingBox_TranslatedOnly, Enums.ChangeSource.Self);
-            }
-        }
-
-        public virtual Vector3d Scale
-        {
-            get { return mScale; }
-            set
-            {
-#if DEBUG
-                if (value == Vector3d.Zero()) throw new ArgumentOutOfRangeException("Transform.Scale cannot be 0,0,0");
-#endif
-                if (value == mScale) return; // some thigns have their scale altered all the time such as for percentage screenspace scaling and if the scale value doesnt change, no need to alter
-
-                //if (this is Entities.Entity && ((Entities.Entity)this).Name == "helm")
-                //    System.Diagnostics.Debug.WriteLine("helm scale err");
-
-                mScale = value;
-                //SetChangeFlags(
-                //     Enums.ChangeStates.Scaled |
-                //    Enums.ChangeStates.MatrixDirty |
-                //    Enums.ChangeStates.RegionMatrixDirty |
-                //   Enums.ChangeStates.GlobalMatrixDirty |
-                //   Enums.ChangeStates.BoundingBoxDirty, Enums.ChangeSource.Self);
-            }
-        }
-
-        /// <summary>
-        /// Local Space Rotation
-        /// </summary>
-        public virtual Quaternion Rotation
-        {
-            get { return mRotation; }
-            set
-            {
-                if (value.IsNullOrEmpty()) return;
-                if (value.Equals(mRotation)) return; // some things have their rotaton altered all the time but never actually change, no need to set change flags here
-                mRotation = value;
-
-
-                //  SetChangeFlags(
-                // 	Enums.ChangeStates.Rotated |
-                //    Enums.ChangeStates.MatrixDirty |
-                //    Enums.ChangeStates.RegionMatrixDirty |
-                //   Enums.ChangeStates.GlobalMatrixDirty |
-                //   Enums.ChangeStates.BoundingBoxDirty, Enums.ChangeSource.Self);
-            }
-        }
-
-        public Vector3d Pivot
-        {
-            get { return mPivot; }
-            set
-            {
-                mPivot = value;
-                if (value == mPivot) return;
-                //   SetChangeFlags(
-                //       Enums.ChangeStates.MatrixDirty |
-                //      Enums.ChangeStates.RegionMatrixDirty |
-                //      Enums.ChangeStates.GlobalMatrixDirty |
-                //      Enums.ChangeStates.BoundingBoxDirty, Enums.ChangeSource.Self);
-            }
-        }
-
-        public Vector3d DerivedTranslation
-        {
-            get
-            {
-                // NOTE: translation can be altered by parent scale as well as translation from parent or self
-                if ((mChangeStates & (ChangeStates.Translated | ChangeStates.Scaled)) != 0)
-                    UpdateRegional();
-
-                return mDerivedTranslation;
-            }
-        }
-
-        public Vector3d DerivedScale
-        {
-            get
-            {
-                if ((mChangeStates & ChangeStates.Scaled) == ChangeStates.Scaled)
-                    UpdateRegional();
-
-                return mDerivedScale;
-            }
-        }
-
-        public Quaternion DerivedRotation
-        {
-            get
-            {
-                if ((mChangeStates & ChangeStates.Rotated) == ChangeStates.Rotated)
-                    UpdateRegional();
-                return mDerivedRotation;
-            }
-        }
-
-        public virtual Vector3d GlobalTranslation
-        {
-            get
-            {
-                // global translation is dirty whenever a) this node translates b) it's parent node translates c) it's parent node's Global translation has changed,
-                // but we dont always need to know the most up to date value 
-                // so maybe we need more flags for these so we can clear Translated flag after local update, but still know that
-                // global still needs to be updated (is dirty) if we should try to grab it's value
-                // global values aren't requested very often.  We try to do most calcs in Region space.  I think mostly it's camera and Regions which use these
-                if ((mChangeStates & ChangeStates.GlobalMatrixDirty) == ChangeStates.GlobalMatrixDirty)
-                    UpdateGlobal();
-
-                Vector3d result = GlobalMatrix.GetTranslation();
-                //System.Diagnostics.Debug.Assert (result == mGlobalTranslation);
-
-                return mGlobalTranslation;
-            }
-            set
-            {
-                mGlobalTranslation = value;
-                /*
-            	if (mParents == null || mParents[0] == null)
-	            {
-	                // there is no parent so GlobalTranslation is same as local
-	                Translation = mGlobalTranslation; // calling public property setter instead of private var will trigger appropriate SetChangeFlags
-	                return;
-	            }
-
-            	Transform parent = (Transform)mParents[0];
-            
-            	// we want to transform coordinate from (src) global to (dest) local identity space
-	           	Matrix source2dest = Matrix.Inverse (parent.GlobalMatrix); // Matrix.Source2Dest(parent.GlobalMatrix, Matrix.Identity());
-        		Matrix locallyTransformedMatrix = Matrix.Multiply4x4(source2dest, Matrix.CreateTranslation (value));
-        		Vector3d result = locallyTransformedMatrix.GetTranslation();
-
-        		// TODO: for Zones this is wrong.  Not even sure for other Entity types because we dont use it much but my recollection
-        		//       is that it is also wrong when trying to place entities in multi-zone region with asset placement tool.
-            	Translation = result; // calling public property setter instead of private var will trigger appropriate SetChangeFlags
-				*/
-            }
-        }
-
-        public Vector3d GlobalScale
-        {
-            get
-            {
-                // global scale is dirty whenever a) this node re-scales b) it's parent node's scales c) it's parent node's Global scale has changed
-                // so maybe we need more flags for these?
-                // global values aren't requested very often.  We try to do most calcs in Region space.  I think mostly it's camera and Regions which use these
-                if ((mChangeStates & ChangeStates.GlobalMatrixDirty) == ChangeStates.GlobalMatrixDirty)
-                    UpdateGlobal();
-
-                return mGlobalScale;
-            }
-        }
-
-        public Quaternion GlobalRotation
-        {
-            get
-            {
-                // global rotation is dirty whenever a) this node rotates b) it's parent node's rotated c) it's parent node's Global rotation has changed
-                // so maybe we need more flags for these?
-                // global values aren't requested very often.  We try to do most calcs in Region space.  I think mostly it's camera and Regions which use these
-                if ((mChangeStates & ChangeStates.GlobalMatrixDirty) == ChangeStates.GlobalMatrixDirty)
-                    UpdateGlobal();
-                return mGlobalRotation;
-            }
-        }
-
-
-        /// <summary>
-        /// Local Matrix is nearly obsolete because what we primarily store are LOCAL translation, 
-        /// scale, and orientation quaternion. 
-        /// 
-        /// This is only used by MoveTool/RotateTool/ScaleTool and ScaleDrawer _all_ for
-        /// EditableMesh which is edited in modelspace and not in the coordinate system of the current 
-        /// Region
-        ///
-        ///  Local matrix is cached primarily so that we can properly compare differences in
-        /// translation to the position elements already in the matrix when translation is the only thing
-        /// that has changed.
-        /// Even setting a local matrix just result in the diffferent vector components being created. 
-        /// 
-        /// Local Matrix is always relative to the parent.
-        /// </summary>
-        public Matrix LocalMatrix
-        {
-            get
-            {
-                // this override of the get{} performs a lazy update of the WorldMatrix
-                // if it's dirty.  It's exactly like what happens with the getter on BoundingBox()
-                // When trying to access the RelativeMatrix, if the position, scale, translation
-                // has changed for this Model, the appropriate flags will get set and we must
-                // compute  a new one.
-                if (mLocalMatrix.IsNullOrEmpty() || (mChangeStates & ChangeStates.MatrixDirty) == ChangeStates.MatrixDirty)
-                {
-                    // update local matrix
-                    Matrix tmat = Matrix.CreateTranslation(mTranslation);
-                    Matrix smat = Matrix.CreateScaling(mScale);
-                    Matrix rmat = new Matrix(mRotation);
-                    //Matrix Rx = Matrix.RotationX(_rotation.x * Utilities.MathHelper.DEGREES_TO_RADIANS);
-                    //Matrix Ry = Matrix.RotationY(_rotation.y * Utilities.MathHelper.DEGREES_TO_RADIANS);
-                    //Matrix Rz = Matrix.RotationZ(_rotation.z * Utilities.MathHelper.DEGREES_TO_RADIANS);
-                    // The order these rotations are performed to match TV3D is: Yaw(y), Pitch(x), then Roll (z). 
-                    //_localMatrix = S*Ry*Rx*Rz*T;
-                    //                Usually, its;
-                    //// scale * rotation * translation
-                    ////But if you want the object to rotate (orbit) around a certain point, then:
-                    ////scale* translationToCertainPoint * rotation * translationToObjectPosition
-                    ////_localMatrix = smat * RotationMatrix * tmat;
-                    if (mPivot == Vector3d.Zero())
-                        mLocalMatrix = smat * rmat * tmat;
-                    else
-                    {
-                        Matrix offsetMat = Matrix.CreateTranslation(mPivot);
-                        Matrix negativeOffsetMat = Matrix.CreateTranslation(-mPivot);
-                        mLocalMatrix = smat * offsetMat * rmat * negativeOffsetMat * tmat;
-                    }
-
-                    // DisableChangeFlags(Enums.ChangeStates.MatrixDirty);
-                }
-                return mLocalMatrix;
-            }
-        }
-
-        //// RegionMatrix is an entity's transform in relation to the Region it's in.  
-        //// Since we only render in Region space with camera space offset, this makes our RegionMatrix
-        //// akin to our WorldMatrix since this is the resulting value we plug into the d3d device
-        //// To render across Regions, we still use this RegionMatrix however we compute a transform
-        //// for the camera view to transform an entity that lies in one region, to be relative to the
-        //// current camera's region.
-        //private Matrix result;
-        public virtual Matrix RegionMatrix
-        {
-            get
-            {
-                if ((mChangeStates & ChangeStates.RegionMatrixDirty) != 0)
-                {
-                    UpdateRegional();
-
-                    Matrix tmat = Matrix.CreateTranslation(mDerivedTranslation);
-                    Matrix smat = Matrix.CreateScaling(mDerivedScale);
-                    Matrix rmat = new Matrix(mDerivedRotation);
-
-                    //Matrix Rx = Matrix.RotationX(_rotation.x * Utilities.MathHelper.DEGREES_TO_RADIANS);
-                    //Matrix Ry = Matrix.RotationY(_rotation.y * Utilities.MathHelper.DEGREES_TO_RADIANS);
-                    //Matrix Rz = Matrix.RotationZ(_rotation.z * Utilities.MathHelper.DEGREES_TO_RADIANS);
-                    // The order these rotations are performed to match TV3D is: Yaw(y), Pitch(x), then Roll (z). 
-                    //_matrix = S*Ry*Rx*Rz*T;
-                    //                Usually, its;
-                    //// scale * rotation * translation
-                    ////But if you want the object to rotate (orbit) around a certain point, then:
-                    ////scale* translationToCertainPoint * rotation * translationToObjectPosition
-                    ////_matrix = smat * RotationMatrix * tmat;
-
-
-                    // NOTE: smat * rmat * tmat is evaluated as (smat * rmat) * tmat
-                    // http://msdn.microsoft.com/en-us/library/ms173145.aspx
-                    // When two or more operators that have the same precedence are present in an 
-                    // expression, they are evaluated based on associativity. Left-associative 
-                    // operators are evaluated in order from left to right. For example, 
-                    // x * y / z is evaluated as (x * y) / z. Right-associative operators are 
-                    // evaluated in order from right to left. For example, the assignment operator
-                    // is right associative. 
-                    //          _matrix = smat * rmat * tmat;
-
-
-                    if (mPivot == Vector3d.Zero())
-                        mMatrix = smat * rmat * tmat;
-                    else
-                    {
-                        Matrix offsetMat = Matrix.CreateTranslation(mPivot);
-                        Matrix negativeOffsetMat = Matrix.CreateTranslation(-mPivot);
-                        mMatrix = smat * offsetMat * rmat * negativeOffsetMat * tmat;
-                    }
-
-                    //DisableChangeFlags(Enums.ChangeStates.RegionMatrixDirty);
-                }
-                return mMatrix;
-            }
-        }
-
-
-        public virtual Matrix GlobalMatrix
-        {
-            get
-            {
-                if (mGlobalMatrix.IsNullOrEmpty() || (mChangeStates & ChangeStates.GlobalMatrixDirty) != 0)
-                {
-                    UpdateGlobal();
-                    Matrix tmat = Matrix.CreateTranslation(mGlobalTranslation);
-                    Matrix smat = Matrix.CreateScaling(mGlobalScale);
-                    Matrix rmat = new Matrix(mGlobalRotation);
-                    mGlobalMatrix = smat * rmat * tmat;
-                    //DisableChangeFlags(Enums.ChangeStates.GlobalMatrixDirty);
-                }
-
-                return mGlobalMatrix;
-            }
-        }
-#endif
-
-        /// <summary>
-        /// This is a translation amount to apply to the current world view position.
-        /// </summary>
-        /// <param name="x"></param>
-        /// <param name="y"></param>
-        /// <param name="z"></param>
-        /// <param name="skipBoundsCheck" ></param>
-        public void Translate(double deltaX, double deltaY, double deltaZ, bool skipBoundsCheck)
-        {
-            // TODO: Rather than just have option to restrict a viewpoint via it's Region's bounds
-            // we should be able to restrict Viewpoints here (or also via an Entity script to be called
-            // upon Translate...?)  
-            // The idea is that we can create say a security cam viewpoint that can rotate, but not translate
-            // Or restrict a Viewpoint with a bounding volume (sphere or box) for editing interior
-            // celledregion of a vehicle.  
-            Vector3d delta;
-            delta.x = deltaX;
-            delta.y = deltaY;
-            delta.z = deltaZ;
-            //System.Diagnostics.Debug.WriteLine(delta.ToString());
-            Translation = Translation + delta;
-        }
-
-
-        /// <summary>
-        /// This is a translation amount to apply to the current camera position.
-        /// </summary>
-        /// <param name="x"></param>
-        /// <param name="y"></param>
-        /// <param name="z"></param>
-        public void deltaZ(double deltaX, double deltaY, double deltaZ)
-        {
-            Translate(deltaX, deltaY, deltaZ, false);
-        }
-
-        public void Translate(Vector3d delta)
-        {
-            Translate(delta.x, delta.y, delta.z, false);
-        }
-
-        public void Translate(Vector3d delta, bool skipBoundsCheck)
-        {
-            Translate(delta.x, delta.y, delta.z, skipBoundsCheck);
-        }
-
-        public void SetRotation(double yawDegrees, double pitchDegrees, double rollDegrees)
-        {
-            Rotation = new Quaternion(yawDegrees * 57.2958d, //Utilities.MathHelper.DEGREES_TO_RADIANS, 
-                                       pitchDegrees * 57.2958d, //Utilities.MathHelper.DEGREES_TO_RADIANS,
-                                       rollDegrees * 57.2958);//Utilities.MathHelper.DEGREES_TO_RADIANS);
-        }
-
-#if USE_MEMORY_T == false
-        #region UPDATES
-        private void UpdateGlobal()
-        {
-            /*
-            // there is no parent                
-            if (mParents == null || mParents[0] == null)
-            {
-                if (this is Portals.Zone)
-                    mGlobalTranslation = ((Portals.Zone)this).ZoneTranslation;
-                else
-                    mGlobalTranslation = mTranslation;
-
-                mGlobalRotation = mRotation;
-                mGlobalScale = mScale;
-                return;
-            }
-
-            Transform mParent = (Transform)mParents[0];
-
-            // Update orientation             
-            Quaternion parentOrientation = mParent.GlobalRotation;
-            if (mInheritRotation)
-            {
-                // Combine orientation with that of parent     
-                if (AttachedToBoneID >= 0)
-                {
-                    // TODO: no way to just get the goddamn rotation... grr...
-                    //((Keystone.Entities.BonedEntity)_parents[0])._actor._actor.getbone. GetBoneMatrix(AttachedToBoneID, true);
-                    //mGlobalRotation = parentOrientation * boneRotation * _rotation;
-                }
-                else
-                    mGlobalRotation = parentOrientation * mRotation;
-            }
-            else
-            {
-                // No inheritence                 
-                mGlobalRotation = mRotation;
-            }
-            // Update scale             
-            Vector3d parentScale = mParent.GlobalScale;
-            if (mInheritScale)
-            {
-                // Scale own position by parent scale, NB just combine                 
-                // as equivalent axes, no shearing                 
-                mGlobalScale = parentScale * mScale;
-            }
-            else
-            {
-                // No inheritence                 
-                mGlobalScale = mScale;
-            }
-            if (mInheritScale)
-            {
-                // Change position vector based on parent's orientation & scale             
-                if (this is Portals.Zone)
-                    mGlobalTranslation = parentOrientation * (parentScale * ((Portals.Zone)this).ZoneTranslation);
-                else
-                    mGlobalTranslation = parentOrientation * (parentScale * mTranslation);
-            }
-            else
-            {
-                // Change position vector based on parent's orientation & scale             
-                if (this is Portals.Zone)
-                    mGlobalTranslation = ((Portals.Zone)this).ZoneTranslation;
-                else
-                    mGlobalTranslation = mTranslation;
-            }
-
-
-            // Add altered position vector to parents 
-            mGlobalTranslation += mParent.GlobalTranslation;
-            */
-        }
-
-        private void UpdateRegional()
-        {
-            /*
-            // DisableChangeFlags(
-            //     Enums.ChangeStates.Translated |
-            //     Enums.ChangeStates.Scaled |
-            //     Enums.ChangeStates.Rotated);
-
-             if (mParents == null || mParents[0] == null || this is Portals.Region)
-             {
-                 // Region node's derived matrix is always identity.  
-                 // _rotation, _translation and _scale are all guaranteed to be default starting values.
-                 mDerivedRotation = mRotation;
-                 mDerivedTranslation = mTranslation;
-                 mDerivedScale = mScale;
-                 return;
-             }
-
-
-             Transform parentTransform = (Transform)mParents[0];
-
-             // Update orientation             
-             Quaternion parentOrientation = parentTransform.DerivedRotation;
-             if (mInheritRotation)
-             {
-                 if (AttachedToBoneID >= 0)
-                 {
-                     // TODO: no way to just get the goddamn rotation... grr...
-                     //((Keystone.Entities.BonedEntity)_parents[0])._actor._actor.getbone. GetBoneMatrix(AttachedToBoneID, true);
-                     //mDerivedRotation = parentOrientation * boneRotation * _rotation;
-                     throw new NotImplementedException();
-                 }
-                 else
-                 {
-                     // Combine orientation with that of parent                 
-                     mDerivedRotation = parentOrientation * mRotation;
-                 }
-             }
-             else
-             {
-                 // No rotation inheritence                 
-                 mDerivedRotation = mRotation;
-             }
-             // Update scale             
-             Vector3d parentScale = parentTransform.DerivedScale;
-             if (mInheritScale)
-             {
-                 // Scale own position by parent scale, NB just combine                 
-                 // as equivalent axes, no shearing                 
-                 mDerivedScale = parentScale * mScale;
-             }
-             else
-             {
-                 // No inheritence                 
-                 mDerivedScale = mScale;
-             }
-
-             if (mInheritScale)
-                 // Change position vector based on parent's orientation & scale                
-                 mDerivedTranslation = parentOrientation * (parentScale * mTranslation);
-             // reverse the parameters to the * operator so second overload op version is used 
-             //mDerivedTranslation = (parentScale * mTranslation) * parentOrientation;
-             else
-                 mDerivedTranslation = mTranslation;
-
-             // Add altered position vector to parents             
-             mDerivedTranslation += parentTransform.DerivedTranslation;
-
-
-             if (mTranslation.x == double.NaN)
-                 System.Diagnostics.Debug.WriteLine("Transform.Update() - NaN");
-		   */
-        }
-
-
-        #endregion */ // UPDATES
-#endif
-
-        #region Disposable members
-#if USE_MEMORY_T
-        public void Dispose()
-        { }
-
-        public void DisposeManagedResources()
-        {
-            // todo
-            //store.CheckIn();
-            //BoidSimulation.mCStoreCol.CheckIn<Transform_Struct>(typeof(Transform_Struct), mMemStore);
-        }
-#endif
-
-        #endregion
-    }
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    // END NODES
-
-		
-		
 
 
 

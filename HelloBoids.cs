@@ -13,14 +13,14 @@ using System.Linq;
 using System.Numerics;
 
 
-// NOTE: The primary purpose of this is to demonstrate the use of Memory<T> 
-//             to increase performance by updating Entities using a data processing model
-//             in order to take advantage of cache coherency instead of 
-//             the typical Entity.Update() model which does not.  
-// NOTE:  We will also be able to experiment with writing DETERMINISTIC code and 
-//              being able to STEP forward and BACKWARDS through the simulation and
-//              ultimately even being able to REPLAY a "recording" of the simulation  or parts
-//             of it.
+// NOTE: The primary purpose of this is to demonstrate the use of Memory<T>
+//to increase performance by updating Entities using a data processing model
+//in order to take advantage of cache coherency instead of
+// the typical Entity.Update() model which does not.
+// NOTE: We will also be able to experiment with writing DETERMINISTIC code and
+// being able to STEP forward and BACKWARDS through the simulation and
+// ultimately even being able to REPLAY a "recording" of the simulation or parts
+//of it.
 namespace HelloBoids
 {
 	// https://vscode.dev/github/MichaelOliveTree/KeystoneGameBlocks
@@ -616,7 +616,10 @@ namespace HelloBoids
                     return false;
                 };
 
-                List<EntityNode> found = currentBoid.SpatialNode.Query(currentBoid, true, searchArea, match);
+                //List<EntityNode> found = currentBoid.SpatialNode.Query(currentBoid, true, searchArea, match);
+				List<EntityNode> found = SpatialQueryLocal(currentBoid, true, searchArea, match);
+	
+	
                 if (found == null || found.Count == 0) return null;
 
                 neighbors = new List<int>(found.Count);
@@ -655,7 +658,44 @@ namespace HelloBoids
             return neighbors;
         }
 
+		private List<EntityNode> SpatialQueryLocal(EntityNode refEnt, bool recurse, BoundingBox searchArea, Func<EntityNode, EntityNode, bool> match)
+		{
+            if (match == null) throw new ArgumentNullException("SpatialQueryLocal() - match cannot be null.");
 
+            if (!refEnt.SpatialNode.BoundingBox.Intersects(searchArea))
+                return null;
+
+            List<EntityNode> results = new List<EntityNode>();
+
+            if ( refEnt.SpatialNode.EntityNodes != null)
+                for (int i = 0; i < refEnt.SpatialNode.EntityNodes.Length; i++)
+                {
+					// TODO: "match" delegate needs to be rewritten to support an index into mem.Span[]
+					//       so that we do not have to keep accessing refEnt.Translation which puts a new
+					//       Span<T> on the stack everytime and thus is very slow.  So we need to have a single
+					//       Span<T> passed in here and then Query without recursion and using ent.SpanIndex into that Span<T>
+                    if (match(refEnt.SpatialNode.EntityNodes[i].SpanIndex, refEnt.SpanIndex))
+                        results.Add(refEnt.SpatialNode.EntityNodes[i]);
+                }
+
+            if (recurse)
+            {
+                if (refEnt.SpatialNode.Children != null)
+                {
+                    // NOTE: We recurse the child OctreeOctants, not EntityNodes
+                    for (int j = 0; j < refEnt.SpatialNode.Children.Length; j++)
+                    {
+                        List<EntityNode> nestedResults = refEnt.SpatialNode.Children[j].Query(refEnt, recurse, searchArea, match);
+                        if (nestedResults != null)
+                            results.AddRange(nestedResults);
+                    }
+                }
+            }
+
+            if (results.Count == 0) return null;
+            return results;
+		}
+			
 #if USE_MEMORY_T == false
         public void Update(double elapsedSeconds, List<Boid> allBoids, double separationDistance, double separationFactor, double alignmentDistance, double alignmentFactor, double cohesionDistance, double cohesionFactor, double maxSpeed, double turnFactor)
         {
@@ -6939,12 +6979,12 @@ namespace HelloBoids
 
 #if USE_MEMORY_T
 		public Memory<Transform_Struct> mMemStore; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
-
+		public int SpanIndex = -1;
+				
         //[StructLayout(LayoutKind.Sequential)]
         public struct Transform_Struct
         {
             //public string EntityID;
-
             public Vector3d Velocity;
 
 
@@ -6976,7 +7016,9 @@ namespace HelloBoids
 #if USE_MEMORY_T
 
             ComponentStore<Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
-            mMemStore = store.CheckOut();
+            int index = -1;
+            mMemStore = store.CheckOut(out index);
+            SpanIndex = index;
             //initialize the memory store
 
             // todo do we need destuuctor for Repository.CheckIn mMemstore?
@@ -8052,8 +8094,6 @@ namespace HelloBoids
         private Dictionary<string, bool[]> mViews;
         private Stack<int> mAvailableForCheckOut;
 
-        private int mLastCheckOutIndex = -1;
-
         private Memory<T> Components;
         private bool[] InUse;
 
@@ -8279,11 +8319,12 @@ namespace HelloBoids
         // Initialize_Entity() will then call CheckOut(typeof(Weapon)) and CheckOut(typeOf(EnergyWeapon))
         // to get direct memory access to the Memory<T> where variables associated with those interfaces
         // will get stored.
-        public Memory<T> CheckOut() // aka: MemoryPool<T>.Rent() 
+        public Memory<T> CheckOut(out int index) // aka: MemoryPool<T>.Rent() 
         {
             lock (mSync)
             {
                 const int HOW_MANY = 1;
+                index = -1;
 
                 if (Components.Equals(null))
                     Expand();
@@ -8293,6 +8334,7 @@ namespace HelloBoids
                 {
                     int i = mAvailableForCheckOut.Pop();
                     InUse[i] = true;
+                    index = i;
                     return Components.Slice(i, HOW_MANY);
                 }
 
@@ -8314,7 +8356,7 @@ namespace HelloBoids
 
                 // if still here, we need to expand first
                 Expand();
-                return CheckOut();
+                return CheckOut(out index);
             }
         }
 

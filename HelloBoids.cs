@@ -490,6 +490,8 @@ namespace HelloBoids
         public double TurnFactor { get; set; } = 0.1; // For boundary avoidance
 
         public OctreeOctant Octree { get; }
+        public static IntervalTimers mIntervalTimers;
+
 
 #if USE_MEMORY_T
         public static ComponentStore<Transform.Transform_Struct> Store;
@@ -498,6 +500,8 @@ namespace HelloBoids
         public BoidSimulation(int numBoids, double width, double height, bool useOctree = false)
         {
             Boids = new List<Boid>(); //NOTE: we do not preallocate the list here
+            mIntervalTimers = new IntervalTimers();
+
 
             if (useOctree)
             {
@@ -606,7 +610,6 @@ namespace HelloBoids
 #if (SPATIAL_SEARCH)
             {
                 BoundingBox searchArea = new BoundingBox(currentBoid.Translation, largestDistance);
-
                 Func<EntityNode, EntityNode, bool> match = (neighbor, current) =>
                 {
                     if (neighbor == current) return false;
@@ -616,9 +619,11 @@ namespace HelloBoids
                     return false;
                 };
 
-                //List<EntityNode> found = currentBoid.SpatialNode.Query(currentBoid, true, searchArea, match);
-				List<EntityNode> found = SpatialQueryLocal(Store.Span, currentBoid.SpatialNode, currentBoid.SpanIndex, largestDistanceSquared, true, searchArea);
-	
+				#if USE_MEMORY_T
+                	List<EntityNode> found = SpatialQueryLocal(Store.Span, currentBoid.SpatialNode, currentBoid.SpanIndex, largestDistanceSquared, true, searchArea);
+				#else
+					List<EntityNode> found = currentBoid.SpatialNode.Query(currentBoid, true, searchArea, match);
+				#endif
 	
                 if (found == null || found.Count == 0) return null;
 
@@ -1000,7 +1005,8 @@ namespace HelloBoids
 	
     public class EntityNode : Transform
     {
-        protected int mIndex;
+        protected string mID;
+		protected int mIndex;
         protected BoundingBox _box;
         protected OctreeOctant _octant;
 
@@ -1009,6 +1015,11 @@ namespace HelloBoids
             get { return _box; }
         }
 
+		public EntityNode (string guid)
+		{
+			mID = guid;
+		}
+		
         public EntityNode(int index, double x, double y, double xV, double yV)
 
         {
@@ -2548,6 +2559,225 @@ namespace HelloBoids
 
         #endregion
     }
+		
+		
+		
+		
+	// https://boristhebrave.github.io/DeBroglie/
+	// https://github.com/BorisTheBrave/DeBroglie
+	// LibNoise
+	// IEntitySystem proc gen
+
+	
+	public struct NFT_Address // Locator 
+	{
+		 public string NestedGUIDs;
+		 public string NestedTypeNames; // Vehicle.?12.&111 // aka vehicle.floor.area
+		 public string NestedNames;     // eg Enterprise.Deck12.Cabin111
+	}
+
+	public struct NFT_State
+	{
+		public bool Loaded;
+		
+	}
+
+	public struct NFT_Description
+	{
+		 public string Name;
+		 public string Description;
+		 public string Attributes; // kvp traits
+		 public string Image;      // thumbnail preview
+
+	}
+
+	public struct NFT_Info
+	{
+		 public string GUID;
+		 public string Owner;
+		 public string Creator;
+		 public NFT_Address Location;
+		 public NFT_Description Description;
+		 public NFT_State State;
+		// public Entity_Taxonomy Taxonomy;     // ProcGen_ItemType enum can be loaded from a modder's file 
+	}
+
+	public struct DeltaInfo
+	{
+		public int ID;
+		public object Properties;
+		public int ReferenceStateID;
+		
+	}
+
+	public interface IEntitySystem 
+	{
+		// 1) an IEntitySystem of type "City{World.Country.Province.County}" might include many different types of child IEntitySystem within it.
+		//    eg. University, Factory, Arthouses, Houses of Worship, Acadamies, Mines, Lodges, Farms, Museums, Research Fascilities, Heavy Idustries, Parks
+		//        Parks, etc.
+		//        - These IEntitySystems are very much like the Simulation of a Vehicle and it's part... each uses "Production and Consumption" that can be
+		//        received by the Simulation.cs in a very consistant/agnosic way.
+		//        - people with various "skills" can be "produced" from Academies... not just minerals, crops, or commodities.
+		//        - these Systems also CONSUME from "Stores"... how do we assign Stores and make them available to something like a "City?"
+		// 2) Stores - food, supplies, medicines, clothing, energy
+		// 3) Do we need to support rendering Proxies here (2D and 3D?)
+
+
+		public int Seed {get;}
+		public int EntityCount{get;}
+		public bool MultithreadingEnabled {get;set;}
+
+		// TODO: perhaps grab the max count from a configuration file
+		public int MaxEntityCount {get; set;}
+
+		public void GenerateSystem();
+		// todo: need delegates for handling the Generate()
+		// todo: need delegate for Create() of single IProcGeneratedItem
+
+
+		// libnoise uses this to find a value on a texture
+		public object GetValue(double x, double y, double z);
+		public IProcGeneratedItem GetItem (string address);
+		public IProcGeneratedItem GetItem (int index);
+		public IProcGeneratedItem GetItem (string guid, int seed);
+		
+		public void Update(double elapsedSeconds);
+		public void Read();
+		public void Write();
+	}
+
+	public class Population : EntityNode, IEntitySystem
+	{
+		private delegate IProcGeneratedItem CreateEntityHandler(int seed, string path);
+		private delegate void GenerateSystemHandler (int seed);
+		private string mPath;
+		private int mMaxEntityCount; 
+		private bool mMultithreadingEnabled;
+		
+		private int mSeed;
+		
+		public Population (string guid) : base(guid)
+		{
+		}
+		
+		public int Seed {get {return mSeed;}}
+		
+		public int MaxEntityCount {get {return mMaxEntityCount;} set {mMaxEntityCount = value;}}
+		public bool MultithreadingEnabled {get {return mMultithreadingEnabled;} set {mMultithreadingEnabled = value;}}
+		public int EntityCount {get {return 0;}}
+		
+		public IProcGeneratedItem GetItem (string address)
+		{
+
+			return null;
+		}
+		
+		public object GetValue(double x, double y, double z)
+		{
+			throw new NotImplementedException();
+		}
+		public IProcGeneratedItem GetItem (int index)
+		{
+			return null;
+		}
+		
+		/// <summary>
+		/// From the GUID, we can lookup the address (hierarchical region) and then the seed used to generate this Entity
+		/// and a "changedState" save file that contains all changed data that is different from the
+		/// Entity that is initially created from the seed.
+		/// </summary>
+		public IProcGeneratedItem GetItem (string guid, int seed)
+		{
+			// todo: note the guid must always be assigned if it's being generated from a seed because
+			//       a GUID cannot be generated from a seed.  It is always going to be a new GUID if we call guid = System.Guid.NewGuid()
+
+			return null;
+		}
+
+		//public IProcGeneratedItem[] GetItems (Rectangle bounds)
+		//{
+			// todo: note the guid must always be assigned if it's being generated from a seed because
+			//       a GUID cannot be generated from a seed.  It is always going to be a new GUID if we call guid = System.Guid.NewGuid()
+
+		//	return null;
+		//}
+
+		public void GenerateSystem()
+		{
+		}
+		
+        public virtual ProcGeneratedItem Create()
+        {
+			return null;
+
+        }
+		
+		public virtual void Update(double elapsedSeconds)
+		{
+
+		}
+		
+		public virtual void Read()
+		{
+		}
+		
+		public virtual void Write()
+		{
+		}
+	}
+	
+
+    public class BoidFactory : Population
+    {
+		public BoidFactory (string guid) : base (guid)
+		{
+		}
+		
+        public override void Update(double elapsedSeconds)
+        {
+
+        }
+    }
+
+
+	// TODO: these interfaces should support LayeredProcGen chunks
+	//       Wave Function Collapse
+	//       LibNoise style texture generation, but with more control over generating "chunks"
+	//       that connect to each other as opposed to a giant texture that then has to be stiched
+	//       together after the fact
+	public interface IProcGeneratedItem
+	{
+		public int Seed {get;}
+		//public Settings.PropertySpec[] Deltas {get ;}
+
+	}
+
+	public abstract class ProcGeneratedItem : IProcGeneratedItem
+	{
+		public int mSeed;
+
+		public int Seed {get {return mSeed;}}
+	}
+	
+    // SEE EntityNode above!  EntityNode is equivalent to Keystone.Entities.Entity
+	//public class Entity : ProcGeneratedItem
+	//{
+	//	public Entity (string guid)
+	//	{
+	//	}
+	//}
+	
+	public class TerrainChunk : ProcGeneratedItem
+	{
+
+	}
+
+	public class ProceduralTexture : IProcGeneratedItem
+	{
+		public int mSeed;
+
+		public int Seed {get {return mSeed;}}
+	}
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // END NODES
@@ -8430,9 +8660,216 @@ namespace HelloBoids
     } // ComponentStore.cs
 
 		
+	
 		
 		
 		
+		
+		
+		
+		
+		
+		
+		
+	public class IntervalTimers
+    {
+        public delegate string IntervalCompleted (string nodeID, string name);
+        //private List<TimePeriod> mTimePeriods;
+        private Dictionary<string, TimePeriod> mKeyedTimePeriods;
+		
+		// NOTE: Using a class for TimePeriod instead of a struct allows us to easily
+        //       increment timePeriod.Elapsed and decrement timePeriod.RepeatsRemaining without
+        //       having to update this timePeriod within the Dictionary.
+        private class TimePeriod
+        {
+            public string OwnerID;
+            public string Name;
+            
+            // milliseconds
+            public double Duration; // the duration in Seconds this Period will last before completed ("IsReady")
+            public double Elapsed;  // get's incremented each frame by elapsedSeconds and compared against Duration
+            public bool Repeating;
+            public int RepeatCount;
+            public int RepeatsRemaining;
+            private bool mIsActive;
+			 // there should be no need to modify the Elapsed when resuming 
+            // because we do not store the starting TickCount, we just 
+            // track the elapsed duration
+            public bool IsPaused; 
+			
+            public bool DeActivateAfterCompleted;
+                       
+            /// notifies the caller that the Interval with the specified "Name" has completed.
+            public IntervalCompleted IntervalCompletedCB;
+			
+			
+            public bool IsReady { get { return Elapsed >= Duration; }}
+            
+            ///<summary>
+            /// Rather than delete a Timer, sometimes we just want to 
+            /// set IsActive=false and we will skip updates to it.
+            ///</summary>
+            public bool IsActive 
+            {
+                get { return mIsActive;}
+                set 
+                {
+                    mIsActive = !mIsActive; // toggle the state
+                    Elapsed = 0;            // always reset the Elapsed to 0
+                }
+            } 
+            
+            
+        }
+        
+
+        
+        public void Register(string nodeID, string name, int durationInSeconds,  bool activateImmediately = true, bool repeating = false, int repeatCount = 0)
+        {
+            TimePeriod tp = new TimePeriod();
+			
+            tp.OwnerID = nodeID;
+            tp.Name = name;
+            tp.Duration = durationInSeconds;
+            tp.Elapsed = 0d;
+            tp.Repeating = repeating;
+            tp.RepeatCount = repeatCount;
+            tp.RepeatsRemaining = repeatCount;
+            
+            tp.IsPaused = false;
+			tp.DeActivateAfterCompleted = false;
+			tp.IntervalCompletedCB = null;
+			//tp.mIsActive = false;
+			
+            //tp.IsActive = activateImmediately;
+			
+            string key = GetKey(nodeID, name);
+            if (mKeyedTimePeriods == null) mKeyedTimePeriods = new Dictionary<string, TimePeriod>();
+            mKeyedTimePeriods.Add (key, tp);
+        }
+        
+        public void UnRegister (string nodeID, string name)
+        {
+            // TODO: remove this period from the dictionary
+            if (mKeyedTimePeriods == null) 
+            {
+                System.Diagnostics.Debug.WriteLine ("GameTime.UnRegister() - " + nodeID + " using name " + name + " does not exist.");
+            }
+            string key = GetKey (nodeID, name);
+            TimePeriod tp;
+            bool success = mKeyedTimePeriods.TryGetValue (key, out tp);
+            
+            if (success) 
+                mKeyedTimePeriods.Remove(key);
+            else 
+                System.Diagnostics.Debug.WriteLine ("GameTime.UnRegister() - " + nodeID + " using name " + name + " does not exist.");
+                
+        }
+        
+        ///<summary>
+        /// Unregisters all Intervals registered for a specific nodeID
+        ///</summary>
+        public void Interval_UnRegisterAll (string nodeID)
+        {
+            
+        }
+        
+
+        //public TimePeriod[] GetAllTimeIntervals (string nodeID)
+        //{
+        //    // for this to work, we must test for existance of "nodeID" at the start of every key in the dictionary 
+        //    return null;
+        //}
+        
+        public void Reset (string nodeID, string name)
+        {
+            if (mKeyedTimePeriods == null) 
+            {
+                System.Diagnostics.Debug.WriteLine ("GameTime.Reset() - " + nodeID + " using name " + name + " does not exist.");
+            }
+            string key = GetKey (nodeID, name);
+            TimePeriod tp;
+            bool success = mKeyedTimePeriods.TryGetValue (key, out tp);
+            
+            if (success) 
+                tp.Elapsed = 0d;
+            else 
+                System.Diagnostics.Debug.WriteLine ("GameTime.Reset() - " + nodeID + " using name " + name + " does not exist.");
+                
+        }
+
+        public bool IsReady (string nodeID, string name)
+        {
+            if (mKeyedTimePeriods == null) 
+            {
+                System.Diagnostics.Debug.WriteLine ("GameTime.IsReady() - " + nodeID + " using name " + name + " does not exist.");
+                return false;
+            }
+            string key = GetKey (nodeID, name);
+            TimePeriod tp;
+            bool success = mKeyedTimePeriods.TryGetValue (key, out tp);
+            
+            if (success) 
+                return !tp.IsPaused && tp.IsActive && tp.Elapsed >= tp.Duration;
+                
+            return false;
+        }
+        
+        public bool IsActive (string nodeID, string name)
+        {
+            if (mKeyedTimePeriods == null) 
+            {
+                System.Diagnostics.Debug.WriteLine ("GameTime.IsActive() - " + nodeID + " using name " + name + " does not exist.");
+                return false;
+            }
+            string key = GetKey (nodeID, name);
+            TimePeriod tp;
+            bool success = mKeyedTimePeriods.TryGetValue (key, out tp);
+            
+            if (success) return tp.IsActive;
+                
+            return false;
+        }
+        
+        private string GetKey (string nodeID, string name)
+        {
+            return nodeID + "_" + name;
+        }
+        
+        public void Update(double elapsedSeconds)
+        {
+            if (mKeyedTimePeriods == null || mKeyedTimePeriods.Count == 0) return;
+
+			foreach (TimePeriod period in mKeyedTimePeriods.Values)
+			{
+				if (!period.IsActive || period.IsPaused) continue;
+                period.Elapsed += elapsedSeconds;
+                
+                if (period.Elapsed >= period.Duration)
+                {
+                    period.IntervalCompletedCB?.Invoke(period.OwnerID, period.Name);
+                    
+                    if (period.Repeating) 
+                    {
+                        double spillOver = period.Elapsed - period.Duration;
+                        period.Elapsed = spillOver;
+                        period.RepeatsRemaining--;
+                        
+                        // return before deactivation or removing the timePeriod
+                        if (period.RepeatsRemaining > 0)
+                            return;
+                    }
+
+                    // deactivate or remove this TimePeriod 
+                    if (period.DeActivateAfterCompleted)
+                        period.IsActive = false;
+                    else
+                        UnRegister (period.OwnerID, period.Name);
+                    
+                }
+            }
+        }
+    }	
 		
     /// <summary>
     /// Zaknafein's TV3D Profiler.  TODO: I should modify this to be more general purpose to include my debug text as well.

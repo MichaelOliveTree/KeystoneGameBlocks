@@ -1,13 +1,18 @@
+/* obsolete - The old code Profiler module used this module to calculate the elapsed times before i switched it to use Stopwatch which is portable
+	/// and does not rely on win32 API calls
+
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
-namespace Keystone.Profiler
+
+namespace Keystone.Timers
 {
 	/// <summary>
 	/// Time management
 	/// </summary>
-	/// <remarks>The Profiler module uses this module to calculate the elapsed times</remarks>
+	/// <remarks>The old Profiler module uses this module to calculate the elapsed times before i switched it to use Stopwatch which is portable
+	/// and does not rely on win32 API calls</remarks>
 	public class Time
     {
 	    // The performance counter API has the best precision
@@ -46,3 +51,4 @@ namespace Keystone.Profiler
 	    }
     }
 }
+*/

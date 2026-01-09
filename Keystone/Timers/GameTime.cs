@@ -8,6 +8,8 @@ namespace Keystone.Timers
     // simulated game time. e.g. 1 minute real time with a TIME_FACTOR = 1000 = 1000 minutes in game time
     public class GameTime 
     {        
+        public IntervalTimers IntervalTimers;
+
         private DateTime _time;
         private double mInitialTimeAtStartup;
         private bool mIsPaused;
@@ -32,6 +34,9 @@ namespace Keystone.Timers
             
             _time = new DateTime(2006, 3, 30, 10, 30, 30, 30);
             
+            IntervalTimers = new IntervalTimers();
+
+
             // http://stackoverflow.com/questions/5248827/convert-datetime-to-julian-date-in-c-sharp-tooadate-safe
 
             int a = (14 - _time.Month) /12;
@@ -104,6 +109,9 @@ namespace Keystone.Timers
             double elapsedMilliseconds = mElapsedGameTimeSeconds * 1000d;
             _time = _time.Add(new TimeSpan(0, 0, 0, 0, (int)elapsedMilliseconds));
             mTicks = _time.Ticks; 
+
+
+            IntervalTimers.Update(elapsedSeconds);
         }
     }
 }

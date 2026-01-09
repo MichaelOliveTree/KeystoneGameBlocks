@@ -43,16 +43,32 @@ namespace KeyEdit.Scripting
 		 }
 		 
 
-// TODO: All timers registered here must TICK each frame... those will exist in Keystone.Timers.IntervalTimers
-		 public void Register_Interval(string entityID, string name, int intervalInSeconds, bool activateImmediately = true, bool repeating = false); 
-		 {
+		// NOTE All Intgerval timers registered are TICKed/Updated each frame from within AppMain.mGameTime
+		//      ... those will exist AppMain.mGameTime.IntervalTimers in code Keystone.Timers.IntervalTimers.cs
+		public void Interval_Register(string nodeID, string name, float intervalInSeconds, bool activateImmediately = true, bool repeating = false)
+		{
+			AppMain.mGameTime.IntervalTimers.Register (nodeID, name, intervalInSeconds, activateImmediately, repeating, 0);
+		}
 
-		 }
+		public void Interval_Reset (string nodeID, string name)
+		{
+			AppMain.mGameTime.IntervalTimers.Reset (nodeID, name);
+		}
 
-		 public void Interval_Reset (string nodeID, string name)
-		 {
-		     
-		 }
+        public void Interval_UnRegister(string nodeID, string name)
+		{
+			AppMain.mGameTime.IntervalTimers.UnRegister (nodeID, name);
+		}
+
+		public bool Interval_IsReady(string nodeID, string name)
+		{
+			return AppMain.mGameTime.IntervalTimers.IsReady (nodeID, name);
+		}
+
+		public bool Interval_IsActive(string nodeID, string name)
+		{
+			return AppMain.mGameTime.IntervalTimers.IsActive (nodeID, name);
+		}
         #endregion
     }
 }

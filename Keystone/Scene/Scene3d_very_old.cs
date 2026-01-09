@@ -18,7 +18,7 @@ using MTV3D65;
 using Light=Core.Light;
 
 
-namespace KeyEdit
+namespace Keystone.Scene
 {
     // NOTE: Hrm.  I had this inheriting FXBase because when scene elements move, I wanted the Scene to be notifiied in case it needs to
     // move that object within the scene to a different sector or octree node.  Or is there another mechanism we want to use for that?

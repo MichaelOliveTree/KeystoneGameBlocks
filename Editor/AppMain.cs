@@ -84,6 +84,7 @@ namespace KeyEdit
         
         public static KeyPlugins.PluginServices PluginService;
         public static Keystone.CoreClient _core;
+        private static Keystone.Simulation.GameTime mGameTime;
         public static KeyEdit.Network.InternetClient mKeyEditInternetClient; // instantiated from KeyEdit.FormMain.OnLoad()
         public static Keystone.Network.LoopbackServer mKGBLoopbackServer;    // instantiated from KeyEdit.FormMain.OnLoad()
         public static Scripting.ScriptingHost mScriptingHost;
@@ -115,7 +116,7 @@ namespace KeyEdit
 
         public static readonly string OPEN_SCENE_FILTER = "Scene Files|SceneInfo.xml";
         public static readonly string OPEN_SAVE_FILTER = "Saved Campaigns|save.db";
-        private static Keystone.Simulation.GameTime mGameTime;
+        
         	
         public const bool EMPTY_UNIVERSE = false;
         public const uint REGIONS_ACROSS = 1;
@@ -240,6 +241,7 @@ namespace KeyEdit
             PluginService.FindPlugins(AppMain.BASE_PATH + @"\Plugins", AppMain.MOD_PATH, AppMain.ModName);
 
             Scripting.DatabaseAPI databaseAPI = new Scripting.DatabaseAPI();
+            Scipting.TimingAPI timingAPI = new Scripting.TimingAPI();
             Scripting.GameAPI gameAPI = new KeyEdit.Scripting.GameAPI ();
             Scripting.GraphicsAPI graphicsAPI = new KeyEdit.Scripting.GraphicsAPI();
             Scripting.EntityAPI entityAPI = new KeyEdit.Scripting.EntityAPI();
@@ -249,6 +251,7 @@ namespace KeyEdit
             Scripting.AudioFXAPI audioAPI = new KeyEdit.Scripting.AudioFXAPI();
             Scripting.AnimationAPI animationAPI = new KeyEdit.Scripting.AnimationAPI();
             AppMain.mScriptingHost  = new Scripting.ScriptingHost(databaseAPI,
+                                                                  timingAPI,
                                                                   gameAPI,
                                                                   graphicsAPI,
                                                                   entityAPI, 
@@ -391,9 +394,9 @@ static int mTimerStartPeriod;
             	// TODO: I think i need seperate .AccurateTimeElapsed for each viewport and accumulate the results?
             	// http://www.truevision3d.com/forums/tv3d_sdk_65/accumlative_accuratetimeelapsed-t20127.0.html
             	// TODO: using stopWatch helps but the elapsedTime seems to be running faster than it should.  No idea why
-            	double elapsedSeconds = stopWatch.ElapsedMilliseconds / 1000d; // _core.Engine.AccurateTimeElapsed() / 1000d;
-            	stopWatch.Reset();
-                stopWatch.Start();
+            	double elapsedSeconds = _core.Engine.AccurateTimeElapsed() / 1000d; // stopWatch.Elapsed.TotalSeconds; // TotalSeconds works as long as we call stopWatch.Restart() each iteration
+            	stopWatch.Restart();
+                
                         
             	if (_form.IsHandleCreated)
                 {
@@ -421,7 +424,7 @@ static int mTimerStartPeriod;
                         continue;
                     }
 
-                    // june.13.2013 - MPJ - TODO: CheckInput() and loopback and netclient
+                    // june.13.2013 - MPJ - TODO: CheckInput() and loopback and mKeyEditInternetClient
                     //                        perhaps should be moved to AppIdle main gui thread
                     //                        since it wont affect threadpool threads from running in background
                     //                        and ProcessCompletedCOmmandQueue should be moved here instead

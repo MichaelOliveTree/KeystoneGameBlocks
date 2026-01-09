@@ -71,7 +71,7 @@ namespace Keystone.Timers
             _disposed = true;
         }
 
-        public void finalize()
+        public void Finalize()
         {
             if (!_disposed) Dispose();
         }

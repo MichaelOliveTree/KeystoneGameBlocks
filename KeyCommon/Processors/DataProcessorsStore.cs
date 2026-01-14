@@ -17,11 +17,23 @@ namespace KeyCommon.Processors
         /// memories[0] = intMemory.AsMemory().Cast<object>(); // Explicit cast needed
         /// memories[1] = stringMemory.AsMemory().Cast<object>();
         ///
+        /// To avoid the problem, we do not use Memory<object> but only structs that represents
+        /// such as Transform.Transform_Struct  or Transform.RigidBody_Struct, etc.
         /// </summary>
         
         // movement {steering, newtonian movement, interpolation animations, collisions}
+        // sound, morale boosts (from the Captain himself for instance if nearby), 
+        // energy, damage of various kinds, etc.
         public delegate void Processor<T>(ComponentStore<T> store, object parameters, int seed, GameTime gt);
         
+        // TODO: there are some types of data processing where an Entity is always added... such as 
+        //       currently when movement/flocking is computed because a "STEER" acceleration/force PRODUCTION
+        //       is required every frame.
+        //       HOWEVER, there are plenty of cases where an Entity would only be added if production was
+        //       occuring such as a CHAIR producing +morale or -fatigue or +health but only when an
+        //       OPERATOR was USING it.  
+
+
         private Keystone.Scene.Scene mScene; 
         private ComponentStore<T>[] mStores;
         

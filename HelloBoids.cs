@@ -11,7 +11,7 @@ using System.Runtime.InteropServices;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-
+using System.Runtime.Intrinsics; // for SIMD enabled code
 
 // NOTE: The primary purpose of this is to demonstrate the use of Memory<T>
 //to increase performance by updating Entities using a data processing model
@@ -122,6 +122,34 @@ namespace HelloBoids
 		// simulation updates
 		private static void GameLoop()
 		{
+						
+			// By the way, this is what Media Molecule does in Dreams. The Trackmania racing games do this as well, to verify runs and make sure people aren’t cheating. Even their 3d physics engine is fully deterministic! very cool stuff.
+
+			//	Notes:
+
+			//  You need to make sure entities are always updated in the same order. This means deterministic O(1) datastructures like pools are your friend.
+			// If you use random numbers then you need to make sure the seeds match at the start of every tick as well. You can probably get by storing only one seed along with the first
+			// The stored replay gets invalidated once you change your gameplay logic, so this method is generally useful for debugging only.
+	
+			//https://jakubtomsu.github.io/posts/fixed_timestep_without_interpolation/ < -- i cant easily do a memcpy to copy the gamestate like this.... storing animation states for us is much more difficult.
+			//                                                                              well, perhaps we only just need to copy the previous animation's "weight"
+			// https://www.rfleury.com/p/main-loops-refresh-rates-and-determinism
+			// 1 - simulaton thread - outputs state
+			// 2 - user thread (drawing here including animation updating)
+			// 3 - input gathering thread
+			
+			// https://www.youtube.com/watch?v=fdAOPHgW7qM <-- frame rate independance for animation... render tick method?
+		
+			// https://www.youtube.com/watch?v=72y2EC5fkcE
+			// TODO: deterministic
+			//       fixed step
+			//       - track each frame 'long currentFrame'
+			//       
+			//       ability to "step" play backwards and forwards
+			//       animation state decoupling for interpolation
+			//  ___________________________________________________
+			//  TODO: Procedural Generation Focus
+			//        - seeds and determinism and such
 			
 			/*
 			Stopwatch stopwatch = Stopwatch.StartNew();
@@ -219,7 +247,11 @@ namespace HelloBoids
             CodeProfiler.Register("Add Model To PVS", cullingCategory);	
             */
 
-
+            
+            IntervalTimers intervals = new IntervalTimers();
+            intervals.Register("HelloBoids", "spawn", 0.1d);
+            
+            
             BoidSimulation bSim = new BoidSimulation((int)NUM_ENTRIES, WIDTH, HEIGHT, useOctree);
             // Note: the larger the various distance values below,
             // the more cpu cycles needed. Tweak these values
@@ -314,40 +346,13 @@ namespace HelloBoids
 #if USE_MEMORY_T == false
             // TEST CLASSES
             // =====================
-
             stopWatch.Start();
-			
-			// By the way, this is what Media Molecule does in Dreams. The Trackmania racing games do this as well, to verify runs and make sure people aren’t cheating. Even their 3d physics engine is fully deterministic! very cool stuff.
 
-			//	Notes:
-
-			//  You need to make sure entities are always updated in the same order. This means deterministic O(1) datastructures like pools are your friend.
-			// If you use random numbers then you need to make sure the seeds match at the start of every tick as well. You can probably get by storing only one seed along with the first
-			// The stored replay gets invalidated once you change your gameplay logic, so this method is generally useful for debugging only.
-	
-			//https://jakubtomsu.github.io/posts/fixed_timestep_without_interpolation/ < -- i cant easily do a memcpy to copy the gamestate like this.... storing animation states for us is much more difficult.
-			//                                                                              well, perhaps we only just need to copy the previous animation's "weight"
-			// https://www.rfleury.com/p/main-loops-refresh-rates-and-determinism
-			// 1 - simulaton thread - outputs state
-			// 2 - user thread (drawing here including animation updating)
-			// 3 - input gathering thread
-			
-			// https://www.youtube.com/watch?v=fdAOPHgW7qM <-- frame rate independance for animation... render tick method?
-		
-			// https://www.youtube.com/watch?v=72y2EC5fkcE
-			// TODO: deterministic
-			//       fixed step
-			//       - track each frame 'long currentFrame'
-			//       
-			//       ability to "step" play backwards and forwards
-			//       animation state decoupling for interpolation
-			//  ___________________________________________________
-			//  TODO: Procedural Generation Focus
-			//        - seeds and determinism and such
 			
             for (int i = 0; i < NUM_ITERATIONS; i++)
                 using (EntryClass.CodeProfiler.HookUp("Process"))
                 {
+					intervals.Update(step);
                     bSim.Update(step, bSim.Boids, bSim.SeparationDistance, bSim.SeparationFactor, bSim.AlignmentDistance, bSim.AlignmentFactor, bSim.CohesionDistance, bSim.CohesionFactor, bSim.MaxSpeed, bSim.TurnFactor);
                 	mCurrentFrame++;
 				}
@@ -379,6 +384,7 @@ namespace HelloBoids
             for (int i = 0; i < NUM_ITERATIONS; i++)
                 using (EntryClass.CodeProfiler.HookUp("Process"))
                 {
+					intervals.Update(step);
                     //bSim.ProcessStep(step, NUM_ENTRIES, BoidSimulation.Store, bSim.SeparationDistance, bSim.SeparationFactor, bSim.AlignmentDistance, bSim.AlignmentFactor, bSim.CohesionDistance, bSim.CohesionFactor, bSim.MaxSpeed, bSim.TurnFactor);
                     bSim.ProcessStep(step, NUM_ENTRIES, bSim.SeparationDistance, bSim.SeparationFactor, bSim.AlignmentDistance, bSim.AlignmentFactor, bSim.CohesionDistance, bSim.CohesionFactor, bSim.MaxSpeed, bSim.TurnFactor);
 					mCurrentFrame++;
@@ -2621,7 +2627,11 @@ namespace HelloBoids
 		//        - these Systems also CONSUME from "Stores"... how do we assign Stores and make them available to something like a "City?"
 		// 2) Stores - food, supplies, medicines, clothing, energy
 		// 3) Do we need to support rendering Proxies here (2D and 3D?)
+		public struct UpdateContext
+		{
+            // see SelectionNode or Elements.SwitchNode for help
 
+		}
 
 		public int Seed {get;}
 		public int EntityCount{get;}
@@ -2641,42 +2651,178 @@ namespace HelloBoids
 		public IProcGeneratedItem GetItem (int index);
 		public IProcGeneratedItem GetItem (string guid, int seed);
 		
-		public void Update(double elapsedSeconds);
+		public void Update(double elapsedSeconds, IEntitySystem.UpdateContext context);
 		public void Read();
 		public void Write();
 	}
 
-	public class Population : EntityNode, IEntitySystem
+	
+
+	public abstract class EntitySystemBase : EntityNode, IEntitySystem
 	{
-		private delegate IProcGeneratedItem CreateEntityHandler(int seed, string path);
-		private delegate void GenerateSystemHandler (int seed);
-		private string mPath;
-		private int mMaxEntityCount; 
-		private bool mMultithreadingEnabled;
+		public delegate IProcGeneratedItem CreateEntityHandler(int seed, string path);
+		public delegate void GenerateSystemHandler (int seed);
+		public delegate void UpdateHandler (double elapsedSeconds, IEntitySystem.UpdateContext context);
 		
-		private int mSeed;
+		// private variables
+		protected string mPath;
+		protected int mMaxEntityCount; 
+		protected bool mMultithreadingEnabled;
+		
+		protected int mTickID; // incremented everytime Update() is called.  NOTE: Update() is not necessarily called once per frame.
+		protected int mSeed;
+
+		protected UpdateHandler[] mUpdateHandlers;
+
+		// properties
+		public int Seed {get {return mSeed;}}
+		public int TickID {get {return mTickID;}}
+		public int EntityCount {get {return 0; }}
+		public bool MultithreadingEnabled {get {return mMultithreadingEnabled;} set {mMultithreadingEnabled = value;}}
+		
+		public int MaxEntityCount {get; set;}
+
+		
+		protected EntitySystemBase (string id)  :base(id) 
+		{
+		}
+		
+		public virtual void Update (double elapsedSeconds, IEntitySystem.UpdateContext context)
+		{
+			// select from mUpdateHandlers based on context... its essentially like update LOD where the
+			// update simulation can be simpler when this IEntitySystem is far away or has no players near it...
+		}
+		
+		public virtual void GenerateSystem()
+		{
+		}
+		// todo: need delegates for handling the Generate()
+		// todo: need delegate for Create() of single IProcGeneratedItem
+
+
+		// libnoise uses this to find a value on a texture
+		public virtual object GetValue(double x, double y, double z)
+		{
+			return null;
+		}
+		
+		public virtual IProcGeneratedItem GetItem (string address)
+		{
+			return  null;
+		}
+		public virtual IProcGeneratedItem GetItem (int index)
+		{
+			return null;
+		}
+		
+		public virtual IProcGeneratedItem GetItem (string guid, int seed)
+		{
+			return null;
+		}
+
+		public virtual void Read()
+		{
+		}
+		
+		public virtual void Write()
+		{
+		}
+		
+	}
+
+	public class City : EntitySystemBase 
+	{
+
+		// City specific structs
+		private struct Terrain
+		{
+			public bool Mountainous;
+			public bool Landlocked;
+			//public Resource[] Resources;			
+		}
+
+		private struct Environment
+		{
+			public float Pollution; // coefficient
+			public float WildLife; // diversity coefficient 
+			
+		}
+
+		
+		private struct Government
+		{
+			public int Type;  // 
+			
+		}
+
+		private struct Infrastructure
+		{
+			public bool Highways;
+			public bool SeaPorts;
+			public bool Airport;
+			public bool Railroads;
+			public int HousingUnits;
+			
+		}
+
+		private struct Economy
+		{
+			public int Credits;
+			//public Store[] Stores;
+			//public Resources[] ResourcesRealized;
+			//public Resources[] ResourcesUnrealized;
+			//public Product[] Commodities;
+			
+		}		
+
+		/*Factories_Light; // produce finished goods
+		Factories_Medium;
+		Factories_Heavy; 
+		Factories_SuperHeavy;
+		PowerPlants;
+		Mines;
+		Farms;
+		Fisheries;
+		
+		Universities;
+		Academies;
+        */
+		
+
+		// City specific variables
+		private int mOwnerID; // eg FactionID
+		private Economy mEconomy;
+		private Queue<EntityNode> mBuildQueue;
+
+		private City[] mConnections; // migration, tourism,  trade
+
+
+		public City (string guid) : base(guid)
+		{
+		}	
+		
+
+	}
+
+	public class Population : EntitySystemBase 
+	{
 		
 		public Population (string guid) : base(guid)
 		{
 		}
 		
-		public int Seed {get {return mSeed;}}
 		
-		public int MaxEntityCount {get {return mMaxEntityCount;} set {mMaxEntityCount = value;}}
-		public bool MultithreadingEnabled {get {return mMultithreadingEnabled;} set {mMultithreadingEnabled = value;}}
-		public int EntityCount {get {return 0;}}
-		
-		public IProcGeneratedItem GetItem (string address)
+		public override IProcGeneratedItem GetItem (string address)
 		{
 
 			return null;
 		}
 		
-		public object GetValue(double x, double y, double z)
+		public override object GetValue(double x, double y, double z)
 		{
 			throw new NotImplementedException();
 		}
-		public IProcGeneratedItem GetItem (int index)
+		public override IProcGeneratedItem GetItem (int index)
 		{
 			return null;
 		}
@@ -2686,7 +2832,7 @@ namespace HelloBoids
 		/// and a "changedState" save file that contains all changed data that is different from the
 		/// Entity that is initially created from the seed.
 		/// </summary>
-		public IProcGeneratedItem GetItem (string guid, int seed)
+		public override IProcGeneratedItem GetItem (string guid, int seed)
 		{
 			// todo: note the guid must always be assigned if it's being generated from a seed because
 			//       a GUID cannot be generated from a seed.  It is always going to be a new GUID if we call guid = System.Guid.NewGuid()
@@ -2702,7 +2848,7 @@ namespace HelloBoids
 		//	return null;
 		//}
 
-		public void GenerateSystem()
+		public override void GenerateSystem()
 		{
 		}
 		
@@ -2712,18 +2858,6 @@ namespace HelloBoids
 
         }
 		
-		public virtual void Update(double elapsedSeconds)
-		{
-
-		}
-		
-		public virtual void Read()
-		{
-		}
-		
-		public virtual void Write()
-		{
-		}
 	}
 	
 
@@ -2733,7 +2867,7 @@ namespace HelloBoids
 		{
 		}
 		
-        public override void Update(double elapsedSeconds)
+        public override void Update(double elapsedSeconds, IEntitySystem.UpdateContext context)
         {
 
         }
@@ -8688,7 +8822,7 @@ namespace HelloBoids
             // milliseconds
             public double Duration; // the duration in Seconds this Period will last before completed ("IsReady")
             public double Elapsed;  // get's incremented each frame by elapsedSeconds and compared against Duration
-            public bool Repeating;
+            public bool Repeating;  // todo: im not sure this is useful because if we find that a TimePeriod has elapsed, then the next Elapsed may need to have the remainder added to it if we're just going to automatically repeat and not wait for a handler to process the current elapsed Interval and then start the next Interval if it wants to...
             public int RepeatCount;
             public int RepeatsRemaining;
             private bool mIsActive;
@@ -8724,7 +8858,7 @@ namespace HelloBoids
         
 
         
-        public void Register(string nodeID, string name, int durationInSeconds,  bool activateImmediately = true, bool repeating = false, int repeatCount = 0)
+        public void Register(string nodeID, string name, double durationInSeconds,  bool activateImmediately = true, bool repeating = false, int repeatCount = 0)
         {
             TimePeriod tp = new TimePeriod();
 			

@@ -14,17 +14,17 @@ namespace Keystone.Resource
     // UPDATE
     // I may be going back against what I originally intended in the "OLD" description.
     // This Repository is for all scene nodes that are being managed by KeyStone. 
-    // RefCounting is done on AddChild() or when the user does node.IncrementRefCount()
+    // RefCounting is done on node.AddChild() or when the user does node.IncrementRefCount() hete.
     //
-    // Thus RemoveChild() will result in node.DecrementRefCount() 
+    // Thus node.RemoveChild() will result in node.DecrementRefCount() here.
     // When the refcount hits 0, on that event, the node is removed from the Repository.
-    // NOTE: When a node is created, its added to the repository but its ref count = 0.  It does
-    // not get deleted because deletes occur on the Derefcount event and when the resulting count  = 0.
+    // NOTE: When a node is created, its added to the repository but its ref count = 0 until its added to a node that is already connevted to the scene.   It does
+    // not get deleted because deletes occur on the DecrementRefcount event and when the resulting count  = 0. 
     // This event clearly doesnt trigger on object creation.
     //
     // Users cannot manually delete objects.  They can RemoveChild() or explicilty Decrement the ref count and if that hits 0
     // will result in Remove() from the cache which will expliciltiy call Dispose() on that object and any unmanaged TV resource
-    // will get destroyed there e.g. mesh.Destroy()  , particle.Destroy() , particle.DestroyEmitter(), light.Destroy(), textureFactory.DeleteTexture()... etc
+    // will get destroyed there e.g. mesh.Destroy()  , particle.Destroy() , particle.DestroyEmitter(), light.Destroy(), textureFactory.DeleteTexture()... etc Note: to destroy a node thst is createf bur never connected to a scene, call IncrementRefCount to raise it's refcount to 1, then immediatly call DecrementRefcount to set it bsck to 0 which will trigger destroy code path.
     // 
     // So, Repository does NOT represent objects in the scene per se, it represents all objects being
     // managed by KeyStone.
@@ -117,9 +117,41 @@ namespace Keystone.Resource
 		}
     	
     	private static Synchronizer <string> mSychronizer = new Synchronizer<string> ();
-    	
         internal static ConcurrentDictionary<string, IResource> mCache = new ConcurrentDictionary<string, IResource>();
-//		internal static Entities.Entity mRecentEntity;
+//		internal static Entities.Entity mRecentEntity;  
+        private static KeyCommon.Data.UserDataStore mUserDataStore = new KeyCommon.Data.UserDataStore();
+        
+        // Note:Because Keystone.dll will know nothing about user types , the processor methods as well as gettors trying to casr usee types in the usetdata, should be in game01.dll
+        // hosts intrinsic or user defined components stores
+        private static KeyCommon.Data.ComponentStoreCollection mStoresCollection = new KeyCommon.Data.UserDataStore();
+        private static KeyCommon.Processors.DataProcessors mIntrinsicProcessors = new KeyCommon.Processors.DataProcessors();
+        private static KeyCommon.Processors.DataProcessors mRulesProcessors = new KeyCommon.Processors.DataProcessors();
+        
+
+
+
+        public static StoresCollection 
+		{
+			get {return mStoresCollection;}
+		}
+        
+        public static DataProcessors IntrinsicProcessors 
+		{ 
+			get {return mIntrinsicProcessors;}
+		}
+        
+        // user rules procesdor methods should reside in game##.dll  because the user types in the ComponentStores will only be kmown to it, the exe, and the scripts. Even if we dynamically loaded the user types into keystone.dll, the processing methods would again, exist in gsme##.dll, tye exe, or the scripts.  
+        // in fact, i think we should enforce that the processibg scripts exist in gsme##.dll and not an entity script as the timingbof script loading for entities isnt reliable.
+        
+        public static DataProcessors RulesProcessors 
+		{ 
+			get { return mUserRulesProcessors;}
+		}
+        
+        public static UserDataStore UserDataStore 
+		{ 
+			get {return mUserDataStore;} 
+		}
 		
         internal static IResource[] Items
         {
@@ -655,6 +687,39 @@ namespace Keystone.Resource
 		                        quats[1] = new Keystone.Types.Quaternion();
 		                        node.SetProperty ("keyframes" , typeof (Keystone.Types.Quaternion), quats);
 		                        break;
+		                 case "KeyframeInterpolator_Material_specular_power":
+		                    // interpolator needs minimum 2 keyframes otherwise delete the interpolator animation clip
+		                        float[] power = new float[2];
+		                        power[0] = 0f;
+		                        power[1] = 0f;
+		                        node.SetProperty ("keyframes" , typeof (float), power);
+		                        break;
+		                  case "KeyframeInterpolator_Material_opacity":
+		                     // interpolator needs minimum 2 keyframes otherwise delete the interpolator animation clip
+		                        Keystone.Types.Vector3d[] scale = new Keystone.Types.Vector3d[2];
+		                        scale[0] = Keystone.Types.Vector3d.Zero();
+		                        scale[1] = Keystone.Types.Vector3d.Zero();
+		                        node.SetProperty ("keyframes" , typeof (Keystone.Types.Vector3d), scale);
+		                        break;
+		                    case "KeyframeInterpolator_Light_diffuse":
+		                       // interpolator needs minimum 2 keyframes otherwise delete the interpolator animation clip
+		                        Keystone.Types.Vector3d[] scale = new Keystone.Types.Vector3d[2];
+		                        scale[0] = Keystone.Types.Vector3d.Zero();
+		                        scale[1] = Keystone.Types.Vector3d.Zero();
+		                        node.SetProperty ("keyframes" , typeof (Keystone.Types.Vector3d), scale);
+		                        break;
+		                    case
+		                   ambient
+		                   Emissive
+		                   Specular
+		                   "KeyframeInterpolator_Material_diffuse":
+		                   ...TODO
+		                       // interpolator needs minimum 2 keyframes otherwise delete the interpolator animation clip
+		                        Keystone.Types.Color[] color = new Keystone.Types.Color[2];
+		                        color[0] = Keystone.Types.Color.Black();
+		                      color[1] = Keystone.Types.Color.Black();
+		                        node.SetProperty ("keyframes" , typeof (Keystone.Types.Color), color);
+		                        break;
 		                    case "KeyframeInterpolator_translation":
 		                        node = new Animation.KeyframeInterpolator<Keystone.Types.Vector3d>(id, "translation");
 		                        // interpolator needs minimum 2 keyframes otherwise delete the interpolator animation clip
@@ -690,6 +755,19 @@ namespace Keystone.Resource
 		                }
 		            }
 		
+		
+		            // When an Entity is CREATED (regardless of whether it's yet added to the Scene)
+		            // assign IntrinsicDataStores to the Entity.
+		            // NOTE: these resources are reclaimed here in Repository.DecrementRef() when the Entity is DISPOSED
+		            if (node is Entity)
+		            {
+		                RentMemoryStores(node as Entity);
+		            }
+		            
+		        
+            
+            
+		
 		            System.Diagnostics.Debug.Assert (node.ID == id, "Repository.Create() - IDs MUST MATCH."); //verify no funky unsafe issue with id assignment
 		            System.Diagnostics.Debug.Assert (mCache.ContainsKey (id), "Repository.Create() - ID should now exist in Repository Cache after Create() call.");
 		            // TODO: above assert somehow is failing.  Is it possible somehow that inbetween the node being added to the repository it is then being removed?
@@ -710,6 +788,32 @@ namespace Keystone.Resource
         	}
         }
 
+        private void RentMemoryStores(Entity e)
+        {
+            int DEFAULT_STORE_SIZE = 1024;
+            
+            KeyCommon.Data.UserData data = mUserDataStore.CheckOut();
+            
+            ComponentStore<Keystone.Data.IntrinsicDataStores.AdvancedEntityData> store = 
+              mStoresCollection.CheckOut<Keystone.Data.IntrinsicDataStores.AdvancedEntityData>(DEFAULT_STORE_SIZE);
+              
+            // grab an available memory record and assign it to the entity
+            System.Memory.Memory<Keystone.Data.IntrinsicDataStores.AdvancedEntityData> mem = store.CheckOut();
+            e.IntrinsicData = mem;
+            e.BlackboardData = data;
+        }
+        
+        private void ReclaimMemoryStores (Entity e)
+        {
+              // Reclaim the intrinsic data storage and UserData objects
+              mUserDataStore.CheckIn (e.BlackboardData, e.ID);
+              e.BlackboardData = null;
+              
+              // todo: we are just checking in the single Memory<T> record of this entity within
+              ////       a ComponentStore of type <Keystone.Data.IntrinsicDataStores.AdvancedEntityData>
+              mStoresCollection.CheckIn<Keystone.Data.IntrinsicDataStores.AdvancedEntityData>(e.IntrinsicData);
+              e.IntrinsicData = null;
+        }
         
         public static void IncrementRef(IResource child)
         {
@@ -780,6 +884,10 @@ namespace Keystone.Resource
 
                         if (node.RefCount == 0)
 		                {
+		                    if (node is Entity)
+		                    {
+		                        ReclaimMemoryStores(node as Entity)
+		                    }
 		                    //if (node is Celestial.World)
 		                        // TODO: i think if our script is running after having just loaded
 		                        // a celled region with assetplacement tool and then we place an instance

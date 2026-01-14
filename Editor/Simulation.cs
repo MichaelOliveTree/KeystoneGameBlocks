@@ -56,7 +56,7 @@ namespace KeyEdit
 
         private Keystone.Simulation.Missions.Mission mCurrentMission;
 
-        private GameTime mGameTime;
+        private Timers.GameTime mGameTime;
         
         // phsyics timing vars
         private const int MAX_STEPS = 20; // TODO: with timeScaling, this value must increase if we don't want to lose precision/stability of orbits
@@ -141,7 +141,7 @@ namespace KeyEdit
         /// </summary>
         public Keystone.Simulation.Missions.Mission CurrentMission { get { return mCurrentMission; } set { mCurrentMission = value; } }
 
-        public Keystone.Simulation.GameTime GameTime {get {return mGameTime;}}
+        public Keystone.Timers.GameTime GameTime {get {return mGameTime;}}
         
         public uint PhysicsHertzInTimesPerSecond
         {
@@ -698,7 +698,7 @@ namespace KeyEdit
         //             Steer.Wander and Collision detection
         // NOTE: parallelism should occur within the processing of the Memory<T> structs with the
         //       assigned Data/Rule Processor.  
-          mIntrinsicProcessors.Update(mScene, mScene.ActiveEntities, gameTime);
+          Repository.IntrinsicProcessors.Update(mScene, mScene.ActiveEntities, gameTime);
           
           // TODO: create intrinsic structs to store
           // enum IntrinsicDataTypes
@@ -713,13 +713,13 @@ namespace KeyEdit
             //       for near term, lets just store a fixed byte[] field in our Memory<T> representing the 
             //       GUID id of every entity.
           
-          mRulesProcessors.Update(mScene, mScene.ActiveEntities, gameTime);
+          Repository.IntrinsicProcessors.RulesProcessors.Update(mScene, mScene.ActiveEntities, gameTime);
           
           // Updates to Game Logic including newly added high performance updates to MemoryStores. August.15.2025
           // todo: August.21.2025 - I don't think we need a mGame.Update() because Game01.dll for example is
           // just a library and mostly only contains rules and gameObjects.
           // But we perform the actual processing here in the EXE
-          mGame.Update(mGameTime.ElapsedSeconds);
+          mGame.Update(mGameTime.ElapsedSeconds); // <-- NOTE: THis is mGame NOT mGameTIME
 
 
           mScene.FinalizeEntityMovement(gameTime.Ticks);

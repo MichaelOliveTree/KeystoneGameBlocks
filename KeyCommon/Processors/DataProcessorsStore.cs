@@ -79,6 +79,8 @@ namespace KeyCommon.Processors
             
         }
         
+        
+
         public void Update(Scene scene, Entities[] entities, GameTime gt)
         {
             for (int i = 0; i < mProcessors.Count; i++)
@@ -102,7 +104,7 @@ namespace KeyCommon.Processors
             }
         }
         
-        private Memory<T> GetStore(string key)
+        private Memory<T> GetComponentStore(string key)
         {
             // TODO: temporary switch to find the correct DataStore containing our Memory<T>
             switch (key)
@@ -185,6 +187,9 @@ namespace KeyCommon.Processors
                 // is doing.  Is it mearly checking to see what other emission productions are being detected
                 // so it can then pass that info over to the contacts list of the sensor
             
+                // TODO: the handler has to have access to the entire span in order to have the actual
+                //       memory values within the span updated.  Grabbing just the current struct and passing 
+                //       that to a handler obviously wont work.
                 handler(currentStruct); // handler(memory.Span[i]);
                 
                 System.Diagnostics.Debug.WriteLine($"Value1: {currentStruct.Value1}, Value2: {currentStruct.Value2}");

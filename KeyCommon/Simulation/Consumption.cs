@@ -19,7 +19,9 @@ namespace KeyCommon.Simulation
         Remove,     // typically for removing an array element
         Union,      // merge two arrays with no duplicates
         Increment,  // for numeric propertyspec values to add the propertySpec value to the existing value within the Entity
-        Decrement
+        Decrement,
+        Additive_Multiply,
+        Additive_Divide
     }
 
     // consumption is more charged with the algorithm for computing how much consumption

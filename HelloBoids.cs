@@ -5,7 +5,7 @@
 
 using System.Diagnostics;
 using System;
-//using System.Memory;
+//using System.Memory;   // not needed for online compilers running latest .net version
 using System.Reflection; // used for "MethodBase" type in Profiler
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
@@ -23,7 +23,7 @@ using System.Runtime.Intrinsics; // for SIMD enabled code
 //of it.
 namespace HelloBoids
 {
-	// https://vscode.dev/github/MichaelOliveTree/KeystoneGameBlocks
+    // https://vscode.dev/github/MichaelOliveTree/KeystoneGameBlocks
     public class EntryClass
     {
         public static HelloBoids.ComponentStoreCollection mCStoreCol = new HelloBoids.ComponentStoreCollection();
@@ -31,173 +31,47 @@ namespace HelloBoids
         public static uint NUM_ITERATIONS = 200;
         public static double WIDTH = 800d;
         public static double HEIGHT = 600d;
-
+        private static string MODE;
+        private static bool useOctree = true;
+        public static double MAX_RUNTIME_SECONDS = 0.5d;
+        public static double step;
+        public static long mCurrentFrame;
         public static Profiler CodeProfiler;
+        public static string output;
+        public static BoidSimulation bSim;
 
         //private static object mTestSpan;
         // private Span<T> mTest;
-		private static bool mIsRunning;
-		private static object mSyncLock;
-		
+        private static bool mIsRunning;
+        private static object mGameThreadLockObject = new object();
+        private static object mSyncLock;
+
         public static void Main()
         {
-			mSyncLock = new object();
-			mIsRunning = true;
-			
-			System.Threading.Thread renderThread = new System.Threading.Thread(RenderLoop);
-			Console.WriteLine("Render thread created.");
-			
-			System.Threading.Thread animationThread = new System.Threading.Thread(AnimationLoop);
-			Console.WriteLine("Animation thread created.");
-			
-            System.Threading.Thread gameThread = new System.Threading.Thread(GameLoop);
-			Console.WriteLine("Game loop thread created.");
-			string output = "____________________________________________";
-            Console.WriteLine(output);
-            Debug.WriteLine(output);
-			
-        	// Set as background so the application can exit when the main thread ends
-			// TODO: this may not be necessary if I just set the exit condition to the known
-			// number of iterations that will be performed so the sentinel "mIsRunning" can be
-			// set to = false;
-        	gameThread.IsBackground = true; 
-        	gameThread.Start();
-			
-			// LOOP USING CLASSES
-			Console.WriteLine("");
-			Console.WriteLine("Class Performance Test started in a separate thread.");
-			Console.WriteLine ("");
-			
-			// The main thread waits for user input to stop the application
-			while (true)
-			{
-				if (Console.ReadKey(true).Key == ConsoleKey.Q)
-				{
-					lock (mSyncLock)
-					{
-						mIsRunning = false;
-					}
-					break; // Exit the main thread's loop
-				}
-			}
 
-			// Ensure the game thread has time to stop gracefully (optional for background threads)
-			gameThread.Join();
-			
-			Console.WriteLine("Class Performance Test completed.");
-			///////////////////////////////////////////////////////////////////////////////////////////////
-			
-			
-			// LOOP USING MEMORY<T>
-			gameThread = new System.Threading.Thread(GameLoop);
-        	// Set as background so the application can exit when the main thread ends
-			// TODO: this may not be necessary if I just set the exit condition to the known
-			// number of iterations that will be performed so the sentinel "mIsRunning" can be
-			// set to = false;
-        	gameThread.IsBackground = true; 
-        	gameThread.Start();
-			
-			Console.WriteLine("Memory<T> Performance Test started in a separate thread.");
-			Console.WriteLine ("");
-			
-			// The main thread waits for user input to stop the application
-			while (true)
-			{
-				if (Console.ReadKey(true).Key == ConsoleKey.Q)
-				{
-					lock (mSyncLock)
-					{
-						mIsRunning = false;
-					}
-					break; // Exit the main thread's loop
-				}
-			}
+            mSyncLock = new object();
 
-			gameThread.Join();
-			
-			Console.WriteLine("Memory<T> Performance Test completed.");
-		}
-
-	
-		// simulation updates
-		private static void GameLoop()
-		{
-						
-			// By the way, this is what Media Molecule does in Dreams. The Trackmania racing games do this as well, to verify runs and make sure people aren’t cheating. Even their 3d physics engine is fully deterministic! very cool stuff.
-
-			//	Notes:
-
-			//  You need to make sure entities are always updated in the same order. This means deterministic O(1) datastructures like pools are your friend.
-			// If you use random numbers then you need to make sure the seeds match at the start of every tick as well. You can probably get by storing only one seed along with the first
-			// The stored replay gets invalidated once you change your gameplay logic, so this method is generally useful for debugging only.
-	
-			//https://jakubtomsu.github.io/posts/fixed_timestep_without_interpolation/ < -- i cant easily do a memcpy to copy the gamestate like this.... storing animation states for us is much more difficult.
-			//                                                                              well, perhaps we only just need to copy the previous animation's "weight"
-			// https://www.rfleury.com/p/main-loops-refresh-rates-and-determinism
-			// 1 - simulaton thread - outputs state
-			// 2 - user thread (drawing here including animation updating)
-			// 3 - input gathering thread
-			
-			// https://www.youtube.com/watch?v=fdAOPHgW7qM <-- frame rate independance for animation... render tick method?
-		
-			// https://www.youtube.com/watch?v=72y2EC5fkcE
-			// TODO: deterministic
-			//       fixed step
-			//       - track each frame 'long currentFrame'
-			//       
-			//       ability to "step" play backwards and forwards
-			//       animation state decoupling for interpolation
-			//  ___________________________________________________
-			//  TODO: Procedural Generation Focus
-			//        - seeds and determinism and such
-			
-			/*
-			Stopwatch stopwatch = Stopwatch.StartNew();
-			double lastTime = stopwatch.Elapsed.TotalMilliseconds;
-
-			while (true)
-			{
-				bool runningStatus;
-				lock (_lockObject)
-				{
-					runningStatus = _isRunning;
-				}
-
-				if (!runningStatus)
-					break; // Exit the game loop
-
-				// Calculate delta time (time since last frame)
-				double currentTime = stopwatch.Elapsed.TotalMilliseconds;
-				double deltaTime = currentTime - lastTime;
-				lastTime = currentTime;
-
-				// Update and Render operations
-				Update(deltaTime);
-				Render();
-
-				// Simple throttling to prevent maxing out the CPU (adjust as needed)
-				Thread.Sleep(15); 
-			}
-			*/
-			
-			
-			
-			bool useOctree = false;
-            string MODE = "Memory<T>";
+            MODE = "Memory<T>";
             bool structs = false;
 
-			long mCurrentFrame = 0;
-			
-			double targetRateFramesPerSecond = 60d;
-			double step = 1d / targetRateFramesPerSecond; // aka dt or "deltaTime"
+#if USE_MEMORY_T == false
+            MODE = "Classes";
+#if USE_STRUCT
+            structs = true;
+#endif
+#endif
+#if SPATIAL_SEARCH
+            useOctree = true;
+#endif
+
+            double targetRateFramesPerSecond = 60d;
+            step = 1d / targetRateFramesPerSecond; // aka dt or "deltaTime"
 
             // step == 1 results targetRateFramesPerSecond of 0.0333 seconds
             // 33.33 milliseconds per frame
 
-			
-#if SPATIAL_SEARCH
-            useOctree = true;
-#endif
+
+
             // how do we profile in other classes if the profiler is not static in Core?
             CodeProfiler = new Profiler();
             CodeProfiler.ProfilerEnabled = true;
@@ -247,12 +121,127 @@ namespace HelloBoids
             CodeProfiler.Register("Add Model To PVS", cullingCategory);	
             */
 
-            
-            IntervalTimers intervals = new IntervalTimers();
-            intervals.Register("HelloBoids", "spawn", 0.1d);
-            
-            
-            BoidSimulation bSim = new BoidSimulation((int)NUM_ENTRIES, WIDTH, HEIGHT, useOctree);
+
+
+            output = "Hello Boids - " + Utils.GetTimeString();
+            Console.WriteLine(output);
+            Debug.WriteLine(output);
+
+            output = "____________________________________________";
+            Console.WriteLine(output);
+            Debug.WriteLine(output);
+
+            output = "MODE = " + MODE;
+            Console.WriteLine(output);
+            Debug.WriteLine(output);
+
+            output = "USE OCTREE == " + useOctree.ToString();
+            Console.WriteLine(output);
+            Debug.WriteLine(output);
+
+            output = "USE STRUCTS INSTEAD OF CLASSES FOR Quaternion and Matrix == " + structs.ToString();
+            Console.WriteLine(output);
+            Debug.WriteLine(output);
+
+            output = "____________________________________________";
+            Console.WriteLine(output);
+            Debug.WriteLine(output);
+
+
+
+            System.Threading.Thread renderThread = new System.Threading.Thread(RenderLoop);
+            Console.WriteLine("Render thread created.");
+
+            System.Threading.Thread animationThread = new System.Threading.Thread(AnimationLoop);
+            Console.WriteLine("Animation thread created.");
+
+            System.Threading.Thread gameThread = new System.Threading.Thread(GameLoop);
+            Console.WriteLine("Game loop thread created.");
+            output = "____________________________________________";
+            Console.WriteLine(output);
+            Debug.WriteLine(output);
+
+
+            mIsRunning = true;
+
+
+            // Set as background so the application can exit when the main thread ends
+            // TODO: this may not be necessary if I just set the exit condition to the known
+            // number of iterations that will be performed so the sentinel "mIsRunning" can be
+            // set to = false;
+            gameThread.IsBackground = true;
+            gameThread.Start();
+
+
+            Console.WriteLine("");
+            Console.WriteLine("Performance Test #1 started in Game thread.");
+            Console.WriteLine("");
+
+            // The main thread waits for user input to stop the application
+            while (mIsRunning)
+            {
+                if (Console.ReadKey(true).Key == ConsoleKey.Q)
+                {
+                    lock (mSyncLock)
+                    {
+                        mIsRunning = false;
+                    }
+                    break; // Exit the main thread's loop
+                }
+            }
+
+            // Ensure the game thread has time to stop gracefully (optional for background threads)
+            gameThread.Join();
+
+            Console.WriteLine("Game Thread #1 completed.");
+            ///////////////////////////////////////////////////////////////////////////////////////////////
+
+
+            // LOOP USING MEMORY<T>
+            mCurrentFrame = 0;
+            mTotalRuntime = 0;
+            mIsRunning = true;
+
+            gameThread = new System.Threading.Thread(GameLoop);
+            // Set as background so the application can exit when the main thread ends
+            // TODO: this may not be necessary if I just set the exit condition to the known
+            // number of iterations that will be performed so the sentinel "mIsRunning" can be
+            // set to = false;
+            gameThread.IsBackground = true;
+            gameThread.Start();
+
+            Console.WriteLine("Performance Test #2 started in a Game thread.");
+            Console.WriteLine("");
+
+            // The main thread waits for user input to stop the application
+            while (mIsRunning)
+            {
+                if (Console.ReadKey(true).Key == ConsoleKey.Q)
+                {
+                    lock (mSyncLock)
+                    {
+                        mIsRunning = false;
+                    }
+                    break; // Exit the main thread's loop
+                }
+            }
+
+            gameThread.Join();
+
+
+            Console.WriteLine("Game Thread #2 completed.");
+
+
+            output = "Goodbye Boids! - " + Utils.GetTimeString();
+            Console.WriteLine(output);
+        }
+
+
+        // simulation updates
+        private static void GameLoop()
+        {
+
+            bSim = new BoidSimulation((int)NUM_ENTRIES, WIDTH, HEIGHT, useOctree);
             // Note: the larger the various distance values below,
             // the more cpu cycles needed. Tweak these values
             // to find a good balance between performance and
@@ -267,9 +256,11 @@ namespace HelloBoids
             bSim.TurnFactor = 0.1; // For boundary avoidance
 
 
-            CodeProfiler.StartLoop();
+            output = "PERFORMANCE TEST RUNNING - " + NUM_ENTRIES.ToString() + " boids @ " + NUM_ITERATIONS.ToString() + " iterations.";
+            Console.WriteLine(output);
+            Debug.WriteLine(output);
 
-            string output = "Hello Boids - " + Utils.GetTimeString();
+            output = "Please Wait...";
             Console.WriteLine(output);
             Debug.WriteLine(output);
 
@@ -277,33 +268,11 @@ namespace HelloBoids
             Console.WriteLine(output);
             Debug.WriteLine(output);
 
-
-#if USE_MEMORY_T == false
-            MODE = "Classes";
-#endif
-            output = "MODE = " + MODE;
-            Console.WriteLine(output);
-            Debug.WriteLine(output);
-
-            output = "USE OCTREE == " + (bSim.Octree != null).ToString();
-            Console.WriteLine(output);
-            Debug.WriteLine(output);
-
-#if USE_STRUCT
-            structs = true;
-#endif
-            output = "USE STRUCTS INSTEAD OF CLASSES FOR Quaternion and Matrix == " + structs.ToString();
-            Console.WriteLine(output);
-            Debug.WriteLine(output);
-
-            output = "____________________________________________";
-            Console.WriteLine(output);
-            Debug.WriteLine(output);
             output = "";
             Console.WriteLine(output);
             Debug.WriteLine(output);
 
-            Stopwatch stopWatch = new Stopwatch();
+
 
             // NOTE: the entire UserDataStore get's passed to our various "data processors."
             //mUserDataStore = new UserDataStore();
@@ -324,82 +293,84 @@ namespace HelloBoids
              p.Invoke(store, parameters, r);
              System.Diagnostics.Debug.WriteLine("WARM-UP - COMPLETED.");
              Console.WriteLine("WARM-UP - COMPLETED.");
-    */
-            output = "PERFORMANCE TEST RUNNING - " + NUM_ENTRIES.ToString() + " boids @ " + NUM_ITERATIONS.ToString() + " iterations.";
-            Console.WriteLine(output);
-            Debug.WriteLine(output);
-
-            output = "Please Wait...";
-            Console.WriteLine(output);
-            Debug.WriteLine(output);
-
-            output = "____________________________________________";
-            Console.WriteLine(output);
-            Debug.WriteLine(output);
-
-            output = "";
-            Console.WriteLine(output);
-            Debug.WriteLine(output);
+             */
 
 
+            // By the way, this is what Media Molecule does in Dreams. The Trackmania racing games do this as well, to verify runs and make sure people aren’t cheating. Even their 3d physics engine is fully deterministic! very cool stuff.
 
-#if USE_MEMORY_T == false
-            // TEST CLASSES
-            // =====================
-            stopWatch.Start();
+            //	Notes:
 
-			
-            for (int i = 0; i < NUM_ITERATIONS; i++)
-                using (EntryClass.CodeProfiler.HookUp("Process"))
+            //  You need to make sure entities are always updated in the same order. This means deterministic O(1) datastructures like pools are your friend.
+            // If you use random numbers then you need to make sure the seeds match at the start of every tick as well. You can probably get by storing only one seed along with the first
+            // The stored replay gets invalidated once you change your gameplay logic, so this method is generally useful for debugging only.
+
+            //https://jakubtomsu.github.io/posts/fixed_timestep_without_interpolation/ < -- i cant easily do a memcpy to copy the gamestate like this.... storing animation states for us is much more difficult.
+            //                                                                              well, perhaps we only just need to copy the previous animation's "weight"
+            // https://www.rfleury.com/p/main-loops-refresh-rates-and-determinism
+            // 1 - simulaton thread - outputs state
+            // 2 - user thread (drawing here including animation updating)
+            // 3 - input gathering thread
+
+            // https://www.youtube.com/watch?v=fdAOPHgW7qM <-- frame rate independance for animation... render tick method?
+
+            // https://www.youtube.com/watch?v=72y2EC5fkcE
+            // TODO: deterministic
+            //       fixed step
+            //       - track each frame 'long currentFrame'
+            //       
+            //       ability to "step" play backwards and forwards
+            //       animation state decoupling for interpolation
+            //  ___________________________________________________
+            //  TODO: Procedural Generation Focus
+            //        - seeds and determinism and such
+
+            CodeProfiler.StartLoop();
+            Stopwatch sw = Stopwatch.StartNew();
+            double lastTime = sw.Elapsed.TotalSeconds;
+
+            while (true)
+            {
+                bool runningStatus;
+                lock (mGameThreadLockObject)
                 {
-					intervals.Update(step);
-                    bSim.Update(step, bSim.Boids, bSim.SeparationDistance, bSim.SeparationFactor, bSim.AlignmentDistance, bSim.AlignmentFactor, bSim.CohesionDistance, bSim.CohesionFactor, bSim.MaxSpeed, bSim.TurnFactor);
-                	mCurrentFrame++;
-				}
+                    runningStatus = mIsRunning;
+                }
 
-            stopWatch.Stop();
+                if (!runningStatus)
+                    break; // Exit the game loop
 
-            TimeSpan timeSpan = stopWatch.Elapsed;
+                // Calculate delta time (time since last frame)
+                double currentTime = sw.Elapsed.TotalSeconds;
+                double elapsedSeconds = currentTime - lastTime;
+                elapsedSeconds = step;
+                lastTime = currentTime;
 
-            // Format and display the TimeSpan value.
+                // Update and Render operations
+                Update(elapsedSeconds);
+                //Render();
+
+                mCurrentFrame++;
+                mTotalRuntime += elapsedSeconds;
+
+                // Console.WriteLine("elapsed == " + mTotalRuntime.ToString());
+                if (mTotalRuntime >= MAX_RUNTIME_SECONDS)
+                    mIsRunning = false;
+
+                // Simple throttling to prevent maxing out the CPU (adjust as needed)
+                //System.Threading.Thread.Sleep(15);
+            }
+
+            CodeProfiler.EndLoop();
+
+
+            TimeSpan timeSpan = sw.Elapsed;
+
+            // Format and  the TimeSpan value.
             string elapsedTimeString = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
                 timeSpan.Hours, timeSpan.Minutes, timeSpan.Seconds,
                 timeSpan.Milliseconds / 10);
-#else
 
-            // TEST MEMORY<T>
-            // ====================
 
-            BoidSimulation.Store = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(NUM_ENTRIES);
-            //ComponentStore<Transform.Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(NUM_ENTRIES);
-            //Span<Transform.Transform_Struct> mem = store.Span;
-
-			mCurrentFrame = 0;
-            stopWatch.Reset();
-            stopWatch.Start();
-
-            //mTestSpan = store.Span;
-            //Span<Transform.Transform_Struct> castTest = (Span<Transform.Transform_Struct>) mTestSpan;
-
-            for (int i = 0; i < NUM_ITERATIONS; i++)
-                using (EntryClass.CodeProfiler.HookUp("Process"))
-                {
-					intervals.Update(step);
-                    //bSim.ProcessStep(step, NUM_ENTRIES, BoidSimulation.Store, bSim.SeparationDistance, bSim.SeparationFactor, bSim.AlignmentDistance, bSim.AlignmentFactor, bSim.CohesionDistance, bSim.CohesionFactor, bSim.MaxSpeed, bSim.TurnFactor);
-                    bSim.ProcessStep(step, NUM_ENTRIES, bSim.SeparationDistance, bSim.SeparationFactor, bSim.AlignmentDistance, bSim.AlignmentFactor, bSim.CohesionDistance, bSim.CohesionFactor, bSim.MaxSpeed, bSim.TurnFactor);
-					mCurrentFrame++;
-                    // p.Invoke(store, parameters, r);
-                }
-			
-            stopWatch.Stop();
-            TimeSpan timeSpan = stopWatch.Elapsed;
-
-            string elapsedTimeString = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
-                 timeSpan.Hours, timeSpan.Minutes, timeSpan.Seconds,
-                 timeSpan.Milliseconds / 10);
-
-#endif
-            CodeProfiler.EndLoop();
 
             // regardless of the NUM_ITERATIONS used, the FPS should typically all be very close 
             // if the NUM_ENTRIES stays the same
@@ -409,7 +380,7 @@ namespace HelloBoids
             System.Diagnostics.Debug.WriteLine(output);
             Console.WriteLine(output);
 
-            // LOG THE RESULTS of both runs - classes and memory<T> 
+            // LOG THE RESULTS
             // =====================
             output = "RunTime Mode: " + MODE + " - " + elapsedTimeString;
             Console.WriteLine(output);
@@ -418,6 +389,10 @@ namespace HelloBoids
             Console.WriteLine(output);
             Debug.WriteLine(output);
 
+            Console.WriteLine("");
+            output = "Begin Profiler Output:";
+            Console.WriteLine(output);
+            Debug.WriteLine(output);
 
             CodeProfiler.OutputToConsole();
 
@@ -448,39 +423,87 @@ namespace HelloBoids
             //       so that each boid only needs to check against close boids and not all
             // TODO: 
 
-            Console.WriteLine("Goodbye Boids!");
-			mIsRunning = false;
-		}
-		
-		private static void UpdateLoop()
-		{
-			// TODO: Insert game logic (physics, AI, input processing from a queue)
-        	// Use lock when accessing shared data
-		}
-		
-		private static void RenderLoop()
-		{
-			// TODO: Insert console drawing logic
-			// Use lock when writing to the console to avoid conflicts
-			lock (mSyncLock)
-			{
-				Console.SetCursorPosition(0, 1);
-				Console.WriteLine($"Game running. Time: {DateTime.Now}");
-			}
-		}
-		
-		
-		private static void AnimationLoop()
-		{
-			
-		}
+        }
+
+        private static void UpdateLoop()
+        {
+            // TODO: Insert game logic (physics, AI, input processing from a queue)
+            // Use lock when accessing shared data
+        }
+
+        private static double mTotalRuntime;
+
+        private static void Update(double elapsedSeconds)
+        {
+
+            using (EntryClass.CodeProfiler.HookUp("Process"))
+            {
+
+
+#if USE_MEMORY_T == false
+                // TEST CLASSES
+                // =====================
+                bSim.Update(elapsedSeconds,
+                            bSim.Boids,
+                            bSim.SeparationDistance,
+                            bSim.SeparationFactor,
+                            bSim.AlignmentDistance,
+                            bSim.AlignmentFactor,
+                            bSim.CohesionDistance,
+                            bSim.CohesionFactor,
+                            bSim.MaxSpeed,
+                            bSim.TurnFactor);
+#else
+
+                // TEST MEMORY<T>
+                // ====================
+
+                BoidSimulation.Store = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(NUM_ENTRIES);
+                //ComponentStore<Transform.Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(NUM_ENTRIES);
+                //Span<Transform.Transform_Struct> mem = store.Span;
+
+                //mTestSpan = store.Span;
+                //Span<Transform.Transform_Struct> castTest = (Span<Transform.Transform_Struct>) mTestSpan;
+
+                //bSim.ProcessStep(elapsedSeconds, NUM_ENTRIES, BoidSimulation.Store, bSim.SeparationDistance, bSim.SeparationFactor, bSim.AlignmentDistance, bSim.AlignmentFactor, bSim.CohesionDistance, bSim.CohesionFactor, bSim.MaxSpeed, bSim.TurnFactor);
+                bSim.ProcessStep(elapsedSeconds,
+                                NUM_ENTRIES,
+                                bSim.SeparationDistance,
+                                bSim.SeparationFactor,
+                                bSim.AlignmentDistance,
+                                bSim.AlignmentFactor,
+                                bSim.CohesionDistance,
+                                bSim.CohesionFactor,
+                                bSim.MaxSpeed,
+                                bSim.TurnFactor);
+#endif
+            }
+        }
+
+        private static void RenderLoop()
+        {
+            // TODO: Insert console drawing logic
+            // Use lock when writing to the console to avoid conflicts
+            lock (mSyncLock)
+            {
+                //Console.SetCursorPosition(0, 1);
+                // Console.WriteLine($"Game running. Time: {DateTime.Now}");
+            }
+        }
+
+
+        private static void AnimationLoop()
+        {
+
+        }
     }
 
 
-	
+
     // TODO: THE SAMPLE FROM GITHUB https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
     // and simply uses System.Drawing to draw the boids.  I will want to just use a simple 3d pyramid type boid .obj instead.
     //https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
+
     public class BoidSimulation
     {
         public List<Boid> Boids { get; set; }
@@ -508,6 +531,7 @@ namespace HelloBoids
             Boids = new List<Boid>(); //NOTE: we do not preallocate the list here
             mIntervalTimers = new IntervalTimers();
 
+            mIntervalTimers.Register("HelloBoids", "spawn", 0.06d);
 
             if (useOctree)
             {
@@ -521,8 +545,8 @@ namespace HelloBoids
 
                 OctreeOctant parent = null; // root has no parent
                 BoundingBox box = new BoundingBox(min, max);
-				uint octreeMaxDepth = 8;
-			 	OctreeOctant.MaxDepth = octreeMaxDepth;
+                uint octreeMaxDepth = 8;
+                OctreeOctant.MaxDepth = octreeMaxDepth;
                 Octree = new OctreeOctant(0, 0, box, parent);
             }
 
@@ -613,106 +637,107 @@ namespace HelloBoids
 #endif
 
             // SPATIAL SEARCH
-#if (SPATIAL_SEARCH)
+#if SPATIAL_SEARCH
+
+            BoundingBox searchArea = new BoundingBox(currentBoid.Translation, largestDistance);
+            Func<EntityNode, EntityNode, bool> match = (neighbor, current) =>
             {
-                BoundingBox searchArea = new BoundingBox(currentBoid.Translation, largestDistance);
-                Func<EntityNode, EntityNode, bool> match = (neighbor, current) =>
-                {
-                    if (neighbor == current) return false;
-                    // TODO: WE MUST CACHE span<T> and not access neighbor.Translation and current.Translation... we need to directly
-                    //        access the indices of the Span<T> here... otherwise its TOO SLOW
-                    if (Vector3d.GetDistance3dSquared(neighbor.Translation, current.Translation) <= largestDistanceSquared) return true;
-                    return false;
-                };
+                if (neighbor == current) return false;
+                // TODO: WE MUST CACHE span<T> and not access neighbor.Translation and current.Translation... we need to directly
+                //        access the indices of the Span<T> here... otherwise its TOO SLOW
+                if (Vector3d.GetDistance3dSquared(neighbor.Translation, current.Translation) <= largestDistanceSquared) return true;
+                return false;
+            };
 
-				#if USE_MEMORY_T
-                	List<EntityNode> found = SpatialQueryLocal(Store.Span, currentBoid.SpatialNode, currentBoid.SpanIndex, largestDistanceSquared, true, searchArea);
-				#else
-					List<EntityNode> found = currentBoid.SpatialNode.Query(currentBoid, true, searchArea, match);
-				#endif
-	
-                if (found == null || found.Count == 0) return null;
+#if USE_MEMORY_T
+            List<EntityNode> found = SpatialQueryLocal(Store.Span, currentBoid.SpatialNode, currentBoid.SpanIndex, largestDistanceSquared, true, searchArea);
+#else
+            List<EntityNode> found = currentBoid.SpatialNode.Query(currentBoid, true, searchArea, match);
+#endif
 
-                neighbors = new List<int>(found.Count);
-                for (int j = 0; j < found.Count; j++)
-                {
-                    neighbors.Add(found[j].Index);
-                }
+            if (found == null || found.Count == 0) return null;
+
+            neighbors = new List<int>(found.Count);
+            for (int j = 0; j < found.Count; j++)
+            {
+                neighbors.Add(found[j].Index);
             }
+
 #else      // NEIGHBOR SEARCH USING DISTANCE CHECK                       
-            {
-                
-	#if USE_MEMORY_T
+
+
+#if USE_MEMORY_T
 					//neighbors = Boid.FindNeighbors(store, numBoids, largestDistance, currentIndex, findNeighborsFunc);
 					neighbors = Boid.FindNeighbors(this.Boids, largestDistanceSquared, currentBoid.Index, ff);
-	#else
-		#if USE_MEMORY_T == false
-						List<Boid> found = Boid.FindNeighbors(this.Boids, largestDistance, currentBoid.Index, ff);
+#else
+#if USE_MEMORY_T == false
+            List<Boid> found = Boid.FindNeighbors(this.Boids, largestDistance, currentBoid.Index, ff);
 
-						if (found == null || found.Count == 0) return null;
-						neighbors = new List<int>(found.Count);
-						for (int j = 0; j < found.Count; j++)
-						{
-							neighbors.Add(found[j].Index);
-						}
-		#else // DO NOT USE A NEIGHBOR FINDING FUNCTION, JUST BRUTE FORCE ALL BOIDS
-						{
+            if (found == null || found.Count == 0) return null;
+            neighbors = new List<int>(found.Count);
+            for (int j = 0; j < found.Count; j++)
+            {
+                neighbors.Add(found[j].Index);
+            }
+#else // DO NOT USE A NEIGHBOR FINDING FUNCTION, JUST BRUTE FORCE ALL BOIDS
+						
 
 							// WARNING: iterating through ALL boids
 							// for each CURRENT boid is O(n^2) and is too expensive
 							// neighors = allBoids;
-						}
-		#endif
-	#endif
+						
+#endif
+#endif
 #endif
             // END NEIGHBOR SEARCH
             return neighbors;
         }
 
-#if USE_MEMORY_T
-		private List<EntityNode> SpatialQueryLocal(Span<Transform.Transform_Struct> memSpan, OctreeOctant refSpatialNode, int refIndex, double distance, bool recurse, BoundingBox searchArea)
-		{
-            if (refSpatialNode == null) throw new ArgumentNullException("SpatialQueryLocal() - reference Entity cannot be null.");
-			if (!refSpatialNode.BoundingBox.Intersects(searchArea)) return null; // early exit
-	
-			// TODO: // TODO: https://daeken.dev/a-stupidly-simple-fast-octree-traversal-for-ray-intersection
-	
-            List<EntityNode> results = new List<EntityNode>();
-	
-			// ITERATIVE DEPTH-FIRST TRAVERSAL
-			Stack<OctreeOctant> stack = new Stack<OctreeOctant>();
-			stack.Push(refSpatialNode);
-	
-			while (stack.Count > 0)
-			{
-				OctreeOctant current = stack.Pop();
-								
-				if ( current.EntityNodes != null)
-				{
-					for (int i = 0; i < current.EntityNodes.Length; i++)
-					{
-						if (current.EntityNodes[i].SpanIndex == refIndex) continue;
-						// TODO: WE MUST CACHE span<T> and not access neighbor.Translation and current.Translation... we need to directly
-						//        access the indices of the Span<T> here... otherwise its TOO SLOW
-						double calc = Vector3d.GetDistance3dSquared(memSpan[current.EntityNodes[i].SpanIndex].Translation, memSpan[refIndex].Translation);
-						//System.Diagnostics.Debug.WriteLine("Calculated distance = " + calc.ToString());
-						if (calc <= distance) 
-							results.Add(current.EntityNodes[i]);
-					}
-				}
-				
-				if (current.Children != null)
-                {
-					 for (int i = 0; i < current.Children.Length; i++)
-						 // NOTE: Each OctreeOctant's BoundingBox needs to be in World Space.
-            			if (current.Children[i].BoundingBox.Intersects(searchArea))
-					 		stack.Push(current.Children[i]);
-				}
-			}
-     		
 
-	
-			/*
+#if USE_MEMORY_T
+        private List<EntityNode> SpatialQueryLocal(Span<Transform.Transform_Struct> memSpan, OctreeOctant refSpatialNode, int refIndex, double distance, bool recurse, BoundingBox searchArea)
+        {
+            if (refSpatialNode == null) throw new ArgumentNullException("SpatialQueryLocal() - reference Entity cannot be null.");
+            if (!refSpatialNode.BoundingBox.Intersects(searchArea)) return null; // early exit
+
+            // TODO: // TODO: https://daeken.dev/a-stupidly-simple-fast-octree-traversal-for-ray-intersection
+
+            List<EntityNode> results = new List<EntityNode>();
+
+            // ITERATIVE DEPTH-FIRST TRAVERSAL
+            Stack<OctreeOctant> stack = new Stack<OctreeOctant>();
+            stack.Push(refSpatialNode);
+
+            while (stack.Count > 0)
+            {
+                OctreeOctant current = stack.Pop();
+
+                if (current.EntityNodes != null)
+                {
+                    for (int i = 0; i < current.EntityNodes.Length; i++)
+                    {
+                        if (current.EntityNodes[i].SpanIndex == refIndex) continue;
+                        // TODO: WE MUST CACHE span<T> and not access neighbor.Translation and current.Translation... we need to directly
+                        //        access the indices of the Span<T> here... otherwise its TOO SLOW
+                        double calc = Vector3d.GetDistance3dSquared(memSpan[current.EntityNodes[i].SpanIndex].Translation, memSpan[refIndex].Translation);
+                        //System.Diagnostics.Debug.WriteLine("Calculated distance = " + calc.ToString());
+                        if (calc <= distance)
+                            results.Add(current.EntityNodes[i]);
+                    }
+                }
+
+                if (current.Children != null)
+                {
+                    for (int i = 0; i < current.Children.Length; i++)
+                        // NOTE: Each OctreeOctant's BoundingBox needs to be in World Space.
+                        if (current.Children[i].BoundingBox.Intersects(searchArea))
+                            stack.Push(current.Children[i]);
+                }
+            }
+
+
+
+            /*
 			// RECURSIVE DEPTH-FIRST TRAVERSAL
 			// NOTE: Each OctreeOctant's BoundingBox needs to be in World Space.
             if (!refSpatialNode.BoundingBox.Intersects(searchArea))
@@ -745,12 +770,21 @@ namespace HelloBoids
 
             if (results.Count == 0) return null;
             return results;
-		}
+        }
 #endif
-			
+    
+
 #if USE_MEMORY_T == false
         public void Update(double elapsedSeconds, List<Boid> allBoids, double separationDistance, double separationFactor, double alignmentDistance, double alignmentFactor, double cohesionDistance, double cohesionFactor, double maxSpeed, double turnFactor)
         {
+            mIntervalTimers.Update(elapsedSeconds);
+            bool spawnReady = mIntervalTimers.IsReady("HelloBoids", "spawn");
+            if (spawnReady)
+            {
+                //Console.WriteLine("Spawn Ready == " + spawnReady.ToString());
+                mIntervalTimers.Reset("HelloBoids", "spawn");
+            }
+
             double largestDistance = System.Math.Max(this.SeparationDistance, this.AlignmentDistance);
             largestDistance = System.Math.Max(largestDistance, this.CohesionDistance);
             double largestDistanceSquared = largestDistance * largestDistance;
@@ -839,6 +873,14 @@ namespace HelloBoids
                 // HOWEVER, using the following line mem = Store.Span is faster than using Store.Span[i].#### everywhere!
                 mem = Store.Span;
                 //Span<Transform.Transform_Struct> mem = store.Span;
+            }
+
+            mIntervalTimers.Update(elapsedSeconds);
+            bool spawnReady = mIntervalTimers.IsReady("HelloBoids", "spawn");
+            if (spawnReady)
+            {
+                //Console.WriteLine("Spawn Ready == " + spawnReady.ToString());
+                mIntervalTimers.Reset("HelloBoids", "spawn");
             }
 
             List<int> neighbors = null;
@@ -1006,13 +1048,14 @@ namespace HelloBoids
         }
 #endif
     }
+
 	
-		
-	
+
+
     public class EntityNode : Transform
     {
         protected string mID;
-		protected int mIndex;
+        protected int mIndex;
         protected BoundingBox _box;
         protected OctreeOctant _octant;
 
@@ -1021,11 +1064,11 @@ namespace HelloBoids
             get { return _box; }
         }
 
-		public EntityNode (string guid)
-		{
-			mID = guid;
-		}
-		
+        public EntityNode(string guid)
+        {
+            mID = guid;
+        }
+
         public EntityNode(int index, double x, double y, double xV, double yV)
 
         {
@@ -1043,8 +1086,8 @@ namespace HelloBoids
         public int Index { get { return mIndex; } }
     }
 
-	
-		
+
+
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // BEGIN BOIDS
     //https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
@@ -1599,13 +1642,13 @@ namespace HelloBoids
         protected Matrix mGlobalMatrix;
 #endif
 
-        // different in translation between current and previous
+        // difference in translation between current and previous
         protected Vector3d mTranslationDelta;
 
 #if USE_MEMORY_T
-		public Memory<Transform_Struct> mMemStore; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
-		public int SpanIndex = -1;
-				
+        public Memory<Transform_Struct> mMemStore; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
+        public int SpanIndex = -1;
+
         //[StructLayout(LayoutKind.Sequential)]
         public struct Transform_Struct
         {
@@ -1628,11 +1671,7 @@ namespace HelloBoids
             //public Quaternion GlobalRotation;
 
             //public Matrix RegionMatrix;
-
         }
-
-        
-
 #endif
 
         protected Transform()
@@ -1665,10 +1704,6 @@ namespace HelloBoids
             mPivot.x = 0;
             mPivot.y = 0;
             mPivot.z = 0;
-
-
-
-
 #endif
 
             AttachedToBoneID = -1;
@@ -1715,13 +1750,13 @@ namespace HelloBoids
             Settings.PropertySpec[] properties = new Settings.PropertySpec[10 + tmp.Length];
             tmp.CopyTo(properties, 10);
 
-	    properties[0] = new Settings.PropertySpec("inheritscale", mInheritScale.GetType().Name);
+        properties[0] = new Settings.PropertySpec("inheritscale", mInheritScale.GetType().Name);
             properties[1] = new Settings.PropertySpec("inheritrotation", mInheritRotation.GetType().Name);
 
             properties[2] = new Settings.PropertySpec("position", mTranslation.GetType().Name);
             properties[3] = new Settings.PropertySpec("scale", mScale.GetType().Name);
             properties[4] = new Settings.PropertySpec("rotation", mRotation.GetType().Name);
-            
+
             properties[5] = new Settings.PropertySpec("velocity", mVelocity.GetType().Name);
             properties[6] = new Settings.PropertySpec("acceleration", mAcceleration.GetType().Name);
             properties[7] = new Settings.PropertySpec("force", mForce.GetType().Name);
@@ -1781,7 +1816,7 @@ namespace HelloBoids
                         break;
 
 
-		    // Physics will be moved to Entity.PhysicsBody which will implement IPhysicsBody (as will RigidBody.cs)
+            // Physics will be moved to Entity.PhysicsBody which will implement IPhysicsBody (as will RigidBody.cs)
                     case "velocity":
                         mVelocity = (Vector3d)properties[i].DefaultValue;
                         break;
@@ -1801,12 +1836,12 @@ namespace HelloBoids
             }
 
             // NOTE: the following flags are set in the property Settors
-//            SetChangeFlags(Enums.ChangeStates.BoundingBoxDirty |
-//                Enums.ChangeStates.GlobalMatrixDirty |
-//                Enums.ChangeStates.MatrixDirty |
-//                Enums.ChangeStates.RegionMatrixDirty, Enums.ChangeSource.Self);
+    //            SetChangeFlags(Enums.ChangeStates.BoundingBoxDirty |
+    //                Enums.ChangeStates.GlobalMatrixDirty |
+    //                Enums.ChangeStates.MatrixDirty |
+    //                Enums.ChangeStates.RegionMatrixDirty, Enums.ChangeSource.Self);
         }
-		*/
+        */
         #endregion
 
 
@@ -1827,7 +1862,7 @@ namespace HelloBoids
                     Enums.ChangeStates.RegionMatrixDirty |
                     Enums.ChangeStates.GlobalMatrixDirty | 
                     Enums.ChangeStates.BoundingBoxDirty, Enums.ChangeSource.Self);
-            	*/
+                */
             }
         }
 
@@ -1842,7 +1877,7 @@ namespace HelloBoids
                     Enums.ChangeStates.RegionMatrixDirty |
                     Enums.ChangeStates.GlobalMatrixDirty |
                     Enums.ChangeStates.BoundingBoxDirty, Enums.ChangeSource.Self);
-				*/
+                */
             }
         }
 
@@ -1956,22 +1991,22 @@ namespace HelloBoids
             get { return mMemStore.Span[0].Pivot; }
             set { mMemStore.Span[0].Pivot = value; }
         }*/
-		Vector3d mSpanAccessTest;
+        Vector3d mSpanAccessTest;
         public Vector3d Translation
         {
-            get 
-			{ 
-				// https://www.codemag.com/Article/2207031/Writing-High-Performance-Code-Using-SpanT-and-MemoryT-in-C
-				return mSpanAccessTest; // NOTE: <-- this line is much faster than returning the Translation from the below line!  
-                // / What we want to do is cache/grab the entire Span[0] once for this Entity/Boid and then directly just modify IT and not this accessor!!!
-                //
-				return mMemStore.Span[0].Translation; 
-			}
-            set 
-			{ 
-				mSpanAccessTest = value; 
-				mMemStore.Span[0].Translation = value; 
-			}
+            get
+            {
+                // https://www.codemag.com/Article/2207031/Writing-High-Performance-Code-Using-SpanT-and-MemoryT-in-C
+                return mSpanAccessTest; // NOTE: <-- this line is much faster than returning the Translation from the below line!  
+                                        // / What we want to do is cache/grab the entire Span[0] once for this Entity/Boid and then directly just modify IT and not this accessor!!!
+                                        //
+                return mMemStore.Span[0].Translation;
+            }
+            set
+            {
+                mSpanAccessTest = value;
+                mMemStore.Span[0].Translation = value;
+            }
         }
         /*
         public Vector3d DerivedTranslation
@@ -2056,7 +2091,7 @@ namespace HelloBoids
             set
             {
 #if DEBUG
-                if (value == Vector3d.Zero()) throw new ArgumentOutOfRangeException("Transform.Scale cannot be 0,0,0");
+            if (value == Vector3d.Zero()) throw new ArgumentOutOfRangeException("Transform.Scale cannot be 0,0,0");
 #endif
                 if (value == mScale) return; // some thigns have their scale altered all the time such as for percentage screenspace scaling and if the scale value doesnt change, no need to alter
 
@@ -2164,24 +2199,24 @@ namespace HelloBoids
             {
                 mGlobalTranslation = value;
                 /*
-            	if (mParents == null || mParents[0] == null)
-	            {
-	                // there is no parent so GlobalTranslation is same as local
-	                Translation = mGlobalTranslation; // calling public property setter instead of private var will trigger appropriate SetChangeFlags
-	                return;
-	            }
+                if (mParents == null || mParents[0] == null)
+                {
+                    // there is no parent so GlobalTranslation is same as local
+                    Translation = mGlobalTranslation; // calling public property setter instead of private var will trigger appropriate SetChangeFlags
+                    return;
+                }
 
-            	Transform parent = (Transform)mParents[0];
-            
-            	// we want to transform coordinate from (src) global to (dest) local identity space
-	           	Matrix source2dest = Matrix.Inverse (parent.GlobalMatrix); // Matrix.Source2Dest(parent.GlobalMatrix, Matrix.Identity());
-        		Matrix locallyTransformedMatrix = Matrix.Multiply4x4(source2dest, Matrix.CreateTranslation (value));
-        		Vector3d result = locallyTransformedMatrix.GetTranslation();
+                Transform parent = (Transform)mParents[0];
 
-        		// TODO: for Zones this is wrong.  Not even sure for other Entity types because we dont use it much but my recollection
-        		//       is that it is also wrong when trying to place entities in multi-zone region with asset placement tool.
-            	Translation = result; // calling public property setter instead of private var will trigger appropriate SetChangeFlags
-				*/
+                // we want to transform coordinate from (src) global to (dest) local identity space
+                Matrix source2dest = Matrix.Inverse (parent.GlobalMatrix); // Matrix.Source2Dest(parent.GlobalMatrix, Matrix.Identity());
+                Matrix locallyTransformedMatrix = Matrix.Multiply4x4(source2dest, Matrix.CreateTranslation (value));
+                Vector3d result = locallyTransformedMatrix.GetTranslation();
+
+                // TODO: for Zones this is wrong.  Not even sure for other Entity types because we dont use it much but my recollection
+                //       is that it is also wrong when trying to place entities in multi-zone region with asset placement tool.
+                Translation = result; // calling public property setter instead of private var will trigger appropriate SetChangeFlags
+                */
             }
         }
 
@@ -2393,8 +2428,8 @@ namespace HelloBoids
         public void SetRotation(double yawDegrees, double pitchDegrees, double rollDegrees)
         {
             Rotation = new Quaternion(yawDegrees * 57.2958d, //Utilities.MathHelper.DEGREES_TO_RADIANS, 
-                                       pitchDegrees * 57.2958d, //Utilities.MathHelper.DEGREES_TO_RADIANS,
-                                       rollDegrees * 57.2958);//Utilities.MathHelper.DEGREES_TO_RADIANS);
+                                        pitchDegrees * 57.2958d, //Utilities.MathHelper.DEGREES_TO_RADIANS,
+                                        rollDegrees * 57.2958);//Utilities.MathHelper.DEGREES_TO_RADIANS);
         }
 
 #if USE_MEMORY_T == false
@@ -2480,74 +2515,74 @@ namespace HelloBoids
             //     Enums.ChangeStates.Scaled |
             //     Enums.ChangeStates.Rotated);
 
-             if (mParents == null || mParents[0] == null || this is Portals.Region)
-             {
-                 // Region node's derived matrix is always identity.  
-                 // _rotation, _translation and _scale are all guaranteed to be default starting values.
-                 mDerivedRotation = mRotation;
-                 mDerivedTranslation = mTranslation;
-                 mDerivedScale = mScale;
-                 return;
-             }
+                if (mParents == null || mParents[0] == null || this is Portals.Region)
+                {
+                    // Region node's derived matrix is always identity.  
+                    // _rotation, _translation and _scale are all guaranteed to be default starting values.
+                    mDerivedRotation = mRotation;
+                    mDerivedTranslation = mTranslation;
+                    mDerivedScale = mScale;
+                    return;
+                }
 
 
-             Transform parentTransform = (Transform)mParents[0];
+                Transform parentTransform = (Transform)mParents[0];
 
-             // Update orientation             
-             Quaternion parentOrientation = parentTransform.DerivedRotation;
-             if (mInheritRotation)
-             {
-                 if (AttachedToBoneID >= 0)
-                 {
-                     // TODO: no way to just get the goddamn rotation... grr...
-                     //((Keystone.Entities.BonedEntity)_parents[0])._actor._actor.getbone. GetBoneMatrix(AttachedToBoneID, true);
-                     //mDerivedRotation = parentOrientation * boneRotation * _rotation;
-                     throw new NotImplementedException();
-                 }
-                 else
-                 {
-                     // Combine orientation with that of parent                 
-                     mDerivedRotation = parentOrientation * mRotation;
-                 }
-             }
-             else
-             {
-                 // No rotation inheritence                 
-                 mDerivedRotation = mRotation;
-             }
-             // Update scale             
-             Vector3d parentScale = parentTransform.DerivedScale;
-             if (mInheritScale)
-             {
-                 // Scale own position by parent scale, NB just combine                 
-                 // as equivalent axes, no shearing                 
-                 mDerivedScale = parentScale * mScale;
-             }
-             else
-             {
-                 // No inheritence                 
-                 mDerivedScale = mScale;
-             }
+                // Update orientation             
+                Quaternion parentOrientation = parentTransform.DerivedRotation;
+                if (mInheritRotation)
+                {
+                    if (AttachedToBoneID >= 0)
+                    {
+                        // TODO: no way to just get the goddamn rotation... grr...
+                        //((Keystone.Entities.BonedEntity)_parents[0])._actor._actor.getbone. GetBoneMatrix(AttachedToBoneID, true);
+                        //mDerivedRotation = parentOrientation * boneRotation * _rotation;
+                        throw new NotImplementedException();
+                    }
+                    else
+                    {
+                        // Combine orientation with that of parent                 
+                        mDerivedRotation = parentOrientation * mRotation;
+                    }
+                }
+                else
+                {
+                    // No rotation inheritence                 
+                    mDerivedRotation = mRotation;
+                }
+                // Update scale             
+                Vector3d parentScale = parentTransform.DerivedScale;
+                if (mInheritScale)
+                {
+                    // Scale own position by parent scale, NB just combine                 
+                    // as equivalent axes, no shearing                 
+                    mDerivedScale = parentScale * mScale;
+                }
+                else
+                {
+                    // No inheritence                 
+                    mDerivedScale = mScale;
+                }
 
-             if (mInheritScale)
-                 // Change position vector based on parent's orientation & scale                
-                 mDerivedTranslation = parentOrientation * (parentScale * mTranslation);
-             // reverse the parameters to the * operator so second overload op version is used 
-             //mDerivedTranslation = (parentScale * mTranslation) * parentOrientation;
-             else
-                 mDerivedTranslation = mTranslation;
+                if (mInheritScale)
+                    // Change position vector based on parent's orientation & scale                
+                    mDerivedTranslation = parentOrientation * (parentScale * mTranslation);
+                // reverse the parameters to the * operator so second overload op version is used 
+                //mDerivedTranslation = (parentScale * mTranslation) * parentOrientation;
+                else
+                    mDerivedTranslation = mTranslation;
 
-             // Add altered position vector to parents             
-             mDerivedTranslation += parentTransform.DerivedTranslation;
+                // Add altered position vector to parents             
+                mDerivedTranslation += parentTransform.DerivedTranslation;
 
 
-             if (mTranslation.x == double.NaN)
-                 System.Diagnostics.Debug.WriteLine("Transform.Update() - NaN");
-		   */
+                if (mTranslation.x == double.NaN)
+                    System.Diagnostics.Debug.WriteLine("Transform.Update() - NaN");
+            */
         }
 
 
-        #endregion */ // UPDATES
+        #endregion  // UPDATES
 #endif
 
         #region Disposable members
@@ -2565,308 +2600,308 @@ namespace HelloBoids
 
         #endregion
     }
-		
-		
-		
-		
-	// https://boristhebrave.github.io/DeBroglie/
-	// https://github.com/BorisTheBrave/DeBroglie
-	// LibNoise
-	// IEntitySystem proc gen
 
-	
-	public struct NFT_Address // Locator 
-	{
-		 public string NestedGUIDs;
-		 public string NestedTypeNames; // Vehicle.?12.&111 // aka vehicle.floor.area
-		 public string NestedNames;     // eg Enterprise.Deck12.Cabin111
-	}
 
-	public struct NFT_State
-	{
-		public bool Loaded;
-		
-	}
 
-	public struct NFT_Description
-	{
-		 public string Name;
-		 public string Description;
-		 public string Attributes; // kvp traits
-		 public string Image;      // thumbnail preview
 
-	}
+    // https://boristhebrave.github.io/DeBroglie/
+    // https://github.com/BorisTheBrave/DeBroglie
+    // LibNoise
+    // IEntitySystem proc gen
 
-	public struct NFT_Info
-	{
-		 public string GUID;
-		 public string Owner;
-		 public string Creator;
-		 public NFT_Address Location;
-		 public NFT_Description Description;
-		 public NFT_State State;
-		// public Entity_Taxonomy Taxonomy;     // ProcGen_ItemType enum can be loaded from a modder's file 
-	}
 
-	public struct DeltaInfo
-	{
-		public int ID;
-		public object Properties;
-		public int ReferenceStateID;
-		
-	}
+    public struct NFT_Address // Locator 
+    {
+        public string NestedGUIDs;
+        public string NestedTypeNames; // Vehicle.?12.&111 // aka vehicle.floor.area
+        public string NestedNames;     // eg Enterprise.Deck12.Cabin111
+    }
 
-	public interface IEntitySystem 
-	{
-		// 1) an IEntitySystem of type "City{World.Country.Province.County}" might include many different types of child IEntitySystem within it.
-		//    eg. University, Factory, Arthouses, Houses of Worship, Acadamies, Mines, Lodges, Farms, Museums, Research Fascilities, Heavy Idustries, Parks
-		//        Parks, etc.
-		//        - These IEntitySystems are very much like the Simulation of a Vehicle and it's part... each uses "Production and Consumption" that can be
-		//        received by the Simulation.cs in a very consistant/agnosic way.
-		//        - people with various "skills" can be "produced" from Academies... not just minerals, crops, or commodities.
-		//        - these Systems also CONSUME from "Stores"... how do we assign Stores and make them available to something like a "City?"
-		// 2) Stores - food, supplies, medicines, clothing, energy
-		// 3) Do we need to support rendering Proxies here (2D and 3D?)
-		public struct UpdateContext
-		{
+    public struct NFT_State
+    {
+        public bool Loaded;
+
+    }
+
+    public struct NFT_Description
+    {
+        public string Name;
+        public string Description;
+        public string Attributes; // kvp traits
+        public string Image;      // thumbnail preview
+
+    }
+
+    public struct NFT_Info
+    {
+        public string GUID;
+        public string Owner;
+        public string Creator;
+        public NFT_Address Location;
+        public NFT_Description Description;
+        public NFT_State State;
+        // public Entity_Taxonomy Taxonomy;     // ProcGen_ItemType enum can be loaded from a modder's file 
+    }
+
+    public struct DeltaInfo
+    {
+        public int ID;
+        public object Properties;
+        public int ReferenceStateID;
+
+    }
+
+    public interface IEntitySystem
+    {
+        // 1) an IEntitySystem of type "City{World.Country.Province.County}" might include many different types of child IEntitySystem within it.
+        //    eg. University, Factory, Arthouses, Houses of Worship, Acadamies, Mines, Lodges, Farms, Museums, Research Fascilities, Heavy Idustries, Parks
+        //        Parks, etc.
+        //        - These IEntitySystems are very much like the Simulation of a Vehicle and it's part... each uses "Production and Consumption" that can be
+        //        received by the Simulation.cs in a very consistant/agnosic way.
+        //        - people with various "skills" can be "produced" from Academies... not just minerals, crops, or commodities.
+        //        - these Systems also CONSUME from "Stores"... how do we assign Stores and make them available to something like a "City?"
+        // 2) Stores - food, supplies, medicines, clothing, energy
+        // 3) Do we need to support rendering Proxies here (2D and 3D?)
+        public struct UpdateContext
+        {
             // see SelectionNode or Elements.SwitchNode for help
 
-		}
+        }
 
-		public int Seed {get;}
-		public int EntityCount{get;}
-		public bool MultithreadingEnabled {get;set;}
+        public int Seed { get; }
+        public int EntityCount { get; }
+        public bool MultithreadingEnabled { get; set; }
 
-		// TODO: perhaps grab the max count from a configuration file
-		public int MaxEntityCount {get; set;}
+        // TODO: perhaps grab the max count from a configuration file
+        public int MaxEntityCount { get; set; }
 
-		public void GenerateSystem();
-		// todo: need delegates for handling the Generate()
-		// todo: need delegate for Create() of single IProcGeneratedItem
-
-
-		// libnoise uses this to find a value on a texture
-		public object GetValue(double x, double y, double z);
-		public IProcGeneratedItem GetItem (string address);
-		public IProcGeneratedItem GetItem (int index);
-		public IProcGeneratedItem GetItem (string guid, int seed);
-		
-		public void Update(double elapsedSeconds, IEntitySystem.UpdateContext context);
-		public void Read();
-		public void Write();
-	}
-
-	
-
-	public abstract class EntitySystemBase : EntityNode, IEntitySystem
-	{
-		public delegate IProcGeneratedItem CreateEntityHandler(int seed, string path);
-		public delegate void GenerateSystemHandler (int seed);
-		public delegate void UpdateHandler (double elapsedSeconds, IEntitySystem.UpdateContext context);
-		
-		// private variables
-		protected string mPath;
-		protected int mMaxEntityCount; 
-		protected bool mMultithreadingEnabled;
-		
-		protected int mTickID; // incremented everytime Update() is called.  NOTE: Update() is not necessarily called once per frame.
-		protected int mSeed;
-
-		protected UpdateHandler[] mUpdateHandlers;
-
-		// properties
-		public int Seed {get {return mSeed;}}
-		public int TickID {get {return mTickID;}}
-		public int EntityCount {get {return 0; }}
-		public bool MultithreadingEnabled {get {return mMultithreadingEnabled;} set {mMultithreadingEnabled = value;}}
-		
-		public int MaxEntityCount {get; set;}
-
-		
-		protected EntitySystemBase (string id)  :base(id) 
-		{
-		}
-		
-		public virtual void Update (double elapsedSeconds, IEntitySystem.UpdateContext context)
-		{
-			// select from mUpdateHandlers based on context... its essentially like update LOD where the
-			// update simulation can be simpler when this IEntitySystem is far away or has no players near it...
-		}
-		
-		public virtual void GenerateSystem()
-		{
-		}
-		// todo: need delegates for handling the Generate()
-		// todo: need delegate for Create() of single IProcGeneratedItem
+        public void GenerateSystem();
+        // todo: need delegates for handling the Generate()
+        // todo: need delegate for Create() of single IProcGeneratedItem
 
 
-		// libnoise uses this to find a value on a texture
-		public virtual object GetValue(double x, double y, double z)
-		{
-			return null;
-		}
-		
-		public virtual IProcGeneratedItem GetItem (string address)
-		{
-			return  null;
-		}
-		public virtual IProcGeneratedItem GetItem (int index)
-		{
-			return null;
-		}
-		
-		public virtual IProcGeneratedItem GetItem (string guid, int seed)
-		{
-			return null;
-		}
+        // libnoise uses this to find a value on a texture
+        public object GetValue(double x, double y, double z);
+        public IProcGeneratedItem GetItem(string address);
+        public IProcGeneratedItem GetItem(int index);
+        public IProcGeneratedItem GetItem(string guid, int seed);
 
-		public virtual void Read()
-		{
-		}
-		
-		public virtual void Write()
-		{
-		}
-		
-	}
-
-	public class City : EntitySystemBase 
-	{
-
-		// City specific structs
-		private struct Terrain
-		{
-			public bool Mountainous;
-			public bool Landlocked;
-			//public Resource[] Resources;			
-		}
-
-		private struct Environment
-		{
-			public float Pollution; // coefficient
-			public float WildLife; // diversity coefficient 
-			
-		}
-
-		
-		private struct Government
-		{
-			public int Type;  // 
-			
-		}
-
-		private struct Infrastructure
-		{
-			public bool Highways;
-			public bool SeaPorts;
-			public bool Airport;
-			public bool Railroads;
-			public int HousingUnits;
-			
-		}
-
-		private struct Economy
-		{
-			public int Credits;
-			//public Store[] Stores;
-			//public Resources[] ResourcesRealized;
-			//public Resources[] ResourcesUnrealized;
-			//public Product[] Commodities;
-			
-		}		
-
-		/*Factories_Light; // produce finished goods
-		Factories_Medium;
-		Factories_Heavy; 
-		Factories_SuperHeavy;
-		PowerPlants;
-		Mines;
-		Farms;
-		Fisheries;
-		
-		Universities;
-		Academies;
-        */
-		
-
-		// City specific variables
-		private int mOwnerID; // eg FactionID
-		private Economy mEconomy;
-		private Queue<EntityNode> mBuildQueue;
-
-		private City[] mConnections; // migration, tourism,  trade
+        public void Update(double elapsedSeconds, IEntitySystem.UpdateContext context);
+        public void Read();
+        public void Write();
+    }
 
 
-		public City (string guid) : base(guid)
-		{
-		}	
-		
 
-	}
+    public abstract class EntitySystemBase : EntityNode, IEntitySystem
+    {
+        public delegate IProcGeneratedItem CreateEntityHandler(int seed, string path);
+        public delegate void GenerateSystemHandler(int seed);
+        public delegate void UpdateHandler(double elapsedSeconds, IEntitySystem.UpdateContext context);
 
-	public class Population : EntitySystemBase 
-	{
-		
-		public Population (string guid) : base(guid)
-		{
-		}
-		
-		
-		public override IProcGeneratedItem GetItem (string address)
-		{
+        // private variables
+        protected string mPath;
+        protected int mMaxEntityCount;
+        protected bool mMultithreadingEnabled;
 
-			return null;
-		}
-		
-		public override object GetValue(double x, double y, double z)
-		{
-			throw new NotImplementedException();
-		}
-		public override IProcGeneratedItem GetItem (int index)
-		{
-			return null;
-		}
-		
-		/// <summary>
-		/// From the GUID, we can lookup the address (hierarchical region) and then the seed used to generate this Entity
-		/// and a "changedState" save file that contains all changed data that is different from the
-		/// Entity that is initially created from the seed.
-		/// </summary>
-		public override IProcGeneratedItem GetItem (string guid, int seed)
-		{
-			// todo: note the guid must always be assigned if it's being generated from a seed because
-			//       a GUID cannot be generated from a seed.  It is always going to be a new GUID if we call guid = System.Guid.NewGuid()
+        protected int mTickID; // incremented everytime Update() is called.  NOTE: Update() is not necessarily called once per frame.
+        protected int mSeed;
 
-			return null;
-		}
+        protected UpdateHandler[] mUpdateHandlers;
 
-		//public IProcGeneratedItem[] GetItems (Rectangle bounds)
-		//{
-			// todo: note the guid must always be assigned if it's being generated from a seed because
-			//       a GUID cannot be generated from a seed.  It is always going to be a new GUID if we call guid = System.Guid.NewGuid()
+        // properties
+        public int Seed { get { return mSeed; } }
+        public int TickID { get { return mTickID; } }
+        public int EntityCount { get { return 0; } }
+        public bool MultithreadingEnabled { get { return mMultithreadingEnabled; } set { mMultithreadingEnabled = value; } }
 
-		//	return null;
-		//}
+        public int MaxEntityCount { get; set; }
 
-		public override void GenerateSystem()
-		{
-		}
-		
-        public virtual ProcGeneratedItem Create()
+
+        protected EntitySystemBase(string id) : base(id)
         {
-			return null;
+        }
+
+        public virtual void Update(double elapsedSeconds, IEntitySystem.UpdateContext context)
+        {
+            // select from mUpdateHandlers based on context... its essentially like update LOD where the
+            // update simulation can be simpler when this IEntitySystem is far away or has no players near it...
+        }
+
+        public virtual void GenerateSystem()
+        {
+        }
+        // todo: need delegates for handling the Generate()
+        // todo: need delegate for Create() of single IProcGeneratedItem
+
+
+        // libnoise uses this to find a value on a texture
+        public virtual object GetValue(double x, double y, double z)
+        {
+            return null;
+        }
+
+        public virtual IProcGeneratedItem GetItem(string address)
+        {
+            return null;
+        }
+        public virtual IProcGeneratedItem GetItem(int index)
+        {
+            return null;
+        }
+
+        public virtual IProcGeneratedItem GetItem(string guid, int seed)
+        {
+            return null;
+        }
+
+        public virtual void Read()
+        {
+        }
+
+        public virtual void Write()
+        {
+        }
+
+    }
+
+    public class City : EntitySystemBase
+    {
+
+        // City specific structs
+        private struct Terrain
+        {
+            public bool Mountainous;
+            public bool Landlocked;
+            //public Resource[] Resources;			
+        }
+
+        private struct Environment
+        {
+            public float Pollution; // coefficient
+            public float WildLife; // diversity coefficient 
 
         }
-		
-	}
-	
+
+
+        private struct Government
+        {
+            public int Type;  // 
+
+        }
+
+        private struct Infrastructure
+        {
+            public bool Highways;
+            public bool SeaPorts;
+            public bool Airport;
+            public bool Railroads;
+            public int HousingUnits;
+
+        }
+
+        private struct Economy
+        {
+            public int Credits;
+            //public Store[] Stores;
+            //public Resources[] ResourcesRealized;
+            //public Resources[] ResourcesUnrealized;
+            //public Product[] Commodities;
+
+        }
+
+        /*Factories_Light; // produce finished goods
+        Factories_Medium;
+        Factories_Heavy; 
+        Factories_SuperHeavy;
+        PowerPlants;
+        Mines;
+        Farms;
+        Fisheries;
+
+        Universities;
+        Academies;
+        */
+
+
+        // City specific variables
+        private int mOwnerID; // eg FactionID
+        private Economy mEconomy;
+        private Queue<EntityNode> mBuildQueue;
+
+        private City[] mConnections; // migration, tourism,  trade
+
+
+        public City(string guid) : base(guid)
+        {
+        }
+
+
+    }
+
+    public class Population : EntitySystemBase
+    {
+
+        public Population(string guid) : base(guid)
+        {
+        }
+
+
+        public override IProcGeneratedItem GetItem(string address)
+        {
+
+            return null;
+        }
+
+        public override object GetValue(double x, double y, double z)
+        {
+            throw new NotImplementedException();
+        }
+        public override IProcGeneratedItem GetItem(int index)
+        {
+            return null;
+        }
+
+        /// <summary>
+        /// From the GUID, we can lookup the address (hierarchical region) and then the seed used to generate this Entity
+        /// and a "changedState" save file that contains all changed data that is different from the
+        /// Entity that is initially created from the seed.
+        /// </summary>
+        public override IProcGeneratedItem GetItem(string guid, int seed)
+        {
+            // todo: note the guid must always be assigned if it's being generated from a seed because
+            //       a GUID cannot be generated from a seed.  It is always going to be a new GUID if we call guid = System.Guid.NewGuid()
+
+            return null;
+        }
+
+        //public IProcGeneratedItem[] GetItems (Rectangle bounds)
+        //{
+        // todo: note the guid must always be assigned if it's being generated from a seed because
+        //       a GUID cannot be generated from a seed.  It is always going to be a new GUID if we call guid = System.Guid.NewGuid()
+
+        //	return null;
+        //}
+
+        public override void GenerateSystem()
+        {
+        }
+
+        public virtual ProcGeneratedItem Create()
+        {
+            return null;
+
+        }
+
+    }
+
 
     public class BoidFactory : Population
     {
-		public BoidFactory (string guid) : base (guid)
-		{
-		}
-		
+        public BoidFactory(string guid) : base(guid)
+        {
+        }
+
         public override void Update(double elapsedSeconds, IEntitySystem.UpdateContext context)
         {
 
@@ -2874,68 +2909,68 @@ namespace HelloBoids
     }
 
 
-	// TODO: these interfaces should support LayeredProcGen chunks
-	//       Wave Function Collapse
-	//       LibNoise style texture generation, but with more control over generating "chunks"
-	//       that connect to each other as opposed to a giant texture that then has to be stiched
-	//       together after the fact
-	public interface IProcGeneratedItem
-	{
-		public int Seed {get;}
-		//public Settings.PropertySpec[] Deltas {get ;}
+    // TODO: these interfaces should support LayeredProcGen chunks
+    //       Wave Function Collapse
+    //       LibNoise style texture generation, but with more control over generating "chunks"
+    //       that connect to each other as opposed to a giant texture that then has to be stiched
+    //       together after the fact
+    public interface IProcGeneratedItem
+    {
+        public int Seed { get; }
+        //public Settings.PropertySpec[] Deltas {get ;}
 
-	}
+    }
 
-	public abstract class ProcGeneratedItem : IProcGeneratedItem
-	{
-		public int mSeed;
+    public abstract class ProcGeneratedItem : IProcGeneratedItem
+    {
+        public int mSeed;
 
-		public int Seed {get {return mSeed;}}
-	}
-	
+        public int Seed { get { return mSeed; } }
+    }
+
     // SEE EntityNode above!  EntityNode is equivalent to Keystone.Entities.Entity
-	//public class Entity : ProcGeneratedItem
-	//{
-	//	public Entity (string guid)
-	//	{
-	//	}
-	//}
-	
-	public class TerrainChunk : ProcGeneratedItem
-	{
+    //public class Entity : ProcGeneratedItem
+    //{
+    //	public Entity (string guid)
+    //	{
+    //	}
+    //}
 
-	}
+    public class TerrainChunk : ProcGeneratedItem
+    {
 
-	public class ProceduralTexture : IProcGeneratedItem
-	{
-		public int mSeed;
+    }
 
-		public int Seed {get {return mSeed;}}
-	}
+    public class ProceduralTexture : IProcGeneratedItem
+    {
+        public int mSeed;
+
+        public int Seed { get { return mSeed; } }
+    }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // END NODES
 
-		
-		
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    // BEGIN OCTREE 
 
-    // http://www.flipcode.com/archives/Octree_Implementation.shtml
-    /// <summary>
-    /// A dynamic + loose octree implementation. 
-    /// Dynamic = children are only added up to the depth that is first deepest enough to accomodate the bounds of the items being inserted into the tree.
-    /// </summary>
-    public class OctreeOctant //: ISpatialNode //, ITraversable, IBoundVolume
-    {
 
-        #region Static variables
-        //public static BoundingBox WorldBox;
-        public static uint MaxDepth;
-        public static uint SplitThreshHold;
+        ////////////////////////////////////////////////////////////////////////////////////////////////
+        // BEGIN OCTREE 
 
-        private static Vector3d[] BoundsOffsetTable = new Vector3d[]
+        // http://www.flipcode.com/archives/Octree_Implementation.shtml
+        /// <summary>
+        /// A dynamic + loose octree implementation. 
+        /// Dynamic = children are only added up to the depth that is first deepest enough to accomodate the bounds of the items being inserted into the tree.
+        /// </summary>
+        public class OctreeOctant //: ISpatialNode //, ITraversable, IBoundVolume
         {
+
+            #region Static variables
+            //public static BoundingBox WorldBox;
+            public static uint MaxDepth;
+            public static uint SplitThreshHold;
+
+            private static Vector3d[] BoundsOffsetTable = new Vector3d[]
+            {
                 new Vector3d(-0.5, -0.5, -0.5),
                 new Vector3d(+0.5, -0.5, -0.5),
                 new Vector3d(-0.5, +0.5, -0.5),
@@ -2944,152 +2979,152 @@ namespace HelloBoids
                 new Vector3d(+0.5, -0.5, +0.5),
                 new Vector3d(-0.5, +0.5, +0.5),
                 new Vector3d(+0.5, +0.5, +0.5)
-        };
+            };
 
-        #endregion
+            #endregion
 
-        private int _depth;
-        private int _index;   // index is specific to each depth and contains x,y,z offset at that depth and is useful for finding neighbors (which we may never do and just always move EntityNodes by re-inserting starting at root)
-        private const int MAX_CHILD_COUNT = 8;
+            private int _depth;
+            private int _index;   // index is specific to each depth and contains x,y,z offset at that depth and is useful for finding neighbors (which we may never do and just always move EntityNodes by re-inserting starting at root)
+            private const int MAX_CHILD_COUNT = 8;
 
-        private BoundingBox mBox;
-        private OctreeOctant mParent;
-        private OctreeOctant[] mChildOctants;
+            private BoundingBox mBox;
+            private OctreeOctant mParent;
+            private OctreeOctant[] mChildOctants;
 
-        // TODO: switch to linked list?
-        private List<EntityNode> mEntityNodesCollection;
+            // TODO: switch to linked list?
+            private List<EntityNode> mEntityNodesCollection;
 
 
-        public OctreeOctant(int index, int depth, BoundingBox box, OctreeOctant parent)
-            : this()
-        {
-            _index = index;
-            _depth = depth;
-            mBox = box;
-            mParent = parent;
-            //System.Diagnostics.Debug.WriteLine("OctreeOctant() -- Created at index " + index.ToString());
-        }
+            public OctreeOctant(int index, int depth, BoundingBox box, OctreeOctant parent)
+                : this()
+            {
+                _index = index;
+                _depth = depth;
+                mBox = box;
+                mParent = parent;
+                //System.Diagnostics.Debug.WriteLine("OctreeOctant() -- Created at index " + index.ToString());
+            }
 
-        public OctreeOctant()
-        {
-            Visible = true;
-        }
+            public OctreeOctant()
+            {
+                Visible = true;
+            }
 
-        ~OctreeOctant()
-        {
-        }
+            ~OctreeOctant()
+            {
+            }
 
-        /*
-                #region ITraversable Members
-                public object Traverse(ITraverser target, object data)
+            /*
+                    #region ITraversable Members
+                    public object Traverse(ITraverser target, object data)
+                    {
+                        return target.Apply(this, data);
+                    }
+                    #endregion
+            */
+
+            private bool IsRoot { get { return mParent == null; } }
+
+            private OctreeOctant Parent { get { return mParent; } set { mParent = value; } }
+
+            public bool IsLeaf { get { return mChildOctants == null; } }
+
+            public int Index
+            {
+                get { return _index; }
+            }
+
+            internal int[] LocalIndexToVector(int index)
+            {
+
+                // divide the index by  2 ^ depth
+                // 
+
+                int[] v = new int[3];
+                if ((index & 1) > 0) v[0] = 1;
+                else v[0] = -1;
+
+                if ((index & 2) > 0) v[1] = 1;
+                else v[1] = -1;
+
+                if ((index & 4) > 0) v[2] = 1;
+                else v[2] = -1;
+
+                return v;
+            }
+
+            internal int LocalVectorToIndex(int[] v)
+            {
+                int index = 0;
+
+                if (v[0] >= 0) index |= 1;
+                if (v[1] >= 0) index |= 2;
+                if (v[2] >= 0) index |= 4;
+
+                return index;
+            }
+
+            internal Vector3d Radius
+            {
+                get
                 {
-                    return target.Apply(this, data);
+
+                    Vector3d radius;
+                    radius.x = mBox.Width * 0.5d;
+                    radius.y = mBox.Height * 0.5d;
+                    radius.z = mBox.Depth * 0.5d;
+                    return radius;
                 }
-                #endregion
-        */
-
-        private bool IsRoot { get { return mParent == null; } }
-
-        private OctreeOctant Parent { get { return mParent; } set { mParent = value; } }
-
-        public bool IsLeaf { get { return mChildOctants == null; } }
-
-        public int Index
-        {
-            get { return _index; }
-        }
-
-        internal int[] LocalIndexToVector(int index)
-        {
-
-            // divide the index by  2 ^ depth
-            // 
-
-            int[] v = new int[3];
-            if ((index & 1) > 0) v[0] = 1;
-            else v[0] = -1;
-
-            if ((index & 2) > 0) v[1] = 1;
-            else v[1] = -1;
-
-            if ((index & 4) > 0) v[2] = 1;
-            else v[2] = -1;
-
-            return v;
-        }
-
-        internal int LocalVectorToIndex(int[] v)
-        {
-            int index = 0;
-
-            if (v[0] >= 0) index |= 1;
-            if (v[1] >= 0) index |= 2;
-            if (v[2] >= 0) index |= 4;
-
-            return index;
-        }
-
-        internal Vector3d Radius
-        {
-            get
-            {
-                
-				Vector3d radius;
-                radius.x = mBox.Width * 0.5d;
-                radius.y = mBox.Height * 0.5d;
-                radius.z = mBox.Depth* 0.5d;
-                return radius;
             }
-        }
 
-        internal int Depth
-        {
-            get { return _depth; }
-        }
-
-        public OctreeOctant[] Children
-        {
-            get { return mChildOctants; }
-        }
-
-        #region ISpatialNode
-        public bool Visible { get; set; }
-
-        public EntityNode[] EntityNodes
-        {
-            get
+            internal int Depth
             {
-                if (mEntityNodesCollection == null) return null;
-                return mEntityNodesCollection.ToArray();
+                get { return _depth; }
             }
-        }
 
-        public void Add(EntityNode entityNode, bool forceRoot)
-        {
-            if (forceRoot)
+            public OctreeOctant[] Children
             {
-                this.AddEntityNodeToCollection((EntityNode)entityNode);
-                //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - "  + entityNode.Entity.TypeName + " Forced into Root");
+                get { return mChildOctants; }
             }
-            else
+
+            #region ISpatialNode
+            public bool Visible { get; set; }
+
+            public EntityNode[] EntityNodes
             {
-                this.Add(entityNode);
-                //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName);
+                get
+                {
+                    if (mEntityNodesCollection == null) return null;
+                    return mEntityNodesCollection.ToArray();
+                }
             }
-        }
 
-        private void AddEntityNodeToCollection(EntityNode entityNode)
-        {
-            if (mEntityNodesCollection == null)
-                mEntityNodesCollection = new List<EntityNode>();
+            public void Add(EntityNode entityNode, bool forceRoot)
+            {
+                if (forceRoot)
+                {
+                    this.AddEntityNodeToCollection((EntityNode)entityNode);
+                    //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - "  + entityNode.Entity.TypeName + " Forced into Root");
+                }
+                else
+                {
+                    this.Add(entityNode);
+                    //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName);
+                }
+            }
 
-            entityNode.SpatialNode = this;
-            mEntityNodesCollection.Add(entityNode);
-        }
+            private void AddEntityNodeToCollection(EntityNode entityNode)
+            {
+                if (mEntityNodesCollection == null)
+                    mEntityNodesCollection = new List<EntityNode>();
 
-        public void Add(EntityNode entityNode)
-        {
-            System.Diagnostics.Debug.Assert(this.BoundingBox != null, "OctreeOctant.Add() - BoundingBox is null.");
+                entityNode.SpatialNode = this;
+                mEntityNodesCollection.Add(entityNode);
+            }
+
+            public void Add(EntityNode entityNode)
+            {
+                System.Diagnostics.Debug.Assert(this.BoundingBox != null, "OctreeOctant.Add() - BoundingBox is null.");
 #if DEBUG
             // only support square octree octants for performance
 //            // TODO: we are going to see if this "performance" concern is no longer valid.  non square octrees are useful 
@@ -3099,183 +3134,183 @@ namespace HelloBoids
 //            this.BoundingBox.Max.z - this.BoundingBox.Min.z);
 #endif
 
-			// TODO: // TODO: https://daeken.dev/a-stupidly-simple-fast-octree-traversal-for-ray-intersection
-	
-            int count;
+                // TODO: // TODO: https://daeken.dev/a-stupidly-simple-fast-octree-traversal-for-ray-intersection
 
-            if (mEntityNodesCollection == null)
-                count = 0;
-            else
-                count = mEntityNodesCollection.Count;
+                int count;
 
-            //    NOTE: We specifically use ">=" for the depth comparison so that we
-            //          can set the maximumDepth depth to 0 if we want a tree with
-            //          no depth.
-            if (count >= OctreeOctant.SplitThreshHold || _depth >= OctreeOctant.MaxDepth)
-            {
-                // add to this octant immmediately
-                // Non Recursive Add
-                this.AddEntityNodeToCollection((EntityNode)entityNode);
-                //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName);
-                return;
-            }
+                if (mEntityNodesCollection == null)
+                    count = 0;
+                else
+                    count = mEntityNodesCollection.Count;
 
-            // note: we intentionally compute a radius without taking into account hypotenuse.
-            // note: if allowiing non square octants, we take the smallest octant radius and we'll compare that against largest radius of entity being inserted
-            double octantRadius = this.BoundingBox.Max.x - this.BoundingBox.Min.x;
-            octantRadius = Math.Min(this.BoundingBox.Max.y - this.BoundingBox.Min.y, octantRadius);
-            octantRadius = Math.Min(this.BoundingBox.Max.z - this.BoundingBox.Min.z, octantRadius);
-            octantRadius *= 0.5d;
-
-            double childOctantRadius = octantRadius * 0.5d;
-            double entityRadius = entityNode.BoundingBox.Radius;
-
-            // attempt to insert using tightbox, but we must cull with loose box
-            if (entityRadius > childOctantRadius)
-            {
-                // this entity won't fit in any children of this octant 
-                // so what about the parent octant?
-                if (entityRadius > octantRadius)
+                //    NOTE: We specifically use ">=" for the depth comparison so that we
+                //          can set the maximumDepth depth to 0 if we want a tree with
+                //          no depth.
+                if (count >= OctreeOctant.SplitThreshHold || _depth >= OctreeOctant.MaxDepth)
                 {
-                    // wont fit, can we try to move up to a parent?
-                    if (this.IsRoot == false)
-                    {
-                        // Recurse UPWARDS
-                        mParent.Add(entityNode);
-                        return;
-                    }
+                    // add to this octant immmediately
+                    // Non Recursive Add
+                    this.AddEntityNodeToCollection((EntityNode)entityNode);
+                    //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName);
+                    return;
                 }
-                // Non Recursive Add because we're still here, 
-                // so it either fits or we're at root and there's
-                // no other place to put it
-                this.AddEntityNodeToCollection(entityNode);
-                //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName);
-                return;
+
+                // note: we intentionally compute a radius without taking into account hypotenuse.
+                // note: if allowiing non square octants, we take the smallest octant radius and we'll compare that against largest radius of entity being inserted
+                double octantRadius = this.BoundingBox.Max.x - this.BoundingBox.Min.x;
+                octantRadius = Math.Min(this.BoundingBox.Max.y - this.BoundingBox.Min.y, octantRadius);
+                octantRadius = Math.Min(this.BoundingBox.Max.z - this.BoundingBox.Min.z, octantRadius);
+                octantRadius *= 0.5d;
+
+                double childOctantRadius = octantRadius * 0.5d;
+                double entityRadius = entityNode.BoundingBox.Radius;
+
+                // attempt to insert using tightbox, but we must cull with loose box
+                if (entityRadius > childOctantRadius)
+                {
+                    // this entity won't fit in any children of this octant 
+                    // so what about the parent octant?
+                    if (entityRadius > octantRadius)
+                    {
+                        // wont fit, can we try to move up to a parent?
+                        if (this.IsRoot == false)
+                        {
+                            // Recurse UPWARDS
+                            mParent.Add(entityNode);
+                            return;
+                        }
+                    }
+                    // Non Recursive Add because we're still here, 
+                    // so it either fits or we're at root and there's
+                    // no other place to put it
+                    this.AddEntityNodeToCollection(entityNode);
+                    //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName);
+                    return;
+                }
+
+                // can't go further, add entitynode here
+                if (this.Split() == false)
+                {
+                    this.AddEntityNodeToCollection(entityNode);
+                    return;
+                }
+
+                Vector3d octantCenter = this.BoundingBox.Center;
+                Vector3d entityCenter = entityNode.BoundingBox.Center; // TODO: is the entityNode box initialized at this point?
+                int code = 0;
+                if (entityCenter.x > octantCenter.x)
+                    code |= 1;
+                if (entityCenter.y > octantCenter.y)
+                    code |= 2;
+                if (entityCenter.z > octantCenter.z)
+                    code |= 4;
+
+                for (int i = 0; i < MAX_CHILD_COUNT; i++)
+                {
+                    // if this bitflag cobmination is not set
+                    if (code != i) continue;
+
+                    Vector3d offset = OctreeOctant.BoundsOffsetTable[i] * octantRadius;
+                    Vector3d center = octantCenter + offset;
+
+                    BoundingBox childOctantBox = new BoundingBox(center, (float)childOctantRadius);
+
+                    if (mChildOctants[i] == null)
+                        mChildOctants[i] =
+                            new OctreeOctant(0, _depth + 1, childOctantBox, this);
+
+                    // Recursive Add() until max depth is reached or the entity's radius > octant's loose radius
+                    mChildOctants[i].Add(entityNode);
+                }
             }
 
-            // can't go further, add entitynode here
-            if (this.Split() == false)
+            public void RemoveEntityNode(EntityNode entityNode)
             {
-                this.AddEntityNodeToCollection(entityNode);
-                return;
+                // NOTE: The reason for this function as opposed to just using OnEntityNode_Removed()
+                // is that when a node is moving, then we directly call OnEntityNode_Removed() instead
+                // so that the .SpatialNode = null can occur before we call OnEntityNode_Removed() 
+                // and yet so we dont have to make the OnEntityNode_Removed() before we .Add to the new
+                // destination.  This is important to avoid collapsing of empty branches before we've
+                // had a chance to find the correct new parent.
+                entityNode.SpatialNode = null;
+                OnEntityNode_Removed(entityNode);
             }
 
-            Vector3d octantCenter = this.BoundingBox.Center;
-            Vector3d entityCenter = entityNode.BoundingBox.Center; // TODO: is the entityNode box initialized at this point?
-            int code = 0;
-            if (entityCenter.x > octantCenter.x)
-                code |= 1;
-            if (entityCenter.y > octantCenter.y)
-                code |= 2;
-            if (entityCenter.z > octantCenter.z)
-                code |= 4;
 
-            for (int i = 0; i < MAX_CHILD_COUNT; i++)
+            public void OnEntityNode_Moved(EntityNode entityNode)
             {
-                // if this bitflag cobmination is not set
-                if (code != i) continue;
+                // is the entity still in this bounds?
+                // we dont have to test the radius of the entityNode because
+                // we already know it fits.
+                //    System.Console.WriteLine("m");
+                if (mBox.Contains(entityNode.BoundingBox.Center)) return;
 
-                Vector3d offset = OctreeOctant.BoundsOffsetTable[i] * octantRadius;
-                Vector3d center = octantCenter + offset;
-
-                BoundingBox childOctantBox = new BoundingBox(center, (float)childOctantRadius);
-
-                if (mChildOctants[i] == null)
-                    mChildOctants[i] =
-                        new OctreeOctant(0, _depth + 1, childOctantBox, this);
-
-                // Recursive Add() until max depth is reached or the entity's radius > octant's loose radius
-                mChildOctants[i].Add(entityNode);
-            }
-        }
-
-        public void RemoveEntityNode(EntityNode entityNode)
-        {
-            // NOTE: The reason for this function as opposed to just using OnEntityNode_Removed()
-            // is that when a node is moving, then we directly call OnEntityNode_Removed() instead
-            // so that the .SpatialNode = null can occur before we call OnEntityNode_Removed() 
-            // and yet so we dont have to make the OnEntityNode_Removed() before we .Add to the new
-            // destination.  This is important to avoid collapsing of empty branches before we've
-            // had a chance to find the correct new parent.
-            entityNode.SpatialNode = null;
-            OnEntityNode_Removed(entityNode);
-        }
-
-
-        public void OnEntityNode_Moved(EntityNode entityNode)
-        {
-            // is the entity still in this bounds?
-            // we dont have to test the radius of the entityNode because
-            // we already know it fits.
-            //    System.Console.WriteLine("m");
-            if (mBox.Contains(entityNode.BoundingBox.Center)) return;
-
-            // inform the parent that the entity in this octant no longer fits
-            // NOTE: we do not add/remove the entityNode here.  The parent must do it
-            // so that we don't trigger collapse of all 8 of it's children before parent can 
-            // have a chance to fit it into one of its other 7 children
-            if (this.IsRoot == false)
-                mParent.Move(this, entityNode); // calls on Parent
-        }
-
-        private void Move(OctreeOctant childOctant, EntityNode entityNode)
-        {
-            //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Move() - " + entityNode.Entity.TypeName);
-            // NOTE: Here we clear the .SpatialNode first but we must not call OnEntityNode_Removed()
-            //       until AFTER .Add() is called.
-            entityNode.SpatialNode = null;
-
-            // we cannot simply attempt to add to this parent because
-            // if the entityNode has moved beyond this parent's own bounds
-            // our fast Add() (which avoids having to do a Box.Contains() call 
-            // will not be able to determine this and will simply force insert
-            // the entityNode into itself.
-
-            // so we can easily avoid that by recursing til we find the first parent
-            // that contains the entityNode.. and provided the entityNode has not changed size
-            // (particularly has not gotten larger) we are guaranteed that the parent octant
-            // is large enought to contain it if the entityNode's center is with in it.
-
-            OctreeOctant newOctant = this;
-            Vector3d entityCenter = entityNode.BoundingBox.Center;
-            while (newOctant.Parent != null)
-            {
-                if (newOctant.BoundingBox.Contains(entityCenter))
-                    break;
-
-                newOctant = newOctant.Parent;
+                // inform the parent that the entity in this octant no longer fits
+                // NOTE: we do not add/remove the entityNode here.  The parent must do it
+                // so that we don't trigger collapse of all 8 of it's children before parent can 
+                // have a chance to fit it into one of its other 7 children
+                if (this.IsRoot == false)
+                    mParent.Move(this, entityNode); // calls on Parent
             }
 
-            System.Console.WriteLine("Moved to new octant");
-            newOctant.Add(entityNode);// Add must always occur before Remove() because we dont want to collapse branches before we've had a chance to determine if the child will move there!
-            childOctant.OnEntityNode_Removed(entityNode);
-        }
-
-        public void OnEntityNode_Resized(EntityNode entityNode)
-        {
-            // does this entityNode still fit in this octant?
-            // we must test against entire box since this entity may now be too big to fit
-            if (mBox.Contains(entityNode.BoundingBox)) return;
-
-            if (this.IsRoot == false)
-                mParent.Resize(this, entityNode);
-        }
-
-        private void Resize(OctreeOctant childOctant, EntityNode entityNode)
-        {
-            //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Resize() - " + entityNode.Entity.TypeName);
-            entityNode.SpatialNode = null;
-
-            // if the entity itself has resized, we cannot do the quick .Contains(point)
-            // and instead must do .Contains(box) to see if this entity still fits within this octant
-            OctreeOctant newOctant = this;
-            BoundingBox box = entityNode.BoundingBox;
-
-
-            while (newOctant.Parent != null)
+            private void Move(OctreeOctant childOctant, EntityNode entityNode)
             {
-                if (newOctant.BoundingBox.Contains(box))
-                    break;
+                //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Move() - " + entityNode.Entity.TypeName);
+                // NOTE: Here we clear the .SpatialNode first but we must not call OnEntityNode_Removed()
+                //       until AFTER .Add() is called.
+                entityNode.SpatialNode = null;
+
+                // we cannot simply attempt to add to this parent because
+                // if the entityNode has moved beyond this parent's own bounds
+                // our fast Add() (which avoids having to do a Box.Contains() call 
+                // will not be able to determine this and will simply force insert
+                // the entityNode into itself.
+
+                // so we can easily avoid that by recursing til we find the first parent
+                // that contains the entityNode.. and provided the entityNode has not changed size
+                // (particularly has not gotten larger) we are guaranteed that the parent octant
+                // is large enought to contain it if the entityNode's center is with in it.
+
+                OctreeOctant newOctant = this;
+                Vector3d entityCenter = entityNode.BoundingBox.Center;
+                while (newOctant.Parent != null)
+                {
+                    if (newOctant.BoundingBox.Contains(entityCenter))
+                        break;
+
+                    newOctant = newOctant.Parent;
+                }
+
+                System.Console.WriteLine("Moved to new octant");
+                newOctant.Add(entityNode);// Add must always occur before Remove() because we dont want to collapse branches before we've had a chance to determine if the child will move there!
+                childOctant.OnEntityNode_Removed(entityNode);
+            }
+
+            public void OnEntityNode_Resized(EntityNode entityNode)
+            {
+                // does this entityNode still fit in this octant?
+                // we must test against entire box since this entity may now be too big to fit
+                if (mBox.Contains(entityNode.BoundingBox)) return;
+
+                if (this.IsRoot == false)
+                    mParent.Resize(this, entityNode);
+            }
+
+            private void Resize(OctreeOctant childOctant, EntityNode entityNode)
+            {
+                //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Resize() - " + entityNode.Entity.TypeName);
+                entityNode.SpatialNode = null;
+
+                // if the entity itself has resized, we cannot do the quick .Contains(point)
+                // and instead must do .Contains(box) to see if this entity still fits within this octant
+                OctreeOctant newOctant = this;
+                BoundingBox box = entityNode.BoundingBox;
+
+
+                while (newOctant.Parent != null)
+                {
+                    if (newOctant.BoundingBox.Contains(box))
+                        break;
 
                 newOctant = newOctant.Parent;
             }
@@ -3544,9 +3579,9 @@ namespace HelloBoids
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // END OCTREE
 
-		
-		
-		
+
+
+
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // BEGIN TYPES
 
@@ -3840,8 +3875,8 @@ namespace HelloBoids
             double angleRadians = Math.Acos(dot / vectorsMagnitude);
 
 #if DEBUG
-            //if (v1 == Vector3d.Up())
-             //   System.Diagnostics.Debug.WriteLine("Determining if v2 is parallel to Up vector");
+        //if (v1 == Vector3d.Up())
+            //   System.Diagnostics.Debug.WriteLine("Determining if v2 is parallel to Up vector");
 #endif
             if (double.IsNaN(angleRadians))
                 return 0;
@@ -3955,7 +3990,7 @@ namespace HelloBoids
             double theta = Math.Acos(dot) * weight;
             Vector3d RelativeVec = end - start * dot;
             RelativeVec.Normalize();     // Orthonormal basis
-            // The final result.
+                                            // The final result.
             return ((start * Math.Cos(theta)) + (RelativeVec * Math.Sin(theta)));
         }
 
@@ -4212,31 +4247,31 @@ namespace HelloBoids
         {
             string delimiter = ",";// keymath.ParseHelper.English.XMLAttributeDelimiter;
             return string.Format("{0}{1}{2}{3}{4}", x, delimiter,
-                                                       y, delimiter,
-                                                       z);
+                                                        y, delimiter,
+                                                        z);
         }
 
         /*  public static string ToString(Vector3d[] vecArray)
-         {
+            {
 
-             if (vecArray == null || vecArray.Length == 0) return null;
+                if (vecArray == null || vecArray.Length == 0) return null;
 
-             string delimiter = keymath.ParseHelper.English.XMLAttributeDelimiter;
-             string result = string.Empty;
-             System.Text.StringBuilder sb = new System.Text.StringBuilder(result);
+                string delimiter = keymath.ParseHelper.English.XMLAttributeDelimiter;
+                string result = string.Empty;
+                System.Text.StringBuilder sb = new System.Text.StringBuilder(result);
 
-             for (int i = 0; i < vecArray.Length; i++)
-             {
-                 sb.Append(vecArray[i].ToString());
-                 if (i != vecArray.Length - 1)
-                     // append delimiter. NOTE: same delimiter is used even between vectors and not just their elements
-                     sb.Append(delimiter);
-             }
-             result = sb.ToString();
- 3
-             return result;
-         }
-         */
+                for (int i = 0; i < vecArray.Length; i++)
+                {
+                    sb.Append(vecArray[i].ToString());
+                    if (i != vecArray.Length - 1)
+                        // append delimiter. NOTE: same delimiter is used even between vectors and not just their elements
+                        sb.Append(delimiter);
+                }
+                result = sb.ToString();
+    3
+                return result;
+            }
+            */
 
         // TODO: i think the thing to do is move this out from here and into the PropertyBags
         //#region ICustomTypeDescriptor Members
@@ -4674,7 +4709,7 @@ namespace HelloBoids
 #if USE_STRUCT
     public struct Quaternion
 #else
-    public class Quaternion 
+    public class Quaternion
 #endif
     {
         private double[] _quat;  // subscripts 0 = x, 1=y, 2=z, 3=w
@@ -4979,9 +5014,9 @@ namespace HelloBoids
         public bool IsNan()
         {
             return double.IsNaN(_quat[0]) ||
-                   double.IsNaN(_quat[1]) ||
-                   double.IsNaN(_quat[2]) ||
-                   double.IsNaN(_quat[3]);
+                    double.IsNaN(_quat[1]) ||
+                    double.IsNaN(_quat[2]) ||
+                    double.IsNaN(_quat[3]);
 
             // NOTE: IEEEE 754 says the following will still return false. We must use .IsNaN() method 
             //	return  _quat[0] == double.NaN || 
@@ -5015,8 +5050,8 @@ namespace HelloBoids
             Quaternion result = new Quaternion(x, y, z, w);
 
 #if DEBUG
-            if (result.IsNan())
-                result = new Quaternion();
+        if (result.IsNan())
+            result = new Quaternion();
 #endif
 
             return result;
@@ -5541,9 +5576,9 @@ namespace HelloBoids
             }
 
             return new Quaternion(sclp * start.X + sclq * end.X,
-                                  sclp * start.Y + sclq * end.Y,
-                                  sclp * start.Z + sclq * end.Z,
-                                  sclp * start.W + sclq * end.W);
+                                    sclp * start.Y + sclq * end.Y,
+                                    sclp * start.Z + sclq * end.Z,
+                                    sclp * start.W + sclq * end.W);
 
             // TODO: i never properly finished this function or tested it
             // Still here? Then the quaternions are nearly opposite so to avoid a divided by zero error
@@ -5579,9 +5614,9 @@ namespace HelloBoids
             }
 
             return new Quaternion((inverse * start.X) + (opposite * end.X),
-                   (inverse * start.Y) + (opposite * end.Y),
-                   (inverse * start.Z) + (opposite * end.Z),
-                   (inverse * start.W) + (opposite * end.W));
+                    (inverse * start.Y) + (opposite * end.Y),
+                    (inverse * start.Z) + (opposite * end.Z),
+                    (inverse * start.W) + (opposite * end.W));
         }
 
         // xna lerp
@@ -5823,7 +5858,8 @@ namespace HelloBoids
             result = sb.ToString();
 
             return result;
-        }*/
+        }
+        */
     }
 
     // http://msdn.microsoft.com/en-au/library/bb206269%28VS.85%29.aspx
@@ -6346,9 +6382,9 @@ namespace HelloBoids
             // TODO: hopefully this is not something quirky with TV View matrix which is all we use this for so far.
             //       But eventually when we try to get one ship to rotate to another, we'll see if that is reversed and then we'll know
             Vector3d forward = -Vector3d.Normalize(position - target); // ZAXIS
-            // orthonormalize (aka up and forward are orthogonal and normalized)
+                                                                        // orthonormalize (aka up and forward are orthogonal and normalized)
             Vector3d newUp = Vector3d.Normalize(Vector3d.CrossProduct(up, forward)); // XAXIS
-            //Vector3d right = Vector3d.CrossProduct(forward, newUp); // YAXIS
+                                                                                        //Vector3d right = Vector3d.CrossProduct(forward, newUp); // YAXIS
             Vector3d right = Vector3d.Normalize(Vector3d.CrossProduct(forward, newUp)); // YAXIS // Normalize here not necessary?
             matrix1.M11 = newUp.x;   // XAXIS
             matrix1.M12 = right.x;   // YAXIS
@@ -6546,7 +6582,7 @@ namespace HelloBoids
 
 
         public static Matrix CreateAxialBillboardRotationMatrix(Matrix rotationMatrix, Vector3d billboardPosition,
-                                                       Vector3d cameraPosition)
+                                                        Vector3d cameraPosition)
         {
             return
                 CreateAxialBillboardRotationMatrix(new Vector3d(rotationMatrix.M21, rotationMatrix.M22, rotationMatrix.M23), billboardPosition, cameraPosition);
@@ -6826,19 +6862,19 @@ namespace HelloBoids
             Matrix source2dest = root2dest * source2root;
 
 #if DEBUG
-        	// TODO: verify that we can first subtract the relative difference in positions from both matrices to cancel those out before we 
-        	//       start matrix multiplication?  <-- Feb.4.2014 - i think the below actually proves this does work, however if there is no difference
-        	//       then there's no need to do it because it's a bit more expensive
-            // get the difference in translation between src and dst matrices
-            // verify the computed source2dest now has a translation that is equal to -difference
-            // within some tolerance and that if we were to subtract out that difference first, then
-			// our results would be more precise  
-		
-			Vector3d srcTranslation = source.GetTranslation();
-			Vector3d dstTranslation= dest.GetTranslation ();
-			Vector3d diff = dstTranslation - srcTranslation;
-			Vector3d s2dTranslation = source2dest.GetTranslation();
-	//		System.Diagnostics.Debug.Assert (s2dTranslation.Equals (diff));
+        // TODO: verify that we can first subtract the relative difference in positions from both matrices to cancel those out before we 
+        //       start matrix multiplication?  <-- Feb.4.2014 - i think the below actually proves this does work, however if there is no difference
+        //       then there's no need to do it because it's a bit more expensive
+        // get the difference in translation between src and dst matrices
+        // verify the computed source2dest now has a translation that is equal to -difference
+        // within some tolerance and that if we were to subtract out that difference first, then
+        // our results would be more precise  
+    
+        Vector3d srcTranslation = source.GetTranslation();
+        Vector3d dstTranslation= dest.GetTranslation ();
+        Vector3d diff = dstTranslation - srcTranslation;
+        Vector3d s2dTranslation = source2dest.GetTranslation();
+//		System.Diagnostics.Debug.Assert (s2dTranslation.Equals (diff));
 #endif
             return source2dest;
         }
@@ -6846,7 +6882,7 @@ namespace HelloBoids
         // TODO: looks like Sylvain has finally added TVMath.TVEulerAnglesFromMatrix(Rot, Matx)
         // if i have any problems with this, i can try switching to tv's version
         public static void Decompose(Matrix mx, out Vector3d outPosition, out Vector3d outRotation,
-                                       out Vector3d outScale)
+                                        out Vector3d outScale)
         {
             Vector3d positionResult;
             positionResult.x = mx.M41;
@@ -7340,25 +7376,25 @@ namespace HelloBoids
                     _min.z == 0d &&
                     _max.x == 0d &&
                     _max.y == 0d &&
-                     _max.z == 0d);
+                        _max.z == 0d);
         }
 
         /*
-               public static BoundingBox FromBoundingRect(BoundingRect rect)
-               {
-                   Vector3d min, max;
-                   min.x = rect.Min.x;
-                   min.y = float.MinValue;
-                   min.z = rect.Min.y;
+                public static BoundingBox FromBoundingRect(BoundingRect rect)
+                {
+                    Vector3d min, max;
+                    min.x = rect.Min.x;
+                    min.y = float.MinValue;
+                    min.z = rect.Min.y;
 
-                   max.x = rect.Max.x;
-                   max.y = float.MaxValue;
-                   max.z = rect.Max.y;
-                   BoundingBox result = new BoundingBox(min, max);
+                    max.x = rect.Max.x;
+                    max.y = float.MaxValue;
+                    max.z = rect.Max.y;
+                    BoundingBox result = new BoundingBox(min, max);
 
-                   return result;
-               }
-       */
+                    return result;
+                }
+        */
         public override string ToString()
         {
             string delimiter = ","; // keymath.ParseHelper.English.XMLAttributeDelimiter;
@@ -7400,7 +7436,7 @@ namespace HelloBoids
         public BoundingBox(Vector3d position, double radius)
             :
                 this(position.x - radius, position.y - radius, position.z - radius,
-                     position.x + radius, position.y + radius, position.z + radius)
+                        position.x + radius, position.y + radius, position.z + radius)
         {
         }
 
@@ -7410,7 +7446,7 @@ namespace HelloBoids
         public BoundingBox(Vector3d position, float radius)
             :
                 this(position.x - radius, position.y - radius, position.z - radius,
-                     position.x + radius, position.y + radius, position.z + radius)
+                        position.x + radius, position.y + radius, position.z + radius)
         {
         }
         // we use * .5f because if we try to take width of these it returns infinity since double overlows
@@ -7509,7 +7545,7 @@ namespace HelloBoids
 
         /// <summary>
         /// True diameter which takes into account the diagonal length from one corner to it's opposite.
-		/// TODO: this is not actually diameter which is a diagonal line, this is the max axis length
+        /// TODO: this is not actually diameter which is a diagonal line, this is the max axis length
         /// </summary>
         public double Diameter
         {
@@ -7756,145 +7792,145 @@ namespace HelloBoids
 
 
         /*  public bool Intersects(Ray r, double t0, double t1, out double distance1, out double distance2)
-          {
-              distance1 = distance2 = 0;
+            {
+                distance1 = distance2 = 0;
 
-              // https://people.csail.mit.edu/amy/papers/box-jgt.pdf
-              Vector3d[] parameters = new Vector3d[2];
-              parameters[0] = _min;
-              parameters[1] = _max;
-              double tXmin = (parameters[r.Sign[0]].x - r.Origin.x) * r.InverseDirection.x;
-              double tXmax = (parameters[1 - r.Sign[0]].x - r.Origin.x) * r.InverseDirection.x;
-              double tymin = (parameters[r.Sign[1]].y - r.Origin.y) * r.InverseDirection.y;
-              double tymax = (parameters[1 - r.Sign[1]].y - r.Origin.y) * r.InverseDirection.y;
+                // https://people.csail.mit.edu/amy/papers/box-jgt.pdf
+                Vector3d[] parameters = new Vector3d[2];
+                parameters[0] = _min;
+                parameters[1] = _max;
+                double tXmin = (parameters[r.Sign[0]].x - r.Origin.x) * r.InverseDirection.x;
+                double tXmax = (parameters[1 - r.Sign[0]].x - r.Origin.x) * r.InverseDirection.x;
+                double tymin = (parameters[r.Sign[1]].y - r.Origin.y) * r.InverseDirection.y;
+                double tymax = (parameters[1 - r.Sign[1]].y - r.Origin.y) * r.InverseDirection.y;
 
-              // TODO: is there an issue in this method of failing to collide when the t0 and t1 are both inside the 
-              // min/max of the bounding box such that there is no collision with any plane?  In that way, the box "contains"
-              // the ray but never intersects it.
+                // TODO: is there an issue in this method of failing to collide when the t0 and t1 are both inside the 
+                // min/max of the bounding box such that there is no collision with any plane?  In that way, the box "contains"
+                // the ray but never intersects it.
 
-              //         distance1 = tXmin;
-              //         distance2 = tXmax;
+                //         distance1 = tXmin;
+                //         distance2 = tXmax;
 
-              if ((tXmin > tymax) || (tymin > tXmax)) return false;
-              // consolidate min/max into txmin and txmax respectively
-              if (tymin > tXmin)
-                  tXmin = tymin;
-              if (tymax < tXmax)
-                  tXmax = tymax;
+                if ((tXmin > tymax) || (tymin > tXmax)) return false;
+                // consolidate min/max into txmin and txmax respectively
+                if (tymin > tXmin)
+                    tXmin = tymin;
+                if (tymax < tXmax)
+                    tXmax = tymax;
 
-              double tzmin = (parameters[r.Sign[2]].z - r.Origin.z) * r.InverseDirection.z;
-              double tzmax = (parameters[1 - r.Sign[2]].z - r.Origin.z) * r.InverseDirection.z;
+                double tzmin = (parameters[r.Sign[2]].z - r.Origin.z) * r.InverseDirection.z;
+                double tzmax = (parameters[1 - r.Sign[2]].z - r.Origin.z) * r.InverseDirection.z;
 
-              if ((tXmin > tzmax) || (tzmin > tXmax)) return false;
-              // consolidate min/max into txmin and txmax respectively
-              if (tzmin > tXmin)
-                  tXmin = tzmin;
-              if (tzmax < tXmax)
-                  tXmax = tzmax;
+                if ((tXmin > tzmax) || (tzmin > tXmax)) return false;
+                // consolidate min/max into txmin and txmax respectively
+                if (tzmin > tXmin)
+                    tXmin = tzmin;
+                if (tzmax < tXmax)
+                    tXmax = tzmax;
 
-              // The code from this lesson returns intersections with the box which are in front or behind 
-              // the origin of the ray. For instance, if the ray's origin is inside the box (like in the 
-              // image on the right), there will be two intersections: one in front of the ray and one behind.
-              // We know that an intersection is "behind" the origin of the ray when the value for t is negative.
-              // When t is positive, the intersection is in front of the origin of the ray. If your algorithm
-              // is not interested in intersections for values of t lower than 0, then you will have to carefully
-              // deal with these cases when you return from the ray-box intersection box (as it is often a source 
-              // of bugs).
+                // The code from this lesson returns intersections with the box which are in front or behind 
+                // the origin of the ray. For instance, if the ray's origin is inside the box (like in the 
+                // image on the right), there will be two intersections: one in front of the ray and one behind.
+                // We know that an intersection is "behind" the origin of the ray when the value for t is negative.
+                // When t is positive, the intersection is in front of the origin of the ray. If your algorithm
+                // is not interested in intersections for values of t lower than 0, then you will have to carefully
+                // deal with these cases when you return from the ray-box intersection box (as it is often a source 
+                // of bugs).
 
-              distance1 = tXmin;
-              distance2 = tXmax;
+                distance1 = tXmin;
+                distance2 = tXmax;
 
-              // if -1 for t0 and t1, no min/max range testing wanted
-              if (t0 == -1d || t1 == -1d) return true;
+                // if -1 for t0 and t1, no min/max range testing wanted
+                if (t0 == -1d || t1 == -1d) return true;
 
-              // return true if any part of collision segmewnt overlaps the min/max range
-              return ((tXmin < t1) && (tXmax > t0));
-          }
+                // return true if any part of collision segmewnt overlaps the min/max range
+                return ((tXmin < t1) && (tXmax > t0));
+            }
 
-          /// <summary>Ray-box intersection using IEEE numerical properties to ensure 
-          ///  that the test is both robust and efficient, as described in:
-          /// 
-          ///       Amy Williams, Steve Barrus, R. Keith Morley, and Peter Shirley
-          ///       "An Efficient and Robust Ray-Box Intersection Algorithm"
-          ///       Journal of graphics tools, 10(1):49-54, 2005
-          ///        
-          /// t0 and t1 accept a valid intersection interval.  In this way
-          /// you can ignore positive hits that are too close or too far away
-          /// from the desired area you're testing. (e.g. in a game with an avatar
-          /// testing only the length by which the player traveled since the last frame
-          /// is good enough for t1 and perhaps t0 being 0 or very close to it .001.
-          /// Same principle works for collision of bullets and particle lasers between frames.
-          /// </summary>
-          /// <param name="r"></param>
-          /// <param name="t0">Start interval</param>
-          /// <param name="t1">End interval</param>
-          /// <returns></returns>
-          public bool Intersects(Ray r, double t0, double t1)
-          {
-              //https://tavianator.com/2011/ray_box.html
-              // http://www.scratchapixel.com/lessons/3d-basic-lessons/lesson-7-intersecting-simple-shapes/ray-box-intersection/
-              Vector3d[] parameters = new Vector3d[2];
-              parameters[0] = _min;
-              parameters[1] = _max;
-              double tXmin = (parameters[r.Sign[0]].x - r.Origin.x) * r.InverseDirection.x;
-              double tXmax = (parameters[1 - r.Sign[0]].x - r.Origin.x) * r.InverseDirection.x;
-              double tymin = (parameters[r.Sign[1]].y - r.Origin.y) * r.InverseDirection.y;
-              double tymax = (parameters[1 - r.Sign[1]].y - r.Origin.y) * r.InverseDirection.y;
+            /// <summary>Ray-box intersection using IEEE numerical properties to ensure 
+            ///  that the test is both robust and efficient, as described in:
+            /// 
+            ///       Amy Williams, Steve Barrus, R. Keith Morley, and Peter Shirley
+            ///       "An Efficient and Robust Ray-Box Intersection Algorithm"
+            ///       Journal of graphics tools, 10(1):49-54, 2005
+            ///        
+            /// t0 and t1 accept a valid intersection interval.  In this way
+            /// you can ignore positive hits that are too close or too far away
+            /// from the desired area you're testing. (e.g. in a game with an avatar
+            /// testing only the length by which the player traveled since the last frame
+            /// is good enough for t1 and perhaps t0 being 0 or very close to it .001.
+            /// Same principle works for collision of bullets and particle lasers between frames.
+            /// </summary>
+            /// <param name="r"></param>
+            /// <param name="t0">Start interval</param>
+            /// <param name="t1">End interval</param>
+            /// <returns></returns>
+            public bool Intersects(Ray r, double t0, double t1)
+            {
+                //https://tavianator.com/2011/ray_box.html
+                // http://www.scratchapixel.com/lessons/3d-basic-lessons/lesson-7-intersecting-simple-shapes/ray-box-intersection/
+                Vector3d[] parameters = new Vector3d[2];
+                parameters[0] = _min;
+                parameters[1] = _max;
+                double tXmin = (parameters[r.Sign[0]].x - r.Origin.x) * r.InverseDirection.x;
+                double tXmax = (parameters[1 - r.Sign[0]].x - r.Origin.x) * r.InverseDirection.x;
+                double tymin = (parameters[r.Sign[1]].y - r.Origin.y) * r.InverseDirection.y;
+                double tymax = (parameters[1 - r.Sign[1]].y - r.Origin.y) * r.InverseDirection.y;
 
-              // TODO: is there an issue in this method of failing to collide when the t0 and t1 are both inside the 
-              // min/max of the bounding box such that there is no collision with any plane?  In that way, the box "contains"
-              // the ray but never intersects it.
+                // TODO: is there an issue in this method of failing to collide when the t0 and t1 are both inside the 
+                // min/max of the bounding box such that there is no collision with any plane?  In that way, the box "contains"
+                // the ray but never intersects it.
 
 
-              if ((tXmin > tymax) || (tymin > tXmax)) return false;
-              // consolidate min/max into txmin and txmax respectively
-              if (tymin > tXmin)
-                  tXmin = tymin;
-              if (tymax < tXmax)
-                  tXmax = tymax;
+                if ((tXmin > tymax) || (tymin > tXmax)) return false;
+                // consolidate min/max into txmin and txmax respectively
+                if (tymin > tXmin)
+                    tXmin = tymin;
+                if (tymax < tXmax)
+                    tXmax = tymax;
 
-              double tzmin = (parameters[r.Sign[2]].z - r.Origin.z) * r.InverseDirection.z;
-              double tzmax = (parameters[1 - r.Sign[2]].z - r.Origin.z) * r.InverseDirection.z;
+                double tzmin = (parameters[r.Sign[2]].z - r.Origin.z) * r.InverseDirection.z;
+                double tzmax = (parameters[1 - r.Sign[2]].z - r.Origin.z) * r.InverseDirection.z;
 
-              if ((tXmin > tzmax) || (tzmin > tXmax)) return false;
-              // consolidate min/max into txmin and txmax respectively
-              if (tzmin > tXmin)
-                  tXmin = tzmin;
-              if (tzmax < tXmax)
-                  tXmax = tzmax;
+                if ((tXmin > tzmax) || (tzmin > tXmax)) return false;
+                // consolidate min/max into txmin and txmax respectively
+                if (tzmin > tXmin)
+                    tXmin = tzmin;
+                if (tzmax < tXmax)
+                    tXmax = tzmax;
 
-              // The code from this lesson returns intersections with the box which are in front or behind 
-              // the origin of the ray. For instance, if the ray's origin is inside the box (like in the 
-              // image on the right), there will be two intersections: one in front of the ray and one behind.
-              // We know that an intersection is "behind" the origin of the ray when the value for t is negative.
-              // When t is positive, the intersection is in front of the origin of the ray. If your algorithm
-              // is not interested in intersections for values of t lower than 0, then you will have to carefully
-              // deal with these cases when you return from the ray-box intersection box (as it is often a source 
-              // of bugs).
+                // The code from this lesson returns intersections with the box which are in front or behind 
+                // the origin of the ray. For instance, if the ray's origin is inside the box (like in the 
+                // image on the right), there will be two intersections: one in front of the ray and one behind.
+                // We know that an intersection is "behind" the origin of the ray when the value for t is negative.
+                // When t is positive, the intersection is in front of the origin of the ray. If your algorithm
+                // is not interested in intersections for values of t lower than 0, then you will have to carefully
+                // deal with these cases when you return from the ray-box intersection box (as it is often a source 
+                // of bugs).
 
-              // if -1 for t0 and t1, no min/max range testing wanted
-              if (t0 == -1d || t1 == -1d) return true;
+                // if -1 for t0 and t1, no min/max range testing wanted
+                if (t0 == -1d || t1 == -1d) return true;
 
-              // return true if any part of collision segmewnt overlaps the min/max range
-              return ((tXmin < t1) && (tXmax > t0));
-          }
+                // return true if any part of collision segmewnt overlaps the min/max range
+                return ((tXmin < t1) && (tXmax > t0));
+            }
 
-          // also a good article on various collision detections
-          // http://www.harveycartel.org/metanet/tutorials/tutorialA.html
-          // a simple collision response so that two colliding boxes dont penetrate
-          // A this point we've already determined that the boxes intersect...
+            // also a good article on various collision detections
+            // http://www.harveycartel.org/metanet/tutorials/tutorialA.html
+            // a simple collision response so that two colliding boxes dont penetrate
+            // A this point we've already determined that the boxes intersect...
 
-          //float dist[4];
+            //float dist[4];
 
-          //dist[0] = box1.max.x - box2.min.x;
-          //dist[1] = box2.max.x - box1.min.x;
-          //dist[2] = box1.max.y - box2.min.y;
-          //dist[3] = box2.max.y - box1.min.y;
+            //dist[0] = box1.max.x - box2.min.x;
+            //dist[1] = box2.max.x - box1.min.x;
+            //dist[2] = box1.max.y - box2.min.y;
+            //dist[3] = box2.max.y - box1.min.y;
 
-          //size_t direction = std::distance(dist, std::min_element(dist, dist + 4));
+            //size_t direction = std::distance(dist, std::min_element(dist, dist + 4));
 
-          //switch (direction) {
-          //    case 0: /* Move box1 along -x by dist[0] */ // break;
+            //switch (direction) {
+            //    case 0: /* Move box1 along -x by dist[0] */ // break;
                                                             //    case 1: /* Move box1 along +x by dist[1] */ break;
                                                             //    case 2: /* Move box1 along -y by dist[2] */ break;
                                                             //    case 3: /* Move box1 along +y by dist[3] */ break;
@@ -8280,7 +8316,7 @@ namespace HelloBoids
                 // one good thing is this code can be used for our imposter code too
                 // find the minimum and maximum distance needed to enclose that box on the supplied axis.
                 public static void GetProjectedDistances(BoundingBox box, Vector3d OnVector, out double NearDistance,
-                                                         out double FarDistance)
+                                                            out double FarDistance)
                 {
                     double FarAssociatedNear = double.MinValue;
                     NearDistance = double.MaxValue;
@@ -8318,18 +8354,18 @@ namespace HelloBoids
                 }
         */
 
-		public override bool Equals (object bb)
-		{
-			if (bb is BoundingBox == false) return false;
-			
-			return this == (BoundingBox)bb;
-		}
-		
-		public override int GetHashCode()
-		{
-			return this.Min.GetHashCode() + this.Max.GetHashCode();
-		}
-		
+        public override bool Equals(object bb)
+        {
+            if (bb is BoundingBox == false) return false;
+
+            return this == (BoundingBox)bb;
+        }
+
+        public override int GetHashCode()
+        {
+            return this.Min.GetHashCode() + this.Max.GetHashCode();
+        }
+
         // Equality operator. Returns dbNull if either operand is dbNull, 
         // otherwise returns dbTrue or dbFalse:
         public static bool operator ==(BoundingBox a, BoundingBox b)
@@ -8377,7 +8413,7 @@ namespace HelloBoids
             for (int i = 0; i < numToFree; i++)
             {
                 byte[] temp = new byte[freeSize]; // Allocate temporarily
-                                                  // No pinning for these, they can be collected
+                                                    // No pinning for these, they can be collected
             }
             Console.WriteLine("Temporary objects created and potentially collected.");
 
@@ -8389,16 +8425,16 @@ namespace HelloBoids
             Console.WriteLine("Garbage collection performed. Fragmentation might be present.");
 
             /*  // Now, try to allocate a large contiguous block
-              try
-              {
-                  byte[] largeBlock = new byte[1024 * 1024 * 5]; // 5MB
-                  Console.WriteLine("Successfully allocated a large contiguous block.");
-              }
-              catch (OutOfMemoryException)
-              {
-                  Console.WriteLine("Failed to allocate a large contiguous block due to fragmentation.");
-              }
-           */
+                try
+                {
+                    byte[] largeBlock = new byte[1024 * 1024 * 5]; // 5MB
+                    Console.WriteLine("Successfully allocated a large contiguous block.");
+                }
+                catch (OutOfMemoryException)
+                {
+                    Console.WriteLine("Failed to allocate a large contiguous block due to fragmentation.");
+                }
+            */
 
         }
 
@@ -8415,8 +8451,8 @@ namespace HelloBoids
             GC.Collect();
             Console.WriteLine("Cleanup complete.");
         }
-		//
-		public static object[] CreateAndFreeObjects(int LargeObjectSize)
+        //
+        public static object[] CreateAndFreeObjects(int LargeObjectSize)
         {
             object[] tmp = new object[3];
 
@@ -8432,8 +8468,8 @@ namespace HelloBoids
         }
 
     }
-		
-		
+
+
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // BEGIN MEMORY STORES
@@ -8763,16 +8799,16 @@ namespace HelloBoids
             }
         }
 
-		public ReadOnlySpan<T> Copy ()
-		{
-			lock (mSync)
+        public ReadOnlySpan<T> Copy()
+        {
+            lock (mSync)
             {
-				ReadOnlySpan<T> result = Components.Span;
-				return result;
+                ReadOnlySpan<T> result = Components.Span;
+                return result;
             }
-		}
-		
-		
+        }
+
+
         public void CheckIn(Memory<T> mem)
         {
             lock (mSync)
@@ -8793,32 +8829,32 @@ namespace HelloBoids
         }
     } // ComponentStore.cs
 
-		
-	
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-	public class IntervalTimers
+
+
+
+
+
+
+
+
+
+
+
+
+    public class IntervalTimers
     {
-        public delegate string IntervalCompleted (string nodeID, string name);
+        public delegate string IntervalCompleted(string nodeID, string name);
         //private List<TimePeriod> mTimePeriods;
         private Dictionary<string, TimePeriod> mKeyedTimePeriods;
-		
-		// NOTE: Using a class for TimePeriod instead of a struct allows us to easily
+
+        // NOTE: Using a class for TimePeriod instead of a struct allows us to easily
         //       increment timePeriod.Elapsed and decrement timePeriod.RepeatsRemaining without
         //       having to update this timePeriod within the Dictionary.
         private class TimePeriod
         {
             public string OwnerID;
             public string Name;
-            
+
             // milliseconds
             public double Duration; // the duration in Seconds this Period will last before completed ("IsReady")
             public double Elapsed;  // get's incremented each frame by elapsedSeconds and compared against Duration
@@ -8826,42 +8862,42 @@ namespace HelloBoids
             public int RepeatCount;
             public int RepeatsRemaining;
             private bool mIsActive;
-			 // there should be no need to modify the Elapsed when resuming 
+            // there should be no need to modify the Elapsed when resuming 
             // because we do not store the starting TickCount, we just 
             // track the elapsed duration
-            public bool IsPaused; 
-			
+            public bool IsPaused;
+
             public bool DeActivateAfterCompleted;
-                       
+
             /// notifies the caller that the Interval with the specified "Name" has completed.
             public IntervalCompleted IntervalCompletedCB;
-			
-			
-            public bool IsReady { get { return Elapsed >= Duration; }}
-            
+
+
+            public bool IsReady { get { return Elapsed >= Duration; } }
+
             ///<summary>
             /// Rather than delete a Timer, sometimes we just want to 
             /// set IsActive=false and we will skip updates to it.
             ///</summary>
-            public bool IsActive 
+            public bool IsActive
             {
-                get { return mIsActive;}
-                set 
+                get { return mIsActive; }
+                set
                 {
                     mIsActive = !mIsActive; // toggle the state
                     Elapsed = 0;            // always reset the Elapsed to 0
                 }
-            } 
-            
-            
-        }
-        
+            }
 
-        
-        public void Register(string nodeID, string name, double durationInSeconds,  bool activateImmediately = true, bool repeating = false, int repeatCount = 0)
+
+        }
+
+
+
+        public void Register(string nodeID, string name, double durationInSeconds, bool activateImmediately = true, bool repeating = false, int repeatCount = 0)
         {
             TimePeriod tp = new TimePeriod();
-			
+
             tp.OwnerID = nodeID;
             tp.Name = name;
             tp.Duration = durationInSeconds;
@@ -8869,126 +8905,130 @@ namespace HelloBoids
             tp.Repeating = repeating;
             tp.RepeatCount = repeatCount;
             tp.RepeatsRemaining = repeatCount;
-            
+
             tp.IsPaused = false;
-			tp.DeActivateAfterCompleted = false;
-			tp.IntervalCompletedCB = null;
-			//tp.mIsActive = false;
-			
-            //tp.IsActive = activateImmediately;
-			
+            tp.DeActivateAfterCompleted = false;
+            tp.IntervalCompletedCB = null;
+
+            tp.IsActive = activateImmediately;
+
             string key = GetKey(nodeID, name);
             if (mKeyedTimePeriods == null) mKeyedTimePeriods = new Dictionary<string, TimePeriod>();
-            mKeyedTimePeriods.Add (key, tp);
+            mKeyedTimePeriods.Add(key, tp);
         }
-        
-        public void UnRegister (string nodeID, string name)
+
+        public void UnRegister(string nodeID, string name)
         {
             // TODO: remove this period from the dictionary
-            if (mKeyedTimePeriods == null) 
+            if (mKeyedTimePeriods == null)
             {
-                System.Diagnostics.Debug.WriteLine ("GameTime.UnRegister() - " + nodeID + " using name " + name + " does not exist.");
+                System.Diagnostics.Debug.WriteLine("GameTime.UnRegister() - " + nodeID + " using name " + name + " does not exist.");
             }
-            string key = GetKey (nodeID, name);
+            string key = GetKey(nodeID, name);
             TimePeriod tp;
-            bool success = mKeyedTimePeriods.TryGetValue (key, out tp);
-            
-            if (success) 
+            bool success = mKeyedTimePeriods.TryGetValue(key, out tp);
+
+            if (success)
                 mKeyedTimePeriods.Remove(key);
-            else 
-                System.Diagnostics.Debug.WriteLine ("GameTime.UnRegister() - " + nodeID + " using name " + name + " does not exist.");
-                
+            else
+                System.Diagnostics.Debug.WriteLine("GameTime.UnRegister() - " + nodeID + " using name " + name + " does not exist.");
+
         }
-        
+
         ///<summary>
         /// Unregisters all Intervals registered for a specific nodeID
         ///</summary>
-        public void Interval_UnRegisterAll (string nodeID)
+        public void Interval_UnRegisterAll(string nodeID)
         {
-            
+
         }
-        
+
 
         //public TimePeriod[] GetAllTimeIntervals (string nodeID)
         //{
         //    // for this to work, we must test for existance of "nodeID" at the start of every key in the dictionary 
         //    return null;
         //}
-        
-        public void Reset (string nodeID, string name)
+
+        public void Reset(string nodeID, string name)
         {
-            if (mKeyedTimePeriods == null) 
+            if (mKeyedTimePeriods == null)
             {
-                System.Diagnostics.Debug.WriteLine ("GameTime.Reset() - " + nodeID + " using name " + name + " does not exist.");
+                System.Diagnostics.Debug.WriteLine("GameTime.Reset() - " + nodeID + " using name " + name + " does not exist.");
             }
-            string key = GetKey (nodeID, name);
+            string key = GetKey(nodeID, name);
             TimePeriod tp;
-            bool success = mKeyedTimePeriods.TryGetValue (key, out tp);
-            
-            if (success) 
+            bool success = mKeyedTimePeriods.TryGetValue(key, out tp);
+
+            if (success)
                 tp.Elapsed = 0d;
-            else 
-                System.Diagnostics.Debug.WriteLine ("GameTime.Reset() - " + nodeID + " using name " + name + " does not exist.");
-                
+            else
+                System.Diagnostics.Debug.WriteLine("GameTime.Reset() - " + nodeID + " using name " + name + " does not exist.");
+
         }
 
-        public bool IsReady (string nodeID, string name)
+        public bool IsReady(string nodeID, string name)
         {
-            if (mKeyedTimePeriods == null) 
+            if (mKeyedTimePeriods == null)
             {
-                System.Diagnostics.Debug.WriteLine ("GameTime.IsReady() - " + nodeID + " using name " + name + " does not exist.");
+                //Console.WriteLine("GameTime.IsReady() - " + nodeID + " using name " + name + " does not exist.");
                 return false;
             }
-            string key = GetKey (nodeID, name);
+            string key = GetKey(nodeID, name);
             TimePeriod tp;
-            bool success = mKeyedTimePeriods.TryGetValue (key, out tp);
-            
-            if (success) 
-                return !tp.IsPaused && tp.IsActive && tp.Elapsed >= tp.Duration;
-                
+            bool success = mKeyedTimePeriods.TryGetValue(key, out tp);
+
+            if (success)
+            {
+                bool result = !tp.IsPaused && tp.IsActive && tp.Elapsed >= tp.Duration;
+
+                //Console.WriteLine("GameTime.IsReady() - " + nodeID + " using name ''" + name + "'' isReady = " + result.ToString());
+                return result;
+            }
+
             return false;
         }
-        
-        public bool IsActive (string nodeID, string name)
+
+        public bool IsActive(string nodeID, string name)
         {
-            if (mKeyedTimePeriods == null) 
+            if (mKeyedTimePeriods == null)
             {
-                System.Diagnostics.Debug.WriteLine ("GameTime.IsActive() - " + nodeID + " using name " + name + " does not exist.");
+                System.Diagnostics.Debug.WriteLine("GameTime.IsActive() - " + nodeID + " using name " + name + " does not exist.");
                 return false;
             }
-            string key = GetKey (nodeID, name);
+            string key = GetKey(nodeID, name);
             TimePeriod tp;
-            bool success = mKeyedTimePeriods.TryGetValue (key, out tp);
-            
+            bool success = mKeyedTimePeriods.TryGetValue(key, out tp);
+
             if (success) return tp.IsActive;
-                
+
             return false;
         }
-        
-        private string GetKey (string nodeID, string name)
+
+        private string GetKey(string nodeID, string name)
         {
             return nodeID + "_" + name;
         }
-        
+
         public void Update(double elapsedSeconds)
         {
             if (mKeyedTimePeriods == null || mKeyedTimePeriods.Count == 0) return;
 
-			foreach (TimePeriod period in mKeyedTimePeriods.Values)
-			{
-				if (!period.IsActive || period.IsPaused) continue;
+            foreach (TimePeriod period in mKeyedTimePeriods.Values)
+            {
+                if (!period.IsActive || period.IsPaused) continue;
                 period.Elapsed += elapsedSeconds;
-                
+
                 if (period.Elapsed >= period.Duration)
                 {
                     period.IntervalCompletedCB?.Invoke(period.OwnerID, period.Name);
-                    
-                    if (period.Repeating) 
+
+                    if (period.Repeating)
                     {
                         double spillOver = period.Elapsed - period.Duration;
                         period.Elapsed = spillOver;
                         period.RepeatsRemaining--;
-                        
+
                         // return before deactivation or removing the timePeriod
                         if (period.RepeatsRemaining > 0)
                             return;
@@ -8996,15 +9036,19 @@ namespace HelloBoids
 
                     // deactivate or remove this TimePeriod 
                     if (period.DeActivateAfterCompleted)
-                        period.IsActive = false;
-                    else
-                        UnRegister (period.OwnerID, period.Name);
-                    
+                        period.IsActive = true;
+                    //else
+                    //    todo: cant unregister it befire callet can
+                    //     check if IsReady== true !!
+                    //     unless a delegate or event is raised
+
+                    //    UnRegister(period.OwnerID, period.Name);
+
                 }
             }
         }
-    }	
-		
+    }
+
     /// <summary>
     /// Zaknafein's TV3D Profiler.  TODO: I should modify this to be more general purpose to include my debug text as well.
     /// </summary>
@@ -9614,13 +9658,13 @@ namespace HelloBoids
             return dt_fps;
         }
 
-		public static string GetTimeString()
+        public static string GetTimeString()
         {
             // NOTE: When running on Online Compiler, this time will be the time of the SERVER 
             //       running the online compiler and NOT your local PC.
             return DateTime.Now.ToString();
         }
-		
+
         public static int RGBA(float r, float g, float b, float a)
         {
             int A = (int)(255 * a);
@@ -9708,6 +9752,7 @@ namespace HelloBoids
     {
         return (Counter - startCounter) *  (1D / (double)Time.Frequency);
 
+    }
     }
     */
 }

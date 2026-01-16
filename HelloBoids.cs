@@ -27,28 +27,31 @@ namespace HelloBoids
     public class EntryClass
     {
         public static HelloBoids.ComponentStoreCollection mCStoreCol = new HelloBoids.ComponentStoreCollection();
+		public static BoidSimulation bSim;
         public static uint NUM_ENTRIES = 768;
         public static uint NUM_ITERATIONS = 200;
         public static double WIDTH = 800d;
         public static double HEIGHT = 600d;
         private static string MODE;
         private static bool useOctree = true;
-        public static double MAX_RUNTIME_SECONDS = 0.5d;
+		
+        public static double MAX_RUNTIME_SECONDS = 2.5d;
         public static double step;
-        public static long mCurrentFrame;
+        private static double mTotalRuntime;
+
+		public static long mCurrentFrame;
         public static Profiler CodeProfiler;
         public static string output;
-        public static BoidSimulation bSim;
+		        
 
-        //private static object mTestSpan;
-        // private Span<T> mTest;
         private static bool mIsRunning;
         private static object mGameThreadLockObject = new object();
         private static object mSyncLock;
 
+		
+		
         public static void Main()
         {
-
             mSyncLock = new object();
 
             MODE = "Memory<T>";
@@ -64,12 +67,17 @@ namespace HelloBoids
             useOctree = true;
 #endif
 
-            double targetRateFramesPerSecond = 60d;
-            step = 1d / targetRateFramesPerSecond; // aka dt or "deltaTime"
+            double targetFrameRatePerSecond = 60d;
+            step = 1d / targetFrameRatePerSecond; // aka dt or "deltaTime"
 
-            // step == 1 results targetRateFramesPerSecond of 0.0333 seconds
-            // 33.33 milliseconds per frame
-
+			// 100FPS uses a step of 1 / 100d == 0.01 seconds 
+			// or 10.00 milliseconds per framer
+			//
+            // 60FPS uses a step of 1 / 60d == 0.0166666666666667 seconds 
+			// or 16.66 milliseconds per framer
+			//
+			// 30FPS uses a step of 1 / 30d == 0.0333333333333333 seconds
+            // or 33.33 milliseconds per frame
 
 
             // how do we profile in other classes if the profiler is not static in Core?
@@ -103,10 +111,10 @@ namespace HelloBoids
 
             // processing
             categoryIndex++;
-            string scriptingCategory = null;// categoryIndex.ToString() + " - Process";
-            CodeProfiler.Register("AssignSpan", scriptingCategory);
-            CodeProfiler.Register("Process", scriptingCategory);
-            CodeProfiler.Register("GetNeighbors", scriptingCategory);
+            string dataProcessing = "Data Processing";
+            CodeProfiler.Register("AssignSpan", dataProcessing);
+            CodeProfiler.Register("Process Frame", dataProcessing);
+            CodeProfiler.Register("GetNeighbors", dataProcessing);
 
             /*	
             // culling  
@@ -174,7 +182,7 @@ namespace HelloBoids
 
 
             Console.WriteLine("");
-            Console.WriteLine("Performance Test #1 started in Game thread.");
+            Console.WriteLine("Performance Test #1 STARTED in Game thread.");
             Console.WriteLine("");
 
             // The main thread waits for user input to stop the application
@@ -193,7 +201,7 @@ namespace HelloBoids
             // Ensure the game thread has time to stop gracefully (optional for background threads)
             gameThread.Join();
 
-            Console.WriteLine("Game Thread #1 completed.");
+            Console.WriteLine("Game Thread #1 COMPLETED.");
             ///////////////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -210,7 +218,7 @@ namespace HelloBoids
             gameThread.IsBackground = true;
             gameThread.Start();
 
-            Console.WriteLine("Performance Test #2 started in a Game thread.");
+            Console.WriteLine("Performance Test #2 STARTED in Game thread.");
             Console.WriteLine("");
 
             // The main thread waits for user input to stop the application
@@ -229,7 +237,7 @@ namespace HelloBoids
             gameThread.Join();
 
 
-            Console.WriteLine("Game Thread #2 completed.");
+            Console.WriteLine("Game Thread #2 COMPLETED.");
 
 
             output = "Goodbye Boids! - " + Utils.GetTimeString();
@@ -240,7 +248,7 @@ namespace HelloBoids
         // simulation updates
         private static void GameLoop()
         {
-
+			
             bSim = new BoidSimulation((int)NUM_ENTRIES, WIDTH, HEIGHT, useOctree);
             // Note: the larger the various distance values below,
             // the more cpu cycles needed. Tweak these values
@@ -256,15 +264,11 @@ namespace HelloBoids
             bSim.TurnFactor = 0.1; // For boundary avoidance
 
 
-            output = "PERFORMANCE TEST RUNNING - " + NUM_ENTRIES.ToString() + " boids @ " + NUM_ITERATIONS.ToString() + " iterations.";
+            output = "Performance Test RUNNING - " + NUM_ENTRIES.ToString() + " boids @ " + NUM_ITERATIONS.ToString() + " iterations.";
             Console.WriteLine(output);
             Debug.WriteLine(output);
 
             output = "Please Wait...";
-            Console.WriteLine(output);
-            Debug.WriteLine(output);
-
-            output = "____________________________________________";
             Console.WriteLine(output);
             Debug.WriteLine(output);
 
@@ -376,7 +380,7 @@ namespace HelloBoids
             // if the NUM_ENTRIES stays the same
             double fps = NUM_ITERATIONS / timeSpan.TotalSeconds;
 
-            output = "PERFORMANCE TEST COMPLETED - " + Utils.GetTimeString();
+            output = "Performance Test COMPLETED - " + Utils.GetTimeString();
             System.Diagnostics.Debug.WriteLine(output);
             Console.WriteLine(output);
 
@@ -425,22 +429,20 @@ namespace HelloBoids
 
         }
 
+        private static void Update(double elapsedSeconds)
+        {
+
+            using (EntryClass.CodeProfiler.HookUp("Process Frame"))
+            {
+                bSim.Update(elapsedSeconds);
+            }
+
+        }
+		
         private static void UpdateLoop()
         {
             // TODO: Insert game logic (physics, AI, input processing from a queue)
             // Use lock when accessing shared data
-        }
-
-        private static double mTotalRuntime;
-
-        private static void Update(double elapsedSeconds)
-        {
-
-            using (EntryClass.CodeProfiler.HookUp("Process"))
-            {
-				bSim.Update(elapsedSeconds);
-			}
-
         }
 
         private static void RenderLoop()
@@ -469,7 +471,10 @@ namespace HelloBoids
 
     public class BoidSimulation
     {
+
+#if USE_MEMORY_T
         public DataProcessorsStore mDataProcessor;
+#endif
         public List<Boid> Boids { get; set; }
         public int Seed { get; set; } = 123;
 
@@ -490,15 +495,16 @@ namespace HelloBoids
         public static ComponentStore<Transform.Transform_Struct> Store;
 #endif
 
-        public BoidSimulation(int numBoids, double width, double height, bool useOctree = false)
+        public BoidSimulation(int numBoids, double width, double height, bool useOctree = false, uint maxOctreeDepth = 9)
         {
             Boids = new List<Boid>(); //NOTE: we do not preallocate the list here
 
+#if USE_MEMORY_T
+        
             mDataProcessor = new DataProcessorsStore(EntryClass.mCStoreCol);
-
+#endif
             mIntervalTimers = new IntervalTimers();
-
-            mIntervalTimers.Register("HelloBoids", "spawn", 0.06d);
+            mIntervalTimers.Register("LifeCycle", "spawn", 0.06d);
 
             if (useOctree)
             {
@@ -512,16 +518,21 @@ namespace HelloBoids
 
                 OctreeOctant parent = null; // root has no parent
                 BoundingBox box = new BoundingBox(min, max);
-                uint octreeMaxDepth = 8;
+                uint octreeMaxDepth = maxOctreeDepth;
                 OctreeOctant.MaxDepth = octreeMaxDepth;
                 Octree = new OctreeOctant(0, 0, box, parent);
             }
 
+
+#if USE_MEMORY_T
+	
             // add data processors
+			DataProcessorsStore.Processor<Transform.Transform_Struct> lifeCycleBehavior = DoLifeCycle;
+            mDataProcessor.Add("LIFECYCLE", lifeCycleBehavior);
+	
             DataProcessorsStore.Processor<Transform.Transform_Struct> flockingBehavior = DoFlocking;
             mDataProcessor.Add("FLOCKING", flockingBehavior);
-
-
+#endif
 
             //System.Numerics.BigInteger bint = 0;
             decimal bint = 0;
@@ -549,7 +560,6 @@ namespace HelloBoids
                 double vX = (rand.NextDouble() - 0.5d) * 2d;
                 double vY = (rand.NextDouble() - 0.5d) * 2d;
 
-
                 Boid b = new Boid(i, posX, posY, vX, vY);
                 Boids.Add(b);
 
@@ -561,73 +571,79 @@ namespace HelloBoids
                 if (NUM_TO_PIN > 0)
                     MemoryFragmenter.Cleanup();
 
-
             }
             Console.WriteLine(numBoids + " Boids Created.  Big Hash = " + bint.ToString());
         }
 
-       	
-		public void Update (double elapsedSeconds)
-		{
-		
+		/// <summary>
+		/// Update simulation using either Data Oriented Technique or Object Oriented Technique
+        public void Update(double elapsedSeconds)
+        {
+
 #if USE_MEMORY_T == false
-			// TEST CLASSES
-			// =====================
-			this.UpdateClasses(elapsedSeconds,
-							   this.Boids,
-							   this.SeparationDistance,
-							   this.SeparationFactor,
-							   this.AlignmentDistance,
-							   this.AlignmentFactor,
-							   this.CohesionDistance,
-							   this.CohesionFactor,
-							   this.MaxSpeed,
-							   this.TurnFactor);
+            // TEST CLASSES (Object Oriented Technique)
+            // =====================
+            this.UpdateClasses(elapsedSeconds,
+                               this.Boids,
+                               this.SeparationDistance,
+                               this.SeparationFactor,
+                               this.AlignmentDistance,
+                               this.AlignmentFactor,
+                               this.CohesionDistance,
+                               this.CohesionFactor,
+                               this.MaxSpeed,
+                               this.TurnFactor);
 #else
 
-			// TEST MEMORY<T>
-			// ====================
+            // TEST MEMORY<T> (Data Oriented Technique)
+            // ====================
 
-			mDataProcessor.Update(elapsedSeconds, Boids.ToArray());
+            mDataProcessor.Update(elapsedSeconds, Boids.ToArray());
 
-			//BoidSimulation.Store = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(NUM_ENTRIES);
-			//ComponentStore<Transform.Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(NUM_ENTRIES);
-			//Span<Transform.Transform_Struct> mem = store.Span;
+            //BoidSimulation.Store = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(NUM_ENTRIES);
+            //ComponentStore<Transform.Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(NUM_ENTRIES);
+            //Span<Transform.Transform_Struct> mem = store.Span;
 
-			//mTestSpan = store.Span;
-			//Span<Transform.Transform_Struct> castTest = (Span<Transform.Transform_Struct>) mTestSpan;
+            //mTestSpan = store.Span;
+            //Span<Transform.Transform_Struct> castTest = (Span<Transform.Transform_Struct>) mTestSpan;
 
-			//bSim.ProcessStep(elapsedSeconds, NUM_ENTRIES, BoidSimulation.Store, bSim.SeparationDistance, bSim.SeparationFactor, bSim.AlignmentDistance, bSim.AlignmentFactor, bSim.CohesionDistance, bSim.CohesionFactor, bSim.MaxSpeed, bSim.TurnFactor);
+            //bSim.ProcessStep(elapsedSeconds, NUM_ENTRIES, BoidSimulation.Store, bSim.SeparationDistance, bSim.SeparationFactor, bSim.AlignmentDistance, bSim.AlignmentFactor, bSim.CohesionDistance, bSim.CohesionFactor, bSim.MaxSpeed, bSim.TurnFactor);
 
-			//bSim.ProcessStep(elapsedSeconds,
-			//               NUM_ENTRIES,
-			//                bSim.SeparationDistance,
-			//                bSim.SeparationFactor,
-			//                bSim.AlignmentDistance,
-			//                bSim.AlignmentFactor,
-			//                bSim.CohesionDistance,
-			//                bSim.CohesionFactor,
-			//                bSim.MaxSpeed,
-			//                bSim.TurnFactor);
+            //bSim.ProcessStep(elapsedSeconds,
+            //               NUM_ENTRIES,
+            //                bSim.SeparationDistance,
+            //                bSim.SeparationFactor,
+            //                bSim.AlignmentDistance,
+            //                bSim.AlignmentFactor,
+            //                bSim.CohesionDistance,
+            //                bSim.CohesionFactor,
+            //                bSim.MaxSpeed,
+            //                bSim.TurnFactor);
 #endif
-		}
-		
+        }
+
         public void UpdateClasses(double elapsedSeconds, List<Boid> allBoids, double separationDistance, double separationFactor, double alignmentDistance, double alignmentFactor, double cohesionDistance, double cohesionFactor, double maxSpeed, double turnFactor)
         {
-            mIntervalTimers.Update(elapsedSeconds);
-            bool spawnReady = mIntervalTimers.IsReady("HelloBoids", "spawn");
+           //////////////////////////////////////////////////////////////////
+			// Life Cycle
+			//////////////////////////////////////////////////////////////////
+			 mIntervalTimers.Update(elapsedSeconds);
+            bool spawnReady = mIntervalTimers.IsReady("LifeCycle", "spawn");
             if (spawnReady)
             {
                 //Console.WriteLine("Spawn Ready == " + spawnReady.ToString());
-                mIntervalTimers.Reset("HelloBoids", "spawn");
+                mIntervalTimers.Reset("LifeCycle", "spawn");
             }
 
+			
+			//////////////////////////////////////////////////////////////////
+			// Flocking
+			//////////////////////////////////////////////////////////////////
             double largestDistance = System.Math.Max(this.SeparationDistance, this.AlignmentDistance);
             largestDistance = System.Math.Max(largestDistance, this.CohesionDistance);
             double largestDistanceSquared = largestDistance * largestDistance;
 
-			
-	
+
             for (int i = 0; i < Boids.Count; i++)
             {
                 List<int> found;
@@ -675,20 +691,11 @@ namespace HelloBoids
                 // ... (Optional: Implement min speed if needed)
 
                 // Update position
+				v *= elapsedSeconds;
                 allBoids[i].Translation += v;
                 allBoids[i].Velocity = v;
 
                 allBoids[i].SpatialNode.OnEntityNode_Moved(allBoids[i]);
-
-                //Console.WriteLine("Separate = " + sepX.ToString() + ", " + sepY.ToString());
-                //Console.WriteLine("Separate TEMP = " + tempX.ToString() + ", " + tempY.ToString());
-
-                //Console.WriteLine("Alignment = " + alignX.ToString() + ", " + alignY.ToString());
-                //Console.WriteLine("Cohesion = " + cohX.ToString() + ", " + cohY.ToString());
-                //Console.WriteLine("Velocity = " + mVelocity.ToString());
-                //Console.WriteLine("Speed = " + speed.ToString());
-                //Console.WriteLine("Translation = " + mTranslation.ToString());
-
 
                 // Apply boundary rules (wrap around)
                 // (You'd need to define boundary dimensions here)
@@ -696,15 +703,27 @@ namespace HelloBoids
             }
         }
 
-		private void DoLifeCycle(ComponentStore<Transform.Transform_Struct> store, object[] parameters, int seed, double elapsedSeconds)
-		{
-			
-		}
-		
+#if USE_MEMORY_T
+
+        private void DoLifeCycle(ComponentStore<Transform.Transform_Struct> store, object[] parameters, int seed, double elapsedSeconds)
+        {
+			//Console.WriteLine("DoLifeCycle()");
+            mIntervalTimers.Update(elapsedSeconds);
+            bool spawnReady = mIntervalTimers.IsReady("LifeCycle", "spawn");
+            if (spawnReady)
+            {
+                //Console.WriteLine("Spawn Ready == " + spawnReady.ToString());
+                mIntervalTimers.Reset("LifeCycle", "spawn");
+            }
+	
+        }
+
         private void DoFlocking(ComponentStore<Transform.Transform_Struct> store, object[] parameters, int seed, double elapsedSeconds)
         {
+            
+			//Console.WriteLine("DoFlocking()");
+			
 			Span<Transform.Transform_Struct> memSpan;
-
             using (EntryClass.CodeProfiler.HookUp("AssignSpan"))
             {
                 // note: passing the store and the need to the span to the stack is slow.
@@ -714,33 +733,25 @@ namespace HelloBoids
                 memSpan = store.Span;
                 //Span<Transform.Transform_Struct> mem = store.Span;
             }
-	
-			// TODO: these need to be in parameters
-        	double turnFactor = 0.1; // For boundary avoidance
-			double seperatationDistanceSquare = 20 * 20; //separationDistance * separationDistance;
+
+            // TODO: these need to be in parameters
+            double turnFactor = 0.1; // For boundary avoidance
+            double seperatationDistanceSquare = 20 * 20; //separationDistance * separationDistance;
             double alignmentDistanceSquared = 50 * 50; //alignmentDistance * alignmentDistance;
             double cohesionDistanceSquared = 50 * 50; // = cohesionDistance * cohesionDistance;
-			double maxSpeed = 5;
-	
-					
-			double separationFactor = 0.5d;
-			double alignmentFactor = 0.2d;
-			double cohesionFactor = 0.1d;
-									
-			mIntervalTimers.Update(elapsedSeconds);
-            bool spawnReady = mIntervalTimers.IsReady("HelloBoids", "spawn");
-            if (spawnReady)
-            {
-                Console.WriteLine("Spawn Ready == " + spawnReady.ToString());
-                mIntervalTimers.Reset("HelloBoids", "spawn");
-            }
+            double maxSpeed = 5;
 
-			List<int> neighbors = null;
+
+            double separationFactor = 0.5d;
+            double alignmentFactor = 0.2d;
+            double cohesionFactor = 0.1d;
+
+            List<int> neighbors = null;
             double largestDistance = System.Math.Max(this.SeparationDistance, this.AlignmentDistance);
             largestDistance = System.Math.Max(largestDistance, this.CohesionDistance);
             double largestDistanceSquared = largestDistance * largestDistance;
-	
-			// TODO: 
+
+            // TODO: 
             // 1) MAKE SURE ALL RESULTS ARE COMPLETELY DETERMINISTIC NO MATTER WHICH PATH IS CHOSEN
             // 2) BOID needs to UPDATE its position within the OCTREE when it moves!
             for (int i = 0; i < memSpan.Length; i++)
@@ -748,13 +759,59 @@ namespace HelloBoids
                 //try
                 //{
                 int currentIndex = i;
-				
-                using (EntryClass.CodeProfiler.HookUp("GetNeighbors"))
-                    neighbors = GetNeighbors(Boids[currentIndex], largestDistance, largestDistanceSquared);
 
+                using (EntryClass.CodeProfiler.HookUp("GetNeighbors"))
+				{
+					EntityNode currentBoid = Boids[i];
+					BoundingBox searchArea = new BoundingBox(currentBoid.Translation, largestDistance);
+                	if (Vector3d.GetDistance3dSquared(neighbor.Translation, currentBoid.Translation) <= largestDistanceSquared) return true;
+
+            		List<EntityNode> found = SpatialQueryLocal(store.Span, currentBoid.SpatialNode, currentBoid.SpanIndex, largestDistanceSquared, true, searchArea);
+	
+										
+					if (!currentBoid.SpatialNode.BoundingBox.Intersects(searchArea)) continue; // early exit
+
+					// TODO: // TODO: https://daeken.dev/a-stupidly-simple-fast-octree-traversal-for-ray-intersection
+
+					List<EntityNode> results = new List<EntityNode>();
+
+					// ITERATIVE DEPTH-FIRST TRAVERSAL
+					Stack<OctreeOctant> stack = new Stack<OctreeOctant>();
+					stack.Push(refSpatialNode);
+
+					while (stack.Count > 0)
+					{
+						OctreeOctant current = stack.Pop();
+
+						if (current.EntityNodes != null)
+						{
+							for (int i = 0; i < current.EntityNodes.Length; i++)
+							{
+								if (current.EntityNodes[i].SpanIndex == currentBoid.Index) continue;
+								// TODO: WE MUST CACHE span<T> and not access neighbor.Translation and current.Translation... we need to directly
+								//        access the indices of the Span<T> here... otherwise its TOO SLOW
+								double calc = Vector3d.GetDistance3dSquared(memSpan[current.EntityNodes[i].SpanIndex].Translation, memSpan[refIndex].Translation);
+								//System.Diagnostics.Debug.WriteLine("Calculated distance = " + calc.ToString());
+								if (calc <= distance)
+									results.Add(current.EntityNodes[i]);
+							}
+						}
+
+						if (current.Children != null)
+						{
+							for (int i = 0; i < current.Children.Length; i++)
+								// NOTE: Each OctreeOctant's BoundingBox needs to be in World Space.
+								if (current.Children[i].BoundingBox.Intersects(searchArea))
+									stack.Push(current.Children[i]);
+						}
+					}
+					
+				}
                 if (neighbors == null || neighbors.Count == 0) continue;
                 int nCount = neighbors.Count;
                 //}
+				
+				
                 // Apply Rules
                 //var (sepX, sepY) = Boid.Separate(elapsedSeconds, Boids, Boids[i], SeparationDistance, SeparationFactor);
                 //var (sepX, sepY) = Boid.Separate(elapsedSeconds, mem, numBoids, i, SeparationDistance, SeparationFactor);
@@ -770,13 +827,15 @@ namespace HelloBoids
                 //var (cohX, cohY) = Boid.Cohese(elapsedSeconds, mem, numBoids, i, CohesionDistance, CohesionFactor, coheseFunc);
                 //var (cohX, cohY) = Boid.Cohese(elapsedSeconds, store, numBoids, i, CohesionDistance, CohesionFactor, neighbors);
 
+
+        
+                // SEPARATION
                 Vector3d sep;
                 Vector3d steer;
                 steer.x = 0d;
                 steer.y = 0d;
                 steer.z = 0d;
-
-                // SEPARATION 
+                 
                 if (nCount > 0)
                 {
                     for (int j = 0; j < nCount; j++)
@@ -800,7 +859,7 @@ namespace HelloBoids
 
                 sep = steer;
 
-				// ALIGNMENT
+                // ALIGNMENT
                 Vector3d align;
                 Vector3d neighborsVelocity;
                 neighborsVelocity.x = 0;
@@ -822,7 +881,7 @@ namespace HelloBoids
                         }
                     }
                 }
-									
+
                 if (foundCount == 0)
                     align = new Vector3d(0, 0, 0);
                 else
@@ -831,7 +890,7 @@ namespace HelloBoids
                     align = (neighborsVelocity - memSpan[currentIndex].Velocity) * alignmentFactor;
                 }
 
-				// COHESION
+                // COHESION
                 Vector3d coh;
                 coh.x = 0;
                 coh.y = 0;
@@ -851,7 +910,7 @@ namespace HelloBoids
                     neighborsAvgCenter /= nCount;
                     coh = (neighborsAvgCenter - memSpan[currentIndex].Translation) * cohesionFactor;
                 }
-				
+
                 // SUM FORCES
                 Vector3d v = sep + align + coh;
 
@@ -865,13 +924,14 @@ namespace HelloBoids
                 // ... (Optional: Implement min speed if needed)
 
                 // Update position
-                //v *= elapsedSeconds;
+                v *= elapsedSeconds;
 
+				memSpan[currentIndex].Velocity = v;
                 memSpan[currentIndex].Translation += v;
-                memSpan[currentIndex].Velocity = v;
+                
 
                 // todo: all these octree update should probably
-                // occur last all at once... in fsct i believe 
+                // occur last all at once... in fact i believe 
                 // this does occur in our main src branch because
                 // we use a method named FinalizeMovement()
 
@@ -883,8 +943,8 @@ namespace HelloBoids
 
             }
         }
+#endif
 
-		
         private List<int> GetNeighbors(Boid currentBoid, double largestDistance, double largestDistanceSquared)
         {
             List<int> neighbors;
@@ -924,7 +984,7 @@ namespace HelloBoids
                 return false;
             };
 #endif
-			
+
             // SPATIAL SEARCH
 #if SPATIAL_SEARCH
 
@@ -939,8 +999,17 @@ namespace HelloBoids
             };
 
 #if USE_MEMORY_T
-			ComponentStore<Transform.Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0); 
+            ComponentStore<Transform.Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
             List<EntityNode> found = SpatialQueryLocal(store.Span, currentBoid.SpatialNode, currentBoid.SpanIndex, largestDistanceSquared, true, searchArea);
+	
+	
+	
+	
+	
+	
+	
+	
+	
 #else
             List<EntityNode> found = currentBoid.SpatialNode.Query(currentBoid, true, searchArea, match);
 #endif
@@ -972,9 +1041,9 @@ namespace HelloBoids
 #else // DO NOT USE A NEIGHBOR FINDING FUNCTION, JUST BRUTE FORCE ALL BOIDS
 						
 
-							// WARNING: iterating through ALL boids
-							// for each CURRENT boid is O(n^2) and is too expensive
-							// neighors = allBoids;
+	  // WARNING: iterating through ALL boids
+	  // for each CURRENT boid is O(n^2) and is too expensive
+	  // neighors = allBoids;
 						
 #endif
 #endif
@@ -1062,7 +1131,7 @@ namespace HelloBoids
             return results;
         }
 #endif
-	}
+    }
 
 
 
@@ -1107,6 +1176,20 @@ namespace HelloBoids
     //https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
     public class Boid : EntityNode
     {
+	public struct LivingEntity
+	{
+		public double BornDate;
+		public double MaxAge;
+		public double 
+
+	        public double GetAge (double currentTime)
+                {
+			return currentTime - currentTime;
+		}
+
+		
+	}
+
 
         public Boid(int index, double x, double y, double xV, double yV)
             : base(index, x, y, xV, yV)
@@ -2945,6 +3028,11 @@ namespace HelloBoids
     // SEE EntityNode above!  EntityNode is equivalent to Keystone.Entities.Entity
     //public class Entity : ProcGeneratedItem
     //{
+    //  public struct LivingEntity
+    //  {
+    //     // see class Boid "public struct LivingEntity"
+    //
+    //  }
     //	public Entity (string guid)
     //	{
     //	}
@@ -8402,98 +8490,10 @@ namespace HelloBoids
 
 
 
-    public class MemoryFragmenter
-    {
-        private static List<GCHandle> _pinnedHandles = new List<GCHandle>();
-        private static List<byte[]> _allocatedObjects = new List<byte[]>();
-
-        public static void Fragment(int numToPin, int pinSize, int numToFree, int freeSize)
-        {
-            Console.WriteLine("Simulating memory fragmentation...");
-
-            // Allocate and pin some objects
-            for (int i = 0; i < numToPin; i++)
-            {
-                byte[] data = new byte[pinSize];
-                GCHandle handle = GCHandle.Alloc(data, GCHandleType.Pinned);
-                _pinnedHandles.Add(handle);
-                _allocatedObjects.Add(data); // Keep a reference to prevent immediate collection
-            }
-
-            Console.WriteLine("Initial objects allocated and pinned.");
-
-            // Release some unpinned objects to create "holes"
-            // We'll simulate this by allocating and then letting some go out of scope
-            for (int i = 0; i < numToFree; i++)
-            {
-                byte[] temp = new byte[freeSize]; // Allocate temporarily
-                                                  // No pinning for these, they can be collected
-            }
-            Console.WriteLine("Temporary objects created and potentially collected.");
-
-            // Force a garbage collection to compact and reveal fragmentation
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-
-            Console.WriteLine("Garbage collection performed. Fragmentation might be present.");
-
-            /*  // Now, try to allocate a large contiguous block
-                try
-                {
-                    byte[] largeBlock = new byte[1024 * 1024 * 5]; // 5MB
-                    Console.WriteLine("Successfully allocated a large contiguous block.");
-                }
-                catch (OutOfMemoryException)
-                {
-                    Console.WriteLine("Failed to allocate a large contiguous block due to fragmentation.");
-                }
-            */
-
-        }
-
-        public static void Cleanup()
-        {
-            // Clean up pinned handles
-            foreach (var handle in _pinnedHandles)
-            {
-                handle.Free();
-            }
-
-            _pinnedHandles.Clear();
-            _allocatedObjects.Clear(); // Allow all objects to be collected
-            GC.Collect();
-            Console.WriteLine("Cleanup complete.");
-        }
-        //
-        public static object[] CreateAndFreeObjects(int LargeObjectSize)
-        {
-            object[] tmp = new object[3];
-
-            for (int i = 0; i < tmp.Length; i++)
-                tmp[i] = new byte[LargeObjectSize];
-
-            // Allocate some large objects within this method's scope
-
-
-            // These objects become eligible for GC once the method exits, 
-            // creating "holes" in the LOH over time.
-            return tmp;
-        }
-
-    }
 
 
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    // BEGIN MEMORY STORES
-
-
-
-
-
-
-
+#if USE_MEMORY_T
     public class DataProcessorsStore
     {
         /// <summary>
@@ -8520,8 +8520,8 @@ namespace HelloBoids
         // energy, damage of various kinds, etc.
         public delegate void Processor<T>(ComponentStore<T> store, object[] parameters, int seed, double elapsedSeconds); // GameTime gt);
 
-		private ComponentStoreCollection mComponentStoreCollection;
-		
+        private ComponentStoreCollection mComponentStoreCollection;
+
         // TODO: there are some types of data processing where an Entity is always added... such as 
         //       currently when movement/flocking is computed because a "STEER" acceleration/force PRODUCTION
         //       is required every frame.
@@ -8544,7 +8544,7 @@ namespace HelloBoids
         public DataProcessorsStore(ComponentStoreCollection col)
         {
 
-			mComponentStoreCollection = col;
+            mComponentStoreCollection = col;
             mProcessors = new Dictionary<string, object>();
         }
 
@@ -8574,28 +8574,25 @@ namespace HelloBoids
         }
 
 
-
         public void Update(double elapsedSeconds, EntityNode[] entities)
         {
-            for (int i = 0; i < mProcessors.Count; i++)
-            {
+            foreach (string key in mProcessors.Keys)
+			{
                 // TODO: make sure IScene implements Entities[] ActiveEntities
                 //object[] interfaces = new object[2];
                 // todo: i dont think the following works because there's apparently not a good way 
                 //       to cast a Memory<object> to a type of Memory<T>
                 //interfaces[0] = mStores[0];
                 //interfaces[1] = mStores[1];
-                string key = "FLOCKING"; // eg "STEER" or "COLLIDE"
-                			
-				
-				var func = mProcessors[key];
-				Processor<Transform.Transform_Struct> f = (Processor<Transform.Transform_Struct>)func;
-				
-				int seed = 0;
-			 	object[] args = GetParameters (key);
-				ComponentStore<Transform.Transform_Struct> store = mComponentStoreCollection.CheckOut<Transform.Transform_Struct>(0);
-				f.Invoke(store, args, seed, elapsedSeconds);
-				
+
+                var func = mProcessors[key];
+                Processor<Transform.Transform_Struct> f = (Processor<Transform.Transform_Struct>)func;
+
+                int seed = 0;
+                object[] args = GetParameters(key);
+                ComponentStore<Transform.Transform_Struct> store = mComponentStoreCollection.CheckOut<Transform.Transform_Struct>(0);
+                f.Invoke(store, args, seed, elapsedSeconds);
+
                 // NOTE: For intrinsic interfaces at least, we need to set changeFlags on the Entities
                 // for mIsDirty updates to Matrices and BoundingBox.
 
@@ -8606,12 +8603,12 @@ namespace HelloBoids
             }
         }
 
-       
+
         private object[] GetParameters(string key)
         {
-			object[] result = null;
-			return result;
-			
+            object[] result = null;
+            return result;
+
             // all parameters are tracked in KeyCommon.UserData
             // TODO: temporary switch to grab the correct parameters from KeyCommon.UserData.
             switch (key)
@@ -8805,7 +8802,7 @@ namespace HelloBoids
          } */
     }
 
-
+#endif
 
 
 
@@ -9775,19 +9772,26 @@ namespace HelloBoids
         {
             double totalProfiledTime = 0;
             double NonCategorisedTime = 0;
-
+			const string PREFIX_CATEGORIZED = "   @";
+			const string PREFIX_NON_CATEGORIZED = "    @";
+			
             if (ProfilerEnabled)
             {
                 foreach (string Name in mProfiles.Keys)
                 {
                     Profile prof = mProfiles[Name];
-
-                    System.Console.WriteLine(Name + prof.Categorized + " " + prof.ElapsedSeconds);
+				
+                    string category = PREFIX_CATEGORIZED + prof.Category + " - ";
+					
                     // display indented each non-categorized element under the catch-all "Non-Categorized" header
-                    if (!(prof.ElapsedSeconds == 0) && !prof.Categorized)
+                    if (!(prof.ElapsedSeconds == 0))
                     {
+						string prefix = category;
+						if (!prof.Categorized)
+							prefix = PREFIX_NON_CATEGORIZED;
+						
                         double Ratio = prof.ElapsedSeconds / mTotalElapsedTime;
-                        string Format = "{0} = {1:P} ({2:0.00} seconds)";
+                        string Format = prefix + "{0} = {1:P} ({2:0.00} seconds)";
                         if (Verbose)
                             Format = " " + Format;
 
@@ -9964,6 +9968,91 @@ namespace HelloBoids
     }
 
 
+
+    public class MemoryFragmenter
+    {
+        private static List<GCHandle> _pinnedHandles = new List<GCHandle>();
+        private static List<byte[]> _allocatedObjects = new List<byte[]>();
+
+        public static void Fragment(int numToPin, int pinSize, int numToFree, int freeSize)
+        {
+            Console.WriteLine("Simulating memory fragmentation...");
+
+            // Allocate and pin some objects
+            for (int i = 0; i < numToPin; i++)
+            {
+                byte[] data = new byte[pinSize];
+                GCHandle handle = GCHandle.Alloc(data, GCHandleType.Pinned);
+                _pinnedHandles.Add(handle);
+                _allocatedObjects.Add(data); // Keep a reference to prevent immediate collection
+            }
+
+            Console.WriteLine("Initial objects allocated and pinned.");
+
+            // Release some unpinned objects to create "holes"
+            // We'll simulate this by allocating and then letting some go out of scope
+            for (int i = 0; i < numToFree; i++)
+            {
+                byte[] temp = new byte[freeSize]; // Allocate temporarily
+                                                  // No pinning for these, they can be collected
+            }
+            Console.WriteLine("Temporary objects created and potentially collected.");
+
+            // Force a garbage collection to compact and reveal fragmentation
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+
+            Console.WriteLine("Garbage collection performed. Fragmentation might be present.");
+
+            /*  // Now, try to allocate a large contiguous block
+                try
+                {
+                    byte[] largeBlock = new byte[1024 * 1024 * 5]; // 5MB
+                    Console.WriteLine("Successfully allocated a large contiguous block.");
+                }
+                catch (OutOfMemoryException)
+                {
+                    Console.WriteLine("Failed to allocate a large contiguous block due to fragmentation.");
+                }
+            */
+
+        }
+
+        public static void Cleanup()
+        {
+            // Clean up pinned handles
+            foreach (var handle in _pinnedHandles)
+            {
+                handle.Free();
+            }
+
+            _pinnedHandles.Clear();
+            _allocatedObjects.Clear(); // Allow all objects to be collected
+            GC.Collect();
+            Console.WriteLine("Cleanup complete.");
+        }
+        //
+        public static object[] CreateAndFreeObjects(int LargeObjectSize)
+        {
+            object[] tmp = new object[3];
+
+            for (int i = 0; i < tmp.Length; i++)
+                tmp[i] = new byte[LargeObjectSize];
+
+            // Allocate some large objects within this method's scope
+
+
+            // These objects become eligible for GC once the method exits, 
+            // creating "holes" in the LOH over time.
+            return tmp;
+        }
+    }
+
+
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    // BEGIN MEMORY STORES
 
     public class Utils
     {

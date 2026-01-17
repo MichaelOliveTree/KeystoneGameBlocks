@@ -2,7 +2,7 @@ using System;
 using System.Drawing;
 using Keystone.Resource;
 
-namespace Keystone.Quadtree
+namespace Keystone.SpatialNodes.Quadtree
 {
     // Uses a recursive "BuidlTree()" method to instantiate children up to the prescribed depth.
     // Root node = depth 0.  The first quad divided nodes (the root node's 4 children) = depth 1

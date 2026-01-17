@@ -2,7 +2,7 @@ using System;
 using System.Drawing;
 using Keystone.Traversers;
 
-namespace Keystone.Quadtree
+namespace Keystone.SpatialNodes.Quadtree
 {
     public abstract class Leaf : QTreeNode
     {

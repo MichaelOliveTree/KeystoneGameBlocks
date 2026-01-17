@@ -8,7 +8,7 @@
 //using Keystone.Types;
 //using MTV3D65;
 
-//namespace Keystone.Quadtree
+//namespace Keystone.SpatialNodes.Quadtree
 //{
 //    public class TreeInjector : ITraverser
 //    {

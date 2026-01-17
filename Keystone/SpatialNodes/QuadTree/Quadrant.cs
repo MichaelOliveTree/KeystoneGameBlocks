@@ -6,7 +6,7 @@ using Keystone.Resource;
 using Keystone.Traversers;
 using Keystone.Types;
 
-namespace Keystone.Quadtree
+namespace Keystone.SpatialNodes.Quadtree
 {
     // Quadrant extends a regular QTree branch into a scene element that can
     // also contain other Node types.  Hrm.. this sucks because id rather

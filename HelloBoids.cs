@@ -11,7 +11,7 @@ using System.Runtime.InteropServices;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using System.Runtime.Intrinsics; // for SIMD enabled code
+//using System.Runtime.Intrinsics; // for SIMD enabled code
 
 // NOTE: The primary purpose of this is to demonstrate the use of Memory<T>
 //to increase performance by updating Entities using a data processing model
@@ -27,29 +27,29 @@ namespace HelloBoids
     public class EntryClass
     {
         public static HelloBoids.ComponentStoreCollection mCStoreCol = new HelloBoids.ComponentStoreCollection();
-		public static BoidSimulation bSim;
+        public static BoidSimulation bSim;
         public static uint NUM_ENTRIES = 768;
         public static uint NUM_ITERATIONS = 200;
         public static double WIDTH = 800d;
         public static double HEIGHT = 600d;
         private static string MODE;
         private static bool useOctree = true;
-		
-        public static double MAX_RUNTIME_SECONDS = 2.5d;
+
+        public static double MAX_RUNTIME_SECONDS = 2.5;
         public static double step;
         private static double mTotalRuntime;
 
-		public static long mCurrentFrame;
+        public static long mCurrentFrame;
         public static Profiler CodeProfiler;
         public static string output;
-		        
+
 
         private static bool mIsRunning;
         private static object mGameThreadLockObject = new object();
         private static object mSyncLock;
 
-		
-		
+
+
         public static void Main()
         {
             mSyncLock = new object();
@@ -70,13 +70,13 @@ namespace HelloBoids
             double targetFrameRatePerSecond = 60d;
             step = 1d / targetFrameRatePerSecond; // aka dt or "deltaTime"
 
-			// 100FPS uses a step of 1 / 100d == 0.01 seconds 
-			// or 10.00 milliseconds per framer
-			//
+            // 100FPS uses a step of 1 / 100d == 0.01 seconds 
+            // or 10.00 milliseconds per framer
+            //
             // 60FPS uses a step of 1 / 60d == 0.0166666666666667 seconds 
-			// or 16.66 milliseconds per framer
-			//
-			// 30FPS uses a step of 1 / 30d == 0.0333333333333333 seconds
+            // or 16.66 milliseconds per framer
+            //
+            // 30FPS uses a step of 1 / 30d == 0.0333333333333333 seconds
             // or 33.33 milliseconds per frame
 
 
@@ -115,6 +115,8 @@ namespace HelloBoids
             CodeProfiler.Register("AssignSpan", dataProcessing);
             CodeProfiler.Register("Process Frame", dataProcessing);
             CodeProfiler.Register("GetNeighbors", dataProcessing);
+			CodeProfiler.Register("FlockingRules", dataProcessing);
+			CodeProfiler.Register("GetDistanceSquared", dataProcessing);
 
             /*	
             // culling  
@@ -248,7 +250,7 @@ namespace HelloBoids
         // simulation updates
         private static void GameLoop()
         {
-			
+
             bSim = new BoidSimulation((int)NUM_ENTRIES, WIDTH, HEIGHT, useOctree);
             // Note: the larger the various distance values below,
             // the more cpu cycles needed. Tweak these values
@@ -330,7 +332,7 @@ namespace HelloBoids
 
             CodeProfiler.StartLoop();
             Stopwatch sw = Stopwatch.StartNew();
-            double lastTime = sw.Elapsed.TotalSeconds;
+            double lastElapsedTime = sw.Elapsed.TotalSeconds;
 
             while (true)
             {
@@ -344,10 +346,14 @@ namespace HelloBoids
                     break; // Exit the game loop
 
                 // Calculate delta time (time since last frame)
-                double currentTime = sw.Elapsed.TotalSeconds;
-                double elapsedSeconds = currentTime - lastTime;
-                elapsedSeconds = step;
-                lastTime = currentTime;
+                double totalElapsedSeconds = sw.Elapsed.TotalSeconds;
+                double elapsedSeconds = totalElapsedSeconds - lastElapsedTime;
+                lastElapsedTime = totalElapsedSeconds;
+				
+				//HACK - make it always fixed step
+				elapsedSeconds = step;
+                
+				
 
                 // Update and Render operations
                 Update(elapsedSeconds);
@@ -356,7 +362,7 @@ namespace HelloBoids
                 mCurrentFrame++;
                 mTotalRuntime += elapsedSeconds;
 
-                // Console.WriteLine("elapsed == " + mTotalRuntime.ToString());
+                Console.WriteLine("TOTAL = " + totalElapsedSeconds.ToString() +  " Frame Time = " + lastElapsedTime.ToString() + "  Runtime elapsed == " + mTotalRuntime.ToString() + " of " + MAX_RUNTIME_SECONDS.ToString() + " seconds.");
                 if (mTotalRuntime >= MAX_RUNTIME_SECONDS)
                     mIsRunning = false;
 
@@ -438,7 +444,7 @@ namespace HelloBoids
             }
 
         }
-		
+
         private static void UpdateLoop()
         {
             // TODO: Insert game logic (physics, AI, input processing from a queue)
@@ -500,7 +506,7 @@ namespace HelloBoids
             Boids = new List<Boid>(); //NOTE: we do not preallocate the list here
 
 #if USE_MEMORY_T
-        
+
             mDataProcessor = new DataProcessorsStore(EntryClass.mCStoreCol);
 #endif
             mIntervalTimers = new IntervalTimers();
@@ -525,11 +531,11 @@ namespace HelloBoids
 
 
 #if USE_MEMORY_T
-	
+
             // add data processors
-			DataProcessorsStore.Processor<Transform.Transform_Struct> lifeCycleBehavior = DoLifeCycle;
-            mDataProcessor.Add("LIFECYCLE", lifeCycleBehavior);
-	
+           // DataProcessorsStore.Processor<Transform.Transform_Struct> lifeCycleBehavior = DoLifeCycle;
+           // mDataProcessor.Add("LIFECYCLE", lifeCycleBehavior);
+
             DataProcessorsStore.Processor<Transform.Transform_Struct> flockingBehavior = DoFlocking;
             mDataProcessor.Add("FLOCKING", flockingBehavior);
 #endif
@@ -575,11 +581,14 @@ namespace HelloBoids
             Console.WriteLine(numBoids + " Boids Created.  Big Hash = " + bint.ToString());
         }
 
-		/// <summary>
-		/// Update simulation using either Data Oriented Technique or Object Oriented Technique
+        /// <summary>
+        /// Update simulation using either Data Oriented Technique or Object Oriented Technique
         public void Update(double elapsedSeconds)
         {
 
+			mIntervalTimers.Update(elapsedSeconds);
+
+			
 #if USE_MEMORY_T == false
             // TEST CLASSES (Object Oriented Technique)
             // =====================
@@ -624,10 +633,9 @@ namespace HelloBoids
 
         public void UpdateClasses(double elapsedSeconds, List<Boid> allBoids, double separationDistance, double separationFactor, double alignmentDistance, double alignmentFactor, double cohesionDistance, double cohesionFactor, double maxSpeed, double turnFactor)
         {
-           //////////////////////////////////////////////////////////////////
-			// Life Cycle
-			//////////////////////////////////////////////////////////////////
-			 mIntervalTimers.Update(elapsedSeconds);
+            //////////////////////////////////////////////////////////////////
+            // Life Cycle
+            //////////////////////////////////////////////////////////////////
             bool spawnReady = mIntervalTimers.IsReady("LifeCycle", "spawn");
             if (spawnReady)
             {
@@ -635,10 +643,9 @@ namespace HelloBoids
                 mIntervalTimers.Reset("LifeCycle", "spawn");
             }
 
-			
-			//////////////////////////////////////////////////////////////////
-			// Flocking
-			//////////////////////////////////////////////////////////////////
+            //////////////////////////////////////////////////////////////////
+            // Flocking
+            //////////////////////////////////////////////////////////////////
             double largestDistance = System.Math.Max(this.SeparationDistance, this.AlignmentDistance);
             largestDistance = System.Math.Max(largestDistance, this.CohesionDistance);
             double largestDistanceSquared = largestDistance * largestDistance;
@@ -691,7 +698,7 @@ namespace HelloBoids
                 // ... (Optional: Implement min speed if needed)
 
                 // Update position
-				v *= elapsedSeconds;
+                v *= elapsedSeconds;
                 allBoids[i].Translation += v;
                 allBoids[i].Velocity = v;
 
@@ -707,32 +714,29 @@ namespace HelloBoids
 
         private void DoLifeCycle(ComponentStore<Transform.Transform_Struct> store, object[] parameters, int seed, double elapsedSeconds)
         {
-			//Console.WriteLine("DoLifeCycle()");
-            mIntervalTimers.Update(elapsedSeconds);
+            //Console.WriteLine("DoLifeCycle()");
             bool spawnReady = mIntervalTimers.IsReady("LifeCycle", "spawn");
             if (spawnReady)
             {
                 //Console.WriteLine("Spawn Ready == " + spawnReady.ToString());
                 mIntervalTimers.Reset("LifeCycle", "spawn");
             }
-	
         }
 
         private void DoFlocking(ComponentStore<Transform.Transform_Struct> store, object[] parameters, int seed, double elapsedSeconds)
         {
-            
-			//Console.WriteLine("DoFlocking()");
-			
-			Span<Transform.Transform_Struct> memSpan;
-            using (EntryClass.CodeProfiler.HookUp("AssignSpan"))
-            {
+            //Console.WriteLine("DoFlocking()");
+
+            Span<Transform.Transform_Struct> memSpan;
+            //using (EntryClass.CodeProfiler.HookUp("AssignSpan"))
+            //{
                 // note: passing the store and the need to the span to the stack is slow.
                 // keep this in mind when developing data procesding funtions.  you dont want
                 // to have to pass thay big bock of memory around. 
                 // HOWEVER, using the following line mem = Store.Span is faster than using Store.Span[i].#### everywhere!
                 memSpan = store.Span;
                 //Span<Transform.Transform_Struct> mem = store.Span;
-            }
+            //}
 
             // TODO: these need to be in parameters
             double turnFactor = 0.1; // For boundary avoidance
@@ -746,202 +750,206 @@ namespace HelloBoids
             double alignmentFactor = 0.2d;
             double cohesionFactor = 0.1d;
 
-            List<int> neighbors = null;
+			
+			Stack<OctreeOctant> stack = new Stack<OctreeOctant>(8);
+            List<int> neighbors = new List<int>(8);
             double largestDistance = System.Math.Max(this.SeparationDistance, this.AlignmentDistance);
             largestDistance = System.Math.Max(largestDistance, this.CohesionDistance);
             double largestDistanceSquared = largestDistance * largestDistance;
-
+            
             // TODO: 
             // 1) MAKE SURE ALL RESULTS ARE COMPLETELY DETERMINISTIC NO MATTER WHICH PATH IS CHOSEN
-            // 2) BOID needs to UPDATE its position within the OCTREE when it moves!
+            // 2) BOID needs to UPDATE its position within the OCTREE when it moves! <-- verify this is occurring by printing out the "address"
+			
             for (int i = 0; i < memSpan.Length; i++)
             {
                 //try
                 //{
-                int currentIndex = i;
 
-                using (EntryClass.CodeProfiler.HookUp("GetNeighbors"))
+				using (EntryClass.CodeProfiler.HookUp("GetNeighbors"))
 				{
-					EntityNode currentBoid = Boids[i];
-					BoundingBox searchArea = new BoundingBox(currentBoid.Translation, largestDistance);
-                	if (Vector3d.GetDistance3dSquared(neighbor.Translation, currentBoid.Translation) <= largestDistanceSquared) return true;
+				// INLINING of "GetNeighbors" in order to avoid have to load the memSpan onto the stack for each iteration
 
-            		List<EntityNode> found = SpatialQueryLocal(store.Span, currentBoid.SpatialNode, currentBoid.SpanIndex, largestDistanceSquared, true, searchArea);
-	
-										
-					if (!currentBoid.SpatialNode.BoundingBox.Intersects(searchArea)) continue; // early exit
-
-					// TODO: // TODO: https://daeken.dev/a-stupidly-simple-fast-octree-traversal-for-ray-intersection
-
-					List<EntityNode> results = new List<EntityNode>();
-
-					// ITERATIVE DEPTH-FIRST TRAVERSAL
-					Stack<OctreeOctant> stack = new Stack<OctreeOctant>();
-					stack.Push(refSpatialNode);
-
-					while (stack.Count > 0)
-					{
-						OctreeOctant current = stack.Pop();
-
-						if (current.EntityNodes != null)
-						{
-							for (int i = 0; i < current.EntityNodes.Length; i++)
-							{
-								if (current.EntityNodes[i].SpanIndex == currentBoid.Index) continue;
-								// TODO: WE MUST CACHE span<T> and not access neighbor.Translation and current.Translation... we need to directly
-								//        access the indices of the Span<T> here... otherwise its TOO SLOW
-								double calc = Vector3d.GetDistance3dSquared(memSpan[current.EntityNodes[i].SpanIndex].Translation, memSpan[refIndex].Translation);
-								//System.Diagnostics.Debug.WriteLine("Calculated distance = " + calc.ToString());
-								if (calc <= distance)
-									results.Add(current.EntityNodes[i]);
-							}
-						}
-
-						if (current.Children != null)
-						{
-							for (int i = 0; i < current.Children.Length; i++)
-								// NOTE: Each OctreeOctant's BoundingBox needs to be in World Space.
-								if (current.Children[i].BoundingBox.Intersects(searchArea))
-									stack.Push(current.Children[i]);
-						}
-					}
+                    EntityNode currentBoid = Boids[i];
+					double radius = largestDistance * 0.5d;
+                    
+					// WARNING:  The first line that uses currentBoid.Translation is 100x SLOWER than the version using CLASSES (eg for "Classes" version comment out #define USE_MEMORY_T
+					//           The second line that uses memSpan[i].Translation is 100x FASTER than the version using CLASSES (WHAT ON EARTH?)
+					//BoundingBox searchArea = new BoundingBox(currentBoid.Translation, radius);
+					BoundingBox searchArea = new BoundingBox(memSpan[i].Translation, radius);
+                    
+                    if (!currentBoid.SpatialNode.BoundingBox.Intersects(searchArea)) continue; // early exit
 					
-				}
-                if (neighbors == null || neighbors.Count == 0) continue;
-                int nCount = neighbors.Count;
-                //}
 				
-				
-                // Apply Rules
-                //var (sepX, sepY) = Boid.Separate(elapsedSeconds, Boids, Boids[i], SeparationDistance, SeparationFactor);
-                //var (sepX, sepY) = Boid.Separate(elapsedSeconds, mem, numBoids, i, SeparationDistance, SeparationFactor);
-                //var (sepX, sepY) = Boid.Separate(elapsedSeconds, store, numBoids, i, SeparationDistance, SeparationFactor, neighbors);
+					//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+					// INLINED VERSION OF "ITERATIVE DEPTH-FIRST" TRAVERSAL OF OCTREE TO FIND NEIGHBORING BOIDS OF THE CURRENT ONE
+					//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+					neighbors.Clear();
+                    stack.Clear();
+                    					
+                    
+                    stack.Push(currentBoid.SpatialNode);
 
-                //var (alignX, alignY) = Boid.Align(elapsedSeconds, Boids, Boids[i], AlignmentDistance, AlignmentFactor);
-                //var (alignX, alignY) = Boid.Align(elapsedSeconds, mem, numBoids, i, AlignmentDistance, AlignmentFactor);
-                //var (alignX, alignY) = Boid.Align(elapsedSeconds, store, numBoids, i, AlignmentDistance, AlignmentFactor, neighbors);
-
-                //var (cohX, cohY) = Boid.Cohese(elapsedSeconds, Boids, Boids[i], CohesionDistance, CohesionFactor);
-                //var (cohX, cohY) = Boid.Cohese(elapsedSeconds, mem, numBoids, i, CohesionDistance, CohesionFactor);
-
-                //var (cohX, cohY) = Boid.Cohese(elapsedSeconds, mem, numBoids, i, CohesionDistance, CohesionFactor, coheseFunc);
-                //var (cohX, cohY) = Boid.Cohese(elapsedSeconds, store, numBoids, i, CohesionDistance, CohesionFactor, neighbors);
-
-
-        
-                // SEPARATION
-                Vector3d sep;
-                Vector3d steer;
-                steer.x = 0d;
-                steer.y = 0d;
-                steer.z = 0d;
-                 
-                if (nCount > 0)
-                {
-                    for (int j = 0; j < nCount; j++)
+                    while (stack.Count > 0)
                     {
-                        //if (j == currentIndex) continue; // <- this check will already have been performed in building of neighbors list
-                        double distanceSquared = Vector3d.GetDistance3dSquared(memSpan[currentIndex].Translation, memSpan[neighbors[j]].Translation);
+                        OctreeOctant currentOctant = stack.Pop();
 
-                        if (distanceSquared < seperatationDistanceSquare)
+                        if (currentOctant.EntityNodes != null)
                         {
-                            if (distanceSquared > 0d) // Hypnotron Dec.4.2025 - required divide by 0 check
+                            for (int j = 0; j < currentOctant.EntityNodes.Length; j++)
                             {
-                                // TODO: are these two results equal?
-                                //steer += (mem[currentIndex].Translation - mem[neighbors[j]].Translation) / distance ;
-                                steer += (memSpan[currentIndex].Translation - memSpan[neighbors[j]].Translation) / System.Math.Sqrt(distanceSquared);
+                                if (currentOctant.EntityNodes[j].SpanIndex == currentBoid.SpanIndex) continue;
+                                // TODO: WE MUST CACHE span<T> and not access neighbor.Translation and current.Translation... we need to directly
+                                //        access the indices of the Span<T> here... otherwise its TOO SLOW
+								double distanceToNeighboringBoidSquared;
+								//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
+                                //	distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[currentOctant.EntityNodes[j].SpanIndex].Translation, memSpan[i].Translation);
+								
+								using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
+									distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(currentOctant.EntityNodes[j].Translation, currentBoid.Translation);
+								
+                                //System.Diagnostics.Debug.WriteLine("Calculated distanceSquared to neighboring boid = " + distanceToNeighboringBoidSquared.ToString());
+                                if (distanceToNeighboringBoidSquared <= largestDistanceSquared)
+                                    neighbors.Add(j);
+                            }
+						}
+
+                         if (currentOctant.Children != null)
+                         {
+                             for (int j = 0; j < currentOctant.Children.Length; j++)
+                                 // NOTE: Each OctreeOctant's BoundingBox needs to be in World Space.
+                                 if (currentOctant.Children[j].BoundingBox.Intersects(searchArea))
+                                     stack.Push(currentOctant.Children[j]);
+                         }
+                    }
+				}
+					
+					int nCount = 0;
+                    if (neighbors != null)
+						nCount = neighbors.Count;
+
+				using (EntryClass.CodeProfiler.HookUp("FlockingRules"))
+				{
+					//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+                    // Apply Flocking Rules
+                    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+                    // SEPARATION
+                    Vector3d sep;
+                    Vector3d steer;
+                    steer.x = 0d;
+                    steer.y = 0d;
+                    steer.z = 0d;
+
+                    if (nCount > 0)
+                    {
+                        for (int j = 0; j < nCount; j++)
+                        {
+                            //if (j == currentIndex) continue; // <- this check will already have been performed in building of neighbors list
+                            double distanceSquared = Vector3d.GetDistance3dSquared(memSpan[i].Translation, memSpan[neighbors[j]].Translation);
+
+                            if (distanceSquared < seperatationDistanceSquare)
+                            {
+                                if (distanceSquared > 0d) // Hypnotron Dec.4.2025 - required divide by 0 check
+                                {
+                                    // TODO: are these two results equal?
+                                    //steer += (mem[currentIndex].Translation - mem[neighbors[j]].Translation) / distance ;
+                                    steer += (memSpan[i].Translation - memSpan[neighbors[j]].Translation) / System.Math.Sqrt(distanceSquared);
+                                }
+                            }
+                        }
+
+                        steer *= separationFactor;
+                    }
+
+                    sep = steer;
+
+                    // ALIGNMENT
+                    Vector3d align;
+                    Vector3d neighborsVelocity;
+                    neighborsVelocity.x = 0;
+                    neighborsVelocity.y = 0;
+                    neighborsVelocity.z = 0;
+
+                    int foundCount = 0;
+                    if (nCount > 0)
+                    {
+                        for (int j = 0; j < neighbors.Count; j++)
+                        {
+                            //if (j == currentIndex) continue; // <- this check will already have been performed in building of neighbors list
+                            double distanceSquared = Vector3d.GetDistance3dSquared(memSpan[i].Translation, memSpan[neighbors[j]].Translation);
+
+                            if (distanceSquared < alignmentDistanceSquared)
+                            {
+                                neighborsVelocity += memSpan[neighbors[j]].Velocity;
+                                foundCount++;
                             }
                         }
                     }
 
-                    steer *= separationFactor;
-                }
-
-                sep = steer;
-
-                // ALIGNMENT
-                Vector3d align;
-                Vector3d neighborsVelocity;
-                neighborsVelocity.x = 0;
-                neighborsVelocity.y = 0;
-                neighborsVelocity.z = 0;
-
-                int foundCount = 0;
-                if (nCount > 0)
-                {
-                    for (int j = 0; j < neighbors.Count; j++)
+                    if (foundCount == 0)
+                        align = new Vector3d(0, 0, 0);
+                    else
                     {
-                        //if (j == currentIndex) continue; // <- this check will already have been performed in building of neighbors list
-                        double distanceSquared = Vector3d.GetDistance3dSquared(memSpan[currentIndex].Translation, memSpan[neighbors[j]].Translation);
-
-                        if (distanceSquared < alignmentDistanceSquared)
-                        {
-                            neighborsVelocity += memSpan[neighbors[j]].Velocity;
-                            foundCount++;
-                        }
+                        neighborsVelocity /= foundCount;
+                        align = (neighborsVelocity - memSpan[i].Velocity) * alignmentFactor;
                     }
+
+                    // COHESION
+                    Vector3d coh;
+                    coh.x = 0;
+                    coh.y = 0;
+                    coh.z = 0.0d;
+
+                    Vector3d neighborsAvgCenter;
+                    neighborsAvgCenter.x = 0;
+                    neighborsAvgCenter.y = 0;
+                    neighborsAvgCenter.z = 0;
+
+                    if (nCount > 0)
+                    {
+                        for (int j = 0; j < nCount; j++)
+                            //if (j == currentIndex) continue; // <- this check will already have been performed in building of neighbors list
+                            neighborsAvgCenter += memSpan[neighbors[j]].Translation;
+
+                        neighborsAvgCenter /= nCount;
+                        coh = (neighborsAvgCenter - memSpan[i].Translation) * cohesionFactor;
+                    }
+				
+				
+				
+                    // SUM FORCES
+                    Vector3d v = sep + align + coh;
+
+                    // Apply speed limits
+                    double speed = v.Length;
+                    if (speed > maxSpeed && maxSpeed != 0)
+                    {
+                        v = (v / speed) * maxSpeed;
+                    }
+
+                    // ... (Optional: Implement min speed if needed)
+
+                    // Update position
+                    v *= elapsedSeconds;
+
+                    memSpan[i].Velocity = v;
+                    memSpan[i].Translation += v;
+			} // end profiler FlockingRules
+
+                    // todo: all these octree update should probably
+                    // occur last all at once... in fact i believe 
+                    // this does occur in our main src branch because
+                    // we use a method named FinalizeMovement()
+
+                    Boids[i].SpatialNode.OnEntityNode_Moved(Boids[i]);
+
+                    // Apply boundary rules (wrap around)
+                    // (You'd need to define boundary dimensions here)
+                    // If X > maxX, X = minX, etc.
+
                 }
 
-                if (foundCount == 0)
-                    align = new Vector3d(0, 0, 0);
-                else
-                {
-                    neighborsVelocity /= foundCount;
-                    align = (neighborsVelocity - memSpan[currentIndex].Velocity) * alignmentFactor;
-                }
-
-                // COHESION
-                Vector3d coh;
-                coh.x = 0;
-                coh.y = 0;
-                coh.z = 0.0d;
-
-                Vector3d neighborsAvgCenter;
-                neighborsAvgCenter.x = 0;
-                neighborsAvgCenter.y = 0;
-                neighborsAvgCenter.z = 0;
-
-                if (nCount > 0)
-                {
-                    for (int j = 0; j < nCount; j++)
-                        //if (j == currentIndex) continue; // <- this check will already have been performed in building of neighbors list
-                        neighborsAvgCenter += memSpan[neighbors[j]].Translation;
-
-                    neighborsAvgCenter /= nCount;
-                    coh = (neighborsAvgCenter - memSpan[currentIndex].Translation) * cohesionFactor;
-                }
-
-                // SUM FORCES
-                Vector3d v = sep + align + coh;
-
-                // Apply speed limits
-                double speed = v.Length;
-                if (speed > maxSpeed && maxSpeed != 0)
-                {
-                    v = (v / speed) * maxSpeed;
-                }
-
-                // ... (Optional: Implement min speed if needed)
-
-                // Update position
-                v *= elapsedSeconds;
-
-				memSpan[currentIndex].Velocity = v;
-                memSpan[currentIndex].Translation += v;
-                
-
-                // todo: all these octree update should probably
-                // occur last all at once... in fact i believe 
-                // this does occur in our main src branch because
-                // we use a method named FinalizeMovement()
-
-                Boids[currentIndex].SpatialNode.OnEntityNode_Moved(Boids[currentIndex]);
-
-                // Apply boundary rules (wrap around)
-                // (You'd need to define boundary dimensions here)
-                // If X > maxX, X = minX, etc.
-
-            }
+            
         }
 #endif
 
@@ -959,7 +967,7 @@ namespace HelloBoids
                      return true;
 
                  return false;
-            
+
         };*/
 
             Func<Transform, Transform, double, bool> ff = (boid, referenceBoid, distanceSquared) =>
@@ -1001,15 +1009,15 @@ namespace HelloBoids
 #if USE_MEMORY_T
             ComponentStore<Transform.Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
             List<EntityNode> found = SpatialQueryLocal(store.Span, currentBoid.SpatialNode, currentBoid.SpanIndex, largestDistanceSquared, true, searchArea);
-	
-	
-	
-	
-	
-	
-	
-	
-	
+
+
+
+
+
+
+
+
+
 #else
             List<EntityNode> found = currentBoid.SpatialNode.Query(currentBoid, true, searchArea, match);
 #endif
@@ -1097,20 +1105,20 @@ namespace HelloBoids
 
 
             /*
-			// RECURSIVE DEPTH-FIRST TRAVERSAL
-			// NOTE: Each OctreeOctant's BoundingBox needs to be in World Space.
+            // RECURSIVE DEPTH-FIRST TRAVERSAL
+            // NOTE: Each OctreeOctant's BoundingBox needs to be in World Space.
             if (!refSpatialNode.BoundingBox.Intersects(searchArea))
                 return null;
-				
-			// compare the distance of all Entities within this Octant
+
+            // compare the distance of all Entities within this Octant
             if ( refSpatialNode.EntityNodes != null)
                 for (int i = 0; i < refSpatialNode.EntityNodes.Length; i++)
                 {
-					if (refSpatialNode.EntityNodes[i].SpanIndex == refIndex) continue;
+                    if (refSpatialNode.EntityNodes[i].SpanIndex == refIndex) continue;
                     // TODO: WE MUST CACHE span<T> and not access neighbor.Translation and current.Translation... we need to directly
                     //        access the indices of the Span<T> here... otherwise its TOO SLOW
                     if (Vector3d.GetDistance3dSquared(memSpan[refSpatialNode.EntityNodes[i].SpanIndex].Translation, memSpan[refIndex].Translation) <= distance) 
-						results.Add(refSpatialNode.EntityNodes[i]);
+                        results.Add(refSpatialNode.EntityNodes[i]);
                 }
 
             if (recurse)
@@ -1125,7 +1133,7 @@ namespace HelloBoids
                     }
                 }
             }
-			*/
+            */
 
             if (results.Count == 0) return null;
             return results;
@@ -1176,19 +1184,19 @@ namespace HelloBoids
     //https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
     public class Boid : EntityNode
     {
-	public struct LivingEntity
-	{
-		public double BornDate;
-		public double MaxAge;
-		public double 
+        public struct LivingEntity
+        {
+            public double BornDate;
+            public double MaxAge;
+            //public double
 
-	        public double GetAge (double currentTime)
-                {
-			return currentTime - currentTime;
-		}
+            public double GetAge(double currentTime)
+            {
+                return currentTime - currentTime;
+            }
 
-		
-	}
+
+        }
 
 
         public Boid(int index, double x, double y, double xV, double yV)
@@ -2102,7 +2110,7 @@ namespace HelloBoids
             set
             {
                 mSpanAccessTest = value;
-                mMemStore.Span[0].Translation = value;
+                //mMemStore.Span[0].Translation = value;
             }
         }
         /*
@@ -2748,6 +2756,11 @@ namespace HelloBoids
 
     }
 
+        public struct UpdateContext
+        {
+            // see SelectionNode or Elements.SwitchNode for help
+
+        }
     public interface IEntitySystem
     {
         // 1) an IEntitySystem of type "City{World.Country.Province.County}" might include many different types of child IEntitySystem within it.
@@ -2759,33 +2772,29 @@ namespace HelloBoids
         //        - these Systems also CONSUME from "Stores"... how do we assign Stores and make them available to something like a "City?"
         // 2) Stores - food, supplies, medicines, clothing, energy
         // 3) Do we need to support rendering Proxies here (2D and 3D?)
-        public struct UpdateContext
-        {
-            // see SelectionNode or Elements.SwitchNode for help
 
-        }
 
-        public int Seed { get; }
-        public int EntityCount { get; }
-        public bool MultithreadingEnabled { get; set; }
+         int Seed { get; }
+         int EntityCount { get; }
+         bool MultithreadingEnabled { get; set; }
 
         // TODO: perhaps grab the max count from a configuration file
-        public int MaxEntityCount { get; set; }
+         int MaxEntityCount { get; set; }
 
-        public void GenerateSystem();
+         void GenerateSystem();
         // todo: need delegates for handling the Generate()
         // todo: need delegate for Create() of single IProcGeneratedItem
 
 
         // libnoise uses this to find a value on a texture
-        public object GetValue(double x, double y, double z);
-        public IProcGeneratedItem GetItem(string address);
-        public IProcGeneratedItem GetItem(int index);
-        public IProcGeneratedItem GetItem(string guid, int seed);
+         object GetValue(double x, double y, double z);
+         IProcGeneratedItem GetItem(string address);
+         IProcGeneratedItem GetItem(int index);
+         IProcGeneratedItem GetItem(string guid, int seed);
 
-        public void Update(double elapsedSeconds, IEntitySystem.UpdateContext context);
-        public void Read();
-        public void Write();
+         void Update(double elapsedSeconds, UpdateContext context);
+         void Read();
+         void Write();
     }
 
 
@@ -2794,7 +2803,7 @@ namespace HelloBoids
     {
         public delegate IProcGeneratedItem CreateEntityHandler(int seed, string path);
         public delegate void GenerateSystemHandler(int seed);
-        public delegate void UpdateHandler(double elapsedSeconds, IEntitySystem.UpdateContext context);
+        public delegate void UpdateHandler(double elapsedSeconds, UpdateContext context);
 
         // private variables
         protected string mPath;
@@ -2819,7 +2828,7 @@ namespace HelloBoids
         {
         }
 
-        public virtual void Update(double elapsedSeconds, IEntitySystem.UpdateContext context)
+        public virtual void Update(double elapsedSeconds, UpdateContext context)
         {
             // select from mUpdateHandlers based on context... its essentially like update LOD where the
             // update simulation can be simpler when this IEntitySystem is far away or has no players near it...
@@ -2999,7 +3008,7 @@ namespace HelloBoids
         {
         }
 
-        public override void Update(double elapsedSeconds, IEntitySystem.UpdateContext context)
+        public override void Update(double elapsedSeconds, UpdateContext context)
         {
 
         }
@@ -3013,7 +3022,7 @@ namespace HelloBoids
     //       together after the fact
     public interface IProcGeneratedItem
     {
-        public int Seed { get; }
+        int Seed { get; }
         //public Settings.PropertySpec[] Deltas {get ;}
 
     }
@@ -8577,7 +8586,7 @@ namespace HelloBoids
         public void Update(double elapsedSeconds, EntityNode[] entities)
         {
             foreach (string key in mProcessors.Keys)
-			{
+            {
                 // TODO: make sure IScene implements Entities[] ActiveEntities
                 //object[] interfaces = new object[2];
                 // todo: i dont think the following works because there's apparently not a good way 
@@ -9772,24 +9781,24 @@ namespace HelloBoids
         {
             double totalProfiledTime = 0;
             double NonCategorisedTime = 0;
-			const string PREFIX_CATEGORIZED = "   @";
-			const string PREFIX_NON_CATEGORIZED = "    @";
-			
+            const string PREFIX_CATEGORIZED = "   @";
+            const string PREFIX_NON_CATEGORIZED = "    @";
+
             if (ProfilerEnabled)
             {
                 foreach (string Name in mProfiles.Keys)
                 {
                     Profile prof = mProfiles[Name];
-				
+
                     string category = PREFIX_CATEGORIZED + prof.Category + " - ";
-					
+
                     // display indented each non-categorized element under the catch-all "Non-Categorized" header
                     if (!(prof.ElapsedSeconds == 0))
                     {
-						string prefix = category;
-						if (!prof.Categorized)
-							prefix = PREFIX_NON_CATEGORIZED;
-						
+                        string prefix = category;
+                        if (!prof.Categorized)
+                            prefix = PREFIX_NON_CATEGORIZED;
+
                         double Ratio = prof.ElapsedSeconds / mTotalElapsedTime;
                         string Format = prefix + "{0} = {1:P} ({2:0.00} seconds)";
                         if (Verbose)

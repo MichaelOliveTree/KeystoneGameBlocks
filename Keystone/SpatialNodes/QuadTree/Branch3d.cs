@@ -3,7 +3,7 @@ using System.Drawing;
 using Keystone.Types;
 using Keystone.Traversers;
 
-namespace Keystone.Quadtree
+namespace Keystone.SpatialNodes.Quadtree
 {
     public class Branch3d : Branch, IBoundVolume
     {

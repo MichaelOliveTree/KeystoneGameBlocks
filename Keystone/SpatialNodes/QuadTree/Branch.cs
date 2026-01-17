@@ -1,6 +1,6 @@
 using System.Drawing;
 
-namespace Keystone.Quadtree
+namespace Keystone.SpatialNodes.Quadtree
 {
     // Branch does in fact inherit from leaf in this case, but for derived
     // types of branches, you can either inherit from here or inherit from

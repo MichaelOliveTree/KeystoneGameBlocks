@@ -24,7 +24,7 @@ using System;
 using System.Drawing;
 using System.Linq;
 
-namespace Dlr.Structures.Generic
+namespace Keystone.SpatialNodes
 {
     // NOTE: I have to research  2d spatial hashing to really determine if this is something that is useful for 
     // my project.  Maybe i could convert the below to work with my RegionNode's as an alternative ISpatialNode type

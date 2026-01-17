@@ -6,7 +6,7 @@ using Keystone.Primitives;
 using Keystone.Traversers;
 using Keystone.Entities;
 
-namespace Keystone.QuadTree
+namespace Keystone.SpatialNodes.QuadTree
 {
     public class QuadtreeCollection : QuadtreeQuadrant
     {

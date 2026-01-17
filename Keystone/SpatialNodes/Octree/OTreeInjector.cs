@@ -9,7 +9,7 @@
 //using MTV3D65;
 //using Sector = Keystone.Quadtree.Sector;
 
-//namespace Keystone.Octree
+//namespace Keystone.SpatialNodes.Octree
 //{
 //    public class OTreeInjector : ITraverser
 //    {

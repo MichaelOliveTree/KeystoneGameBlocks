@@ -1,5 +1,5 @@
 ﻿using System;
-using Keystone.Portals;
+using Keystone.SpatialNodes.Octree;
 
 
 namespace Keystone.SpatialNodes

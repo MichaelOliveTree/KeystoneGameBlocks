@@ -6,7 +6,7 @@ using Keystone.SpatialNodes;
 using Keystone.Traversers;
 using Keystone.Primitives;
 
-namespace Keystone.QuadTree
+namespace Keystone.SpatialNodes.QuadTree
 {
     
     // http://www.flipcode.com/archives/Octree_Implementation.shtml

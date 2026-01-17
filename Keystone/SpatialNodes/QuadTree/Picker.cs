@@ -9,10 +9,10 @@
 //using Keystone.Traversers;
 //using Keystone.Types;
 //using MTV3D65;
-//using Sector = Keystone.Quadtree.Sector;
+//using Sector = Keystone.SpatialNodes.Quadtree.Sector;
 //using Keystone.QuadTree;
 
-//namespace Keystone.QuadTree
+//namespace Keystone.SpatialNodes.QuadTree
 //{
 //    // used to find a particular leaf node in a quadtree
 //    public class Picker : ITraverser

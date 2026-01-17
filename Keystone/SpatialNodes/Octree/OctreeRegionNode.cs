@@ -5,7 +5,7 @@
 //using Keystone.Portals;
 //using Keystone.Traversers;
 
-//namespace Keystone.Octree
+//namespace Keystone.SpatialNodes.Octree
 //{
 //    /// <summary>
 //    // note: i need to enforce the following:

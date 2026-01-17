@@ -3,7 +3,7 @@ using System.Drawing;
 using Keystone.Types;
 using Keystone.Traversers;
 
-namespace Keystone.Quadtree
+namespace KeyKeystone.SpatialNodesstone.Quadtree
 {
     // A "3d" quadtree node allows us to use TVCamera.IsBoxVisible() for culling rather than just
     // using 2d test.  The benefit is that when looking upward for instance, you can still cull

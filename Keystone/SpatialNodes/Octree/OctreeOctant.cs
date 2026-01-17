@@ -6,13 +6,18 @@ using Keystone.Traversers;
 using Keystone.Types;
 using Keystone.SpatialNodes;
 
-namespace Keystone.Octree
+namespace Keystone.SpatialNodes.Octree
 {
 
+    // TODO: Fast Ray / Octree intersection traversal
+    // // TODO: // TODO: https://daeken.dev/a-stupidly-simple-fast-octree-traversal-for-ray-intersection
+
+    // TODO: https://discussions.unity.com/t/free-nativetrees-burst-compatible-generic-octree-and-quadtree/901144
+
     // http://www.flipcode.com/archives/Octree_Implementation.shtml
+    //  - COTD Entry submitted by Paul Nettle [midnight@FluidStudios.com]
+    //  - Corresponds with an Ask MidNight response (http://www.flipcode.com/askmid/)
     /// <summary>
-    /// A dynamic + loose octree implementation. 
-    /// Dynamic = children are only added up to the depth that is first deepest enough to accomodate the bounds of the items being inserted into the tree.
     /// </summary>
     public class OctreeOctant : ISpatialNode, ITraversable, IBoundVolume
     {

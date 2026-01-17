@@ -3,7 +3,7 @@ using System.Drawing;
 using Keystone.Elements;
 using Keystone.Traversers;
 
-namespace Keystone.Quadtree
+namespace Keystone.SpatialNodes.Quadtree
 {
     public enum QUADRANT : int
     {

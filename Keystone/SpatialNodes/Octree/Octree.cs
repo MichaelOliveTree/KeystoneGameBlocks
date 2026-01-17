@@ -5,7 +5,7 @@
 //using Keystone.Traversers;
 //using Keystone.Types;
 
-//namespace Keystone.Octree
+//namespace Keystone.SpatialNodes.Octree
 //{
 //    public enum OctreeQuadrant : int
 //    {

@@ -4,7 +4,7 @@ using System.Diagnostics;
 using Keystone.Types;
 
 
-namespace Keystone.Octree
+namespace Keystone.SpatialNodes.Octree
 {
 	// http://www.flipcode.com/archives/Octree_Implementation.shtml
     /// <summary>

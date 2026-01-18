@@ -8,64 +8,63 @@ using System.Collections.Generic;
 namespace Keystone.Timers
 {
     
-		
 	public class IntervalTimers
     {
-        public delegate string IntervalCompleted (string nodeID, string name);
+        public delegate string IntervalCompleted(string nodeID, string name);
         //private List<TimePeriod> mTimePeriods;
         private Dictionary<string, TimePeriod> mKeyedTimePeriods;
-		
-		// NOTE: Using a class for TimePeriod instead of a struct allows us to easily
+
+        // NOTE: Using a class for TimePeriod instead of a struct allows us to easily
         //       increment timePeriod.Elapsed and decrement timePeriod.RepeatsRemaining without
         //       having to update this timePeriod within the Dictionary.
         private class TimePeriod
         {
             public string OwnerID;
             public string Name;
-            
+
             // milliseconds
             public double Duration; // the duration in Seconds this Period will last before completed ("IsReady")
             public double Elapsed;  // get's incremented each frame by elapsedSeconds and compared against Duration
-            public bool Repeating;
+            public bool Repeating;  // todo: im not sure this is useful because if we find that a TimePeriod has elapsed, then the next Elapsed may need to have the remainder added to it if we're just going to automatically repeat and not wait for a handler to process the current elapsed Interval and then start the next Interval if it wants to...
             public int RepeatCount;
             public int RepeatsRemaining;
             private bool mIsActive;
-			 // there should be no need to modify the Elapsed when resuming 
+            // there should be no need to modify the Elapsed when resuming 
             // because we do not store the starting TickCount, we just 
             // track the elapsed duration
-            public bool IsPaused; 
-			
+            public bool IsPaused;
+
             public bool DeActivateAfterCompleted;
-                       
+
             /// notifies the caller that the Interval with the specified "Name" has completed.
             public IntervalCompleted IntervalCompletedCB;
-			
-			
-            public bool IsReady { get { return Elapsed >= Duration; }}
-            
+
+
+            public bool IsReady { get { return Elapsed >= Duration; } }
+
             ///<summary>
             /// Rather than delete a Timer, sometimes we just want to 
             /// set IsActive=false and we will skip updates to it.
             ///</summary>
-            public bool IsActive 
+            public bool IsActive
             {
-                get { return mIsActive;}
-                set 
+                get { return mIsActive; }
+                set
                 {
                     mIsActive = !mIsActive; // toggle the state
                     Elapsed = 0;            // always reset the Elapsed to 0
                 }
-            } 
-            
-            
-        }
-        
+            }
 
-        
-        public void Register(string nodeID, string name, int durationInSeconds,  bool activateImmediately = true, bool repeating = false, int repeatCount = 0)
+
+        }
+
+
+
+        public void Register(string nodeID, string name, double durationInSeconds, bool activateImmediately = true, bool repeating = false, int repeatCount = 0)
         {
             TimePeriod tp = new TimePeriod();
-			
+
             tp.OwnerID = nodeID;
             tp.Name = name;
             tp.Duration = durationInSeconds;
@@ -73,126 +72,131 @@ namespace Keystone.Timers
             tp.Repeating = repeating;
             tp.RepeatCount = repeatCount;
             tp.RepeatsRemaining = repeatCount;
-            
+
             tp.IsPaused = false;
-			tp.DeActivateAfterCompleted = false;
-			tp.IntervalCompletedCB = null;
-			//tp.mIsActive = false;
-			
-            //tp.IsActive = activateImmediately;
-			
+            tp.DeActivateAfterCompleted = false;
+            tp.IntervalCompletedCB = null;
+
+            tp.IsActive = activateImmediately;
+
             string key = GetKey(nodeID, name);
             if (mKeyedTimePeriods == null) mKeyedTimePeriods = new Dictionary<string, TimePeriod>();
-            mKeyedTimePeriods.Add (key, tp);
+            mKeyedTimePeriods.Add(key, tp);
         }
-        
-        public void UnRegister (string nodeID, string name)
+
+        public void UnRegister(string nodeID, string name)
         {
             // TODO: remove this period from the dictionary
-            if (mKeyedTimePeriods == null) 
+            if (mKeyedTimePeriods == null)
             {
-                System.Diagnostics.Debug.WriteLine ("GameTime.UnRegister() - " + nodeID + " using name " + name + " does not exist.");
+                System.Diagnostics.Debug.WriteLine("GameTime.UnRegister() - " + nodeID + " using name " + name + " does not exist.");
             }
-            string key = GetKey (nodeID, name);
+            string key = GetKey(nodeID, name);
             TimePeriod tp;
-            bool success = mKeyedTimePeriods.TryGetValue (key, out tp);
-            
-            if (success) 
+            bool success = mKeyedTimePeriods.TryGetValue(key, out tp);
+
+            if (success)
                 mKeyedTimePeriods.Remove(key);
-            else 
-                System.Diagnostics.Debug.WriteLine ("GameTime.UnRegister() - " + nodeID + " using name " + name + " does not exist.");
-                
+            else
+                System.Diagnostics.Debug.WriteLine("GameTime.UnRegister() - " + nodeID + " using name " + name + " does not exist.");
+
         }
-        
+
         ///<summary>
         /// Unregisters all Intervals registered for a specific nodeID
         ///</summary>
-        public void Interval_UnRegisterAll (string nodeID)
+        public void Interval_UnRegisterAll(string nodeID)
         {
-            
+
         }
-        
+
 
         //public TimePeriod[] GetAllTimeIntervals (string nodeID)
         //{
         //    // for this to work, we must test for existance of "nodeID" at the start of every key in the dictionary 
         //    return null;
         //}
-        
-        public void Reset (string nodeID, string name)
+
+        public void Reset(string nodeID, string name)
         {
-            if (mKeyedTimePeriods == null) 
+            if (mKeyedTimePeriods == null)
             {
-                System.Diagnostics.Debug.WriteLine ("GameTime.Reset() - " + nodeID + " using name " + name + " does not exist.");
+                System.Diagnostics.Debug.WriteLine("GameTime.Reset() - " + nodeID + " using name " + name + " does not exist.");
             }
-            string key = GetKey (nodeID, name);
+            string key = GetKey(nodeID, name);
             TimePeriod tp;
-            bool success = mKeyedTimePeriods.TryGetValue (key, out tp);
-            
-            if (success) 
+            bool success = mKeyedTimePeriods.TryGetValue(key, out tp);
+
+            if (success)
                 tp.Elapsed = 0d;
-            else 
-                System.Diagnostics.Debug.WriteLine ("GameTime.Reset() - " + nodeID + " using name " + name + " does not exist.");
-                
+            else
+                System.Diagnostics.Debug.WriteLine("GameTime.Reset() - " + nodeID + " using name " + name + " does not exist.");
+
         }
 
-        public bool IsReady (string nodeID, string name)
+        public bool IsReady(string nodeID, string name)
         {
-            if (mKeyedTimePeriods == null) 
+            if (mKeyedTimePeriods == null)
             {
-                System.Diagnostics.Debug.WriteLine ("GameTime.IsReady() - " + nodeID + " using name " + name + " does not exist.");
+                //Console.WriteLine("GameTime.IsReady() - " + nodeID + " using name " + name + " does not exist.");
                 return false;
             }
-            string key = GetKey (nodeID, name);
+            string key = GetKey(nodeID, name);
             TimePeriod tp;
-            bool success = mKeyedTimePeriods.TryGetValue (key, out tp);
-            
-            if (success) 
-                return !tp.IsPaused && tp.IsActive && tp.Elapsed >= tp.Duration;
-                
+            bool success = mKeyedTimePeriods.TryGetValue(key, out tp);
+
+            if (success)
+            {
+                bool result = !tp.IsPaused && tp.IsActive && tp.Elapsed >= tp.Duration;
+
+                //Console.WriteLine("GameTime.IsReady() - " + nodeID + " using name ''" + name + "'' isReady = " + result.ToString());
+                return result;
+            }
+
             return false;
         }
-        
-        public bool IsActive (string nodeID, string name)
+
+        public bool IsActive(string nodeID, string name)
         {
-            if (mKeyedTimePeriods == null) 
+            if (mKeyedTimePeriods == null)
             {
-                System.Diagnostics.Debug.WriteLine ("GameTime.IsActive() - " + nodeID + " using name " + name + " does not exist.");
+                System.Diagnostics.Debug.WriteLine("GameTime.IsActive() - " + nodeID + " using name " + name + " does not exist.");
+                //using HelloBoids.Transform;
                 return false;
             }
-            string key = GetKey (nodeID, name);
+            string key = GetKey(nodeID, name);
             TimePeriod tp;
-            bool success = mKeyedTimePeriods.TryGetValue (key, out tp);
-            
+            bool success = mKeyedTimePeriods.TryGetValue(key, out tp);
+
             if (success) return tp.IsActive;
-                
+
             return false;
         }
-        
-        private string GetKey (string nodeID, string name)
+
+        private string GetKey(string nodeID, string name)
         {
             return nodeID + "_" + name;
         }
-        
+
         public void Update(double elapsedSeconds)
         {
             if (mKeyedTimePeriods == null || mKeyedTimePeriods.Count == 0) return;
 
-			foreach (TimePeriod period in mKeyedTimePeriods.Values)
-			{
-				if (!period.IsActive || period.IsPaused) continue;
+            foreach (TimePeriod period in mKeyedTimePeriods.Values)
+            {
+                if (!period.IsActive || period.IsPaused) continue;
                 period.Elapsed += elapsedSeconds;
-                
+
                 if (period.Elapsed >= period.Duration)
                 {
                     period.IntervalCompletedCB?.Invoke(period.OwnerID, period.Name);
-                    
-                    if (period.Repeating) 
+
+                    if (period.Repeating)
                     {
                         double spillOver = period.Elapsed - period.Duration;
                         period.Elapsed = spillOver;
                         period.RepeatsRemaining--;
-                        
+
                         // return before deactivation or removing the timePeriod
                         if (period.RepeatsRemaining > 0)
                             return;
@@ -200,13 +204,17 @@ namespace Keystone.Timers
 
                     // deactivate or remove this TimePeriod 
                     if (period.DeActivateAfterCompleted)
-                        period.IsActive = false;
-                    else
-                        UnRegister (period.OwnerID, period.Name);
-                    
+                        period.IsActive = true;
+                    //else
+                    //    todo: cant unregister it befire callet can
+                    //     check if IsReady== true !!
+                    //     unless a delegate or event is raised
+
+                    //    UnRegister(period.OwnerID, period.Name);
+
                 }
             }
         }
-    }	
+    }
     
 }

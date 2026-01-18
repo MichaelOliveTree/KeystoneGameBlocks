@@ -13,7 +13,9 @@ namespace Keystone.Timers
         private DateTime _time;
         private double mInitialTimeAtStartup;
         private bool mIsPaused;
-        private float _timeScaling; // gameSecondsPerRealLifeSecond.  eg. 60 gameSeconds per real life second means every real life minute results in one hour of game time passing
+        private float _timeScaling;                    // used for FFWD and REVERSE time speed ups and slow downs
+        private float mGameSecondsPerEachRealSecond;  // eg. 60 gameSeconds for every real life second means every real life minute results in one hour of game time passing
+        
         private double _totalElapsed; // total elapsed time since the first update
         private double _elapsedSeconds;
         private double mElapsedGameTimeSeconds;

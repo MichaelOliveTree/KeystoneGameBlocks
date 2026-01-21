@@ -13,7 +13,7 @@ namespace Keystone.Timers
         private DateTime _time;
         private double mInitialTimeAtStartup;
         private bool mIsPaused;
-        private float _timeScaling;                    // used for FFWD and REVERSE time speed ups and slow downs
+        private float _timeScaling;                    // 0.0 == paused.  0.5 == half speed slow motion.  1.0 == fullspeed.  2.0 = 2x speed, etc.  used for FFWD and REVERSE time speed ups and slow downs
         private float mGameSecondsPerEachRealSecond;  // eg. 60 gameSeconds for every real life second means every real life minute results in one hour of game time passing
         
         private double _totalElapsed; // total elapsed time since the first update
@@ -22,20 +22,24 @@ namespace Keystone.Timers
         private long mTicks;
 		private float _julianDay;
 
+        private bool mInitialized;
+        private double mFixedStep;
+
         // TODO: use Stopwatch here!!!  
 
         /// <summary>
         /// 
         /// </summary>
         /// <param name="timeScaling">minimum value must be >0.0 unless we want to support reverse time.</param>
-        public GameTime(float timeScaling)
+        public GameTime(float fixedFrequencyInSeconds = 60d, float timeScaling = 1.0f)
         {
-        	// TODO: what if 0.0 == paused/stopped
-            if (timeScaling <= 0f) throw new ArgumentOutOfRangeException("GameTime.ctor() - timeScaling must be greater than 0.");
+            if (timeScaling < 0f) throw new ArgumentOutOfRangeException("GameTime.ctor() - REVERSE time is not supported.. yet?");
             _timeScaling = timeScaling;
             
             _time = new DateTime(2006, 3, 30, 10, 30, 30, 30);
             
+            mFixedStep = 1d / (double)fixedFrequencyInSeconds;
+
             IntervalTimers = new IntervalTimers();
 
 
@@ -49,10 +53,7 @@ namespace Keystone.Timers
             _julianDay -= 1f / 24f;
         }
 
-        private GameTime() : this (1.0f)
-        {
-        }
-        
+
         public DateTime Time {get {return _time;}}
         
         /// <summary>
@@ -101,19 +102,48 @@ namespace Keystone.Timers
         	}
         }
 
-        public void Update(double elapsedSeconds)
+        public void Initialize()
         {
+            mInitialized = true;
+            _totalElapsed = 0.0d;
+            mElapsedGameTimeSeconds = 0.0d;
+        }
+
+        /// <summary>
+        /// Advances the overall elapsedSeconds tracking variables.
+        /// Updates IntervalTimers.
+        /// Updates overall time in "Game world" values (eg 1 second == 60 seconds game world time)
+        /// Returns the elapsedSeconds for this frame 
+        /// </summary>
+        public double Update()
+        {
+            if (!mInitialized)
+            { 
+                Console.WriteLine ("GameTime.Update() - GameTime not initialized.");
+                return;
+            }
         	if (_timeScaling == 0.0f) return; 
         	
-            _elapsedSeconds = elapsedSeconds * _timeScaling;
+            // TODO: the fixed step needs to be set here
+            
+
+            _elapsedSeconds = mFixedStep * _timeScaling;
             _totalElapsed += _elapsedSeconds;
-            mElapsedGameTimeSeconds = _elapsedSeconds * _timeScaling;
-            double elapsedMilliseconds = mElapsedGameTimeSeconds * 1000d;
+            mElapsedGameTimeSeconds = _totalElapsed * mGameSecondsPerEachRealSecond;
+
+            double elapsedMilliseconds = _totalElapsed * 1000d;
             _time = _time.Add(new TimeSpan(0, 0, 0, 0, (int)elapsedMilliseconds));
+
+            // todo: are we in replay mode?  Ticks shouldn't be advanced here... 
+            // revisit this
+            //todo: should we be grabbing this from a running mStopWatch?
+            //       
             mTicks = _time.Ticks; 
 
 
-            IntervalTimers.Update(elapsedSeconds);
+            IntervalTimers.Update(_elapsedSeconds);
+
+            return _elapsedSeconds;
         }
     }
 }

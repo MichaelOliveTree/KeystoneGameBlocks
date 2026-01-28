@@ -7,6 +7,32 @@ using System.Collections.Generic;
 namespace KeyScript.Host
 {
 
+
+    public static class Generator
+    {
+    // TODO: it appears I can use the "precompiler" to compile an ENUM at runtime
+    //       and then i can use this Enum with our scripts and our scripts can still  use full
+    //       EnumName.EnumMember syntax as well as the Game01.dll.  
+    //       This will be better than any other option such as building an Enum dynamically at runtime
+    //       and then only being able to access it generically and losing the friendly syntax which
+    //       makes Enums useful in the first place.
+
+    // NOTE: Once the Enum is generated, we can then use the regular KeyScript.Loader to compile it into a binary
+
+    // 
+    // TODO: https://www.csscript.net/help/precompilers.html
+    // download latest cs-script from https://github.com/oleg-shilo/cs-script
+
+        public bool GenerateEnum()
+        {
+            return false;
+        }
+
+        
+    }
+
+
+
     public class Loader
     {   	
 //        private CSScript.LoadedScript PropertyConverters;

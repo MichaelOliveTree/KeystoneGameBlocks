@@ -1,6 +1,6 @@
 #define CACHE_VERTICES
 #define USE_STRUCT // instead of classes for Quaternion and Matrix
-//#define USE_MEMORY_T
+#define USE_MEMORY_T
 #define SPATIAL_SEARCH
 
 using System.Diagnostics;
@@ -734,23 +734,24 @@ namespace HelloBoids
 			{
 				// todo: i think we need to check to see if this record is for
 				//       an Entity that is enabled
-				double age = gt.TotalElapsedSeconds - memSpan[i].CreationDateTime;
+				long age = gt.Ticks - memSpan[i].CreationDateTime;
+				memSpan[i].Age = age;
 				if (age >= maxAge)
 					Destroy(Boids[i]);
 			}
 	
 			// spawn new ones up to max spawn number per frame
+			Random rand = new Random(seed);
+			double width = (double)parameters[0];
+			double height = (double)parameters[1];
 			int numToCreate = 0;
 			for (int i = 0; i < numToCreate; i++)
 			{
 				// todo: i think we need to check to see if this record is for
 				//       an Entity that is enabled
 				double age = gt.TotalElapsedSeconds - memSpan[i].CreationDateTime;
-				Spawn(i);
-				
+				Spawn(rand, i, width, height);
 			}
-	
-	
         }
 		
 
@@ -8673,6 +8674,12 @@ namespace HelloBoids
 					case "LIFECYCLE":
 						Processor<Transform.Living_Entity> life = (Processor<Transform.Living_Entity>)func;
                         ComponentStore<Transform.Living_Entity> store1 = mComponentStoreCollection.CheckOut<Transform.Living_Entity>(0);
+  		                Console.WriteLine("LIFE CYCEL ARGS COUNT == " + args.Length.ToString());
+  		                Console.WriteLine("LIFE CYCEL ARGS COUNT == " + args.Length.ToString());
+  		                Console.WriteLine("LIFE CYCEL ARGS COUNT == " + args.Length.ToString());
+  		                Console.WriteLine("LIFE CYCEL ARGS COUNT == " + args.Length.ToString());
+  		                Console.WriteLine("LIFE CYCEL ARGS COUNT == " + args.Length.ToString());
+  		                
   		                life.Invoke(store1, args, seed, gt);
 						break;
 					default:
@@ -8701,9 +8708,13 @@ namespace HelloBoids
             // TODO: temporary switch to grab the correct parameters from KeyCommon.UserData.
             switch (key)
             {
-				case "LIFECYCLE":
+				case "LIFECYCLE": 
+				    result = new object[2];
+				    result[0] = EntryClass.HEIGHT;
+				    result[1] = EntryClass.WIDTH;
                     break;
                 case "FLOCKING":
+                
                     break;
 					
                 case "STEER":
@@ -8714,7 +8725,7 @@ namespace HelloBoids
                     throw new NotImplementedException("DataProcessors.GetParameters() - No store for key '" + key + "'");
             }
 
-            return null;
+            return result;
 
         }
 

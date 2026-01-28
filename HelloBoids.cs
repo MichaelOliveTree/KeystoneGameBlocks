@@ -1,6 +1,6 @@
 #define CACHE_VERTICES
 #define USE_STRUCT // instead of classes for Quaternion and Matrix
-#define USE_MEMORY_T
+//#define USE_MEMORY_T
 #define SPATIAL_SEARCH
 
 using System.Diagnostics;
@@ -10,7 +10,7 @@ using System.Reflection; // used for "MethodBase" type in Profiler
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
+//using System.Numerics;
 //using System.Runtime.Intrinsics; // for SIMD enabled code
 
 // NOTE: The primary purpose of this is to demonstrate the use of Memory<T>
@@ -591,7 +591,7 @@ namespace HelloBoids
 #if USE_MEMORY_T == false
             // TEST CLASSES (Object Oriented Technique)
             // =====================
-            this.UpdateClasses(elapsedSeconds,
+            this.UpdateClasses(gt,
                                this.Boids,
                                this.SeparationDistance,
                                this.SeparationFactor,
@@ -746,32 +746,13 @@ namespace HelloBoids
 				// todo: i think we need to check to see if this record is for
 				//       an Entity that is enabled
 				double age = gt.TotalElapsedSeconds - memSpan[i].CreationDateTime;
-				//Spawn(i);
+				Spawn(i);
 				
 			}
 	
 	
         }
 		
-		private void Destroy(EntityNode entity)
-		{
-			// remove from Octree
-			
-			// remove from Boids[] list
-			
-			
-		}
-		
-		private Boid Spawn(Random rand, int index, double width, double height)
-		{
-			double posX = rand.NextDouble() * width;
-            double posY = rand.NextDouble() * height;
-            double vX = (rand.NextDouble() - 0.5d) * 2d;
-            double vY = (rand.NextDouble() - 0.5d) * 2d;
-
-            Boid b = new Boid(index, posX, posY, vX, vY);
-			return b;
-		}
 
         private void DoFlocking(ComponentStore<Transform.Transform_Struct> store, object[] parameters, int seed, GameTime gt)
         {
@@ -1010,6 +991,27 @@ namespace HelloBoids
         }
 #endif
 
+        
+		private void Destroy(EntityNode entity)
+		{
+			// remove from Octree
+			
+			// remove from Boids[] list
+			
+			
+		}
+		
+		public Boid Spawn(Random rand, int index, double width, double height)
+		{
+			double posX = rand.NextDouble() * width;
+            double posY = rand.NextDouble() * height;
+            double vX = (rand.NextDouble() - 0.5d) * 2d;
+            double vY = (rand.NextDouble() - 0.5d) * 2d;
+
+            Boid b = new Boid(index, posX, posY, vX, vY);
+			return b;
+		}
+		
         private List<int> GetNeighbors(Boid currentBoid, double largestDistance, double largestDistanceSquared)
         {
             List<int> neighbors;

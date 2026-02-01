@@ -1,6 +1,6 @@
 #define CACHE_VERTICES
 #define USE_STRUCT // instead of classes for Quaternion and Matrix
-#define USE_MEMORY_T
+#define USE_MEMORY_T  // 3300 FPS with Memory<T> vs 250 FPS using classes.  Maintaining good cache coherency is KEY.  Running this on a c# compiler on my android phone with little runtime memeory available is much more difficult with NUM_ENTRIES and NUM_ITERATIONS set to a  high value
 #define SPATIAL_SEARCH
 
 using System.Diagnostics;
@@ -28,26 +28,25 @@ namespace HelloBoids
     {
         public static HelloBoids.ComponentStoreCollection mCStoreCol = new HelloBoids.ComponentStoreCollection();
         public static BoidSimulation bSim;
-        public static uint NUM_ENTRIES = 768;
-        public static uint NUM_ITERATIONS = 200;
         public static double WIDTH = 800d;
         public static double HEIGHT = 600d;
-        private static string MODE;
+        private static string MODE = MODE = "Memory<T>"; // Classes or Memory<T> and is set at RunTime but defaults to Memory<T> unless #define Memory_T is commented out
         private static bool useOctree = true;
 
+		public static uint NUM_ENTRIES = 768;
+        public static uint NUM_ITERATIONS = 200;
         public static double MAX_RUNTIME_SECONDS = 2.5;
         public static double step;
         private static double mTotalRuntime;
 
         public static long mCurrentFrame;
-        public static Profiler CodeProfiler;
-        public static string output;
-
-
         private static bool mIsRunning;
         private static object mGameThreadLockObject = new object();
         private static object mSyncLock;
 
+		// debugging aids
+		public static Profiler CodeProfiler;
+        public static string output;
 
 
         public static void Main()
@@ -112,6 +111,7 @@ namespace HelloBoids
             // processing
             categoryIndex++;
             string dataProcessing = "Data Processing";
+           
             CodeProfiler.Register("AssignSpan", dataProcessing);
             CodeProfiler.Register("Process Frame", dataProcessing);
             CodeProfiler.Register("GetNeighbors", dataProcessing);
@@ -421,20 +421,7 @@ namespace HelloBoids
             // members are ever used.
             //     Validate(store, classes);
 
-
-            //DataProcessors.Processor p = TestIntrinsicProcessor;
-
-            //mIntrinsicProcessors = new KeyCommon.Processors.DataProcessors();
-            //mIntrinsicProcessors.Add("STEER", p);
-            // then -> p[i].Invoke(store, parameters, r);
-
-            //mRulesProcessors = game.RulesProcessors;
-
-            //Update(0.01f);
             // TODO:implement a https://en.wikipedia.org/wiki/K-d_tree
-            //       so that each boid only needs to check against close boids and not all
-            // TODO: 
-
         }
 
         private static void Update(GameTime gt)
@@ -542,10 +529,12 @@ namespace HelloBoids
             mDataProcessor.Add("FLOCKING", flockingBehavior);
 #endif
 
-            //System.Numerics.BigInteger bint = 0;
+            // SPAWN INITIAL SET OF BOIDS UP TO EntryClass.NUM_ENTRIES
+			//System.Numerics.BigInteger bint = 0;
             decimal bint = 0;
-
             Random rand = new Random(Seed);
+			System.Diagnostics.Debug.Assert(EntryClass.NUM_ENTRIES == numBoids);
+	
             for (int i = 0; i < numBoids; i++)
             {
                 // fragment the memory to account for fact that our
@@ -576,7 +565,7 @@ namespace HelloBoids
                     MemoryFragmenter.Cleanup();
 
             }
-            Console.WriteLine(numBoids + " Boids Created.  Big Hash = " + bint.ToString());
+            Console.WriteLine("BoidSimulation.ctor() - " + numBoids + " Boids Created.  Big Hash = " + bint.ToString());
         }
 
         /// <summary>
@@ -605,31 +594,13 @@ namespace HelloBoids
 
             // TEST MEMORY<T> (Data Oriented Technique)
             // ====================
-
             mDataProcessor.Update(gt, Boids.ToArray());
-
-            //BoidSimulation.Store = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(NUM_ENTRIES);
-            //ComponentStore<Transform.Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(NUM_ENTRIES);
-            //Span<Transform.Transform_Struct> mem = store.Span;
-
-            //mTestSpan = store.Span;
-            //Span<Transform.Transform_Struct> castTest = (Span<Transform.Transform_Struct>) mTestSpan;
-
-            //bSim.ProcessStep(elapsedSeconds, NUM_ENTRIES, BoidSimulation.Store, bSim.SeparationDistance, bSim.SeparationFactor, bSim.AlignmentDistance, bSim.AlignmentFactor, bSim.CohesionDistance, bSim.CohesionFactor, bSim.MaxSpeed, bSim.TurnFactor);
-
-            //bSim.ProcessStep(elapsedSeconds,
-            //               NUM_ENTRIES,
-            //                bSim.SeparationDistance,
-            //                bSim.SeparationFactor,
-            //                bSim.AlignmentDistance,
-            //                bSim.AlignmentFactor,
-            //                bSim.CohesionDistance,
-            //                bSim.CohesionFactor,
-            //                bSim.MaxSpeed,
-            //                bSim.TurnFactor);
 #endif
         }
 
+		/// <summary>
+		/// Run the simulation using Update method for data stored in CLASSES  in a typical way, as opposed to Memory<T> based storage which allows us to use (D)ata (O)riented processing of Entities
+		/// </summary>
         public void UpdateClasses(GameTime gt, List<Boid> allBoids, double separationDistance, double separationFactor, double alignmentDistance, double alignmentFactor, 
 								  double cohesionDistance, double cohesionFactor, double maxSpeed, double turnFactor)
         {
@@ -716,20 +687,14 @@ namespace HelloBoids
 
         private void DoLifeCycle(ComponentStore<Transform.Living_Entity> store, object[] parameters, int seed, GameTime gt)
         {
-            //Console.WriteLine("DoLifeCycle()");
-            bool spawnReady = mIntervalTimers.IsReady("LifeCycle", "spawn");
-            if (spawnReady)
-            {
-                //Console.WriteLine("Spawn Ready == " + spawnReady.ToString());
-                mIntervalTimers.Reset("LifeCycle", "spawn");
-            }
-	
+            
 			Span<Transform.Living_Entity> memSpan = store.Span;
-
-            // TODO: these need to be in parameters
-            double maxAge = 0.9d;
+	
+			// todo: maxAge and minAge need to be set in Parameters
+	        double maxAge = 0.9d;
             double minAge = 0.3d;
-
+			int numDestroyed = 0;
+	
             for (int i = 0; i < memSpan.Length; i++)
 			{
 				// todo: i think we need to check to see if this record is for
@@ -737,14 +702,29 @@ namespace HelloBoids
 				long age = gt.Ticks - memSpan[i].CreationDateTime;
 				memSpan[i].Age = age;
 				if (age >= maxAge)
+				{
+					// TODO: there is a bug here in CheckIn and Destroy()... we are not managing the entity.Index and entity.SpanIndex properly
+					/*
+					store.CheckIn(Boids[i].mMemStore_LivingEntity);
 					Destroy(Boids[i]);
+					numDestroyed++;
+					*/
+				}
 			}
+         
+            bool spawnReady = mIntervalTimers.IsReady("LifeCycle", "spawn");
+            if (spawnReady)
+            {
+                // Console.WriteLine("Spawn Ready == " + spawnReady.ToString());
+                mIntervalTimers.Reset("LifeCycle", "spawn");
+            }
 	
 			// spawn new ones up to max spawn number per frame
 			Random rand = new Random(seed);
 			double width = (double)parameters[0];
 			double height = (double)parameters[1];
-			int numToCreate = 0;
+	
+			int numToCreate = numDestroyed;
 			for (int i = 0; i < numToCreate; i++)
 			{
 				// todo: i think we need to check to see if this record is for
@@ -757,7 +737,7 @@ namespace HelloBoids
 
         private void DoFlocking(ComponentStore<Transform.Transform_Struct> store, object[] parameters, int seed, GameTime gt)
         {
-            //Console.WriteLine("DoFlocking()");
+        
 			double elapsedSeconds = gt.ElapsedSeconds;
 			
             Span<Transform.Transform_Struct> memSpan;
@@ -809,13 +789,18 @@ namespace HelloBoids
                     // WARNING:  The first line that uses currentBoid.Translation is 100x SLOWER than the version using CLASSES (eg for "Classes" version comment out #define USE_MEMORY_T
                     //           The second line that uses memSpan[i].Translation is 100x FASTER than the version using CLASSES (WHAT ON EARTH?
 					//           I believe it is because the cache evicts the span<T> data and has to re-load it every iteration (eg memSpan.Length)
-                    //BoundingBox searchArea = new BoundingBox(currentBoid.Translation, radius);
-					//BoundingBox searchArea = new BoundingBox(Boids[i].Translation, radius);
-					Vector3d tmp = currentBoid.Translation;
-					tmp.x += 0.2;
-					currentBoid.Translation = tmp;
-                    BoundingBox searchArea = new BoundingBox(memSpan[i].Translation, radius);
+					// UPDATE:   Above is likely wrong.  One problem is memSpan[i].Translation was always 0,0,0 and so the search box was often
+					//           never intersecting with the box of the currentB's spatial node SpatialNode.BoundingBox
 					
+            //       BoundingBox searchArea = new BoundingBox(currentBoid.Translation, radius);
+					//System.Console.WriteLine("Translation CLASS = " + currentBoid.Translation.ToString());
+					//BoundingBox searchArea = new BoundingBox(Boids[i].Translation, radius);
+			// TMP HACK TO SEE ABOUT CACHE COHERENCY ISSUES
+			//		Vector3d tmp = currentBoid.Translation;
+			//		tmp.x += 0.2;
+			//		currentBoid.Translation = tmp;
+                    BoundingBox searchArea = new BoundingBox(memSpan[i].Translation, radius);
+					//System.Console.WriteLine("Translation MEMORY<T> = " + memSpan[i].Translation.ToString());
 					// TODO: 
                     if (!currentBoid.SpatialNode.BoundingBox.Intersects(searchArea)) continue; // early exit
 
@@ -992,16 +977,7 @@ namespace HelloBoids
         }
 #endif
 
-        
-		private void Destroy(EntityNode entity)
-		{
-			// remove from Octree
-			
-			// remove from Boids[] list
-			
-			
-		}
-		
+        		
 		public Boid Spawn(Random rand, int index, double width, double height)
 		{
 			double posX = rand.NextDouble() * width;
@@ -1012,6 +988,36 @@ namespace HelloBoids
             Boid b = new Boid(index, posX, posY, vX, vY);
 			return b;
 		}
+		
+		
+		private void Destroy(EntityNode entity)
+		{
+					
+			Console.WriteLine("Destroy() == Started on index " + entity.SpanIndexLE.ToString());
+	
+			int lastIndex = this.Boids.Count - 1;
+	
+			// remove from Octree
+			this.Octree.OnEntityNode_Removed(entity);
+			
+			// remove from Boids[] list
+			// TODO: do we need to update all the indices to keep our Memory<T> packed?
+			//       one method is to always move the last indexed entity into the slot where 
+			//       an Entity was removed, update its entity.Index, and then change the count 
+			//       of the Memory<T> store to previousCount - 1;
+			// TODO: we need to release all Memory<T> used by Transform_Struct and Living_Entity structs.
+			this.Boids[entity.Index] = null;
+			this.Boids[entity.Index] = this.Boids[lastIndex];
+			this.Boids[entity.Index].Index = lastIndex;
+	
+			this.Boids.RemoveAt(lastIndex); // todo: this wont result in a List copy to a new List will it?
+	
+	
+
+			Console.WriteLine("Destroy() == Completed on index " + entity.SpanIndexLE.ToString());
+			
+		}
+
 		
         private List<int> GetNeighbors(Boid currentBoid, double largestDistance, double largestDistanceSquared)
         {
@@ -1220,11 +1226,10 @@ namespace HelloBoids
             mID = guid;
         }
 
-        public EntityNode(int index, double x, double y, double xV, double yV)
-
+        public EntityNode(int index, double x, double y, double xV, double yV) 
+			: base (x, y, xV, yV)
         {
             mIndex = index;
-
         }
 
         public OctreeOctant SpatialNode
@@ -1234,7 +1239,7 @@ namespace HelloBoids
             set { _octant = value; }
         }
 
-        public int Index { get { return mIndex; } }
+        public int Index { get { return mIndex; } set {mIndex = value;}}
     }
 
 
@@ -1811,9 +1816,11 @@ namespace HelloBoids
         protected Vector3d mTranslationDelta;
 
 #if USE_MEMORY_T
-        public Memory<Transform_Struct> mMemStore; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
-        public int SpanIndex = -1;
+        public Memory<Transform_Struct> mMemStore_Transform; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
+		public Memory<Living_Entity> mMemStore_LivingEntity; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
 
+        public int SpanIndex = -1;
+		public int SpanIndexLE = -1;
 				
 				
 		//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
@@ -1849,6 +1856,36 @@ namespace HelloBoids
             //public Matrix RegionMatrix;
         }
 #endif
+	
+		protected Transform (double x, double y, double xV, double yV) : this()
+		{
+			#if USE_MEMORY_T
+				Vector3d translation = new Vector3d(x, y, 0d);
+				mSpanAccessTest = translation;
+				mMemStore_Transform.Span[0].Translation = mSpanAccessTest;// translation;
+
+			#else
+				mMatrix = Matrix.Identity();
+				mScale.x = 1;
+				mScale.y = 1;
+				mScale.z = 1;
+				mTranslation.x = x;
+				mTranslation.y = y;
+				mTranslation.z = 0;
+				mRotation = new Quaternion();
+				//_rotation.X = 0;
+				//_rotation.Y = 0;
+				//_rotation.Z = 0;
+				//_rotation.W = 1;
+				mPivot.x = 0;
+				mPivot.y = 0;
+				mPivot.z = 0;
+	
+				mVelocity.x = xV;
+				mVelocity.Y = yV;
+			#endif
+	
+		}
 
         protected Transform()
         {
@@ -1857,13 +1894,17 @@ namespace HelloBoids
 
             ComponentStore<Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
             int index = -1;
-            mMemStore = store.CheckOut(out index);
+            mMemStore_Transform = store.CheckOut(out index);
             SpanIndex = index;
             //initialize the memory store
 
             // todo do we need destuuctor for Repository.CheckIn mMemstore?
 
-
+			ComponentStore<Living_Entity> storeLE = EntryClass.mCStoreCol.CheckOut<Living_Entity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
+            index = -1;
+            mMemStore_LivingEntity = storeLE.CheckOut(out index);
+            SpanIndexLE = index;
+            //initialize the memory store
 #else
             mMatrix = Matrix.Identity();
             mScale.x = 1;
@@ -2176,12 +2217,12 @@ namespace HelloBoids
                 return mSpanAccessTest; // NOTE: <-- this line is much faster than returning the Translation from the below line!  
                                         // / What we want to do is cache/grab the entire Span[0] once for this Entity/Boid and then directly just modify IT and not this accessor!!!
                                         //
-                return mMemStore.Span[0].Translation;
+                return mMemStore_Transform.Span[0].Translation;
             }
             set
             {
                 mSpanAccessTest = value;
-                //mMemStore.Span[0].Translation = value;
+                //mMemStore_Transform.Span[0].Translation = value;
             }
         }
         /*
@@ -2197,8 +2238,8 @@ namespace HelloBoids
 
         public Vector3d Scale
         {
-            get { return mMemStore.Span[0].Scale; }
-            set { mMemStore.Span[0].Scale = value; }
+            get { return mMemStore_Transform.Span[0].Scale; }
+            set { mMemStore_Transform.Span[0].Scale = value; }
         }
         /*
         public Vector3d DerivedScale
@@ -2211,8 +2252,8 @@ namespace HelloBoids
         }*/
         public Quaternion Rotation
         {
-            get { return mMemStore.Span[0].Rotation; }
-            set { mMemStore.Span[0].Rotation = value; }
+            get { return mMemStore_Transform.Span[0].Rotation; }
+            set { mMemStore_Transform.Span[0].Rotation = value; }
         }
         /*
         public Quaternion DerivedRotation
@@ -8656,31 +8697,32 @@ namespace HelloBoids
 
         public void Update(GameTime gt, EntityNode[] entities)
         {
+           
+            
+            
             foreach (string key in mProcessors.Keys)
             {
+                
                 var func = mProcessors[key];
 				int seed = 0;
+			
                 object[] args = GetParameters(key);
-				
+	
 				// cast processors of type 'object' to the appropriate type we need for this processor (based on the name of it's key)
 				// note: we could probably check it's GetType() instead... but not necessary for now
 				switch (key)
 				{
 					case "FLOCKING":
-						Processor<Transform.Transform_Struct> flocking = (Processor<Transform.Transform_Struct>)func;
+						
+			Processor<Transform.Transform_Struct> flocking = (Processor<Transform.Transform_Struct>)func;
                         ComponentStore<Transform.Transform_Struct> store0 = mComponentStoreCollection.CheckOut<Transform.Transform_Struct>(0);
   		                flocking.Invoke(store0, args, seed, gt);
 						break;
 					case "LIFECYCLE":
-						Processor<Transform.Living_Entity> life = (Processor<Transform.Living_Entity>)func;
-                        ComponentStore<Transform.Living_Entity> store1 = mComponentStoreCollection.CheckOut<Transform.Living_Entity>(0);
-  		                Console.WriteLine("LIFE CYCEL ARGS COUNT == " + args.Length.ToString());
-  		                Console.WriteLine("LIFE CYCEL ARGS COUNT == " + args.Length.ToString());
-  		                Console.WriteLine("LIFE CYCEL ARGS COUNT == " + args.Length.ToString());
-  		                Console.WriteLine("LIFE CYCEL ARGS COUNT == " + args.Length.ToString());
-  		                Console.WriteLine("LIFE CYCEL ARGS COUNT == " + args.Length.ToString());
-  		                
-  		                life.Invoke(store1, args, seed, gt);
+		Processor<Transform.Living_Entity> life = (Processor<Transform.Living_Entity>)func;
+               ComponentStore<Transform.Living_Entity> store1 = mComponentStoreCollection.CheckOut<Transform.Living_Entity>(0);
+  		    
+ life.Invoke(store1, args, seed, gt);
 						break;
 					default:
 						throw new NotImplementedException();
@@ -8702,7 +8744,6 @@ namespace HelloBoids
         private object[] GetParameters(string key)
         {
             object[] result = null;
-            return result;
 
             // all parameters are tracked in KeyCommon.UserData
             // TODO: temporary switch to grab the correct parameters from KeyCommon.UserData.
@@ -8965,14 +9006,14 @@ namespace HelloBoids
         private const uint MIN_SIZE = 64;
         private const uint MAX_SIZE = 1024;
         private uint EXPAND_INCREMENT = MIN_SIZE; // expand by this amount when needed.  if 0, it will double the size of Components
+        
+		private Memory<T> Components;
+		private Stack<int> mAvailableForCheckOut;
+		private bool[] InUse;       
+
         private object mSync;
         private Dictionary<string, bool[]> mViews;
-        private Stack<int> mAvailableForCheckOut;
-
-        private Memory<T> Components;
-        private bool[] InUse;
-
-
+		
         /*Span<T> in C# is a value type that provides a safe and efficient way to work with 
         contiguous regions of memory, whether that memory is managed (like an array on the 
         heap), unmanaged, or allocated on the stack. Despite being a value type, Span<T> 
@@ -9040,11 +9081,103 @@ namespace HelloBoids
 			Console.WriteLine("ComponentStore.ctor() - " + Utils.SizeSuffix(totalUsed) + " used.");
         }
 
+		
         public uint Size { get { return (uint)Components.Length; } }
 
         public Span<T> Span { get { return Components.Span; } }
+        
+        public ReadOnlySpan<T> Copy()
+        {
+            lock (mSync)
+            {
+                ReadOnlySpan<T> result = Components.Span;
+                return result;
+            }
+        }
+		
+        // GameAPI will need commands for checking in/out via our Entity script initializations, 
+        // the types made here in our ComponentStore
+        // So for instance, if "EnergyWeapon.cs" on Initialize()
+        // will register "Weapon" and "EnergyWeapon" interfaces.
+        // Recall that Initialize() is only called ONCE PER SCRIPT whereas Initialize_Entity
+        // is called per Entity that is using that script.
+        // Initialize_Entity() will then call CheckOut(typeof(Weapon)) and CheckOut(typeOf(EnergyWeapon))
+        // to get direct memory access to the Memory<T> where variables associated with those interfaces
+        // will get stored.
+        public Memory<T> CheckOut(out int index) // aka: MemoryPool<T>.Rent() 
+        {
+            lock (mSync)
+            {
 
-        public void RemoveView(string viewName)
+                const int HOW_MANY = 1;
+                index = -1;
+                try
+                {
+
+                    if (Components.Equals(null))
+                        Expand();
+
+                    // using stack<int> of available indices
+                    if (mAvailableForCheckOut.Count > 0)
+                    {
+                        int i = mAvailableForCheckOut.Pop();
+                        InUse[i] = true;
+                        index = i;
+                        return Components.Slice(i, HOW_MANY);
+                    }
+
+                    // NOTE: we start searching from mLastCheckOutIndex + 1 otherwise
+                    //       finding an available slot is very slow.  This works great
+                    //       but when we also start to CheckIn() items, we need to maintain
+                    //       a list of those as well.  
+                    //       In fact, all we need is to initially create a stack<> of available
+                    //       generated by adding initially all indices from bottom to top so that
+                    //       we grab from the top first.  Then any item's that are "CheckIn" get 
+                    //       their indices added back to the stack.
+                    //for (int i = mLastCheckOutIndex + 1; i < Components.Length; i++)
+                    //    if (!InUse[i])
+                    //    {
+                    //        InUse[i] = true;
+                    //        mLastCheckOutIndex = i;
+                    //        return Components.Slice(i, HOW_MANY);    
+                    //    }
+
+                    // if still here, we need to expand first
+                    Expand();
+                    return CheckOut(out index);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("componentStore.Checkout" + ex.Message);
+                    return null;
+                }
+
+            }
+        }
+
+        public void CheckIn(Memory<T> mem)
+        {
+            lock (mSync)
+            {
+
+                // find the index of this mem being checked In
+                for (int i = 0; i < Components.Length; i++)
+                    if (!InUse[i] && (mem.Equals(this.Components.Slice(i, 1))))
+                    {
+                        InUse[i] = false;
+						
+						// CheckIn(); 
+						
+						
+                        mAvailableForCheckOut.Push(i);
+                        return;
+
+                        // todo: Components.Span[i] = default(T);    
+                    }
+            }
+        }
+		
+		public void RemoveView(string viewName)
         {
             if (mViews == null) throw new Exception("ComponentStore.RemoveView() - A View with name '" + viewName + "' NOT FOUND.");
             bool[] view;
@@ -9194,94 +9327,6 @@ namespace HelloBoids
             }
         }
 
-        // GameAPI will need commands for checking in/out via our Entity script initializations, 
-        // the types made here in our ComponentStore
-        // So for instance, if "EnergyWeapon.cs" on Initialize()
-        // will register "Weapon" and "EnergyWeapon" interfaces.
-        // Recall that Initialize() is only called ONCE PER SCRIPT whereas Initialize_Entity
-        // is called per Entity that is using that script.
-        // Initialize_Entity() will then call CheckOut(typeof(Weapon)) and CheckOut(typeOf(EnergyWeapon))
-        // to get direct memory access to the Memory<T> where variables associated with those interfaces
-        // will get stored.
-        public Memory<T> CheckOut(out int index) // aka: MemoryPool<T>.Rent() 
-        {
-            lock (mSync)
-            {
-
-                const int HOW_MANY = 1;
-                index = -1;
-                try
-                {
-
-                    if (Components.Equals(null))
-                        Expand();
-
-                    // using stack<int> of available indices
-                    if (mAvailableForCheckOut.Count > 0)
-                    {
-                        int i = mAvailableForCheckOut.Pop();
-                        InUse[i] = true;
-                        index = i;
-                        return Components.Slice(i, HOW_MANY);
-                    }
-
-                    // NOTE: we start searching from mLastCheckOutIndex + 1 otherwise
-                    //       finding an available slot is very slow.  This works great
-                    //       but when we also start to CheckIn() items, we need to maintain
-                    //       a list of those as well.  
-                    //       In fact, all we need is to initially create a stack<> of available
-                    //       generated by adding initially all indices from bottom to top so that
-                    //       we grab from the top first.  Then any item's that are "CheckIn" get 
-                    //       their indices added back to the stack.
-                    //for (int i = mLastCheckOutIndex + 1; i < Components.Length; i++)
-                    //    if (!InUse[i])
-                    //    {
-                    //        InUse[i] = true;
-                    //        mLastCheckOutIndex = i;
-                    //        return Components.Slice(i, HOW_MANY);    
-                    //    }
-
-                    // if still here, we need to expand first
-                    Expand();
-                    return CheckOut(out index);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("componentStore.Checkout" + ex.Message);
-                    return null;
-                }
-
-            }
-        }
-
-        public ReadOnlySpan<T> Copy()
-        {
-            lock (mSync)
-            {
-                ReadOnlySpan<T> result = Components.Span;
-                return result;
-            }
-        }
-
-
-        public void CheckIn(Memory<T> mem)
-        {
-            lock (mSync)
-            {
-
-                // find the index of this mem being checked In
-                for (int i = 0; i < Components.Length; i++)
-                    if (!InUse[i] && (mem.Equals(this.Components.Slice(i, 1))))
-                    {
-                        InUse[i] = false;
-
-                        mAvailableForCheckOut.Push(i);
-                        return;
-
-                        // todo: Components.Span[i] = default(T);    
-                    }
-            }
-        }
     } // ComponentStore.cs
 
 
@@ -9329,7 +9374,6 @@ namespace HelloBoids
             _time = new DateTime(2006, 3, 30, 10, 30, 30, 30);
             
             IntervalTimers = new IntervalTimers();
-
 
             // http://stackoverflow.com/questions/5248827/convert-datetime-to-julian-date-in-c-sharp-tooadate-safe
 

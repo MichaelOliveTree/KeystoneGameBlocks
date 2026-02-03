@@ -32,7 +32,8 @@ namespace HelloBoids
         public static double HEIGHT = 600d;
         private static string MODE = MODE = "Memory<T>"; // Classes or Memory<T> and is set at RunTime but defaults to Memory<T> unless #define Memory_T is commented out
         private static bool useOctree = true;
-
+		public static uint OctreeMaxDepth = 8;
+			
 		public static uint NUM_ENTRIES = 768;
         public static uint NUM_ITERATIONS = 200;
         public static double MAX_RUNTIME_SECONDS = 2.5;
@@ -44,6 +45,22 @@ namespace HelloBoids
         private static object mGameThreadLockObject = new object();
         private static object mSyncLock;
 
+		// global settings
+		// Note: the larger the various distance values below,
+        // the more cpu cycles needed. Tweak these values
+        // to find a good balance between performance and
+        // simulation/behavior quality
+		public static double SEPERATION_DISTANCE = 5.0d;
+		public static double ALIGNMENT_DISTANCE = 2.5d;
+		public static double COHESION_DISTANCE = 2.5d;
+		
+		public static double SEPARATION_FACTOR = 0.5d;
+		public static double ALIGNMENT_FACTOR = 0.2d;
+		public static double COHESION_FACTOR = 0.1d;
+		public static double TURN_FACTOR = 0.1d; // For boundary avoidance
+		public static double MAX_SPEED = 5d;
+		
+		
 		// debugging aids
 		public static Profiler CodeProfiler;
         public static string output;
@@ -252,19 +269,6 @@ namespace HelloBoids
         {
 
             bSim = new BoidSimulation((int)NUM_ENTRIES, WIDTH, HEIGHT, useOctree);
-            // Note: the larger the various distance values below,
-            // the more cpu cycles needed. Tweak these values
-            // to find a good balance between performance and
-            // simulation/behavior quality
-            bSim.SeparationDistance = 20;
-            bSim.SeparationFactor = 0.5;
-            bSim.AlignmentDistance = 20;
-            bSim.AlignmentFactor = 0.2;
-            bSim.CohesionDistance = 25;
-            bSim.CohesionFactor = 0.1;
-            bSim.MaxSpeed = 5;
-            bSim.TurnFactor = 0.1; // For boundary avoidance
-
 
             output = "Performance Test RUNNING - " + NUM_ENTRIES.ToString() + " boids @ " + NUM_ITERATIONS.ToString() + " iterations.";
             Console.WriteLine(output);
@@ -466,21 +470,20 @@ namespace HelloBoids
 
     public class BoidSimulation
     {
-
 #if USE_MEMORY_T
         public DataProcessorsStore mDataProcessor;
 #endif
         public List<Boid> Boids { get; set; }
         public int Seed { get; set; } = 123;
 
-        public double SeparationDistance { get; set; } = 20;
-        public double SeparationFactor { get; set; } = 0.5;
-        public double AlignmentDistance { get; set; } = 50;
-        public double AlignmentFactor { get; set; } = 0.2;
-        public double CohesionDistance { get; set; } = 50;
-        public double CohesionFactor { get; set; } = 0.1;
-        public double MaxSpeed { get; set; } = 5;
-        public double TurnFactor { get; set; } = 0.1; // For boundary avoidance
+        private double SeparationDistance;
+        private double SeparationFactor ;
+        private double AlignmentDistance;
+        private double AlignmentFactor;
+        private double CohesionDistance;
+        private double CohesionFactor;
+        private double MaxSpeed;
+        private double TurnFactor; // For boundary avoidance
 
         public OctreeOctant Octree { get; }
         public static IntervalTimers mIntervalTimers;
@@ -490,10 +493,19 @@ namespace HelloBoids
         public static ComponentStore<Transform.Transform_Struct> Store;
 #endif
 
-        public BoidSimulation(int numBoids, double width, double height, bool useOctree = false, uint maxOctreeDepth = 9)
+        public BoidSimulation(int numBoids, double width, double height, bool useOctree = false)
         {
             Boids = new List<Boid>(); //NOTE: we do not preallocate the list here
-
+	
+			SeparationDistance = EntryClass.SEPERATION_DISTANCE;
+        	SeparationFactor = EntryClass.SEPARATION_FACTOR;
+        	AlignmentDistance = EntryClass.ALIGNMENT_DISTANCE;
+        	AlignmentFactor = EntryClass.ALIGNMENT_FACTOR;
+        	CohesionDistance = EntryClass.COHESION_DISTANCE;
+        	CohesionFactor = EntryClass.COHESION_FACTOR;
+       		MaxSpeed = EntryClass.MAX_SPEED;
+        	TurnFactor = EntryClass.TURN_FACTOR; // For boundary avoidance
+	
 #if USE_MEMORY_T
 
             mDataProcessor = new DataProcessorsStore(EntryClass.mCStoreCol);
@@ -513,8 +525,8 @@ namespace HelloBoids
 
                 OctreeOctant parent = null; // root has no parent
                 BoundingBox box = new BoundingBox(min, max);
-                uint octreeMaxDepth = maxOctreeDepth;
-                OctreeOctant.MaxDepth = octreeMaxDepth;
+         
+                OctreeOctant.MaxDepth = EntryClass.OctreeMaxDepth;
                 Octree = new OctreeOctant(0, 0, box, parent);
             }
 
@@ -687,7 +699,7 @@ namespace HelloBoids
 
         private void DoLifeCycle(ComponentStore<Transform.Living_Entity> store, object[] parameters, int seed, GameTime gt)
         {
-            
+
 			Span<Transform.Living_Entity> memSpan = store.Span;
 	
 			// todo: maxAge and minAge need to be set in Parameters
@@ -751,18 +763,23 @@ namespace HelloBoids
             //Span<Transform.Transform_Struct> mem = store.Span;
             //}
 
-            // TODO: these need to be in parameters
-            double turnFactor = 0.1; // For boundary avoidance
-            double seperatationDistanceSquare = 20 * 20; //separationDistance * separationDistance;
-            double alignmentDistanceSquared = 50 * 50; //alignmentDistance * alignmentDistance;
-            double cohesionDistanceSquared = 50 * 50; // = cohesionDistance * cohesionDistance;
-            double maxSpeed = 5;
-
-
-            double separationFactor = 0.5d;
-            double alignmentFactor = 0.2d;
-            double cohesionFactor = 0.1d;
-
+			// NOTE: these values derived from passed in parameters
+			double separationDistance = (double)parameters[0];
+			double alignmentDistance = (double)parameters[1];
+			double cohesionDistance = (double)parameters[2];
+			
+			// more parameters
+			double separationFactor = (double)parameters[3];
+            double alignmentFactor = (double)parameters[4];
+            double cohesionFactor = (double)parameters[5];
+			double turnFactor = (double)parameters[6]; // For boundary avoidance
+			double maxSpeed = (double)parameters[7];
+            
+            double seperatationDistanceSquare = separationDistance * separationDistance;
+            double alignmentDistanceSquared = alignmentDistance * alignmentDistance;
+            double cohesionDistanceSquared = cohesionDistance * cohesionDistance;
+		   
+			//Console.WriteLine("SD_SQUARED = " + seperatationDistanceSquare.ToString());
 
             Stack<OctreeOctant> stack = new Stack<OctreeOctant>(8);
             List<int> neighbors = new List<int>(8);
@@ -774,7 +791,7 @@ namespace HelloBoids
             // 1) MAKE SURE ALL RESULTS ARE COMPLETELY DETERMINISTIC NO MATTER WHICH PATH IS CHOSEN
             // 2) BOID needs to UPDATE its position within the OCTREE when it moves! <-- verify this is occurring by printing out the "address"
 
-            for (int i = 0; i < memSpan.Length; i++)
+            for (int i = 0; i < memSpan.Length; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
             {
                 //try
                 //{
@@ -793,17 +810,16 @@ namespace HelloBoids
 					//           never intersecting with the box of the currentB's spatial node SpatialNode.BoundingBox
 					
             //       BoundingBox searchArea = new BoundingBox(currentBoid.Translation, radius);
-					//System.Console.WriteLine("Translation CLASS = " + currentBoid.Translation.ToString());
+			//       System.Console.WriteLine("Translation CLASS = " + currentBoid.Translation.ToString());
 					//BoundingBox searchArea = new BoundingBox(Boids[i].Translation, radius);
 			// TMP HACK TO SEE ABOUT CACHE COHERENCY ISSUES
 			//		Vector3d tmp = currentBoid.Translation;
 			//		tmp.x += 0.2;
 			//		currentBoid.Translation = tmp;
                     BoundingBox searchArea = new BoundingBox(memSpan[i].Translation, radius);
-					//System.Console.WriteLine("Translation MEMORY<T> = " + memSpan[i].Translation.ToString());
+			//		System.Console.WriteLine("Translation MEMORY<T> = " + memSpan[i].Translation.ToString());
 					// TODO: 
-                    if (!currentBoid.SpatialNode.BoundingBox.Intersects(searchArea)) continue; // early exit
-
+                    
                     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
                     // INLINED VERSION OF "ITERATIVE DEPTH-FIRST" TRAVERSAL OF OCTREE TO FIND NEIGHBORING BOIDS OF THE CURRENT ONE
 					// NOTE: We use this inline version that uses a stack<> to avoid recursion because having to load the span<T> onto
@@ -824,7 +840,10 @@ namespace HelloBoids
                             {
                                 if (currentOctant.EntityNodes[j].SpanIndex == currentBoid.SpanIndex) continue;
 
+								if (!currentOctant.EntityNodes[j].BoundingBox.Intersects(searchArea)) continue;
+								
                                 double distanceToNeighboringBoidSquared;
+								// TODO: if i stored the SpanIndex in the Octree instead of the EntityNode perhaps that would help?
                                 using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
                                     distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[currentOctant.EntityNodes[j].SpanIndex].Translation, memSpan[i].Translation);
 
@@ -876,8 +895,7 @@ namespace HelloBoids
                                 if (distanceSquared > 0d) // Hypnotron Dec.4.2025 - required divide by 0 check
                                 {
                                     // TODO: are these two results equal?
-                                    //steer += (mem[currentIndex].Translation - mem[neighbors[j]].Translation) / distance ;
-                                    steer += (memSpan[i].Translation - memSpan[neighbors[j]].Translation) / System.Math.Sqrt(distanceSquared);
+                                    steer += (memSpan[i].Translation - memSpan[neighbors[j]].Translation) / separationDistance ;
                                 }
                             }
                         }
@@ -993,8 +1011,9 @@ namespace HelloBoids
 		private void Destroy(EntityNode entity)
 		{
 					
-			Console.WriteLine("Destroy() == Started on index " + entity.SpanIndexLE.ToString());
-	
+#if MEMORY_T
+        	Console.WriteLine("Destroy() == Started on index " + entity.SpanIndexLE.ToString());
+#endif
 			int lastIndex = this.Boids.Count - 1;
 	
 			// remove from Octree
@@ -1013,9 +1032,9 @@ namespace HelloBoids
 			this.Boids.RemoveAt(lastIndex); // todo: this wont result in a List copy to a new List will it?
 	
 	
-
+#if MEMORY_T
 			Console.WriteLine("Destroy() == Completed on index " + entity.SpanIndexLE.ToString());
-			
+#endif
 		}
 
 		
@@ -1279,6 +1298,7 @@ namespace HelloBoids
             v.z = 0.0d;
             Velocity = v;
 
+			// bounding box in World Space which is probably not what we want for KGB Entity but only for KGB EntityNode (which is derived from SceneNode and used for hierarchical bbox structure)
             _box = new BoundingBox(t, 2.0d);
         }
 
@@ -1882,7 +1902,7 @@ namespace HelloBoids
 				mPivot.z = 0;
 	
 				mVelocity.x = xV;
-				mVelocity.Y = yV;
+				mVelocity.y = yV;
 			#endif
 	
 		}
@@ -8755,7 +8775,15 @@ namespace HelloBoids
 				    result[1] = EntryClass.WIDTH;
                     break;
                 case "FLOCKING":
-                
+					result = new object[8];
+					result[0] = EntryClass.SEPERATION_DISTANCE;
+					result[1] = EntryClass.ALIGNMENT_DISTANCE;
+					result[2] = EntryClass.COHESION_DISTANCE;
+					result[3] = EntryClass.SEPARATION_FACTOR;
+					result[4] = EntryClass.ALIGNMENT_FACTOR;
+					result[5] = EntryClass.COHESION_FACTOR;
+					result[6] = EntryClass.TURN_FACTOR; // For boundary avoidance
+					result[7] = EntryClass.MAX_SPEED;
                     break;
 					
                 case "STEER":

@@ -839,12 +839,11 @@ namespace HelloBoids
                             for (int j = 0; j < currentOctant.EntityNodes.Length; j++)
                             {
                                 if (currentOctant.EntityNodes[j].SpanIndex == currentBoid.SpanIndex) continue;
-
 								if (!currentOctant.EntityNodes[j].BoundingBox.Intersects(searchArea)) continue;
 								
                                 double distanceToNeighboringBoidSquared;
 								// TODO: if i stored the SpanIndex in the Octree instead of the EntityNode perhaps that would help?
-                                using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
+                                //using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
                                     distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[currentOctant.EntityNodes[j].SpanIndex].Translation, memSpan[i].Translation);
 
                                 //using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))

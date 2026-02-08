@@ -1,10 +1,13 @@
 #define CACHE_VERTICES
 #define USE_STRUCT // instead of classes for Quaternion and Matrix
-#define USE_MEMORY_T  // 3300 FPS with Memory<T> vs 250 FPS using classes.  Maintaining good cache coherency is KEY.  Running this on a c# compiler on my android phone with little runtime memeory available is much more difficult with NUM_ENTRIES and NUM_ITERATIONS set to a  high value
+#define USE_MEMORY_T  // 500 FPS Memory<T>, 530 FPS Classes -> 2000 iterations @ 758 BOIDS 
 #define SPATIAL_SEARCH
+//#define DEBUG_OUTPUT;
 
+
+using System.Runtime.CompilerServices; // needed for using "[MethodImpl(MethodImplOptions.AggressiveInlining)]"
 using System.Diagnostics;
-using System;
+using System; 
 //using System.Memory;   // not needed for online compilers running latest .net version
 using System.Reflection; // used for "MethodBase" type in Profiler
 using System.Runtime.InteropServices;
@@ -26,17 +29,30 @@ namespace HelloBoids
     // https://vscode.dev/github/MichaelOliveTree/KeystoneGameBlocks
     public class EntryClass
     {
+		public static string mSimulationOutputFile;
+		public static string OUTPUT_FILENAME = "hello_output.txt";
+		
         public static HelloBoids.ComponentStoreCollection mCStoreCol = new HelloBoids.ComponentStoreCollection();
         public static BoidSimulation bSim;
+        // NOTE: cube shaped otrees are MUCH faster than non cubed octreesbecause they are easier to keep balanced when inserting entityNodes
         public static double WIDTH = 800d;
-        public static double HEIGHT = 600d;
+        public static double HEIGHT = 800d;
+        public static double DEPTH = 800d;
+		public static double BOID_SIZE = 2d; // since this is 2D, we need a size for the Octree's Z depth 
+		
         private static string MODE = MODE = "Memory<T>"; // Classes or Memory<T> and is set at RunTime but defaults to Memory<T> unless #define Memory_T is commented out
         private static bool useOctree = true;
-		public static uint OctreeMaxDepth = 8;
-			
+		private static uint OctreeMaxDepth = 12;
+		private static uint OctreeSplitThreshold = 8;
+		
 		public static uint NUM_ENTRIES = 768;
-        public static uint NUM_ITERATIONS = 200;
+        public static uint NUM_ITERATIONS = 2000;
         public static double MAX_RUNTIME_SECONDS = 2.5;
+		// fragment the memory to account for fact that our
+        // Boid objects wont be instantiated contiguously like this in production code
+        public const int FRAGMENTED_OBJ_SIZE = 128;
+		public const int NUM_TO_PIN = 0;
+		
         public static double step;
         private static double mTotalRuntime;
 
@@ -50,9 +66,9 @@ namespace HelloBoids
         // the more cpu cycles needed. Tweak these values
         // to find a good balance between performance and
         // simulation/behavior quality
-		public static double SEPERATION_DISTANCE = 5.0d;
-		public static double ALIGNMENT_DISTANCE = 2.5d;
-		public static double COHESION_DISTANCE = 2.5d;
+		public static double SEPERATION_DISTANCE = 50.0d;
+		public static double ALIGNMENT_DISTANCE = 25.5d;
+		public static double COHESION_DISTANCE = 25.5d;
 		
 		public static double SEPARATION_FACTOR = 0.5d;
 		public static double ALIGNMENT_FACTOR = 0.2d;
@@ -60,8 +76,7 @@ namespace HelloBoids
 		public static double TURN_FACTOR = 0.1d; // For boundary avoidance
 		public static double MAX_SPEED = 5d;
 		
-		
-		// debugging aids
+		// Debugging Aids
 		public static Profiler CodeProfiler;
         public static string output;
 
@@ -83,6 +98,8 @@ namespace HelloBoids
             useOctree = true;
 #endif
 
+			mSimulationOutputFile = Utils.CreateFile(OUTPUT_FILENAME);
+			
             double targetFrameRatePerSecond = 60d;
             step = 1d / targetFrameRatePerSecond; // aka dt or "deltaTime"
 
@@ -94,7 +111,6 @@ namespace HelloBoids
             //
             // 30FPS uses a step of 1 / 30d == 0.0333333333333333 seconds
             // or 33.33 milliseconds per frame
-
 
             // how do we profile in other classes if the profiler is not static in Core?
             CodeProfiler = new Profiler();
@@ -130,11 +146,14 @@ namespace HelloBoids
             string dataProcessing = "Data Processing";
            
             CodeProfiler.Register("AssignSpan", dataProcessing);
-            CodeProfiler.Register("Process Frame", dataProcessing);
+            CodeProfiler.Register("Update() - Process Frame", dataProcessing);
             CodeProfiler.Register("GetNeighbors", dataProcessing);
             CodeProfiler.Register("FlockingRules", dataProcessing);
             CodeProfiler.Register("GetDistanceSquared", dataProcessing);
 
+			CodeProfiler.Register("GetSearchArea", dataProcessing);
+            CodeProfiler.Register("IntersectsSearchArea", dataProcessing);					
+											
             /*	
             // culling  
             categoryIndex ++;
@@ -147,8 +166,6 @@ namespace HelloBoids
             CodeProfiler.Register("VisibleItem Creation", cullingCategory);
             CodeProfiler.Register("Add Model To PVS", cullingCategory);	
             */
-
-
 
             output = "Hello Boids - " + Utils.GetTimeString();
             Console.WriteLine(output);
@@ -175,7 +192,6 @@ namespace HelloBoids
             Debug.WriteLine(output);
 
 
-
             System.Threading.Thread renderThread = new System.Threading.Thread(RenderLoop);
             Console.WriteLine("Render thread created.");
 
@@ -188,9 +204,7 @@ namespace HelloBoids
             Console.WriteLine(output);
             Debug.WriteLine(output);
 
-
             mIsRunning = true;
-
 
             // Set as background so the application can exit when the main thread ends
             // TODO: this may not be necessary if I just set the exit condition to the known
@@ -198,7 +212,6 @@ namespace HelloBoids
             // set to = false;
             gameThread.IsBackground = true;
             gameThread.Start();
-
 
             Console.WriteLine("");
             Console.WriteLine("Performance Test #1 STARTED in Game thread.");
@@ -221,8 +234,9 @@ namespace HelloBoids
             gameThread.Join();
 
             Console.WriteLine("Game Thread #1 COMPLETED.");
+            
+            
             ///////////////////////////////////////////////////////////////////////////////////////////////
-
 
             // LOOP USING MEMORY<T>
             mCurrentFrame = 0;
@@ -255,10 +269,7 @@ namespace HelloBoids
 
             gameThread.Join();
 
-
             Console.WriteLine("Game Thread #2 COMPLETED.");
-
-
             output = "Goodbye Boids! - " + Utils.GetTimeString();
             Console.WriteLine(output);
         }
@@ -267,8 +278,7 @@ namespace HelloBoids
         // simulation updates
         private static void GameLoop()
         {
-
-            bSim = new BoidSimulation((int)NUM_ENTRIES, WIDTH, HEIGHT, useOctree);
+            bSim = new BoidSimulation((int)NUM_ENTRIES, WIDTH, HEIGHT, DEPTH, useOctree);
 
             output = "Performance Test RUNNING - " + NUM_ENTRIES.ToString() + " boids @ " + NUM_ITERATIONS.ToString() + " iterations.";
             Console.WriteLine(output);
@@ -281,7 +291,6 @@ namespace HelloBoids
             output = "";
             Console.WriteLine(output);
             Debug.WriteLine(output);
-
 
 
             // NOTE: the entire UserDataStore get's passed to our various "data processors."
@@ -304,7 +313,6 @@ namespace HelloBoids
              System.Diagnostics.Debug.WriteLine("WARM-UP - COMPLETED.");
              Console.WriteLine("WARM-UP - COMPLETED.");
              */
-
 
             // By the way, this is what Media Molecule does in Dreams. The Trackmania racing games do this as well, to verify runs and make sure people aren’t cheating. Even their 3d physics engine is fully deterministic! very cool stuff.
 
@@ -338,8 +346,7 @@ namespace HelloBoids
             Stopwatch sw = Stopwatch.StartNew();
             double lastElapsedTime = sw.Elapsed.TotalSeconds;
 			GameTime gt = new GameTime();
-			
-			
+						
             while (true)
             {
                 bool runningStatus;
@@ -369,7 +376,8 @@ namespace HelloBoids
                 mTotalRuntime += elapsedSeconds;
 
                 //Console.WriteLine("TOTAL = " + totalElapsedSeconds.ToString() + " Frame Time = " + lastElapsedTime.ToString() + "  Runtime elapsed == " + mTotalRuntime.ToString() + " of " + MAX_RUNTIME_SECONDS.ToString() + " seconds.");
-                if (mTotalRuntime >= MAX_RUNTIME_SECONDS)
+               // if (mTotalRuntime >= MAX_RUNTIME_SECONDS)
+               if (mCurrentFrame >= NUM_ITERATIONS)
                     mIsRunning = false;
 
                 // Simple throttling to prevent maxing out the CPU (adjust as needed)
@@ -377,7 +385,6 @@ namespace HelloBoids
             }
 
             CodeProfiler.EndLoop();
-
 
             TimeSpan timeSpan = sw.Elapsed;
 
@@ -387,10 +394,9 @@ namespace HelloBoids
                 timeSpan.Milliseconds / 10);
 
 
-
             // regardless of the NUM_ITERATIONS used, the FPS should typically all be very close 
             // if the NUM_ENTRIES stays the same
-            double fps = NUM_ITERATIONS / timeSpan.TotalSeconds;
+            double fps = mCurrentFrame / timeSpan.TotalSeconds;
 
             output = "Performance Test COMPLETED - " + Utils.GetTimeString();
             System.Diagnostics.Debug.WriteLine(output);
@@ -406,12 +412,11 @@ namespace HelloBoids
             Debug.WriteLine(output);
 
             Console.WriteLine("");
-            output = "Begin Profiler Output:";
+            output = "Begin Profiler Output (" + MODE + ")";
             Console.WriteLine(output);
             Debug.WriteLine(output);
 
             CodeProfiler.OutputToConsole();
-
 
             output = "____________________________________________";
             Console.WriteLine(output);
@@ -420,6 +425,30 @@ namespace HelloBoids
             Console.WriteLine(output);
             Debug.WriteLine(output);
 
+					
+		#if DEBUG_OUTPUT
+			string text = Utils.ReadAllText(EntryClass.mSimulationOutputFile);
+		
+			Console.WriteLine ("GameLoop() - DEBUG OUTPUT - Translations and Velocities");
+			const int BufferSize = 256;
+			using (var fileStream = System.IO.File.OpenRead(EntryClass.mSimulationOutputFile))
+			{
+				Console.WriteLine ("GameLoop() - Debug Output - Filestream null == " + fileStream == null);
+				
+  				using (var streamReader = new System.IO.StreamReader(fileStream, System.Text.Encoding.UTF8, true, BufferSize)) 
+				{
+    				string line;
+    				while ((line = streamReader.ReadLine()) != null)
+    				{
+      					// Process line
+						Console.WriteLine(line);
+    				}
+  				}
+			}
+		#else
+			Console.WriteLine ("GameLoop() - DEBUG OUTPUT #DEFINE DISABLED");
+		#endif
+			
             // Validate() is only used to make sure the compiler doesn't take a huge shortcut
             // and not run the test code at all because none of the TestClass or TestStruct 
             // members are ever used.
@@ -430,12 +459,10 @@ namespace HelloBoids
 
         private static void Update(GameTime gt)
         {
-
-            using (EntryClass.CodeProfiler.HookUp("Process Frame"))
+            using (EntryClass.CodeProfiler.HookUp("Update() - Process Frame"))
             {
                 bSim.Update(gt);
-            }
-
+            }	
         }
 
         private static void UpdateLoop()
@@ -454,7 +481,6 @@ namespace HelloBoids
                 // Console.WriteLine($"Game running. Time: {DateTime.Now}");
             }
         }
-
 
         private static void AnimationLoop()
         {
@@ -475,7 +501,8 @@ namespace HelloBoids
 #endif
         public List<Boid> Boids { get; set; }
         public int Seed { get; set; } = 123;
-
+		public ThreadedRandom mTHRandom;
+		
         private double SeparationDistance;
         private double SeparationFactor ;
         private double AlignmentDistance;
@@ -493,9 +520,12 @@ namespace HelloBoids
         public static ComponentStore<Transform.Transform_Struct> Store;
 #endif
 
-        public BoidSimulation(int numBoids, double width, double height, bool useOctree = false)
+        public BoidSimulation(int numBoids, double width, double height, double depth, bool useOctree = false)
         {
             Boids = new List<Boid>(); //NOTE: we do not preallocate the list here
+				
+			mTHRandom = new ThreadedRandom(Seed);
+	
 	
 			SeparationDistance = EntryClass.SEPERATION_DISTANCE;
         	SeparationFactor = EntryClass.SEPARATION_FACTOR;
@@ -512,21 +542,23 @@ namespace HelloBoids
 #endif
             mIntervalTimers = new IntervalTimers();
             mIntervalTimers.Register("LifeCycle", "spawn", 0.06d);
-
+		
             if (useOctree)
             {
+				//Console.WriteLine ("Width = " + width.ToString() + " Height = " + height.ToString());
                 Vector3d min, max;
-                min.x = width - width * 0.5d;
-                min.y = height - height * 0.5d;
-                min.z = 0d;
-                max.x = width + width * 0.5d;
-                max.y = height + height * 0.5d;
-                max.z = 0d;
+                min.x = -width * 0.5d;
+                min.y = -height * 0.5d;
+                min.z = -depth * 0.5d;
+                max.x = min.x + width;
+                max.y = min.y + height;
+                max.z = min.z + depth; 
 
                 OctreeOctant parent = null; // root has no parent
                 BoundingBox box = new BoundingBox(min, max);
          
-                OctreeOctant.MaxDepth = EntryClass.OctreeMaxDepth;
+               // OctreeOctant.MaxDepth = EntryClass.OctreeMaxDepth;
+				//OctreeOctant.SplitThreshHold = EntryClass.OctreeSplitThreshold;
                 Octree = new OctreeOctant(0, 0, box, parent);
             }
 
@@ -544,28 +576,23 @@ namespace HelloBoids
             // SPAWN INITIAL SET OF BOIDS UP TO EntryClass.NUM_ENTRIES
 			//System.Numerics.BigInteger bint = 0;
             decimal bint = 0;
-            Random rand = new Random(Seed);
+
+
 			System.Diagnostics.Debug.Assert(EntryClass.NUM_ENTRIES == numBoids);
 	
             for (int i = 0; i < numBoids; i++)
             {
-                // fragment the memory to account for fact that our
-                // Boid objects wont be instantiated contiguously like this in production code
-                const int FRAGMENTED_OBJ_SIZE = 128;
-
                 // todo: the above doesn't make a diff, but perhaps
                 // if i added dummy objects into the array instead..?
-                object[] tmp = MemoryFragmenter.CreateAndFreeObjects(FRAGMENTED_OBJ_SIZE);
+                object[] tmp = MemoryFragmenter.CreateAndFreeObjects(EntryClass.FRAGMENTED_OBJ_SIZE);
                 for (int j = 0; j < tmp.Length; j++)
                     bint += tmp[j].GetHashCode();
 
-
-                const int NUM_TO_PIN = 0;
-                if (NUM_TO_PIN > 0)
-                    MemoryFragmenter.Fragment(NUM_TO_PIN, 512, NUM_TO_PIN / 2, 128);
+                if (EntryClass.NUM_TO_PIN > 0)
+                    MemoryFragmenter.Fragment(EntryClass.NUM_TO_PIN, 512, EntryClass.NUM_TO_PIN / 2, 128);
 
 				
-				Boid b = Spawn(rand, i, width, height);
+				Boid b = Spawn(mTHRandom, i, width, height, depth);
                 Boids.Add(b);
 
                 if (useOctree)
@@ -573,21 +600,20 @@ namespace HelloBoids
                     Octree.Add((EntityNode)b);
                 }
 
-                if (NUM_TO_PIN > 0)
+                if (EntryClass.NUM_TO_PIN > 0)
                     MemoryFragmenter.Cleanup();
-
             }
+	
             Console.WriteLine("BoidSimulation.ctor() - " + numBoids + " Boids Created.  Big Hash = " + bint.ToString());
         }
 
         /// <summary>
         /// Update simulation using either Data Oriented Technique or Object Oriented Technique
+		/// </summary>
         public void Update(GameTime gt)
         {
 			double elapsedSeconds = gt.ElapsedSeconds; 
-
             mIntervalTimers.Update(elapsedSeconds);
-
 
 #if USE_MEMORY_T == false
             // TEST CLASSES (Object Oriented Technique)
@@ -634,8 +660,7 @@ namespace HelloBoids
             double largestDistance = System.Math.Max(this.SeparationDistance, this.AlignmentDistance);
             largestDistance = System.Math.Max(largestDistance, this.CohesionDistance);
             double largestDistanceSquared = largestDistance * largestDistance;
-
-
+            
             for (int i = 0; i < Boids.Count; i++)
             {
                 List<int> found;
@@ -648,58 +673,96 @@ namespace HelloBoids
                     // partitioning
                     found = GetNeighbors(Boids[i], largestDistance, largestDistanceSquared);
 
-                    if (found == null || found.Count == 0) continue;
-                    neighbors = new List<Boid>(found.Count);
-                    for (int j = 0; j < found.Count; j++)
-                    {
-                        neighbors.Add(Boids[found[j]]);
-                    }
-                }
+                    if (found == null || found.Count == 0) 
+                   	{ 
+					   //Console.WriteLine("UpdateClasses() - Found Count == 0");
+						neighbors = null;
+					}
+                    else
+					{
+						//Console.WriteLine("UpdateClasses() - Found Count == 0");
 
-                // Apply Rules
-                //var (sepX, sepY) = Boid.Separate(elapsedSeconds, allBoids, allBoids[i], separationDistance, separationFactor);
-                var (sepX, sepY) = Boid.Separate(elapsedSeconds, allBoids, allBoids[i], separationDistance, separationFactor, neighbors);
+						neighbors = new List<Boid>(found.Count);
+						for (int j = 0; j < found.Count; j++)
+						{
+							neighbors.Add(Boids[found[j]]);
+						}
+					}
+				} // end Using "GetNeighbors"
+               
 
-                //var (alignX, alignY) = Boid.Align(elapsedSeconds, allBoids, allBoids[i], alignmentDistance, alignmentFactor);
-                var (alignX, alignY) = Boid.Align(elapsedSeconds, allBoids, allBoids[i], alignmentDistance, alignmentFactor, neighbors);
+				//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+				// Apply Flocking Rules
+				//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+                using (EntryClass.CodeProfiler.HookUp("FlockingRules"))
+               	{
+					// Apply Rules
+					//var (sepX, sepY) = Boid.Separate(elapsedSeconds, allBoids, allBoids[i], separationDistance, separationFactor);
+					double sepX = 0d; double sepY = 0d;
+					if (neighbors != null)
+					 (sepX, sepY) = Boid.Separate(elapsedSeconds, allBoids, allBoids[i], separationDistance, separationFactor, neighbors);
 
-                //var (cohX, cohY) = Boid.Cohese(elapsedSeconds, allBoids, allBoids[i], cohesionDistance, cohesionFactor);
-                var (cohX, cohY) = Boid.Cohese(elapsedSeconds, allBoids, allBoids[i], cohesionDistance, cohesionFactor, neighbors);
+					//var (alignX, alignY) = Boid.Align(elapsedSeconds, allBoids, allBoids[i], alignmentDistance, alignmentFactor);
+					double alignX = 0d; double alignY = 0d;
+					if (neighbors != null)
+						(alignX, alignY) = Boid.Align(elapsedSeconds, allBoids, allBoids[i], alignmentDistance, alignmentFactor, neighbors);
 
-                // Sum forces
-                Vector3d v;
-                v.x = sepX + alignX + cohX;
-                v.y = sepY + alignY + cohY;
-                v.z = 0.0d;
+					//var (cohX, cohY) = Boid.Cohese(elapsedSeconds, allBoids, allBoids[i], cohesionDistance, cohesionFactor);
+					double cohX = 0d; double cohY = 0d;
 
-                // Apply speed limits
-                double speed = v.Length;
+					if (neighbors != null)
+						(cohX, cohY) = Boid.Cohese(elapsedSeconds, allBoids, allBoids[i], cohesionDistance, cohesionFactor, neighbors);
 
-                if (speed > maxSpeed && maxSpeed != 0)
-                {
-                    v = (v / speed) * maxSpeed;
-                }
+					// Sum forces
+					Vector3d v;
+					v.x = sepX + alignX + cohX;
+					v.y = sepY + alignY + cohY;
+					v.z = 0.0d;
 
-                // ... (Optional: Implement min speed if needed)
+					// Apply speed limits
+					double speed = v.Length;
 
-                // Update position
-                v *= elapsedSeconds;
-                allBoids[i].Translation += v;
-                allBoids[i].Velocity = v;
+					if (speed > maxSpeed && maxSpeed != 0)
+					{
+						v = (v / speed) * maxSpeed;
+					}
 
-                allBoids[i].SpatialNode.OnEntityNode_Moved(allBoids[i]);
+					// ... (Optional: Implement min speed if needed)
 
-                // Apply boundary rules (wrap around)
-                // (You'd need to define boundary dimensions here)
-                // If X > maxX, X = minX, etc.
-            }
+					// Update position
+					v *= elapsedSeconds;
+					allBoids[i].Velocity += v;
+					allBoids[i].Translation += allBoids[i].Velocity;
+					
+
+					allBoids[i].SpatialNode.OnEntityNode_Moved(allBoids[i]);
+
+			#if DEBUG_OUTPUT
+					const string SEPERATOR = "|";
+					Utils.AppendText(EntryClass.mSimulationOutputFile, allBoids[i].Translation.ToString() + SEPERATOR + allBoids[i].Velocity.ToString());
+			#endif
+	
+					// TODO: unfortunately, i dont know how to read in data locally... we would literally have to
+					// paste the data into a string variable.
+					// eg.
+
+	
+					
+					// Apply boundary rules (wrap around)
+					// (You'd need to define boundary dimensions here)
+					// If X > maxX, X = minX, etc.
+
+				} // end for loop
+			} // end using "FlockingRules"
         }
 
 #if USE_MEMORY_T
 
         private void DoLifeCycle(ComponentStore<Transform.Living_Entity> store, object[] parameters, int seed, GameTime gt)
         {
-
+			// TODO: until both paths use DoLifeCycle(), this will throw off deterministism for Memory<T> path
+    		return;
+    
 			Span<Transform.Living_Entity> memSpan = store.Span;
 	
 			// todo: maxAge and minAge need to be set in Parameters
@@ -711,7 +774,9 @@ namespace HelloBoids
 			{
 				// todo: i think we need to check to see if this record is for
 				//       an Entity that is enabled
-				long age = gt.Ticks - memSpan[i].CreationDateTime;
+				// todo: i think this needs to use a GameTime not a Tick() because if the simulation pauses
+				//       this result wont be a correct value
+				long age = gt.Ticks - memSpan[i].CreationDateTime;// Utils.GetAge(memSpan[i].CreationDateTime);
 				memSpan[i].Age = age;
 				if (age >= maxAge)
 				{
@@ -732,9 +797,9 @@ namespace HelloBoids
             }
 	
 			// spawn new ones up to max spawn number per frame
-			Random rand = new Random(seed);
 			double width = (double)parameters[0];
 			double height = (double)parameters[1];
+			double depth = (double)parameters[2];
 	
 			int numToCreate = numDestroyed;
 			for (int i = 0; i < numToCreate; i++)
@@ -742,11 +807,17 @@ namespace HelloBoids
 				// todo: i think we need to check to see if this record is for
 				//       an Entity that is enabled
 				double age = gt.TotalElapsedSeconds - memSpan[i].CreationDateTime;
-				Spawn(rand, i, width, height);
+				Spawn(this.mTHRandom, i, width, height, depth);
 			}
         }
 		
-
+		private void DoParallelTest(ComponentStore<Transform.Transform_Struct> store, int start, int end)
+		{
+			int l = store.Span.Length;;
+			int a = l * start * end;
+			Console.WriteLine(a.ToString());
+		}
+		
         private void DoFlocking(ComponentStore<Transform.Transform_Struct> store, object[] parameters, int seed, GameTime gt)
         {
         
@@ -760,7 +831,6 @@ namespace HelloBoids
             // to have to pass thay big bock of memory around. 
             // HOWEVER, using the following line mem = Store.Span is faster than using Store.Span[i].#### everywhere!
             memSpan = store.Span;
-            //Span<Transform.Transform_Struct> mem = store.Span;
             //}
 
 			// NOTE: these values derived from passed in parameters
@@ -781,7 +851,7 @@ namespace HelloBoids
 		   
 			//Console.WriteLine("SD_SQUARED = " + seperatationDistanceSquare.ToString());
 
-            Stack<OctreeOctant> stack = new Stack<OctreeOctant>(8);
+            Stack<OctreeOctant> stack = new Stack<OctreeOctant>(32);
             List<int> neighbors = new List<int>(8);
             double largestDistance = System.Math.Max(this.SeparationDistance, this.AlignmentDistance);
             largestDistance = System.Math.Max(largestDistance, this.CohesionDistance);
@@ -791,32 +861,44 @@ namespace HelloBoids
             // 1) MAKE SURE ALL RESULTS ARE COMPLETELY DETERMINISTIC NO MATTER WHICH PATH IS CHOSEN
             // 2) BOID needs to UPDATE its position within the OCTREE when it moves! <-- verify this is occurring by printing out the "address"
 
+			
+			
+			// TEMP - Parallel test using a lambda
+		//	var size = memSpan.Length;
+		//	System.Threading.Tasks.Parallel.Invoke(
+		//		() =>  DoParallelTest(store, 0, size / 2),
+		//		() => DoParallelTest(store, size/2, size)
+		//	);
+			
+			
+			//System.Threading.Tasks.Parallel.For(0, memSpan.Length, i )
             for (int i = 0; i < memSpan.Length; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
             {
-                //try
-                //{
+				// INLINING of "GetNeighbors" in order to avoid have to load the memSpan onto the stack for each iteration
 
-                using (EntryClass.CodeProfiler.HookUp("GetNeighbors"))
-                {
-                    // INLINING of "GetNeighbors" in order to avoid have to load the memSpan onto the stack for each iteration
+				EntityNode currentBoid = Boids[i];
+				//Vector3d currentBoidTranslation = memSpan[i].Translation;
+				double searchRadius = largestDistance * 0.5d;
 
-                    EntityNode currentBoid = Boids[i];
-                    double radius = largestDistance * 0.5d;
+				// WARNING:  The first line that uses currentBoid.Translation is 100x SLOWER than the version using CLASSES (eg for "Classes" version comment out #define USE_MEMORY_T
+				//           The second line that uses memSpan[i].Translation is 100x FASTER than the version using CLASSES (WHAT ON EARTH?
+				//           I believe it is because the cache evicts the span<T> data and has to re-load it every iteration (eg memSpan.Length)
+				// UPDATE:   Above is likely wrong.  One problem is memSpan[i].Translation was always 0,0,0 and so the search box was often
+				//           never intersecting with the box of the currentB's spatial node SpatialNode.BoundingBox
 
-                    // WARNING:  The first line that uses currentBoid.Translation is 100x SLOWER than the version using CLASSES (eg for "Classes" version comment out #define USE_MEMORY_T
-                    //           The second line that uses memSpan[i].Translation is 100x FASTER than the version using CLASSES (WHAT ON EARTH?
-					//           I believe it is because the cache evicts the span<T> data and has to re-load it every iteration (eg memSpan.Length)
-					// UPDATE:   Above is likely wrong.  One problem is memSpan[i].Translation was always 0,0,0 and so the search box was often
-					//           never intersecting with the box of the currentB's spatial node SpatialNode.BoundingBox
-					
-            //       BoundingBox searchArea = new BoundingBox(currentBoid.Translation, radius);
-			//       System.Console.WriteLine("Translation CLASS = " + currentBoid.Translation.ToString());
-					//BoundingBox searchArea = new BoundingBox(Boids[i].Translation, radius);
-			// TMP HACK TO SEE ABOUT CACHE COHERENCY ISSUES
-			//		Vector3d tmp = currentBoid.Translation;
-			//		tmp.x += 0.2;
-			//		currentBoid.Translation = tmp;
-                    BoundingBox searchArea = new BoundingBox(memSpan[i].Translation, radius);
+				//       BoundingBox searchArea = new BoundingBox(currentBoid.Translation, radius);
+				//       System.Console.WriteLine("Translation CLASS = " + currentBoid.Translation.ToString());
+				//BoundingBox searchArea = new BoundingBox(Boids[i].Translation, radius);
+				// TMP HACK TO SEE ABOUT CACHE COHERENCY ISSUES
+				//		Vector3d tmp = currentBoid.Translation;
+				//		tmp.x += 0.2;
+				//		currentBoid.Translation = tmp;
+				using (EntryClass.CodeProfiler.HookUp("GetNeighbors"))
+				{
+					BoundingBox searchArea;
+					//using (EntryClass.CodeProfiler.HookUp("GetSearchArea"))
+                    	searchArea = new BoundingBox(memSpan[i].Translation, searchRadius);
+					//BoundingBox searchArea = new BoundingBox(currentBoidTranslation, radius);
 			//		System.Console.WriteLine("Translation MEMORY<T> = " + memSpan[i].Translation.ToString());
 					// TODO: 
                     
@@ -828,53 +910,94 @@ namespace HelloBoids
                     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
                     neighbors.Clear();
                     stack.Clear();
-                    stack.Push(currentBoid.SpatialNode);
+						
+					OctreeOctant root = this.Octree;
+					stack.Push(root);//currentBoid.SpatialNode);
 
-                    while (stack.Count > 0)
+					while (stack.Count > 0)
                     {
-                        OctreeOctant currentOctant = stack.Pop();
+						OctreeOctant currentOctant = stack.Pop();
+						if (currentOctant.BoundingBox.Intersects(searchArea))
+						{
+							EntityNode[] ents = currentOctant.EntityNodes;
+						
+							if (ents != null)
+							{
+							   // if (ents.Length > 230)
+									//Console.WriteLine("Entity Node Count == " + ents.Length.ToString());
 
-                        if (currentOctant.EntityNodes != null)
-                        {
-                            for (int j = 0; j < currentOctant.EntityNodes.Length; j++)
-                            {
-                                if (currentOctant.EntityNodes[j].SpanIndex == currentBoid.SpanIndex) continue;
-								if (!currentOctant.EntityNodes[j].BoundingBox.Intersects(searchArea)) continue;
+								for (int j = 0; j < ents.Length; j++)
+								{
+									EntityNode potentialNeighbor = ents[j];
+
+									if (currentOctant.MaxRadius * 2d <= largestDistance)
+									{
+							 			neighbors.Add(potentialNeighbor.SpanIndex);
+
+                         			}   
+                         			else
+									{   /* if (currentOctant.EntityNodes[j].SpanIndex == currentBoid.SpanIndex) continue; */
+										//using (EntryClass.CodeProfiler.HookUp("IntersectsSearchArea"))
+										if (!potentialNeighbor.BoundingBox.Intersects(searchArea)) 
+											continue;
 								
-                                double distanceToNeighboringBoidSquared;
-								// TODO: if i stored the SpanIndex in the Octree instead of the EntityNode perhaps that would help?
-                                //using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
-                                    distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[currentOctant.EntityNodes[j].SpanIndex].Translation, memSpan[i].Translation);
+										double distanceToNeighboringBoidSquared;
+										// TODO: if i stored the SpanIndex in the Octree instead of the EntityNode perhaps that would help?
+										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
+											distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[potentialNeighbor.SpanIndex].Translation, memSpan[i].Translation);
+											//distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[potentialNeighbor.SpanIndex].Translation, currentBoidTranslation);
 
-                                //using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
-                                //   distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(currentOctant.EntityNodes[j].Translation, currentBoid.Translation);
+										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
+										//   distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(currentOctant.EntityNodes[j].Translation, currentBoid.Translation);
 
-                                //System.Diagnostics.Debug.WriteLine("Calculated distanceSquared to neighboring boid = " + distanceToNeighboringBoidSquared.ToString());
-                                if (distanceToNeighboringBoidSquared <= largestDistanceSquared)
-                                    neighbors.Add(j);
-                            }
-                        }
+										//System.Diagnostics.Debug.WriteLine("Calculated distanceSquared to neighboring boid = " + distanceToNeighboringBoidSquared.ToString());
+										if (distanceToNeighboringBoidSquared <= largestDistanceSquared)
 
-                        if (currentOctant.Children != null)
-                        {
-                            for (int j = 0; j < currentOctant.Children.Length; j++)
-                                // NOTE: Each OctreeOctant's BoundingBox needs to be in World Space.
-                                if (currentOctant.Children[j].BoundingBox.Intersects(searchArea))
-                                    stack.Push(currentOctant.Children[j]);
-                        }
-                    }
-                }
+											neighbors.Add(potentialNeighbor.SpanIndex);
+     								}       
+             					}  // end for ents[]        
+							}
+
+							OctreeOctant[] childOctants = currentOctant.Children;
+							if (childOctants != null)
+							{
+								//Console.WriteLine("CLength == " + childOctants.Length.ToString());
+								for (int j = 0; j < childOctants.Length; j++)
+								{
+									// NOTE: Each OctreeOctant's BoundingBox needs to be in World Space.
+									bool intersects = false;
+									//using (EntryClass.CodeProfiler.HookUp("IntersectsSearchArea"))
+									{
+										if (childOctants[j] == null)
+											continue;
+
+										intersects = childOctants[j].BoundingBox.Intersects(searchArea);
+									}
+									if (intersects)
+									{
+										stack.Push(childOctants[j]);
+									}
+									//Console.WriteLine("DoFlocking() - #940 - Stack count == " + stack.Count.ToString());
+								} // end for childOctants[]
+
+								//Console.WriteLine("DoFlocking() - #943 - Stack count == " + stack.Count.ToString());
+							}
+						} // end if currentOctant intersects searchArea test
+					} // end While loop
+				} // end Using (GetNeighbors)
 
                 int nCount = 0;
                 if (neighbors != null)
                     nCount = neighbors.Count;
 
+				// if (i < 8)
+				//	Console.WriteLine("DoFlocking() - #954 - Neighbor Count = " + nCount.ToString());
 				
 				//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 				// Apply Flocking Rules
 				//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
                 using (EntryClass.CodeProfiler.HookUp("FlockingRules"))
-                {
+               	{
                     // SEPARATION
                     Vector3d sep;
                     Vector3d steer;
@@ -888,13 +1011,15 @@ namespace HelloBoids
                         {
                             //if (j == currentIndex) continue; // <- this check will already have been performed in building of neighbors list
                             double distanceSquared = Vector3d.GetDistance3dSquared(memSpan[i].Translation, memSpan[neighbors[j]].Translation);
-
+							//double distanceSquared = Vector3d.GetDistance3dSquared(currentBoidTranslation, memSpan[neighbors[j]].Translation);
+							
                             if (distanceSquared < seperatationDistanceSquare)
                             {
                                 if (distanceSquared > 0d) // Hypnotron Dec.4.2025 - required divide by 0 check
                                 {
                                     // TODO: are these two results equal?
                                     steer += (memSpan[i].Translation - memSpan[neighbors[j]].Translation) / separationDistance ;
+									//steer += (currentBoidTranslation - memSpan[neighbors[j]].Translation) / separationDistance ;
                                 }
                             }
                         }
@@ -918,7 +1043,8 @@ namespace HelloBoids
                         {
                             //if (j == currentIndex) continue; // <- this check will already have been performed in building of neighbors list
                             double distanceSquared = Vector3d.GetDistance3dSquared(memSpan[i].Translation, memSpan[neighbors[j]].Translation);
-
+							//double distanceSquared = Vector3d.GetDistance3dSquared(currentBoidTranslation, memSpan[neighbors[j]].Translation);
+							
                             if (distanceSquared < alignmentDistanceSquared)
                             {
                                 neighborsVelocity += memSpan[neighbors[j]].Velocity;
@@ -954,9 +1080,8 @@ namespace HelloBoids
 
                         neighborsAvgCenter /= nCount;
                         coh = (neighborsAvgCenter - memSpan[i].Translation) * cohesionFactor;
+						//coh = (neighborsAvgCenter - currentBoidTranslation) * cohesionFactor;
                     }
-
-
 
                     // SUM FORCES
                     Vector3d v = sep + align + coh;
@@ -973,8 +1098,8 @@ namespace HelloBoids
                     // Update position
                     v *= elapsedSeconds;
 
-                    memSpan[i].Velocity = v;
-                    memSpan[i].Translation += v;
+                    memSpan[i].Velocity += v;
+					memSpan[i].Translation += memSpan[i].Velocity;
                 } // end profiler FlockingRules
 
                 // todo: all these octree update should probably
@@ -982,27 +1107,31 @@ namespace HelloBoids
                 // this does occur in our main src branch because
                 // we use a method named FinalizeMovement()
 
-                Boids[i].SpatialNode.OnEntityNode_Moved(Boids[i]);
+                currentBoid.SpatialNode.OnEntityNode_Moved(currentBoid);
 
+			#if DEBUG_OUTPUT
+				const string SEPERATOR = "|";
+				Utils.AppendText(EntryClass.mSimulationOutputFile, memSpan[i].Translation.ToString() + SEPERATOR + memSpan[i].Velocity.ToString());
+			#endif	
+				
                 // Apply boundary rules (wrap around)
                 // (You'd need to define boundary dimensions here)
                 // If X > maxX, X = minX, etc.
-
             }
-
-
         }
 #endif
-
         		
-		public Boid Spawn(Random rand, int index, double width, double height)
+		public Boid Spawn(ThreadedRandom rand, int index, double width, double height, double depth)
 		{
 			double posX = rand.NextDouble() * width;
             double posY = rand.NextDouble() * height;
+            
+            double posZ= rand.NextDouble() * depth;
+            
             double vX = (rand.NextDouble() - 0.5d) * 2d;
             double vY = (rand.NextDouble() - 0.5d) * 2d;
 
-            Boid b = new Boid(index, posX, posY, vX, vY);
+            Boid b = new Boid(index, posX, posY, posZ, vX, vY);
 			return b;
 		}
 		
@@ -1080,12 +1209,12 @@ namespace HelloBoids
             // SPATIAL SEARCH
 #if SPATIAL_SEARCH
 
-            BoundingBox searchArea = new BoundingBox(currentBoid.Translation, largestDistance);
+            BoundingBox searchArea = new BoundingBox(currentBoid.Translation, largestDistance * 0.5d);
             Func<EntityNode, EntityNode, bool> match = (neighbor, current) =>
             {
                 if (neighbor == current) return false;
                 // TODO: WE MUST CACHE span<T> and not access neighbor.Translation and current.Translation... we need to directly
-                //        access the indices of the Span<T> here... otherwise its TOO SLOW
+                 //        access the indices of the Span<T> here... otherwise its TOO SLOW
                 if (Vector3d.GetDistance3dSquared(neighbor.Translation, current.Translation) <= largestDistanceSquared) return true;
                 return false;
             };
@@ -1103,10 +1232,11 @@ namespace HelloBoids
 
 
 #else
-            List<EntityNode> found = currentBoid.SpatialNode.Query(currentBoid, true, searchArea, match);
+            List<EntityNode> found = this.Octree.Query(currentBoid, true, searchArea, match);
 #endif
 
             if (found == null || found.Count == 0) return null;
+//Console.WriteLine("nc = " + found.Count.ToString());
 
             neighbors = new List<int>(found.Count);
             for (int j = 0; j < found.Count; j++)
@@ -1244,8 +1374,8 @@ namespace HelloBoids
             mID = guid;
         }
 
-        public EntityNode(int index, double x, double y, double xV, double yV) 
-			: base (x, y, xV, yV)
+        public EntityNode(int index, double x, double y, double z, double xV, double yV) 
+			: base (x, y, z, xV, yV)
         {
             mIndex = index;
         }
@@ -1267,6 +1397,8 @@ namespace HelloBoids
     //https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
     public class Boid : EntityNode
     {
+        private const double BOID_WIDTH = 2.0d;
+        
         public struct LivingEntity
         {
             public double BornDate;
@@ -1282,14 +1414,9 @@ namespace HelloBoids
         }
 
 
-        public Boid(int index, double x, double y, double xV, double yV)
-            : base(index, x, y, xV, yV)
+        public Boid(int index, double x, double y, double z,  double xV, double yV)
+            : base(index, x, y, z, xV, yV)
         {
-            Vector3d t;
-            t.x = x;
-            t.y = y;
-            t.z = 0.0d;
-            Translation = t;
 
             Vector3d v;
             v.x = xV;
@@ -1298,9 +1425,10 @@ namespace HelloBoids
             Velocity = v;
 
 			// bounding box in World Space which is probably not what we want for KGB Entity but only for KGB EntityNode (which is derived from SceneNode and used for hierarchical bbox structure)
-            _box = new BoundingBox(t, 2.0d);
+            _box = new BoundingBox(Translation,  BOID_WIDTH);
         }
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static double GetDistance(Boid b1, Boid b2)
         {
             return Vector3d.GetDistance3d(b1.Translation, b2.Translation);
@@ -1350,6 +1478,7 @@ namespace HelloBoids
             // for each CURRENT boid is O(n^2) and is too 
             // expensive
             // Iterate through other boids
+if (neighbors!= null)
             foreach (Boid other in neighbors)
             {
                 //if (other == current) continue;
@@ -1417,7 +1546,8 @@ namespace HelloBoids
             // WARNING: iterating through ALL boids
             // for each CURRENT boid is O(n^2) and is too 
             // expensive
-            // Iterate through precomputed nearISH neihbors 
+            // Iterate through precomputed nearISH neihbors
+if (neighbors!= null)
             for (int i = 0; i < neighbors.Count; i++)
             {
                 //if (i == currentIndex) continue;
@@ -1462,6 +1592,9 @@ namespace HelloBoids
             // WARNING: LinkQ .Where iterates through ALL boids
             // for each CURRENT boid and is O(n^2) and is too 
             // expensive
+if (preNeighbors== null)
+return (0,0);
+
             var neighbors = preNeighbors.Where(x => x != current && GetDistance(current, x) < alignmentDistance);
             if (!neighbors.Any())
             {
@@ -1876,10 +2009,11 @@ namespace HelloBoids
         }
 #endif
 	
-		protected Transform (double x, double y, double xV, double yV) : this()
+		protected Transform (double x, double y, double z, double xV, double yV) : this()
 		{
 			#if USE_MEMORY_T
-				Vector3d translation = new Vector3d(x, y, 0d);
+				Vector3d translation = new Vector3d(x, y, z);
+				mMemStore_Transform.Span[0].Velocity = new Vector3d(xV, yV, 0d);
 				mSpanAccessTest = translation;
 				mMemStore_Transform.Span[0].Translation = mSpanAccessTest;// translation;
 
@@ -1890,7 +2024,8 @@ namespace HelloBoids
 				mScale.z = 1;
 				mTranslation.x = x;
 				mTranslation.y = y;
-				mTranslation.z = 0;
+				mTranslation.z = z;
+				Translation = mTranslation;
 				mRotation = new Quaternion();
 				//_rotation.X = 0;
 				//_rotation.Y = 0;
@@ -2157,7 +2292,11 @@ namespace HelloBoids
         {
             get
             {
-                return mVelocity;
+				#if USE_MEMORY_T
+					return mMemStore_Transform.Span[0].Velocity;
+				#else
+                	return mVelocity;
+				#endif
             }
             set
             {
@@ -2241,7 +2380,7 @@ namespace HelloBoids
             set
             {
                 mSpanAccessTest = value;
-                //mMemStore_Transform.Span[0].Translation = value;
+                mMemStore_Transform.Span[0].Translation = value;
             }
         }
         /*
@@ -3208,8 +3347,8 @@ namespace HelloBoids
 
         #region Static variables
         //public static BoundingBox WorldBox;
-        public static uint MaxDepth;
-        public static uint SplitThreshHold;
+        public static uint MaxDepth = 7;            // try ~7 - 9
+        public static uint SplitThreshHold = 8; // try ~8 - 15
 
         private static Vector3d[] BoundsOffsetTable = new Vector3d[]
         {
@@ -3224,8 +3363,9 @@ namespace HelloBoids
         };
 
         #endregion
-
+        private bool mEnforceMaxDepth = false;
         private int _depth;
+        private double octantRadius;
         private int _index;   // index is specific to each depth and contains x,y,z offset at that depth and is useful for finding neighbors (which we may never do and just always move EntityNodes by re-inserting starting at root)
         private const int MAX_CHILD_COUNT = 8;
 
@@ -3244,6 +3384,12 @@ namespace HelloBoids
             _depth = depth;
             mBox = box;
             mParent = parent;
+            
+            octantRadius = this.BoundingBox.Max.x - this.BoundingBox.Min.x;
+            octantRadius = Math.Min(this.BoundingBox.Max.y - this.BoundingBox.Min.y, octantRadius);
+			octantRadius = Math.Min(this.BoundingBox.Max.z - this.BoundingBox.Min.z, octantRadius);
+			octantRadius *= 0.5d;
+
             //System.Diagnostics.Debug.WriteLine("OctreeOctant() -- Created at index " + index.ToString());
         }
 
@@ -3276,6 +3422,7 @@ namespace HelloBoids
             get { return _index; }
         }
 
+		/*
         internal int[] LocalIndexToVector(int index)
         {
 
@@ -3305,6 +3452,7 @@ namespace HelloBoids
 
             return index;
         }
+		*/
 
         internal Vector3d Radius
         {
@@ -3322,6 +3470,15 @@ namespace HelloBoids
         internal int Depth
         {
             get { return _depth; }
+        }
+        
+        public double MaxRadius
+        {
+            get 
+            { 
+                
+                return octantRadius;
+            }
         }
 
         public OctreeOctant[] Children
@@ -3341,7 +3498,7 @@ namespace HelloBoids
             }
         }
 
-        public void Add(EntityNode entityNode, bool forceRoot)
+        public void Add(EntityNode entityNode, bool forceRoot = false)
         {
             if (forceRoot)
             {
@@ -3355,16 +3512,7 @@ namespace HelloBoids
             }
         }
 
-        private void AddEntityNodeToCollection(EntityNode entityNode)
-        {
-            if (mEntityNodesCollection == null)
-                mEntityNodesCollection = new List<EntityNode>();
-
-            entityNode.SpatialNode = this;
-            mEntityNodesCollection.Add(entityNode);
-        }
-
-        public void Add(EntityNode entityNode)
+        private void Add(EntityNode entityNode)
         {
             System.Diagnostics.Debug.Assert(this.BoundingBox != null, "OctreeOctant.Add() - BoundingBox is null.");
 #if DEBUG
@@ -3378,18 +3526,17 @@ namespace HelloBoids
 
             // TODO: // TODO: https://daeken.dev/a-stupidly-simple-fast-octree-traversal-for-ray-intersection
 
-            int count;
+            int count = 0;
 
-            if (mEntityNodesCollection == null)
-                count = 0;
-            else
+            if (mEntityNodesCollection != null)
                 count = mEntityNodesCollection.Count;
 
             //    NOTE: We specifically use ">=" for the depth comparison so that we
             //          can set the maximumDepth depth to 0 if we want a tree with
             //          no depth.
-            if (count >= OctreeOctant.SplitThreshHold || _depth >= OctreeOctant.MaxDepth)
+            if (mEnforceMaxDepth && _depth >= OctreeOctant.MaxDepth)
             {
+				//Console.WriteLine("OctreeOctant.Add() - AddEntityNodeToCollection");
                 // add to this octant immmediately
                 // Non Recursive Add
                 this.AddEntityNodeToCollection((EntityNode)entityNode);
@@ -3397,19 +3544,21 @@ namespace HelloBoids
                 return;
             }
 
+			double entityRadius = entityNode.BoundingBox.Radius;
+			
             // note: we intentionally compute a radius without taking into account hypotenuse.
             // note: if allowiing non square octants, we take the smallest octant radius and we'll compare that against largest radius of entity being inserted
-            double octantRadius = this.BoundingBox.Max.x - this.BoundingBox.Min.x;
-            octantRadius = Math.Min(this.BoundingBox.Max.y - this.BoundingBox.Min.y, octantRadius);
-            octantRadius = Math.Min(this.BoundingBox.Max.z - this.BoundingBox.Min.z, octantRadius);
-            octantRadius *= 0.5d;
-
+            double octantRadius = this.MaxRadius;
             double childOctantRadius = octantRadius * 0.5d;
-            double entityRadius = entityNode.BoundingBox.Radius;
-
-            // attempt to insert using tightbox, but we must cull with loose box
+            
+			
+            // if the entityRadius is greater than that of any child nodes, try adding it here
+			// or recurse UPWARDS (note: because we cull using loose bounding box, it is ok
+			// to add when it's radius is less than or equal to the octant's radius because that alone guarantees
+			// entire entity's box will fit within loose bounds which is used during culling
             if (entityRadius > childOctantRadius)
             {
+				//Console.WriteLine("OctreeOctant.Add() - insert testing at depth " + _depth.ToString());
                 // this entity won't fit in any children of this octant 
                 // so what about the parent octant?
                 if (entityRadius > octantRadius)
@@ -3418,6 +3567,7 @@ namespace HelloBoids
                     if (this.IsRoot == false)
                     {
                         // Recurse UPWARDS
+						//Console.WriteLine("OctreeOctant.Add() - insert UPWARDs");
                         mParent.Add(entityNode);
                         return;
                     }
@@ -3433,6 +3583,7 @@ namespace HelloBoids
             // can't go further, add entitynode here
             if (this.Split() == false)
             {
+				//Console.WriteLine("OctreeOctant.Add() - SPLIT = FALSE");
                 this.AddEntityNodeToCollection(entityNode);
                 return;
             }
@@ -3444,7 +3595,9 @@ namespace HelloBoids
                 code |= 1;
             if (entityCenter.y > octantCenter.y)
                 code |= 2;
-            if (entityCenter.z > octantCenter.z)
+			
+			// TODO: if this is a 2D Octree which should just use a quadtree of course... then we should skip the following entityCenter.z test
+            if (entityCenter.z >= octantCenter.z)
                 code |= 4;
 
             for (int i = 0; i < MAX_CHILD_COUNT; i++)
@@ -3464,9 +3617,35 @@ namespace HelloBoids
                 // Recursive Add() until max depth is reached or the entity's radius > octant's loose radius
                 mChildOctants[i].Add(entityNode);
             }
+            
+  if (mEntityNodesCollection != null)
+  {
+      EntityNode[] toReAdd = mEntityNodesCollection.ToArray();
+      mEntityNodesCollection = null;
+  for (int i = 0; i < toReAdd.Length; i++)
+            {
+            
+                 Add(toReAdd[i]);
+            }
+       }
+   }
+
+		private void AddEntityNodeToCollection(EntityNode entityNode)
+        {
+            if (mEntityNodesCollection == null)
+                mEntityNodesCollection = new List<EntityNode>();
+
+            entityNode.SpatialNode = this;
+            mEntityNodesCollection.Add(entityNode);
+           
+           //Console.WriteLine(_depth.ToString());
+           // if (_depth > 7)
+            
+           // Console.WriteLine("Added at Depth == " + _depth.ToString() +  "total ent count = " + mEntityNodesCollection.Count.ToString());
         }
 
-        public void RemoveEntityNode(EntityNode entityNode)
+		
+        public void RemoveEntityNode (EntityNode entityNode)
         {
             // NOTE: The reason for this function as opposed to just using OnEntityNode_Removed()
             // is that when a node is moving, then we directly call OnEntityNode_Removed() instead
@@ -3477,7 +3656,51 @@ namespace HelloBoids
             entityNode.SpatialNode = null;
             OnEntityNode_Removed(entityNode);
         }
+        
+   
 
+        private bool Split()
+        {
+						
+            // cannot split because we're at max depth
+            if (mEnforceMaxDepth && _depth == OctreeOctant.MaxDepth)
+			{
+                Console.WriteLine("Max Depth reached ... " + _depth.ToString());
+				return false;
+			}
+			
+            // we are already split
+            if (this.mChildOctants != null)
+            {
+               
+                return true;
+            }
+
+		
+			if (this.mEntityNodesCollection != null)
+			{
+				if (this.mEntityNodesCollection.Count >= OctreeOctant.SplitThreshHold)
+				{
+
+        // we only meed to split if splithreshold reached, otherwise this represents deepest available octant on this branch
+
+					// initialize the array but do not instance or assign an Octant
+					this.mChildOctants = new OctreeOctant[8];
+					
+					// se if we can move the existing Entities to one of these new octants which represents the deepest current octants on this branch
+//EntityNode[] toRemove = mEntityNodesCollection.ToArray();
+//mEntityNodesCollection =
+
+					//for (int i = 0; i < toRemove.Length; i++)
+					//Add(toRemove[i]);
+					
+					return true;
+				}
+			
+
+        	}
+			return false;
+		}
 
         public void OnEntityNode_Moved(EntityNode entityNode)
         {
@@ -3523,7 +3746,7 @@ namespace HelloBoids
                 newOctant = newOctant.Parent;
             }
 
-            System.Console.WriteLine("Moved to new octant");
+            //System.Console.WriteLine("Moved to new octant");
             newOctant.Add(entityNode);// Add must always occur before Remove() because we dont want to collapse branches before we've had a chance to determine if the child will move there!
             childOctant.OnEntityNode_Removed(entityNode);
         }
@@ -3532,6 +3755,7 @@ namespace HelloBoids
         {
             // does this entityNode still fit in this octant?
             // we must test against entire box since this entity may now be too big to fit
+			// TODO: is this call correct? ".Contains()" must check that all corners are fully contained correct? not just intersecting?
             if (mBox.Contains(entityNode.BoundingBox)) return;
 
             if (this.IsRoot == false)
@@ -3725,21 +3949,6 @@ namespace HelloBoids
         //    return octant;
         //}
 
-        private bool Split()
-        {
-            // cannot split because we're at max depth
-            if (_depth == OctreeOctant.MaxDepth)
-                return false;
-
-            // we are already split
-            if (this.mChildOctants != null)
-                return true;
-
-            // initialize the array but do not instance or assign an Octant
-            this.mChildOctants = new OctreeOctant[8];
-            return true;
-        }
-
         // TODO: I should implement an overloaded version of Query that traverses for Entities that lay within a bounding box or sphere with potential also of matching a "match" predicate.
         //       Multi-threading of the query would be ideal.
         /// <summary>
@@ -3765,6 +3974,9 @@ namespace HelloBoids
                     if (match(mEntityNodesCollection[i], refEnt))
                         results.Add(mEntityNodesCollection[i]);
                 }
+//if (!recurse)
+ //  Console.WriteLine("%%");
+//recurse = true;
 
             if (recurse)
             {
@@ -3773,6 +3985,8 @@ namespace HelloBoids
                     // NOTE: We recurse the child OctreeOctants, not EntityNodes
                     for (int j = 0; j < mChildOctants.Length; j++)
                     {
+						if (mChildOctants[j] == null) continue;
+						
                         List<EntityNode> nestedResults = mChildOctants[j].Query(refEnt, recurse, searchArea, match);
                         if (nestedResults != null)
                             results.AddRange(nestedResults);
@@ -3781,7 +3995,9 @@ namespace HelloBoids
                 }
             }
 
-            if (results.Count == 0) return null;
+            if (results.Count == 0)  
+                return null;
+          
             return results;
         }
 
@@ -4075,27 +4291,37 @@ namespace HelloBoids
             return TransformCoord(v, Quaternion.ToMatrix(q));
         }
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static double GetDistance3d(Vector3d v, Vector3d v2)
         {
             return Math.Sqrt(GetDistance3dSquared(v, v2));
         }
+		
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static double GetLength(double x, double y, double z)
         {
             return Math.Sqrt(GetLengthSquared(x, y, z));
         }
+		
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static double GetLength(Vector3d v)
         {
             return Math.Sqrt(GetLengthSquared(v));
         }
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static double GetLengthSquared(double x, double y, double z)
         {
             return (x * x) + (y * y) + (z * z);
         }
+		
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static double GetLengthSquared(Vector3d v)
         {
             return GetLengthSquared(v.x, v.y, v.z);
         }
+		
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static double GetDistance3dSquared(Vector3d v1, Vector3d v2)
         {
             double dx = v1.x - v2.x;
@@ -8186,6 +8412,7 @@ namespace HelloBoids
         // sadly, the worst case represents a maximum of 24 tests but we can usually bail out early 
         //TODO: I think technically, if the boxes arent necessarily exact but have all 4 corners on the same
         // planes as two sides each then it might not register as being "contained" since its more accurately "on" the other.
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Intersects(BoundingBox box)
         {
 
@@ -8769,9 +8996,11 @@ namespace HelloBoids
             switch (key)
             {
 				case "LIFECYCLE": 
-				    result = new object[2];
+				    result = new object[3];
 				    result[0] = EntryClass.HEIGHT;
 				    result[1] = EntryClass.WIDTH;
+				    result[2] =
+				    EntryClass.DEPTH;
                     break;
                 case "FLOCKING":
 					result = new object[8];
@@ -9469,10 +9698,10 @@ namespace HelloBoids
         {
         	if (_timeScaling == 0.0f) return; 
         	
-            _elapsedSeconds = elapsedSeconds * _timeScaling;
+            _elapsedSeconds = elapsedSeconds;
             _totalElapsed += _elapsedSeconds;
             mElapsedGameTimeSeconds = _elapsedSeconds * _timeScaling;
-            double elapsedMilliseconds = mElapsedGameTimeSeconds * 1000d;
+            double elapsedMilliseconds = _elapsedSeconds * 1000d;
             _time = _time.Add(new TimeSpan(0, 0, 0, 0, (int)elapsedMilliseconds));
             mTicks = _time.Ticks; 
 
@@ -10169,11 +10398,11 @@ namespace HelloBoids
     /// </summary>
     internal class ProfileHook : IProfileHook
     {
-
         private IProfile mHookedProfile;
         private Stopwatch mStopwatch;
-
-        public ProfileHook(IProfile profile)
+		private bool disposedValue = false;
+		
+		public ProfileHook(IProfile profile)
         {
             if (profile == null) throw new ArgumentNullException("ProfileHook.ctor() - 'profile' argument cannot be null.");
             mHookedProfile = profile;
@@ -10181,8 +10410,6 @@ namespace HelloBoids
             mStopwatch = new Stopwatch();
             mStopwatch.Start();
         }
-
-        private bool disposedValue = false;
 
         protected virtual void Dispose(bool disposing)
         {
@@ -10208,7 +10435,6 @@ namespace HelloBoids
     /// </summary>
     public interface IProfile
     {
-
         void Update(double elapsed);
         void ResetTimer();
     }
@@ -10226,7 +10452,6 @@ namespace HelloBoids
         private double LastTotal;
         // private bool HookedUp; // TODO: HookedUp var is never used. might be useful for re-entrant sync, but so far it's not used
 
-
         public Profile(string Name)
         {
             this.ProfileName = Name;
@@ -10236,7 +10461,6 @@ namespace HelloBoids
             this.ProfileName = Name;
             this.ProfileCategory = Category;
         }
-
 
         public void Update(double elapsed)
         {
@@ -10340,7 +10564,7 @@ namespace HelloBoids
             GC.Collect();
             Console.WriteLine("Cleanup complete.");
         }
-        //
+        
         public static object[] CreateAndFreeObjects(int LargeObjectSize)
         {
             object[] tmp = new object[3];
@@ -10358,6 +10582,39 @@ namespace HelloBoids
     }
 
 
+		#region Random Number Generation
+		///<summary>
+		/// code by Alessandro D'Andria
+		/// https://stackoverflow.com/questions/19270507/correct-way-to-use-random-in-multithread-application
+		/// </summary>
+		public class ThreadedRandom
+		{
+			static int mSeed = Environment.TickCount;
+
+			 public ThreadedRandom(int seed)
+			 {
+				  mSeed = seed;
+			 }
+
+
+			// NOTE: the use of the "ThreadLocal<>" generic  provides a thread-local Random instance , meaning each thread that accesses the variable mRandom, gets an independently initialized copy of the variable.
+			// This mechanism ensures data isolation between threads, eliminating the need for synchronization and thus improving performance and simplifying concurrent programming. 
+			private readonly System.Threading.ThreadLocal<Random> mTLRandom =
+				new System.Threading.ThreadLocal<Random>(() => new Random(System.Threading.Interlocked.Increment(ref mSeed)));
+
+			public int NextInt()
+			{
+				// this could be confusing, but understand we reference "Value" because this is the Random var from the ThreadLocal<Random> variable named mTLRandom
+				return mTLRandom.Value.Next();
+			}
+
+			public double NextDouble()
+			{
+				return mTLRandom.Value.NextDouble();
+			}
+		}
+
+		#endregion
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // BEGIN MEMORY STORES
@@ -10403,20 +10660,78 @@ namespace HelloBoids
 			return results;
 		}
 		
-		public long GetAge()
+			
+		#region FileIO
+		public static void AppendText(string fullPath, string text)
+		{
+			bool append = true;
+			using (System.IO.TextWriter tw = new System.IO.StreamWriter(fullPath, append))
+				tw.WriteLine(text, System.Text.Encoding.UTF8);
+		}
+		
+		/// <summary>
+		/// .NETFiddle and other online compilers local stores 
+		/// this will get the path our .NETFiddle app is running on at the remote server
+		/// </summary>
+		public static string GetPath (string fileName)
+		{
+			string fullPath = System.IO.Directory.GetCurrentDirectory();
+			fullPath = System.IO.Path.Combine(fullPath, fileName);
+			
+			return fullPath;
+		}
+		
+		/// <summary>
+		/// .NETFiddle and other online compilers local stores 
+		/// this will get the path our .NETFiddle app is running on at the remote server
+		/// </summary>
+		public static string CreateFile(string fileName)
+		{
+			//string p = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+			//p = System.IO.Directory.GetCurrentDirectory();
+			//p += "/Downloads";
+
+			string fullPath = GetPath(fileName);
+
+			// create a file in the path our app is compiled too
+			System.IO.FileStream stream = System.IO.File.Create (fullPath);
+			
+			// verify it exists
+			bool exists = System.IO.File.Exists(fullPath);
+			Console.WriteLine(fullPath + "  File Created = "  + exists.ToString() );
+		
+			stream.Close();
+			
+			return fullPath;
+		}
+	
+		// TODO: past all the data we want to load into the below and then pass in the path to write it
+		public static void WriteFile(string path, string textToWrite)
+		{
+			System.IO.File.WriteAllText(path, textToWrite, System.Text.Encoding.UTF8);
+		}
+
+		public static string ReadAllText(string path)
+		{
+			return System.IO.File.ReadAllText(path, System.Text.Encoding.UTF8);
+		}
+		#endregion
+		
+			
+		public static long NowTicks()
 		{
 			return DateTime.Now.Ticks;
 		}
 		
 		
-		public long GetAge (long startingTicks)
+		public static long GetAge (long startingTicks)
 		{
-			long diff = DateTime.Now.Ticks - startingTicks;
+			long diff = NowTicks() - startingTicks;
 			Console.WriteLine("Show long As TimeSpan : {0}", new TimeSpan(diff));
 			return diff;
 		}
 		
-		public double GetAge (double startingOLEAutomationDate)
+		public static double GetAge (double startingOLEAutomationDate)
 		{
 			double diff = DateTime.Now.ToOADate() - startingOLEAutomationDate;
 			
@@ -10429,7 +10744,7 @@ namespace HelloBoids
         {
             // NOTE: When running on Online Compiler, this time will be the time of the SERVER 
             //       running the online compiler and NOT your local PC.
-            return DateTime.Now.ToString();
+            return NowTicks().ToString();
         }
 
 		private static readonly string[] SizeSuffixes = 
@@ -10497,6 +10812,7 @@ namespace HelloBoids
             return A | R | G | B;
         }
     }
+
 
 
     /*

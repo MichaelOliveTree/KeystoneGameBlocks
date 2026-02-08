@@ -1,8 +1,8 @@
 #define CACHE_VERTICES
 #define USE_STRUCT // instead of classes for Quaternion and Matrix
-#define USE_MEMORY_T  // 500 FPS Memory<T>, 530 FPS Classes -> 2000 iterations @ 758 BOIDS 
+//#define USE_MEMORY_T  // 500 FPS Memory<T>, 530 FPS Classes -> 2000 iterations @ 758 BOIDS  2800 FPS for Parallel.For with Memory<T> HOWEVER, need to re-enable Octree OnEntityMove()
 #define SPATIAL_SEARCH
-//#define DEBUG_OUTPUT;
+//#define DEBUG_OUTPUT
 
 
 using System.Runtime.CompilerServices; // needed for using "[MethodImpl(MethodImplOptions.AggressiveInlining)]"
@@ -175,6 +175,15 @@ namespace HelloBoids
             Console.WriteLine(output);
             Debug.WriteLine(output);
 
+			output = "Remote Computer Has " + Environment.ProcessorCount.ToString() + " processors.";
+            Console.WriteLine(output);
+            Debug.WriteLine(output);
+			
+			output = "____________________________________________";
+            Console.WriteLine(output);
+            Debug.WriteLine(output);
+			
+			
             output = "MODE = " + MODE;
             Console.WriteLine(output);
             Debug.WriteLine(output);
@@ -410,6 +419,12 @@ namespace HelloBoids
             output = "FPS = " + fps.ToString();
             Console.WriteLine(output);
             Debug.WriteLine(output);
+
+            output = "Remote Computer Has " + Environment.ProcessorCount.ToString() + " processors.";
+            Console.WriteLine(output);
+            Debug.WriteLine(output);
+			
+			output = "____________________________________________";
 
             Console.WriteLine("");
             output = "Begin Profiler Output (" + MODE + ")";
@@ -818,19 +833,19 @@ namespace HelloBoids
 			Console.WriteLine(a.ToString());
 		}
 		
+		
         private void DoFlocking(ComponentStore<Transform.Transform_Struct> store, object[] parameters, int seed, GameTime gt)
         {
         
 			double elapsedSeconds = gt.ElapsedSeconds;
 			
-            Span<Transform.Transform_Struct> memSpan;
             //using (EntryClass.CodeProfiler.HookUp("AssignSpan"))
             //{
             // note: passing the store and the need to the span to the stack is slow.
             // keep this in mind when developing data procesding funtions.  you dont want
             // to have to pass thay big bock of memory around. 
             // HOWEVER, using the following line mem = Store.Span is faster than using Store.Span[i].#### everywhere!
-            memSpan = store.Span;
+            
             //}
 
 			// NOTE: these values derived from passed in parameters
@@ -849,37 +864,42 @@ namespace HelloBoids
             double alignmentDistanceSquared = alignmentDistance * alignmentDistance;
             double cohesionDistanceSquared = cohesionDistance * cohesionDistance;
 		   
-			//Console.WriteLine("SD_SQUARED = " + seperatationDistanceSquare.ToString());
-
-            Stack<OctreeOctant> stack = new Stack<OctreeOctant>(32);
-            List<int> neighbors = new List<int>(8);
             double largestDistance = System.Math.Max(this.SeparationDistance, this.AlignmentDistance);
             largestDistance = System.Math.Max(largestDistance, this.CohesionDistance);
             double largestDistanceSquared = largestDistance * largestDistance;
-
-            // TODO: 
-            // 1) MAKE SURE ALL RESULTS ARE COMPLETELY DETERMINISTIC NO MATTER WHICH PATH IS CHOSEN
-            // 2) BOID needs to UPDATE its position within the OCTREE when it moves! <-- verify this is occurring by printing out the "address"
+			double searchRadius = largestDistance * 0.5d;
 
 			
+			OctreeOctant root = this.Octree;
 			
+			/*
 			// TEMP - Parallel test using a lambda
-		//	var size = memSpan.Length;
-		//	System.Threading.Tasks.Parallel.Invoke(
-		//		() =>  DoParallelTest(store, 0, size / 2),
-		//		() => DoParallelTest(store, size/2, size)
-		//	);
+			var size = memSpan.Length;
+			System.Threading.Tasks.Parallel.Invoke(
+				() =>  DoParallelTest(store, 0, size / 2),
+				() => DoParallelTest(store, size/2, size)
+			);
+			*/
 			
-			
-			//System.Threading.Tasks.Parallel.For(0, memSpan.Length, i )
-            for (int i = 0; i < memSpan.Length; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
+			int length = store.Span.Length;
+			System.Threading.Tasks.Parallel.For(0, length, i =>
+			{
+            /* 
+			for (int i = 0; i < memSpan.Length; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
             {
+			*/	
+				Stack<OctreeOctant> stack = new Stack<OctreeOctant>(32);
+            	List<int> neighbors = new List<int>(8);
+
+				// NOTE: inside of the Parallel.For(), Span<T> cannot be passed in
+				//      because the code inside the Paralle.For() is treated as a Lambda
+				Span<Transform.Transform_Struct> memSpan = store.Span;
+				
 				// INLINING of "GetNeighbors" in order to avoid have to load the memSpan onto the stack for each iteration
-
-				EntityNode currentBoid = Boids[i];
-				//Vector3d currentBoidTranslation = memSpan[i].Translation;
-				double searchRadius = largestDistance * 0.5d;
-
+				EntityNode currentBoid = Boids[(int)i];
+				// Vector3d currentBoidTranslation = memSpan[i].Translation;
+				
+				
 				// WARNING:  The first line that uses currentBoid.Translation is 100x SLOWER than the version using CLASSES (eg for "Classes" version comment out #define USE_MEMORY_T
 				//           The second line that uses memSpan[i].Translation is 100x FASTER than the version using CLASSES (WHAT ON EARTH?
 				//           I believe it is because the cache evicts the span<T> data and has to re-load it every iteration (eg memSpan.Length)
@@ -889,18 +909,13 @@ namespace HelloBoids
 				//       BoundingBox searchArea = new BoundingBox(currentBoid.Translation, radius);
 				//       System.Console.WriteLine("Translation CLASS = " + currentBoid.Translation.ToString());
 				//BoundingBox searchArea = new BoundingBox(Boids[i].Translation, radius);
-				// TMP HACK TO SEE ABOUT CACHE COHERENCY ISSUES
-				//		Vector3d tmp = currentBoid.Translation;
-				//		tmp.x += 0.2;
-				//		currentBoid.Translation = tmp;
 				using (EntryClass.CodeProfiler.HookUp("GetNeighbors"))
 				{
 					BoundingBox searchArea;
 					//using (EntryClass.CodeProfiler.HookUp("GetSearchArea"))
-                    	searchArea = new BoundingBox(memSpan[i].Translation, searchRadius);
+                    	searchArea = new BoundingBox(memSpan[(int)i].Translation, searchRadius);
 					//BoundingBox searchArea = new BoundingBox(currentBoidTranslation, radius);
 			//		System.Console.WriteLine("Translation MEMORY<T> = " + memSpan[i].Translation.ToString());
-					// TODO: 
                     
                     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
                     // INLINED VERSION OF "ITERATIVE DEPTH-FIRST" TRAVERSAL OF OCTREE TO FIND NEIGHBORING BOIDS OF THE CURRENT ONE
@@ -911,7 +926,7 @@ namespace HelloBoids
                     neighbors.Clear();
                     stack.Clear();
 						
-					OctreeOctant root = this.Octree;
+					
 					stack.Push(root);//currentBoid.SpatialNode);
 
 					while (stack.Count > 0)
@@ -920,7 +935,6 @@ namespace HelloBoids
 						if (currentOctant.BoundingBox.Intersects(searchArea))
 						{
 							EntityNode[] ents = currentOctant.EntityNodes;
-						
 							if (ents != null)
 							{
 							   // if (ents.Length > 230)
@@ -933,10 +947,10 @@ namespace HelloBoids
 									if (currentOctant.MaxRadius * 2d <= largestDistance)
 									{
 							 			neighbors.Add(potentialNeighbor.SpanIndex);
-
                          			}   
                          			else
-									{   /* if (currentOctant.EntityNodes[j].SpanIndex == currentBoid.SpanIndex) continue; */
+									{   
+										// if (currentOctant.EntityNodes[j].SpanIndex == currentBoid.SpanIndex) continue; 
 										//using (EntryClass.CodeProfiler.HookUp("IntersectsSearchArea"))
 										if (!potentialNeighbor.BoundingBox.Intersects(searchArea)) 
 											continue;
@@ -944,7 +958,7 @@ namespace HelloBoids
 										double distanceToNeighboringBoidSquared;
 										// TODO: if i stored the SpanIndex in the Octree instead of the EntityNode perhaps that would help?
 										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
-											distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[potentialNeighbor.SpanIndex].Translation, memSpan[i].Translation);
+											distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[potentialNeighbor.SpanIndex].Translation, memSpan[(int)i].Translation);
 											//distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[potentialNeighbor.SpanIndex].Translation, currentBoidTranslation);
 
 										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
@@ -993,10 +1007,11 @@ namespace HelloBoids
 				// if (i < 8)
 				//	Console.WriteLine("DoFlocking() - #954 - Neighbor Count = " + nCount.ToString());
 				
+				
 				//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 				// Apply Flocking Rules
 				//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-                using (EntryClass.CodeProfiler.HookUp("FlockingRules"))
+                //using (EntryClass.CodeProfiler.HookUp("FlockingRules"))
                	{
                     // SEPARATION
                     Vector3d sep;
@@ -1010,7 +1025,7 @@ namespace HelloBoids
                         for (int j = 0; j < nCount; j++)
                         {
                             //if (j == currentIndex) continue; // <- this check will already have been performed in building of neighbors list
-                            double distanceSquared = Vector3d.GetDistance3dSquared(memSpan[i].Translation, memSpan[neighbors[j]].Translation);
+                            double distanceSquared = Vector3d.GetDistance3dSquared(memSpan[(int)i].Translation, memSpan[neighbors[j]].Translation);
 							//double distanceSquared = Vector3d.GetDistance3dSquared(currentBoidTranslation, memSpan[neighbors[j]].Translation);
 							
                             if (distanceSquared < seperatationDistanceSquare)
@@ -1018,7 +1033,7 @@ namespace HelloBoids
                                 if (distanceSquared > 0d) // Hypnotron Dec.4.2025 - required divide by 0 check
                                 {
                                     // TODO: are these two results equal?
-                                    steer += (memSpan[i].Translation - memSpan[neighbors[j]].Translation) / separationDistance ;
+                                    steer += (memSpan[(int)i].Translation - memSpan[neighbors[j]].Translation) / separationDistance ;
 									//steer += (currentBoidTranslation - memSpan[neighbors[j]].Translation) / separationDistance ;
                                 }
                             }
@@ -1042,7 +1057,7 @@ namespace HelloBoids
                         for (int j = 0; j < neighbors.Count; j++)
                         {
                             //if (j == currentIndex) continue; // <- this check will already have been performed in building of neighbors list
-                            double distanceSquared = Vector3d.GetDistance3dSquared(memSpan[i].Translation, memSpan[neighbors[j]].Translation);
+                            double distanceSquared = Vector3d.GetDistance3dSquared(memSpan[(int)i].Translation, memSpan[neighbors[j]].Translation);
 							//double distanceSquared = Vector3d.GetDistance3dSquared(currentBoidTranslation, memSpan[neighbors[j]].Translation);
 							
                             if (distanceSquared < alignmentDistanceSquared)
@@ -1058,7 +1073,7 @@ namespace HelloBoids
                     else
                     {
                         neighborsVelocity /= foundCount;
-                        align = (neighborsVelocity - memSpan[i].Velocity) * alignmentFactor;
+                        align = (neighborsVelocity - memSpan[(int)i].Velocity) * alignmentFactor;
                     }
 
                     // COHESION
@@ -1079,7 +1094,7 @@ namespace HelloBoids
                             neighborsAvgCenter += memSpan[neighbors[j]].Translation;
 
                         neighborsAvgCenter /= nCount;
-                        coh = (neighborsAvgCenter - memSpan[i].Translation) * cohesionFactor;
+                        coh = (neighborsAvgCenter - memSpan[(int)i].Translation) * cohesionFactor;
 						//coh = (neighborsAvgCenter - currentBoidTranslation) * cohesionFactor;
                     }
 
@@ -1098,8 +1113,8 @@ namespace HelloBoids
                     // Update position
                     v *= elapsedSeconds;
 
-                    memSpan[i].Velocity += v;
-					memSpan[i].Translation += memSpan[i].Velocity;
+                    memSpan[(int)i].Velocity += v;
+					memSpan[(int)i].Translation += memSpan[(int)i].Velocity;
                 } // end profiler FlockingRules
 
                 // todo: all these octree update should probably
@@ -1107,17 +1122,26 @@ namespace HelloBoids
                 // this does occur in our main src branch because
                 // we use a method named FinalizeMovement()
 
-                currentBoid.SpatialNode.OnEntityNode_Moved(currentBoid);
+//              // making this thread safe is going to be a problem if we also want to maintain performance
+				// i could maybe only add locks to depth = 1 and not any further.
+//				currentBoid.SpatialNode.OnEntityNode_Moved(currentBoid);
 
-			#if DEBUG_OUTPUT
-				const string SEPERATOR = "|";
-				Utils.AppendText(EntryClass.mSimulationOutputFile, memSpan[i].Translation.ToString() + SEPERATOR + memSpan[i].Velocity.ToString());
-			#endif	
-				
+			
                 // Apply boundary rules (wrap around)
                 // (You'd need to define boundary dimensions here)
                 // If X > maxX, X = minX, etc.
-            }
+			
+				//Console.WriteLine(i.ToString());
+			}); // end parallel.for
+			
+		#if DEBUG_OUTPUT
+			Span<Transform.Transform_Struct> memSpan = store.Span;
+			for (int i = 0; i < memSpan.Length; i++)
+			{
+				const string SEPERATOR = "|";
+				Utils.AppendText(EntryClass.mSimulationOutputFile, memSpan[i].Translation.ToString() + SEPERATOR + memSpan[i].Velocity.ToString());	
+			}	
+		#endif	
         }
 #endif
         		
@@ -1222,13 +1246,6 @@ namespace HelloBoids
 #if USE_MEMORY_T
             ComponentStore<Transform.Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
             List<EntityNode> found = SpatialQueryLocal(store.Span, currentBoid.SpatialNode, currentBoid.SpanIndex, largestDistanceSquared, true, searchArea);
-
-
-
-
-
-
-
 
 
 #else
@@ -10548,7 +10565,6 @@ return (0,0);
                     Console.WriteLine("Failed to allocate a large contiguous block due to fragmentation.");
                 }
             */
-
         }
 
         public static void Cleanup()
@@ -10582,39 +10598,37 @@ return (0,0);
     }
 
 
-		#region Random Number Generation
-		///<summary>
-		/// code by Alessandro D'Andria
-		/// https://stackoverflow.com/questions/19270507/correct-way-to-use-random-in-multithread-application
-		/// </summary>
-		public class ThreadedRandom
+	#region Random Number Generation
+	///<summary>
+	/// code by Alessandro D'Andria
+	/// https://stackoverflow.com/questions/19270507/correct-way-to-use-random-in-multithread-application
+	/// </summary>
+	public class ThreadedRandom
+	{
+		static int mSeed = Environment.TickCount;
+
+		public ThreadedRandom(int seed)
 		{
-			static int mSeed = Environment.TickCount;
-
-			 public ThreadedRandom(int seed)
-			 {
-				  mSeed = seed;
-			 }
-
-
-			// NOTE: the use of the "ThreadLocal<>" generic  provides a thread-local Random instance , meaning each thread that accesses the variable mRandom, gets an independently initialized copy of the variable.
-			// This mechanism ensures data isolation between threads, eliminating the need for synchronization and thus improving performance and simplifying concurrent programming. 
-			private readonly System.Threading.ThreadLocal<Random> mTLRandom =
-				new System.Threading.ThreadLocal<Random>(() => new Random(System.Threading.Interlocked.Increment(ref mSeed)));
-
-			public int NextInt()
-			{
-				// this could be confusing, but understand we reference "Value" because this is the Random var from the ThreadLocal<Random> variable named mTLRandom
-				return mTLRandom.Value.Next();
-			}
-
-			public double NextDouble()
-			{
-				return mTLRandom.Value.NextDouble();
-			}
+			mSeed = seed;
 		}
 
-		#endregion
+		// NOTE: the use of the "ThreadLocal<>" generic  provides a thread-local Random instance , meaning each thread that accesses the variable mRandom, gets an independently initialized copy of the variable.
+		// This mechanism ensures data isolation between threads, eliminating the need for synchronization and thus improving performance and simplifying concurrent programming. 
+		private readonly System.Threading.ThreadLocal<Random> mTLRandom =
+			new System.Threading.ThreadLocal<Random>(() => new Random(System.Threading.Interlocked.Increment(ref mSeed)));
+
+		public int NextInt()
+		{
+			// this could be confusing, but understand we reference "Value" because this is the Random var from the ThreadLocal<Random> variable named mTLRandom
+			return mTLRandom.Value.Next();
+		}
+
+		public double NextDouble()
+		{
+			return mTLRandom.Value.NextDouble();
+		}
+	}
+	#endregion
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // BEGIN MEMORY STORES

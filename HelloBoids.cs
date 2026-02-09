@@ -1,6 +1,6 @@
 #define CACHE_VERTICES
 #define USE_STRUCT // instead of classes for Quaternion and Matrix
-//#define USE_MEMORY_T  // 500 FPS Memory<T>, 530 FPS Classes -> 2000 iterations @ 758 BOIDS  2800 FPS for Parallel.For with Memory<T> HOWEVER, need to re-enable Octree OnEntityMove()
+#define USE_MEMORY_T  // 500 FPS Memory<T>, 530 FPS Classes -> 2000 iterations @ 758 BOIDS  2800 FPS for Parallel.For with Memory<T> HOWEVER, need to re-enable Octree OnEntityMove()
 #define SPATIAL_SEARCH
 //#define DEBUG_OUTPUT
 
@@ -301,7 +301,6 @@ namespace HelloBoids
             Console.WriteLine(output);
             Debug.WriteLine(output);
 
-
             // NOTE: the entire UserDataStore get's passed to our various "data processors."
             //mUserDataStore = new UserDataStore();
 
@@ -375,7 +374,6 @@ namespace HelloBoids
                 //HACK - make it always fixed step
                 elapsedSeconds = step;
 				gt.Update(elapsedSeconds);
-
 
                 // Update and Render operations
                 Update(gt);
@@ -657,8 +655,7 @@ namespace HelloBoids
         public void UpdateClasses(GameTime gt, List<Boid> allBoids, double separationDistance, double separationFactor, double alignmentDistance, double alignmentFactor, 
 								  double cohesionDistance, double cohesionFactor, double maxSpeed, double turnFactor)
         {
-			double elapsedSeconds = gt.ElapsedSeconds;
-			
+						
             //////////////////////////////////////////////////////////////////
             // Life Cycle
             //////////////////////////////////////////////////////////////////
@@ -669,18 +666,43 @@ namespace HelloBoids
                 mIntervalTimers.Reset("LifeCycle", "spawn");
             }
 
+			
             //////////////////////////////////////////////////////////////////
             // Flocking
-            //////////////////////////////////////////////////////////////////
-            double largestDistance = System.Math.Max(this.SeparationDistance, this.AlignmentDistance);
-            largestDistance = System.Math.Max(largestDistance, this.CohesionDistance);
-            double largestDistanceSquared = largestDistance * largestDistance;
-            
-            for (int i = 0; i < Boids.Count; i++)
+            //////////////////////////////////////////////////////////////////		
+			
+			
+			int count = Boids.Count;
+            System.Threading.Tasks.Parallel.For(0, count, i => 
+            //for (int i = 0; i < Boids.Count; i++)
             {
                 List<int> found;
                 List<Boid> neighbors;
 
+				double separationDistance = EntryClass.SEPERATION_DISTANCE;
+				double alignmentDistance = EntryClass.ALIGNMENT_DISTANCE;
+				double cohesionDistance = EntryClass.COHESION_DISTANCE;
+
+				// more parameters
+				double separationFactor = EntryClass.SEPARATION_FACTOR;
+				double alignmentFactor = EntryClass.ALIGNMENT_FACTOR;
+				double cohesionFactor = EntryClass.COHESION_FACTOR;
+				double turnFactor =  EntryClass.TURN_FACTOR; // For boundary avoidance
+				double maxSpeed = EntryClass.MAX_SPEED;
+				
+				double seperatationDistanceSquare = separationDistance * separationDistance;
+				double alignmentDistanceSquared = alignmentDistance * alignmentDistance;
+				double cohesionDistanceSquared = cohesionDistance * cohesionDistance;
+				
+				
+				
+				double elapsedSeconds = gt.ElapsedSeconds;
+            	double largestDistance = System.Math.Max(this.SeparationDistance, this.AlignmentDistance);
+            	largestDistance = System.Math.Max(largestDistance, this.CohesionDistance);
+            	double largestDistanceSquared = largestDistance * largestDistance;
+            
+				
+				
                 using (EntryClass.CodeProfiler.HookUp("GetNeighbors"))
                 {
                     // WARNING: here we pass in entire list of
@@ -712,21 +734,21 @@ namespace HelloBoids
                 using (EntryClass.CodeProfiler.HookUp("FlockingRules"))
                	{
 					// Apply Rules
-					//var (sepX, sepY) = Boid.Separate(elapsedSeconds, allBoids, allBoids[i], separationDistance, separationFactor);
+					//var (sepX, sepY) = Boid.Separate(elapsedSeconds, Boids, Boids[i], separationDistance, separationFactor);
 					double sepX = 0d; double sepY = 0d;
 					if (neighbors != null)
-					 (sepX, sepY) = Boid.Separate(elapsedSeconds, allBoids, allBoids[i], separationDistance, separationFactor, neighbors);
+					 (sepX, sepY) = Boid.Separate(elapsedSeconds, Boids, Boids[i], separationDistance, separationFactor, neighbors);
 
-					//var (alignX, alignY) = Boid.Align(elapsedSeconds, allBoids, allBoids[i], alignmentDistance, alignmentFactor);
+					//var (alignX, alignY) = Boid.Align(elapsedSeconds, Boids, Boids[i], alignmentDistance, alignmentFactor);
 					double alignX = 0d; double alignY = 0d;
 					if (neighbors != null)
-						(alignX, alignY) = Boid.Align(elapsedSeconds, allBoids, allBoids[i], alignmentDistance, alignmentFactor, neighbors);
+						(alignX, alignY) = Boid.Align(elapsedSeconds, Boids, Boids[i], alignmentDistance, alignmentFactor, neighbors);
 
-					//var (cohX, cohY) = Boid.Cohese(elapsedSeconds, allBoids, allBoids[i], cohesionDistance, cohesionFactor);
+					//var (cohX, cohY) = Boid.Cohese(elapsedSeconds, Boids, Boids[i], cohesionDistance, cohesionFactor);
 					double cohX = 0d; double cohY = 0d;
 
 					if (neighbors != null)
-						(cohX, cohY) = Boid.Cohese(elapsedSeconds, allBoids, allBoids[i], cohesionDistance, cohesionFactor, neighbors);
+						(cohX, cohY) = Boid.Cohese(elapsedSeconds, Boids, Boids[i], cohesionDistance, cohesionFactor, neighbors);
 
 					// Sum forces
 					Vector3d v;
@@ -746,29 +768,23 @@ namespace HelloBoids
 
 					// Update position
 					v *= elapsedSeconds;
-					allBoids[i].Velocity += v;
-					allBoids[i].Translation += allBoids[i].Velocity;
+					Boids[i].Velocity += v;
+					Boids[i].Translation += Boids[i].Velocity;
 					
-
-					allBoids[i].SpatialNode.OnEntityNode_Moved(allBoids[i]);
+					// TODO: uncomment... currently Octree is NOT THREAD SAFE
+		//			Boids[i].SpatialNode.OnEntityNode_Moved(Boids[i]);
 
 			#if DEBUG_OUTPUT
 					const string SEPERATOR = "|";
-					Utils.AppendText(EntryClass.mSimulationOutputFile, allBoids[i].Translation.ToString() + SEPERATOR + allBoids[i].Velocity.ToString());
+					Utils.AppendText(EntryClass.mSimulationOutputFile, Boids[i].Translation.ToString() + SEPERATOR + Boids[i].Velocity.ToString());
 			#endif
-	
-					// TODO: unfortunately, i dont know how to read in data locally... we would literally have to
-					// paste the data into a string variable.
-					// eg.
-
-	
 					
 					// Apply boundary rules (wrap around)
 					// (You'd need to define boundary dimensions here)
 					// If X > maxX, X = minX, etc.
 
 				} // end for loop
-			} // end using "FlockingRules"
+			});  // end using "FlockingRules"   NOTE: Close Parenthesis and Semicolon here is needed after close curly brace only when using Parallel.For()
         }
 
 #if USE_MEMORY_T
@@ -883,11 +899,8 @@ namespace HelloBoids
 			
 			int length = store.Span.Length;
 			System.Threading.Tasks.Parallel.For(0, length, i =>
-			{
-            /* 
-			for (int i = 0; i < memSpan.Length; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
+			//for (int i = 0; i < memSpan.Length; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
             {
-			*/	
 				Stack<OctreeOctant> stack = new Stack<OctreeOctant>(32);
             	List<int> neighbors = new List<int>(8);
 
@@ -898,8 +911,7 @@ namespace HelloBoids
 				// INLINING of "GetNeighbors" in order to avoid have to load the memSpan onto the stack for each iteration
 				EntityNode currentBoid = Boids[(int)i];
 				// Vector3d currentBoidTranslation = memSpan[i].Translation;
-				
-				
+								
 				// WARNING:  The first line that uses currentBoid.Translation is 100x SLOWER than the version using CLASSES (eg for "Classes" version comment out #define USE_MEMORY_T
 				//           The second line that uses memSpan[i].Translation is 100x FASTER than the version using CLASSES (WHAT ON EARTH?
 				//           I believe it is because the cache evicts the span<T> data and has to re-load it every iteration (eg memSpan.Length)
@@ -3541,6 +3553,23 @@ return (0,0);
 //            this.BoundingBox.Max.z - this.BoundingBox.Min.z);
 #endif
 
+	
+			// https://stackoverflow.com/questions/4324703/should-an-octree-be-rebuilt-every-frame
+
+			// https://www.gamedev.net/articles/programming/general-and-gameplay-programming/introduction-to-octrees-r3529/
+			//     1 - this one from gamedev.net has a good idea of creating a list of Entities (objects) that are to be added
+			//       to or moved within, the Octree during a particular frame, and then to update them all at once after 
+			//       this list of Entities/Objects to add/move is completed.
+			//     2 - it also  has an idea for using a lifespan test to see if an empty octant should be deleted rather than
+			//         to delete it immediately upon becoming empty of any EntityNodes/Objects.  This way if say a stream\burst
+			//         of bullets are moving in the same direction, one bullet will leave an octant, but closely followed by another which may soon need
+			//         the octant previously occupied by the earlier bullet.
+			//			a) the code can also be found here -> https://www.wobblyduckstudios.com/Octrees.php
+			//				- https://www.wobblyduckstudios.com/Code/OctTree.cs
+			//              - https://www.wobblyduckstudios.com/Code/IntersectionRecord.cs
+			//				- https://www.wobblyduckstudios.com/Code/Physical.cs    <-- sort of an Entity class with Physics properties like acceleration, max acceleration, velocity, etc
+			// 
+			//
             // TODO: // TODO: https://daeken.dev/a-stupidly-simple-fast-octree-traversal-for-ray-intersection
 
             int count = 0;
@@ -3617,9 +3646,17 @@ return (0,0);
             if (entityCenter.z >= octantCenter.z)
                 code |= 4;
 
+			// TODO: surely a FOR LOOP here is not needed?  We just
+			//       need: if (code < MAX_)
+			//      int i = code;
+			//      // then leave the rest of the code the same... 
+			System.Diagnostics.Debug.Assert (code >= 0 && code <= MAX_CHILD_COUNT, "code out of range.")
+				
             for (int i = 0; i < MAX_CHILD_COUNT; i++)
             {
-                // if this bitflag cobmination is not set
+                // the bitflag combination created above MUST ALWAYS evaluate to
+				// values of 0 thru 7 which represents the 8 octants
+	
                 if (code != i) continue;
 
                 Vector3d offset = OctreeOctant.BoundsOffsetTable[i] * octantRadius;
@@ -3635,17 +3672,16 @@ return (0,0);
                 mChildOctants[i].Add(entityNode);
             }
             
-  if (mEntityNodesCollection != null)
-  {
-      EntityNode[] toReAdd = mEntityNodesCollection.ToArray();
-      mEntityNodesCollection = null;
-  for (int i = 0; i < toReAdd.Length; i++)
-            {
-            
-                 Add(toReAdd[i]);
-            }
-       }
-   }
+  			if (mEntityNodesCollection != null)
+  			{
+      			EntityNode[] toReAdd = mEntityNodesCollection.ToArray();
+      			mEntityNodesCollection = null;
+  				for (int i = 0; i < toReAdd.Length; i++)
+            	{
+                 	Add(toReAdd[i]);
+            	}
+       		}
+   		}
 
 		private void AddEntityNodeToCollection(EntityNode entityNode)
         {

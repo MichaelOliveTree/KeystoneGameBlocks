@@ -1,29 +1,111 @@
 #define CACHE_VERTICES
-#define USE_STRUCT // instead of classes for Quaternion and Matrix
-#define USE_MEMORY_T  // 500 FPS Memory<T>, 530 FPS Classes -> 2000 iterations @ 758 BOIDS  2800 FPS for Parallel.For with Memory<T> HOWEVER, need to re-enable Octree OnEntityMove()
-#define SPATIAL_SEARCH
+#define USE_STRUCT 		// instead of classes for Quaternion and Matrix
+#define USE_MEMORY_T  	// 500 FPS Memory<T>, 530 FPS Classes -> 2000 iterations @ 758 BOIDS  2800 FPS for Parallel.For with Memory<T> HOWEVER, need to re-enable Octree OnEntityMove()
+//#define SPATIAL_SEARCH
 //#define DEBUG_OUTPUT
-
 
 using System.Runtime.CompilerServices; // needed for using "[MethodImpl(MethodImplOptions.AggressiveInlining)]"
 using System.Diagnostics;
 using System; 
-//using System.Memory;   // not needed for online compilers running latest .net version
+// using System.Memory;   // not needed for online compilers running latest .net version
 using System.Reflection; // used for "MethodBase" type in Profiler
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
 using System.Linq;
-//using System.Numerics;
-//using System.Runtime.Intrinsics; // for SIMD enabled code
+// using System.Numerics;
+// using System.Runtime.Intrinsics; // for SIMD enabled code
+
+
+// // https://erikmcclure.com/blog/multithreading-problems-in-game-design/
+			/*
+			Updating game entities in parallel while maintaining determinism requires strict control over update ordering and data access, typically achieved using an Entity-Component-System (ECS) architecture with a job system or double-buffering. Determinism ensures that given the same initial state and inputs, the simulation produces identical results every time, regardless of the machine or number of CPU cores used.Reddit
+			ReddiHere are the key approaches to achieve parallel, deterministic updates:
+
+			1. Structured Parallel ECS (Job System)
+			Modern ECS frameworks (like Unity DOTS) allow running systems in parallel while maintaining order through dependency tracking. 
+
+			System Dependencies: Use [UpdateBefore] and [UpdateAfter] attributes to define a strict order of execution for systems.
+			Job Scheduling: Use ScheduleParallel() for systems that do not conflict, which automatically splits work across cores while maintaining deterministic ordering of data processing.
+			Avoid Non-Determinism: Do not use Run() in a way that allows arbitrary thread scheduling. Ensure that if systems depend on each other, they are synchronized using Dependency.Complete(). 
+
+			2. Double-Buffering (Read-Only Input, Write-Only Output)
+			To avoid race conditions, systems should read from the current state and write changes to a "next state" buffer. 
+
+			Process: Par	allelize reading entity data (Component A, B) to calculate results.
+			Deferred Mutation: Write new component data (Component C) to a separate buffer.
+			Swap: After all systems finish, swap the read and write buffers.
+			Result: All entities update based on the same snapshot of the previous frame, eliminating dependency on thread execution order. 
+
+			3. Deterministic Ordering and Sorting
+			If entities are updated in parallel, the order of modification must not matter, or it must be explicitly enforced. 
+
+			Sort Entities: If the outcome depends on which entity updates first, sort entities by a fixed ID before processing.
+			Avoid Hash Maps: Avoid data structures where iteration order changes, as this can break determinism between different machine architectures. 
+
+			4. Deterministic Simulation Techniques
+			Fixed Timestep: Run the simulation logic on a fixed cadence (FixedUpdate in Unity, for example), separate from the rendering framerate.
+				Floating Point Constraints: Ensure that floating-point calculations are identical across platforms (e.g., using fixed point math or forcing strict IEEE 754 compliance).
+			Deterministic RNG: Use a seeded random number generator. Ensure it is called in the same order every frame. 
+
+			Key Considerations for Parallelism
+			Data Layout: Use contiguous memory (Arrays/NativeContainers) for component data to allow parallel access without locking.
+			Job System Hazards: Ensure that parallel jobs do not write to the same memory location. Use NativeParallelHashMap or NativeArray with strict index management to ensure safe parallel writes. 
+			*/
+
+            // By the way, this is what Media Molecule does in Dreams. The Trackmania racing games do this as well, to verify runs and make sure people aren’t cheating. Even their 3d physics engine is fully deterministic! very cool stuff.
+
+            //	Notes:
+
+            //  You need to make sure entities are always updated in the same order. This means deterministic O(1) datastructures like pools are your friend.
+            // If you use random numbers then you need to make sure the seeds match at the start of every tick as well. You can probably get by storing only one seed along with the first
+            // The stored replay gets invalidated once you change your gameplay logic, so this method is generally useful for debugging only.
+
+            //https://jakubtomsu.github.io/posts/fixed_timestep_without_interpolation/ < -- i cant easily do a memcpy to copy the gamestate like this.... storing animation states for us is much more difficult.
+            //                                                                              well, perhaps we only just need to copy the previous animation's "weight"
+            // https://www.rfleury.com/p/main-loops-refresh-rates-and-determinism
+            // 1 - simulaton thread - outputs state
+            // 2 - user thread (drawing here including animation updating)
+            // 3 - input gathering thread
+
+            // https://www.youtube.com/watch?v=fdAOPHgW7qM <-- frame rate independance for animation... render tick method?
+
+            // https://www.youtube.com/watch?v=72y2EC5fkcE
+            // TODO: deterministic
+            //       fixed step
+            //       - track each frame 'long currentFrame'
+            //       
+            //       ability to "step" play backwards and forwards
+            //       animation state decoupling for interpolation
+            //  ___________________________________________________
+            //  TODO: Procedural Generation Focus
+            //        - seeds and determinism and such
+
+
+
+// TODO: 
+// 1 - multi-thread octree... perhaps cache all Add() and then Execute() at the end of the loop
+// 2 - Test determinism of spawning with a parallel.For() loop and using the ThreadedRandom.cs
+// 3 - Instead of just one buffer accessed through ComponentStore<>.Span, create two buffers 
+//     ComponentStore.ReadOnlySpan  and ComponentStore.WriteOnlySpan, ComponentStore.SwapBuffers()
+//     for double buffering.  This means we can multithread the updates and not worry about the state
+//     of each EntityNode changing until all parallel threads are complete and then we can SwapBuffers.
+// 4 - Replay system with single step FWD and REVS functions
+// 5 - procedural generation of a Colony : IEntitySystem -> both proc generation with seeds/THreaded<Random> and updates
+// 6 - SIMD code
+// 7 - Added destructor to Transform.cs for freeing up the memory of Memory<T>... i think this still needs work to keep the Memory<T> blocks packed correctly.
+// 
+// 
+
 
 // NOTE: The primary purpose of this is to demonstrate the use of Memory<T>
-//to increase performance by updating Entities using a data processing model
-//in order to take advantage of cache coherency instead of
-// the typical Entity.Update() model which does not.
+// via ComponentStore.cs (ComponentStore.ReadOnlySpan and ComponentStore.WriteOnlySpan)
+// to increase performance by updating Entities using a data-oriented processing model 
+// in order to take advantage of cache coherency instead of the typical Entity.Update()
+// model which does not.
 // NOTE: We will also be able to experiment with writing DETERMINISTIC code and
 // being able to STEP forward and BACKWARDS through the simulation and
 // ultimately even being able to REPLAY a "recording" of the simulation or parts
-//of it.
+// of it.
 namespace HelloBoids
 {
     // https://vscode.dev/github/MichaelOliveTree/KeystoneGameBlocks
@@ -41,8 +123,8 @@ namespace HelloBoids
 		public static double BOID_SIZE = 2d; // since this is 2D, we need a size for the Octree's Z depth 
 		
         private static string MODE = MODE = "Memory<T>"; // Classes or Memory<T> and is set at RunTime but defaults to Memory<T> unless #define Memory_T is commented out
-        private static bool useOctree = true;
-		private static uint OctreeMaxDepth = 12;
+        private static bool useOctree = false;
+		private static uint OctreeMaxDepth = 12; // NOTE: this is ignored if Octree.EnforceMaxDepth == false in which case the splitthreshHold and radius of the entity being added is the main determinant
 		private static uint OctreeSplitThreshold = 8;
 		
 		public static uint NUM_ENTRIES = 768;
@@ -58,8 +140,8 @@ namespace HelloBoids
 
         public static long mCurrentFrame;
         private static bool mIsRunning;
-        private static object mGameThreadLockObject = new object();
-        private static object mSyncLock;
+        private static object mGameThreadLockObject = new object(); // used by GameLoop()
+        private static object mSyncLock; // used by Main() 
 
 		// global settings
 		// Note: the larger the various distance values below,
@@ -124,23 +206,6 @@ namespace HelloBoids
             // Registers profiles before we use them
             int categoryIndex = 0;
 
-            // mouse/keyboard	  
-            //categoryIndex ++;
-            //string ioCategory = categoryIndex.ToString() + " - I/O";		
-            //CodeProfiler.Register("View Behavior", ioCategory);	        
-
-            // networking
-            //categoryIndex ++;
-            //string networkingCategory = categoryIndex.ToString() + " - Networking";
-            //CodeProfiler.Register("TBD", networkingCategory);
-
-            // physics
-            //categoryIndex ++;
-            //string phsyicsCategory = categoryIndex.ToString() + " - Physics";
-            //CodeProfiler.Register("Gravity", phsyicsCategory);
-            //CodeProfiler.Register("Production", phsyicsCategory);
-            //CodeProfiler.Register("Consumption", phsyicsCategory);
-
             // processing
             categoryIndex++;
             string dataProcessing = "Data Processing";
@@ -153,20 +218,8 @@ namespace HelloBoids
 
 			CodeProfiler.Register("GetSearchArea", dataProcessing);
             CodeProfiler.Register("IntersectsSearchArea", dataProcessing);					
-											
-            /*	
-            // culling  
-            categoryIndex ++;
-            string cullingCategory = categoryIndex.ToString() + " - Culling";
-            CodeProfiler.Register("Bucket Insertion", cullingCategory);	
-            CodeProfiler.Register("Bucket Creation", cullingCategory);	
-            CodeProfiler.Register("GetCameraSpaceBox", cullingCategory);
-            CodeProfiler.Register("IntersectTest", cullingCategory);	
-            CodeProfiler.Register ("Model Selection", cullingCategory);
-            CodeProfiler.Register("VisibleItem Creation", cullingCategory);
-            CodeProfiler.Register("Add Model To PVS", cullingCategory);	
-            */
 
+			// output some information about this program and the settings for this Performance Test
             output = "Hello Boids - " + Utils.GetTimeString();
             Console.WriteLine(output);
             Debug.WriteLine(output);
@@ -213,12 +266,13 @@ namespace HelloBoids
             Console.WriteLine(output);
             Debug.WriteLine(output);
 
-            mIsRunning = true;
+            
 
             // Set as background so the application can exit when the main thread ends
             // TODO: this may not be necessary if I just set the exit condition to the known
             // number of iterations that will be performed so the sentinel "mIsRunning" can be
             // set to = false;
+			mIsRunning = true;
             gameThread.IsBackground = true;
             gameThread.Start();
 
@@ -287,7 +341,10 @@ namespace HelloBoids
         // simulation updates
         private static void GameLoop()
         {
-            bSim = new BoidSimulation((int)NUM_ENTRIES, WIDTH, HEIGHT, DEPTH, useOctree);
+         	// TODO: THE SAMPLE FROM GITHUB https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
+         	// and simply uses System.Drawing to draw the boids.  I will want to just use a simple 3d pyramid type boid .obj instead.
+         	// https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
+           	bSim = new BoidSimulation((int)NUM_ENTRIES, WIDTH, HEIGHT, DEPTH, useOctree);
 
             output = "Performance Test RUNNING - " + NUM_ENTRIES.ToString() + " boids @ " + NUM_ITERATIONS.ToString() + " iterations.";
             Console.WriteLine(output);
@@ -309,7 +366,6 @@ namespace HelloBoids
             //UserData data = mUserDataStore.CheckOut(entityID);
             //entity.Data = data;
 
-            object parameters = new object();
 
             // WARM UP the code so that the loops are JIT properly
             // =====================
@@ -321,35 +377,7 @@ namespace HelloBoids
              System.Diagnostics.Debug.WriteLine("WARM-UP - COMPLETED.");
              Console.WriteLine("WARM-UP - COMPLETED.");
              */
-
-            // By the way, this is what Media Molecule does in Dreams. The Trackmania racing games do this as well, to verify runs and make sure people aren’t cheating. Even their 3d physics engine is fully deterministic! very cool stuff.
-
-            //	Notes:
-
-            //  You need to make sure entities are always updated in the same order. This means deterministic O(1) datastructures like pools are your friend.
-            // If you use random numbers then you need to make sure the seeds match at the start of every tick as well. You can probably get by storing only one seed along with the first
-            // The stored replay gets invalidated once you change your gameplay logic, so this method is generally useful for debugging only.
-
-            //https://jakubtomsu.github.io/posts/fixed_timestep_without_interpolation/ < -- i cant easily do a memcpy to copy the gamestate like this.... storing animation states for us is much more difficult.
-            //                                                                              well, perhaps we only just need to copy the previous animation's "weight"
-            // https://www.rfleury.com/p/main-loops-refresh-rates-and-determinism
-            // 1 - simulaton thread - outputs state
-            // 2 - user thread (drawing here including animation updating)
-            // 3 - input gathering thread
-
-            // https://www.youtube.com/watch?v=fdAOPHgW7qM <-- frame rate independance for animation... render tick method?
-
-            // https://www.youtube.com/watch?v=72y2EC5fkcE
-            // TODO: deterministic
-            //       fixed step
-            //       - track each frame 'long currentFrame'
-            //       
-            //       ability to "step" play backwards and forwards
-            //       animation state decoupling for interpolation
-            //  ___________________________________________________
-            //  TODO: Procedural Generation Focus
-            //        - seeds and determinism and such
-
+			
             CodeProfiler.StartLoop();
             Stopwatch sw = Stopwatch.StartNew();
             double lastElapsedTime = sw.Elapsed.TotalSeconds;
@@ -502,11 +530,6 @@ namespace HelloBoids
     }
 
 
-
-    // TODO: THE SAMPLE FROM GITHUB https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
-    // and simply uses System.Drawing to draw the boids.  I will want to just use a simple 3d pyramid type boid .obj instead.
-    //https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
-
     public class BoidSimulation
     {
 #if USE_MEMORY_T
@@ -538,7 +561,6 @@ namespace HelloBoids
             Boids = new List<Boid>(); //NOTE: we do not preallocate the list here
 				
 			mTHRandom = new ThreadedRandom(Seed);
-	
 	
 			SeparationDistance = EntryClass.SEPERATION_DISTANCE;
         	SeparationFactor = EntryClass.SEPARATION_FACTOR;
@@ -593,6 +615,11 @@ namespace HelloBoids
 
 			System.Diagnostics.Debug.Assert(EntryClass.NUM_ENTRIES == numBoids);
 	
+	
+			// TODO: adding these to the Octree will cause System.AggregateException() until we 
+			//       make Add() to the Octree thread-safe
+			// Spawn the Boids using Parallel.For() and optional memory fragmenting
+			//System.Threading.Tasks.Parallel.For(0, numBoids, i=>
             for (int i = 0; i < numBoids; i++)
             {
                 // todo: the above doesn't make a diff, but perhaps
@@ -604,18 +631,13 @@ namespace HelloBoids
                 if (EntryClass.NUM_TO_PIN > 0)
                     MemoryFragmenter.Fragment(EntryClass.NUM_TO_PIN, 512, EntryClass.NUM_TO_PIN / 2, 128);
 
-				
+				// spawn will add to the Octree 
 				Boid b = Spawn(mTHRandom, i, width, height, depth);
                 Boids.Add(b);
 
-                if (useOctree)
-                {
-                    Octree.Add((EntityNode)b);
-                }
-
                 if (EntryClass.NUM_TO_PIN > 0)
                     MemoryFragmenter.Cleanup();
-            }
+            }//);
 	
             Console.WriteLine("BoidSimulation.ctor() - " + numBoids + " Boids Created.  Big Hash = " + bint.ToString());
         }
@@ -671,7 +693,6 @@ namespace HelloBoids
             // Flocking
             //////////////////////////////////////////////////////////////////		
 			
-			
 			int count = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 
             //for (int i = 0; i < Boids.Count; i++)
@@ -694,14 +715,11 @@ namespace HelloBoids
 				double alignmentDistanceSquared = alignmentDistance * alignmentDistance;
 				double cohesionDistanceSquared = cohesionDistance * cohesionDistance;
 				
-				
-				
 				double elapsedSeconds = gt.ElapsedSeconds;
             	double largestDistance = System.Math.Max(this.SeparationDistance, this.AlignmentDistance);
             	largestDistance = System.Math.Max(largestDistance, this.CohesionDistance);
             	double largestDistanceSquared = largestDistance * largestDistance;
             
-				
 				
                 using (EntryClass.CodeProfiler.HookUp("GetNeighbors"))
                 {
@@ -842,6 +860,16 @@ namespace HelloBoids
 			}
         }
 		
+		
+		// not used... but would be used with parallel.Invoke() as in
+		/*
+			// TEMP - Parallel test using a lambda
+			var size = memSpan.Length;
+			System.Threading.Tasks.Parallel.Invoke(
+				() =>  DoParallelTest(store, 0, size / 2),
+				() => DoParallelTest(store, size/2, size)
+			);
+		*/
 		private void DoParallelTest(ComponentStore<Transform.Transform_Struct> store, int start, int end)
 		{
 			int l = store.Span.Length;;
@@ -852,7 +880,6 @@ namespace HelloBoids
 		
         private void DoFlocking(ComponentStore<Transform.Transform_Struct> store, object[] parameters, int seed, GameTime gt)
         {
-        
 			double elapsedSeconds = gt.ElapsedSeconds;
 			
             //using (EntryClass.CodeProfiler.HookUp("AssignSpan"))
@@ -888,14 +915,6 @@ namespace HelloBoids
 			
 			OctreeOctant root = this.Octree;
 			
-			/*
-			// TEMP - Parallel test using a lambda
-			var size = memSpan.Length;
-			System.Threading.Tasks.Parallel.Invoke(
-				() =>  DoParallelTest(store, 0, size / 2),
-				() => DoParallelTest(store, size/2, size)
-			);
-			*/
 			
 			int length = store.Span.Length;
 			System.Threading.Tasks.Parallel.For(0, length, i =>
@@ -937,8 +956,7 @@ namespace HelloBoids
                     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
                     neighbors.Clear();
                     stack.Clear();
-						
-					
+											
 					stack.Push(root);//currentBoid.SpatialNode);
 
 					while (stack.Count > 0)
@@ -1168,6 +1186,13 @@ namespace HelloBoids
             double vY = (rand.NextDouble() - 0.5d) * 2d;
 
             Boid b = new Boid(index, posX, posY, posZ, vX, vY);
+	
+	
+		    if (this.Octree != null)
+            {
+           		Octree.Add((EntityNode)b);
+            }
+
 			return b;
 		}
 		
@@ -1194,8 +1219,7 @@ namespace HelloBoids
 			this.Boids[entity.Index].Index = lastIndex;
 	
 			this.Boids.RemoveAt(lastIndex); // todo: this wont result in a List copy to a new List will it?
-	
-	
+
 #if MEMORY_T
 			Console.WriteLine("Destroy() == Completed on index " + entity.SpanIndexLE.ToString());
 #endif
@@ -1216,7 +1240,6 @@ namespace HelloBoids
                      return true;
 
                  return false;
-
         };*/
 
             Func<Transform, Transform, double, bool> ff = (boid, referenceBoid, distanceSquared) =>
@@ -1382,41 +1405,6 @@ namespace HelloBoids
             return results;
         }
 #endif
-    }
-
-
-
-    public class EntityNode : Transform
-    {
-        protected string mID;
-        protected int mIndex;
-        protected BoundingBox _box;
-        protected OctreeOctant _octant;
-
-        public BoundingBox BoundingBox
-        {
-            get { return _box; }
-        }
-
-        public EntityNode(string guid)
-        {
-            mID = guid;
-        }
-
-        public EntityNode(int index, double x, double y, double z, double xV, double yV) 
-			: base (x, y, z, xV, yV)
-        {
-            mIndex = index;
-        }
-
-        public OctreeOctant SpatialNode
-        {
-
-            get { return _octant; }
-            set { _octant = value; }
-        }
-
-        public int Index { get { return mIndex; } set {mIndex = value;}}
     }
 
 
@@ -1943,6 +1931,42 @@ return (0,0);
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // BEGIN NODES
+	
+    public class EntityNode : Transform
+    {
+        protected string mID;
+        protected int mIndex;
+        protected BoundingBox _box;
+        protected OctreeOctant _octant;
+
+        public BoundingBox BoundingBox
+        {
+            get { return _box; }
+        }
+
+        public EntityNode(string guid)
+        {
+            mID = guid;
+        }
+
+        public EntityNode(int index, double x, double y, double z, double xV, double yV) 
+			: base (x, y, z, xV, yV)
+        {
+            mIndex = index;
+        }
+
+        public OctreeOctant SpatialNode
+        {
+
+            get { return _octant; }
+            set { _octant = value; }
+        }
+
+        public int Index { get { return mIndex; } set {mIndex = value;}}
+    }
+
+
+
     // Transform node type. Entities and Models inherit this type.
     // NOTE: The global variables are almost exclusively as they relate to Zones.
     //       Otherwise the mDerived* vars are our worldspace variables.  Adjacent Zones
@@ -2037,38 +2061,6 @@ return (0,0);
             //public Matrix RegionMatrix;
         }
 #endif
-	
-		protected Transform (double x, double y, double z, double xV, double yV) : this()
-		{
-			#if USE_MEMORY_T
-				Vector3d translation = new Vector3d(x, y, z);
-				mMemStore_Transform.Span[0].Velocity = new Vector3d(xV, yV, 0d);
-				mSpanAccessTest = translation;
-				mMemStore_Transform.Span[0].Translation = mSpanAccessTest;// translation;
-
-			#else
-				mMatrix = Matrix.Identity();
-				mScale.x = 1;
-				mScale.y = 1;
-				mScale.z = 1;
-				mTranslation.x = x;
-				mTranslation.y = y;
-				mTranslation.z = z;
-				Translation = mTranslation;
-				mRotation = new Quaternion();
-				//_rotation.X = 0;
-				//_rotation.Y = 0;
-				//_rotation.Z = 0;
-				//_rotation.W = 1;
-				mPivot.x = 0;
-				mPivot.y = 0;
-				mPivot.z = 0;
-	
-				mVelocity.x = xV;
-				mVelocity.y = yV;
-			#endif
-	
-		}
 
         protected Transform()
         {
@@ -2136,7 +2128,40 @@ return (0,0);
 
             //Shareable = false; // Transform nodes and derived can never be shared.
         }
+				
+		protected Transform (double x, double y, double z, double xV, double yV) : this()
+		{
+			#if USE_MEMORY_T
+				Vector3d translation = new Vector3d(x, y, z);
+				mMemStore_Transform.Span[0].Velocity = new Vector3d(xV, yV, 0d);
+				mSpanAccessTest = translation;
+				mMemStore_Transform.Span[0].Translation = mSpanAccessTest;// translation;
 
+			#else
+				mMatrix = Matrix.Identity();
+				mScale.x = 1;
+				mScale.y = 1;
+				mScale.z = 1;
+				mTranslation.x = x;
+				mTranslation.y = y;
+				mTranslation.z = z;
+				Translation = mTranslation;
+				mRotation = new Quaternion();
+				//_rotation.X = 0;
+				//_rotation.Y = 0;
+				//_rotation.Z = 0;
+				//_rotation.W = 1;
+				mPivot.x = 0;
+				mPivot.y = 0;
+				mPivot.z = 0;
+	
+				mVelocity.x = xV;
+				mVelocity.y = yV;
+			#endif
+	
+		}
+
+		
         #region ResourceBase members
 
         /*/// <summary>
@@ -2992,13 +3017,20 @@ return (0,0);
         #region Disposable members
 #if USE_MEMORY_T
         public void Dispose()
-        { }
+        {
+		}
 
         public void DisposeManagedResources()
         {
-            // todo
-            //store.CheckIn();
-            //BoidSimulation.mCStoreCol.CheckIn<Transform_Struct>(typeof(Transform_Struct), mMemStore);
+            ComponentStore<Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
+			store.CheckIn(mMemStore_Transform);
+            //SpanIndex ;
+            Console.WriteLine ("DisposeManagedResources() - Checked In Transform_Struct");
+			
+			ComponentStore<Living_Entity> storeLE = EntryClass.mCStoreCol.CheckOut<Living_Entity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
+            storeLE.CheckIn(mMemStore_LivingEntity);
+            //SpanIndexLE ;
+			Console.WriteLine ("DisposeManagedResources() - Checked In Living_Entity struct");
         }
 #endif
 
@@ -3552,7 +3584,6 @@ return (0,0);
 //            this.BoundingBox.Max.x - this.BoundingBox.Min.x == 
 //            this.BoundingBox.Max.z - this.BoundingBox.Min.z);
 #endif
-
 	
 			// https://stackoverflow.com/questions/4324703/should-an-octree-be-rebuilt-every-frame
 
@@ -3597,7 +3628,6 @@ return (0,0);
             double octantRadius = this.MaxRadius;
             double childOctantRadius = octantRadius * 0.5d;
             
-			
             // if the entityRadius is greater than that of any child nodes, try adding it here
 			// or recurse UPWARDS (note: because we cull using loose bounding box, it is ok
 			// to add when it's radius is less than or equal to the octant's radius because that alone guarantees
@@ -3629,7 +3659,6 @@ return (0,0);
             // can't go further, add entitynode here
             if (this.Split() == false)
             {
-				//Console.WriteLine("OctreeOctant.Add() - SPLIT = FALSE");
                 this.AddEntityNodeToCollection(entityNode);
                 return;
             }
@@ -3650,7 +3679,7 @@ return (0,0);
 			//       need: if (code < MAX_)
 			//      int i = code;
 			//      // then leave the rest of the code the same... 
-			System.Diagnostics.Debug.Assert (code >= 0 && code <= MAX_CHILD_COUNT, "code out of range.")
+			System.Diagnostics.Debug.Assert (code >= 0 && code <= MAX_CHILD_COUNT, "code out of range.");
 				
             for (int i = 0; i < MAX_CHILD_COUNT; i++)
             {
@@ -3659,6 +3688,8 @@ return (0,0);
 	
                 if (code != i) continue;
 
+				// todo: add code to get a string value of the depth and octants within the octree that an EntityNode has been placed
+				//       so that we can do a DETERMINISM test.
                 Vector3d offset = OctreeOctant.BoundsOffsetTable[i] * octantRadius;
                 Vector3d center = octantCenter + offset;
 
@@ -3672,6 +3703,7 @@ return (0,0);
                 mChildOctants[i].Add(entityNode);
             }
             
+			// Remove nodes that already exist 
   			if (mEntityNodesCollection != null)
   			{
       			EntityNode[] toReAdd = mEntityNodesCollection.ToArray();
@@ -3691,9 +3723,7 @@ return (0,0);
             entityNode.SpatialNode = this;
             mEntityNodesCollection.Add(entityNode);
            
-           //Console.WriteLine(_depth.ToString());
-           // if (_depth > 7)
-            
+           //Console.WriteLine(_depth.ToString());           
            // Console.WriteLine("Added at Depth == " + _depth.ToString() +  "total ent count = " + mEntityNodesCollection.Count.ToString());
         }
 
@@ -3709,12 +3739,10 @@ return (0,0);
             entityNode.SpatialNode = null;
             OnEntityNode_Removed(entityNode);
         }
-        
-   
+           
 
         private bool Split()
-        {
-						
+        {	
             // cannot split because we're at max depth
             if (mEnforceMaxDepth && _depth == OctreeOctant.MaxDepth)
 			{
@@ -3725,32 +3753,23 @@ return (0,0);
             // we are already split
             if (this.mChildOctants != null)
             {
-               
                 return true;
             }
-
 		
 			if (this.mEntityNodesCollection != null)
 			{
+				// we only meed to split if splitThreshold reached (NOTE: if we made it here, mEnforceMaxDepth must be false)
+				// otherwise this represents deepest available octant on this branch
 				if (this.mEntityNodesCollection.Count >= OctreeOctant.SplitThreshHold)
 				{
-
-        // we only meed to split if splithreshold reached, otherwise this represents deepest available octant on this branch
-
 					// initialize the array but do not instance or assign an Octant
 					this.mChildOctants = new OctreeOctant[8];
 					
-					// se if we can move the existing Entities to one of these new octants which represents the deepest current octants on this branch
-//EntityNode[] toRemove = mEntityNodesCollection.ToArray();
-//mEntityNodesCollection =
-
-					//for (int i = 0; i < toRemove.Length; i++)
-					//Add(toRemove[i]);
-					
+					// NOTE: the existing Entities which must now be tested to see if they can fit in the deepest Octant
+					//       which may now be one of the mChildOctants we just instanced above, is done at the bottom of
+					//       private void Add(EntityNode node)
 					return true;
 				}
-			
-
         	}
 			return false;
 		}
@@ -3771,7 +3790,7 @@ return (0,0);
                 mParent.Move(this, entityNode); // calls on Parent
         }
 
-        private void Move(OctreeOctant childOctant, EntityNode entityNode)
+        private void Move(OctreeOctant previousOctant, EntityNode entityNode)
         {
             //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Move() - " + entityNode.Entity.TypeName);
             // NOTE: Here we clear the .SpatialNode first but we must not call OnEntityNode_Removed()
@@ -3801,7 +3820,7 @@ return (0,0);
 
             //System.Console.WriteLine("Moved to new octant");
             newOctant.Add(entityNode);// Add must always occur before Remove() because we dont want to collapse branches before we've had a chance to determine if the child will move there!
-            childOctant.OnEntityNode_Removed(entityNode);
+            previousOctant.OnEntityNode_Removed(entityNode);
         }
 
         public void OnEntityNode_Resized(EntityNode entityNode)
@@ -3825,7 +3844,6 @@ return (0,0);
             OctreeOctant newOctant = this;
             BoundingBox box = entityNode.BoundingBox;
 
-
             while (newOctant.Parent != null)
             {
                 if (newOctant.BoundingBox.Contains(box))
@@ -3842,12 +3860,10 @@ return (0,0);
             childOctant.OnEntityNode_Removed(entityNode);
         }
 
-
         internal void OnEntityNode_Removed(EntityNode entityNode)
         {
             // remove the entityNode
             if (mEntityNodesCollection == null) return;
-
             mEntityNodesCollection.Remove(entityNode);
 
             // can we collapse this octant?

@@ -1,7 +1,10 @@
 #define CACHE_VERTICES
 #define USE_STRUCT 		// instead of classes for Quaternion and Matrix
-#define USE_MEMORY_T  	// 500 FPS Memory<T>, 530 FPS Classes -> 2000 iterations @ 758 BOIDS  2800 FPS for Parallel.For with Memory<T> HOWEVER, need to re-enable Octree OnEntityMove()
-//#define SPATIAL_SEARCH
+#define USE_MEMORY_T  	// 500 FPS Memory<T>, 530 FPS Classes -> 2000 iterations @ 758 BOIDS  2800 FPS for Parallel.For with Memory<T> 
+                        // HOWEVER, this is with OctreeOcant.OnEntityMove() not being called during the parallel loop.
+						// once we added a lock() to the re-entrant OctreeOcant.Add() and OctreeOctant.OnEntityMove(), the FPS 
+						// went down to 465 FPS from 2800 FPS.  The "OnEntityMoved()" needs to be made much faster.
+#define SPATIAL_SEARCH
 //#define DEBUG_OUTPUT
 
 using System.Runtime.CompilerServices; // needed for using "[MethodImpl(MethodImplOptions.AggressiveInlining)]"
@@ -83,7 +86,39 @@ using System.Linq;
 
 
 // TODO: 
-// 1 - multi-thread octree... perhaps cache all Add() and then Execute() at the end of the loop
+// 1 - multi-thread octree... perhaps cache all Add() and Move() and then Execute() at the end of the loop?
+//     -  tasks or threadpool is probably the way to go
+//     -  Add() should only be single threaded... but needs lock() because its multi-entrant.
+//     - Queries can be multithreaded because many branches of the same depth can be visible at once.
+//     - INCONSISTANT CRASH OCCURS 
+			/* Unhandled exception. System.AggregateException: One or more errors occurred. (Object reference not set to an instance of an object.)
+			 ---> System.NullReferenceException: Object reference not set to an instance of an object.
+			   at HelloBoids.BoidSimulation.<>c__DisplayClass28_0.<DoFlocking>b__0(Int32 i)
+			   at System.Threading.Tasks.Parallel.<>c__DisplayClass19_0`2.<ForWorker>b__1(RangeWorker& currentWorker, Int64 timeout, Boolean& replicationDelegateYieldedBeforeCompletion)
+			--- End of stack trace from previous location ---
+			   at System.Threading.Tasks.Parallel.<>c__DisplayClass19_0`2.<ForWorker>b__1(RangeWorker& currentWorker, Int64 timeout, Boolean& replicationDelegateYieldedBeforeCompletion)
+			   at System.Threading.Tasks.TaskReplicator.Replica.Execute()
+			   --- End of inner exception stack trace ---
+			   at System.Threading.Tasks.TaskReplicator.Run[TState](ReplicatableUserAction`1 action, ParallelOptions options, Boolean stopOnFirstFailure)
+			   at System.Threading.Tasks.Parallel.ForWorker[TLocal,TInt](TInt fromInclusive, TInt toExclusive, ParallelOptions parallelOptions, Action`1 body, Action`2 bodyWithState, Func`4 bodyWithLocal, Func`1 localInit, Action`1 localFinally)
+			--- End of stack trace from previous location ---
+			   at System.Threading.Tasks.Parallel.ForWorker[TLocal,TInt](TInt fromInclusive, TInt toExclusive, ParallelOptions parallelOptions, Action`1 body, Action`2 bodyWithState, Func`4 bodyWithLocal, Func`1 localInit, Action`1 localFinally)
+			   at System.Threading.Tasks.Parallel.For(Int32 fromInclusive, Int32 toExclusive, Action`1 body)
+			   at HelloBoids.BoidSimulation.DoFlocking(ComponentStore`1 store, Object[] parameters, Int32 seed, GameTime gt)
+			   at HelloBoids.DataProcessorsStore.Update(GameTime gt, EntityNode[] entities)
+			   at HelloBoids.BoidSimulation.Update(GameTime gt)
+			   at HelloBoids.EntryClass.Update(GameTime gt)
+			   at HelloBoids.EntryClass.GameLoop()
+			   at System.Threading.Thread.StartCallback()
+			Command terminated by signal 6
+			Last Run:	6:20:36 pm
+			Compile:	0.104s
+			Execute:	0.2s
+			Memory:	13.47Mb
+			CPU:	0.304s
+			*/
+
+
 // 2 - Test determinism of spawning with a parallel.For() loop and using the ThreadedRandom.cs
 // 3 - Instead of just one buffer accessed through ComponentStore<>.Span, create two buffers 
 //     ComponentStore.ReadOnlySpan  and ComponentStore.WriteOnlySpan, ComponentStore.SwapBuffers()
@@ -280,7 +315,8 @@ namespace HelloBoids
             Console.WriteLine("Performance Test #1 STARTED in Game thread.");
             Console.WriteLine("");
 
-            // The main thread waits for user input to stop the application
+			// This main thread waits for user input to stop the application OR for the gameLoop
+			// to finish
             while (mIsRunning)
             {
                 if (Console.ReadKey(true).Key == ConsoleKey.Q)
@@ -296,12 +332,12 @@ namespace HelloBoids
             // Ensure the game thread has time to stop gracefully (optional for background threads)
             gameThread.Join();
 
-            Console.WriteLine("Game Thread #1 COMPLETED.");
+            Console.WriteLine("Game Loop #1 COMPLETED.");
             
             
             ///////////////////////////////////////////////////////////////////////////////////////////////
 
-            // LOOP USING MEMORY<T>
+            // Reset Variables and Prepare to start GameLoop again for Test #2
             mCurrentFrame = 0;
             mTotalRuntime = 0;
             mIsRunning = true;
@@ -317,7 +353,8 @@ namespace HelloBoids
             Console.WriteLine("Performance Test #2 STARTED in Game thread.");
             Console.WriteLine("");
 
-            // The main thread waits for user input to stop the application
+            // This main thread waits for user input to stop the application OR for the gameLoop
+			// to finish
             while (mIsRunning)
             {
                 if (Console.ReadKey(true).Key == ConsoleKey.Q)
@@ -332,7 +369,7 @@ namespace HelloBoids
 
             gameThread.Join();
 
-            Console.WriteLine("Game Thread #2 COMPLETED.");
+            Console.WriteLine("Game Loop #2 COMPLETED.");
             output = "Goodbye Boids! - " + Utils.GetTimeString();
             Console.WriteLine(output);
         }
@@ -650,6 +687,8 @@ namespace HelloBoids
 			double elapsedSeconds = gt.ElapsedSeconds; 
             mIntervalTimers.Update(elapsedSeconds);
 
+			// TODO: I should probably just add a setting for whether we are doing CLASSES or MEMORYT so that
+			//       we can run both Tests in one run.
 #if USE_MEMORY_T == false
             // TEST CLASSES (Object Oriented Technique)
             // =====================
@@ -790,7 +829,7 @@ namespace HelloBoids
 					Boids[i].Translation += Boids[i].Velocity;
 					
 					// TODO: uncomment... currently Octree is NOT THREAD SAFE
-		//			Boids[i].SpatialNode.OnEntityNode_Moved(Boids[i]);
+					Boids[i].SpatialNode.OnEntityNode_Moved(Boids[i]);
 
 			#if DEBUG_OUTPUT
 					const string SEPERATOR = "|";
@@ -920,12 +959,18 @@ namespace HelloBoids
 			System.Threading.Tasks.Parallel.For(0, length, i =>
 			//for (int i = 0; i < memSpan.Length; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
             {
-				Stack<OctreeOctant> stack = new Stack<OctreeOctant>(32);
-            	List<int> neighbors = new List<int>(8);
-
 				// NOTE: inside of the Parallel.For(), Span<T> cannot be passed in
 				//      because the code inside the Paralle.For() is treated as a Lambda
 				Span<Transform.Transform_Struct> memSpan = store.Span;
+				List<int> neighbors = new List<int>(8);
+		#if SPATIAL_SEARCH == false
+				neighbors = GetNeighbors(Boids[i], largestDistance, largestDistanceSquared);
+		#endif
+			
+		#if SPATIAL_SEARCH
+				Stack<OctreeOctant> stack = new Stack<OctreeOctant>(32);
+            	
+				
 				
 				// INLINING of "GetNeighbors" in order to avoid have to load the memSpan onto the stack for each iteration
 				EntityNode currentBoid = Boids[(int)i];
@@ -1029,12 +1074,14 @@ namespace HelloBoids
 						} // end if currentOctant intersects searchArea test
 					} // end While loop
 				} // end Using (GetNeighbors)
-
+		#endif // SPATIAL_SEARCH
+				
                 int nCount = 0;
+				
                 if (neighbors != null)
                     nCount = neighbors.Count;
 
-				// if (i < 8)
+				 //if (i == 8)
 				//	Console.WriteLine("DoFlocking() - #954 - Neighbor Count = " + nCount.ToString());
 				
 				
@@ -1154,13 +1201,15 @@ namespace HelloBoids
 
 //              // making this thread safe is going to be a problem if we also want to maintain performance
 				// i could maybe only add locks to depth = 1 and not any further.
-//				currentBoid.SpatialNode.OnEntityNode_Moved(currentBoid);
+				currentBoid.SpatialNode.OnEntityNode_Moved(currentBoid);
 
 			
                 // Apply boundary rules (wrap around)
                 // (You'd need to define boundary dimensions here)
                 // If X > maxX, X = minX, etc.
 			
+				//if (i == 8)
+				//	Console.WriteLine("DoFlocking() - #954 - " + i.ToString());
 				//Console.WriteLine(i.ToString());
 			}); // end parallel.for
 			
@@ -3426,14 +3475,16 @@ return (0,0);
         #endregion
         private bool mEnforceMaxDepth = false;
         private int _depth;
-        private double octantRadius;
-        private int _index;   // index is specific to each depth and contains x,y,z offset at that depth and is useful for finding neighbors (which we may never do and just always move EntityNodes by re-inserting starting at root)
+        private double mOctantRadius;
+        private int mIndex;   // index is specific to each depth and contains x,y,z offset at that depth and is useful for finding neighbors (which we may never do and just always move EntityNodes by re-inserting starting at root)
         private const int MAX_CHILD_COUNT = 8;
 
         private BoundingBox mBox;
         private OctreeOctant mParent;
         private OctreeOctant[] mChildOctants;
 
+		private object mAddLock;
+		
         // TODO: switch to linked list?
         private List<EntityNode> mEntityNodesCollection;
 
@@ -3441,17 +3492,19 @@ return (0,0);
         public OctreeOctant(int index, int depth, BoundingBox box, OctreeOctant parent)
             : this()
         {
-            _index = index;
+            mIndex = index;
             _depth = depth;
             mBox = box;
             mParent = parent;
             
-            octantRadius = this.BoundingBox.Max.x - this.BoundingBox.Min.x;
-            octantRadius = Math.Min(this.BoundingBox.Max.y - this.BoundingBox.Min.y, octantRadius);
-			octantRadius = Math.Min(this.BoundingBox.Max.z - this.BoundingBox.Min.z, octantRadius);
-			octantRadius *= 0.5d;
+            mOctantRadius = this.BoundingBox.Max.x - this.BoundingBox.Min.x;
+            mOctantRadius = Math.Min(this.BoundingBox.Max.y - this.BoundingBox.Min.y, mOctantRadius);
+			mOctantRadius = Math.Min(this.BoundingBox.Max.z - this.BoundingBox.Min.z, mOctantRadius);
+			mOctantRadius *= 0.5d;
 
-            //System.Diagnostics.Debug.WriteLine("OctreeOctant() -- Created at index " + index.ToString());
+			mAddLock =  new object();
+				
+            System.Diagnostics.Debug.WriteLine("OctreeOctant.ctor() -- Created at index " + index.ToString());
         }
 
         public OctreeOctant()
@@ -3478,11 +3531,60 @@ return (0,0);
 
         public bool IsLeaf { get { return mChildOctants == null; } }
 
-        public int Index
+		internal Vector3d Radius
         {
-            get { return _index; }
+            get
+            {
+                Vector3d radius;
+                radius.x = mBox.Width * 0.5d;
+                radius.y = mBox.Height * 0.5d;
+                radius.z = mBox.Depth * 0.5d;
+                return radius;
+            }
         }
 
+        internal int Depth
+        {
+            get { return _depth; }
+        }
+        
+        public double MaxRadius
+        {
+            get 
+            { 
+                
+                return mOctantRadius;
+            }
+        }
+
+        public int Index
+        {
+            get { return mIndex; }
+        }
+
+		public string Address 
+		{
+			get 
+			{
+				const string SEPERATOR = ",";
+				string result = this.mIndex.ToString();
+				OctreeOctant parent = mParent;
+				
+				while (mParent != null)
+				{
+					result = mParent.mIndex + SEPERATOR + result;
+					mParent = mParent.mParent;
+				}
+				
+				return result;
+			}
+		}
+		
+        public OctreeOctant[] Children
+        {
+            get { return mChildOctants; }
+        }
+		
 		/*
         internal int[] LocalIndexToVector(int index)
         {
@@ -3515,37 +3617,6 @@ return (0,0);
         }
 		*/
 
-        internal Vector3d Radius
-        {
-            get
-            {
-
-                Vector3d radius;
-                radius.x = mBox.Width * 0.5d;
-                radius.y = mBox.Height * 0.5d;
-                radius.z = mBox.Depth * 0.5d;
-                return radius;
-            }
-        }
-
-        internal int Depth
-        {
-            get { return _depth; }
-        }
-        
-        public double MaxRadius
-        {
-            get 
-            { 
-                
-                return octantRadius;
-            }
-        }
-
-        public OctreeOctant[] Children
-        {
-            get { return mChildOctants; }
-        }
 
         #region ISpatialNode
         public bool Visible { get; set; }
@@ -3561,158 +3632,164 @@ return (0,0);
 
         public void Add(EntityNode entityNode, bool forceRoot = false)
         {
-            if (forceRoot)
-            {
-                this.AddEntityNodeToCollection((EntityNode)entityNode);
-                //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - "  + entityNode.Entity.TypeName + " Forced into Root");
-            }
-            else
-            {
-                this.Add(entityNode);
-                //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName);
-            }
+			lock(mAddLock)
+			{
+				if (forceRoot)
+				{
+					this.AddEntityNodeToCollection((EntityNode)entityNode);
+					//System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName + " at Address " + this.Address + " Forced into Root");
+				}
+				else
+				{
+					// TODO: we might have optional param to EnQueue this Add() rather than try to Add it immediately
+					this.Add(entityNode);
+				}
+			}
         }
 
         private void Add(EntityNode entityNode)
         {
-            System.Diagnostics.Debug.Assert(this.BoundingBox != null, "OctreeOctant.Add() - BoundingBox is null.");
-#if DEBUG
-            // only support square octree octants for performance
-//            // TODO: we are going to see if this "performance" concern is no longer valid.  non square octrees are useful 
-//            System.Diagnostics.Debug.Assert(this.BoundingBox.Max.x - this.BoundingBox.Min.x ==
-//                this.BoundingBox.Max.y - this.BoundingBox.Min.y &&
-//            this.BoundingBox.Max.x - this.BoundingBox.Min.x == 
-//            this.BoundingBox.Max.z - this.BoundingBox.Min.z);
-#endif
-	
-			// https://stackoverflow.com/questions/4324703/should-an-octree-be-rebuilt-every-frame
+			lock(mAddLock)
+			{
+				System.Diagnostics.Debug.Assert(this.BoundingBox != null, "OctreeOctant.Add() - BoundingBox is null.");
+	#if DEBUG
+				// only support square octree octants for performance
+	//            // TODO: we are going to see if this "performance" concern is no longer valid.  non square octrees are useful 
+	//            System.Diagnostics.Debug.Assert(this.BoundingBox.Max.x - this.BoundingBox.Min.x ==
+	//                this.BoundingBox.Max.y - this.BoundingBox.Min.y &&
+	//            this.BoundingBox.Max.x - this.BoundingBox.Min.x == 
+	//            this.BoundingBox.Max.z - this.BoundingBox.Min.z);
+	#endif
 
-			// https://www.gamedev.net/articles/programming/general-and-gameplay-programming/introduction-to-octrees-r3529/
-			//     1 - this one from gamedev.net has a good idea of creating a list of Entities (objects) that are to be added
-			//       to or moved within, the Octree during a particular frame, and then to update them all at once after 
-			//       this list of Entities/Objects to add/move is completed.
-			//     2 - it also  has an idea for using a lifespan test to see if an empty octant should be deleted rather than
-			//         to delete it immediately upon becoming empty of any EntityNodes/Objects.  This way if say a stream\burst
-			//         of bullets are moving in the same direction, one bullet will leave an octant, but closely followed by another which may soon need
-			//         the octant previously occupied by the earlier bullet.
-			//			a) the code can also be found here -> https://www.wobblyduckstudios.com/Octrees.php
-			//				- https://www.wobblyduckstudios.com/Code/OctTree.cs
-			//              - https://www.wobblyduckstudios.com/Code/IntersectionRecord.cs
-			//				- https://www.wobblyduckstudios.com/Code/Physical.cs    <-- sort of an Entity class with Physics properties like acceleration, max acceleration, velocity, etc
-			// 
-			//
-            // TODO: // TODO: https://daeken.dev/a-stupidly-simple-fast-octree-traversal-for-ray-intersection
+				// https://stackoverflow.com/questions/4324703/should-an-octree-be-rebuilt-every-frame
 
-            int count = 0;
+				// https://www.gamedev.net/articles/programming/general-and-gameplay-programming/introduction-to-octrees-r3529/
+				//     1 - this one from gamedev.net has a good idea of creating a list of Entities (objects) that are to be added
+				//       to or moved within, the Octree during a particular frame, and then to update them all at once after 
+				//       this list of Entities/Objects to add/move is completed.
+				//     2 - it also  has an idea for using a lifespan test to see if an empty octant should be deleted rather than
+				//         to delete it immediately upon becoming empty of any EntityNodes/Objects.  This way if say a stream\burst
+				//         of bullets are moving in the same direction, one bullet will leave an octant, but closely followed by another which may soon need
+				//         the octant previously occupied by the earlier bullet.
+				//			a) the code can also be found here -> https://www.wobblyduckstudios.com/Octrees.php
+				//				- https://www.wobblyduckstudios.com/Code/OctTree.cs
+				//              - https://www.wobblyduckstudios.com/Code/IntersectionRecord.cs
+				//				- https://www.wobblyduckstudios.com/Code/Physical.cs    <-- sort of an Entity class with Physics properties like acceleration, max acceleration, velocity, etc
+				// 
+				//
+				// TODO: // TODO: https://daeken.dev/a-stupidly-simple-fast-octree-traversal-for-ray-intersection
 
-            if (mEntityNodesCollection != null)
-                count = mEntityNodesCollection.Count;
+				int count = 0;
 
-            //    NOTE: We specifically use ">=" for the depth comparison so that we
-            //          can set the maximumDepth depth to 0 if we want a tree with
-            //          no depth.
-            if (mEnforceMaxDepth && _depth >= OctreeOctant.MaxDepth)
-            {
-				//Console.WriteLine("OctreeOctant.Add() - AddEntityNodeToCollection");
-                // add to this octant immmediately
-                // Non Recursive Add
-                this.AddEntityNodeToCollection((EntityNode)entityNode);
-                //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName);
-                return;
-            }
+				if (mEntityNodesCollection != null)
+					count = mEntityNodesCollection.Count;
 
-			double entityRadius = entityNode.BoundingBox.Radius;
-			
-            // note: we intentionally compute a radius without taking into account hypotenuse.
-            // note: if allowiing non square octants, we take the smallest octant radius and we'll compare that against largest radius of entity being inserted
-            double octantRadius = this.MaxRadius;
-            double childOctantRadius = octantRadius * 0.5d;
-            
-            // if the entityRadius is greater than that of any child nodes, try adding it here
-			// or recurse UPWARDS (note: because we cull using loose bounding box, it is ok
-			// to add when it's radius is less than or equal to the octant's radius because that alone guarantees
-			// entire entity's box will fit within loose bounds which is used during culling
-            if (entityRadius > childOctantRadius)
-            {
-				//Console.WriteLine("OctreeOctant.Add() - insert testing at depth " + _depth.ToString());
-                // this entity won't fit in any children of this octant 
-                // so what about the parent octant?
-                if (entityRadius > octantRadius)
-                {
-                    // wont fit, can we try to move up to a parent?
-                    if (this.IsRoot == false)
-                    {
-                        // Recurse UPWARDS
-						//Console.WriteLine("OctreeOctant.Add() - insert UPWARDs");
-                        mParent.Add(entityNode);
-                        return;
-                    }
-                }
-                // Non Recursive Add because we're still here, 
-                // so it either fits or we're at root and there's
-                // no other place to put it
-                this.AddEntityNodeToCollection(entityNode);
-                //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName);
-                return;
-            }
+				//    NOTE: We specifically use ">=" for the depth comparison so that we
+				//          can set the maximumDepth depth to 0 if we want a tree with
+				//          no depth.
+				if (mEnforceMaxDepth && _depth >= OctreeOctant.MaxDepth)
+				{
+					// add to this octant immmediately Non Recursively
+					this.AddEntityNodeToCollection((EntityNode)entityNode);
+					return;
+				}
 
-            // can't go further, add entitynode here
-            if (this.Split() == false)
-            {
-                this.AddEntityNodeToCollection(entityNode);
-                return;
-            }
+				double entityRadius = entityNode.BoundingBox.Radius;
 
-            Vector3d octantCenter = this.BoundingBox.Center;
-            Vector3d entityCenter = entityNode.BoundingBox.Center; // TODO: is the entityNode box initialized at this point?
-            int code = 0;
-            if (entityCenter.x > octantCenter.x)
-                code |= 1;
-            if (entityCenter.y > octantCenter.y)
-                code |= 2;
-			
-			// TODO: if this is a 2D Octree which should just use a quadtree of course... then we should skip the following entityCenter.z test
-            if (entityCenter.z >= octantCenter.z)
-                code |= 4;
+				// note: we intentionally compute a radius without taking into account hypotenuse.
+				// note: if allowiing non square octants, we take the smallest octant radius and we'll compare that against largest radius of entity being inserted
+				double octantRadius = this.MaxRadius;
+				double childOctantRadius = octantRadius * 0.5d;
 
-			// TODO: surely a FOR LOOP here is not needed?  We just
-			//       need: if (code < MAX_)
-			//      int i = code;
-			//      // then leave the rest of the code the same... 
-			System.Diagnostics.Debug.Assert (code >= 0 && code <= MAX_CHILD_COUNT, "code out of range.");
-				
-            for (int i = 0; i < MAX_CHILD_COUNT; i++)
-            {
-                // the bitflag combination created above MUST ALWAYS evaluate to
-				// values of 0 thru 7 which represents the 8 octants
-	
-                if (code != i) continue;
+				// if the entityRadius is greater than that of any child nodes, try adding it here
+				// or recurse UPWARDS (note: because we cull using loose bounding box, it is ok
+				// to add when it's radius is less than or equal to the octant's radius because that alone guarantees
+				// entire entity's box will fit within loose bounds which is used during culling
+				if (entityRadius > childOctantRadius)
+				{
+					//Console.WriteLine("OctreeOctant.Add() - insert testing at depth " + _depth.ToString());
+					// this entity won't fit in any children of this octant 
+					// so what about the parent octant?
+					if (entityRadius > octantRadius)
+					{
+						// wont fit, can we try to move up to a parent?
+						if (this.IsRoot == false)
+						{
+							// Recurse UPWARDS
+							//Console.WriteLine("OctreeOctant.Add() - insert UPWARDs");
+							mParent.Add(entityNode);
+							return;
+						}
+					}
+					// Non Recursive Add because we're still here, 
+					// so it either fits or we're at root and there's
+					// no other place to put it
+					this.AddEntityNodeToCollection(entityNode);
+					return;
+				}
 
-				// todo: add code to get a string value of the depth and octants within the octree that an EntityNode has been placed
-				//       so that we can do a DETERMINISM test.
-                Vector3d offset = OctreeOctant.BoundsOffsetTable[i] * octantRadius;
-                Vector3d center = octantCenter + offset;
+				// can't go further, add entitynode here
+				if (this.Split() == false)
+				{
+					this.AddEntityNodeToCollection(entityNode);
+					return;
+				}
 
-                BoundingBox childOctantBox = new BoundingBox(center, (float)childOctantRadius);
+				Vector3d octantCenter = this.BoundingBox.Center;
+				Vector3d entityCenter = entityNode.BoundingBox.Center; // TODO: is the entityNode box initialized at this point?
+				int code = 0;
+				if (entityCenter.x > octantCenter.x)
+					code |= 1;
+				if (entityCenter.y > octantCenter.y)
+					code |= 2;
 
-                if (mChildOctants[i] == null)
-                    mChildOctants[i] =
-                        new OctreeOctant(0, _depth + 1, childOctantBox, this);
+				// TODO: if this is a 2D Octree which should just use a quadtree of course... then we should skip the following entityCenter.z test
+				if (entityCenter.z >= octantCenter.z)
+					code |= 4;
 
-                // Recursive Add() until max depth is reached or the entity's radius > octant's loose radius
-                mChildOctants[i].Add(entityNode);
-            }
-            
-			// Remove nodes that already exist 
-  			if (mEntityNodesCollection != null)
-  			{
-      			EntityNode[] toReAdd = mEntityNodesCollection.ToArray();
-      			mEntityNodesCollection = null;
-  				for (int i = 0; i < toReAdd.Length; i++)
-            	{
-                 	Add(toReAdd[i]);
-            	}
-       		}
+				// TODO: surely a FOR LOOP here is not needed?  We just
+				//       need: if (code < MAX_)
+				//      int i = code;
+				//      // then leave the rest of the code the same... 
+				System.Diagnostics.Debug.Assert (code >= 0 && code <= MAX_CHILD_COUNT, "code out of range.");
+
+				int testIndex = -1;
+				for (int i = 0; i < MAX_CHILD_COUNT; i++)
+				{
+					// the bitflag combination created above MUST ALWAYS evaluate to
+					// values of 0 thru 7 which represents the 8 octants
+
+					if (code != i) continue;
+					if (testIndex == -1) 
+						testIndex = i;
+					else 
+						Console.WriteLine("UNEXPECTED OCTANT INDEX.................................");
+					// todo: add code to get a string value of the depth and octants within the octree that an EntityNode has been placed
+					//       so that we can do a DETERMINISM test.
+					Vector3d offset = OctreeOctant.BoundsOffsetTable[i] * octantRadius;
+					Vector3d center = octantCenter + offset;
+
+					BoundingBox childOctantBox = new BoundingBox(center, (float)childOctantRadius);
+
+					if (mChildOctants[i] == null)
+						mChildOctants[i] =
+							new OctreeOctant(i, _depth + 1, childOctantBox, this);
+
+					// Recursive Add() until max depth is reached or the entity's radius > octant's loose radius
+					mChildOctants[i].Add(entityNode);
+				}
+
+				// Remove nodes that already exist 
+				if (mEntityNodesCollection != null)
+				{
+					EntityNode[] toReAdd = mEntityNodesCollection.ToArray();
+					mEntityNodesCollection = null;
+					for (int i = 0; i < toReAdd.Length; i++)
+					{
+						Add(toReAdd[i]);
+					}
+				}
+			}
    		}
 
 		private void AddEntityNodeToCollection(EntityNode entityNode)
@@ -3776,52 +3853,61 @@ return (0,0);
 
         public void OnEntityNode_Moved(EntityNode entityNode)
         {
-            // is the entity still in this bounds?
-            // we dont have to test the radius of the entityNode because
-            // we already know it fits.
-            //    System.Console.WriteLine("m");
-            if (mBox.Contains(entityNode.BoundingBox.Center)) return;
+			lock(mAddLock)
+			{
+				// is the entity still in this bounds?
+				// we dont have to test the radius of the entityNode because
+				// we already know it fits.
+				//    System.Console.WriteLine("m");
+				if (mBox.Contains(entityNode.BoundingBox.Center)) return;
 
-            // inform the parent that the entity in this octant no longer fits
-            // NOTE: we do not add/remove the entityNode here.  The parent must do it
-            // so that we don't trigger collapse of all 8 of it's children before parent can 
-            // have a chance to fit it into one of its other 7 children
-            if (this.IsRoot == false)
-                mParent.Move(this, entityNode); // calls on Parent
+				// inform the parent that the entity in this octant no longer fits
+				// NOTE: we do not add/remove the entityNode here.  The parent must do it
+				// so that we don't trigger collapse of all 8 of it's children before parent can 
+				// have a chance to fit it into one of its other 7 children
+				if (this.IsRoot == false)
+					mParent.Move(this, entityNode); // calls on Parent
+			}
         }
 
         private void Move(OctreeOctant previousOctant, EntityNode entityNode)
         {
-            //System.Diagnostics.Debug.WriteLine ("OctreeOctant.Move() - " + entityNode.Entity.TypeName);
-            // NOTE: Here we clear the .SpatialNode first but we must not call OnEntityNode_Removed()
-            //       until AFTER .Add() is called.
-            entityNode.SpatialNode = null;
 
-            // we cannot simply attempt to add to this parent because
-            // if the entityNode has moved beyond this parent's own bounds
-            // our fast Add() (which avoids having to do a Box.Contains() call 
-            // will not be able to determine this and will simply force insert
-            // the entityNode into itself.
+			//System.Diagnostics.Debug.WriteLine ("OctreeOctant.Move() - " + entityNode.Entity.TypeName);
+			// NOTE: Here we clear the .SpatialNode first but we must not call OnEntityNode_Removed()
+			//       until AFTER .Add() is called.
+			entityNode.SpatialNode = null;
 
-            // so we can easily avoid that by recursing til we find the first parent
-            // that contains the entityNode.. and provided the entityNode has not changed size
-            // (particularly has not gotten larger) we are guaranteed that the parent octant
-            // is large enought to contain it if the entityNode's center is with in it.
+			// we cannot simply attempt to add to this parent because
+			// if the entityNode has moved beyond this parent's own bounds
+			// our fast Add() (which avoids having to do a Box.Contains() call 
+			// will not be able to determine this and will simply force insert
+			// the entityNode into itself.
 
-            OctreeOctant newOctant = this;
-            Vector3d entityCenter = entityNode.BoundingBox.Center;
-            while (newOctant.Parent != null)
-            {
-                if (newOctant.BoundingBox.Contains(entityCenter))
-                    break;
+			// so we can easily avoid that by recursing til we find the first parent
+			// that contains the entityNode.. and provided the entityNode has not changed size
+			// (particularly has not gotten larger) we are guaranteed that the parent octant
+			// is large enought to contain it if the entityNode's center is with in it.
 
-                newOctant = newOctant.Parent;
-            }
+			// 
+			OctreeOctant newOctant = previousOctant;
+			if (previousOctant.mParent != null)
+				newOctant = previousOctant.mParent;
+			
+			Vector3d entityCenter = entityNode.BoundingBox.Center;
+			while (newOctant.Parent != null)
+			{
+				if (newOctant.BoundingBox.Contains(entityCenter))
+					break;
 
-            //System.Console.WriteLine("Moved to new octant");
-            newOctant.Add(entityNode);// Add must always occur before Remove() because we dont want to collapse branches before we've had a chance to determine if the child will move there!
-            previousOctant.OnEntityNode_Removed(entityNode);
-        }
+				newOctant = newOctant.Parent;
+			}
+
+			//System.Console.WriteLine("OctreeOctant.Move() - Entity '" + entityNode.Index.ToString() + "' at OctreeOcant " + previousOctant.Address + " Moved to new octant");
+			newOctant.Add(entityNode);// Add must always occur before Remove() because we dont want to collapse branches before we've had a chance to determine if the child will move there!
+			previousOctant.OnEntityNode_Removed(entityNode);
+
+		}
 
         public void OnEntityNode_Resized(EntityNode entityNode)
         {

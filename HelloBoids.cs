@@ -1,10 +1,14 @@
+#define DEBUG
 #define CACHE_VERTICES
 #define USE_STRUCT 		// instead of classes for Quaternion and Matrix
 #define USE_MEMORY_T  	// 500 FPS Memory<T>, 530 FPS Classes -> 2000 iterations @ 758 BOIDS  2800 FPS for Parallel.For with Memory<T> 
                         // HOWEVER, this is with OctreeOcant.OnEntityMove() not being called during the parallel loop.
-						// once we added a lock() to the re-entrant OctreeOcant.Add() and OctreeOctant.OnEntityMove(), the FPS 
+						// once we added a lock() or semaphore to the re-entrant OctreeOcant.Add() and OctreeOctant.OnEntityMove(), the FPS 
 						// went down to 465 FPS from 2800 FPS.  The "OnEntityMoved()" needs to be made much faster.
-#define SPATIAL_SEARCH
+						
+#define SPATIAL_SEARCH       // this define enables adding to Octree
+#define SPATIAL_MOVE_UPDATES // this define enables update of the Octree as moving of Entities occurs
+
 //#define DEBUG_OUTPUT
 
 using System.Runtime.CompilerServices; // needed for using "[MethodImpl(MethodImplOptions.AggressiveInlining)]"
@@ -84,53 +88,50 @@ using System.Linq;
             //        - seeds and determinism and such
 
 
-
-// TODO: 
-// 1 - multi-thread octree... perhaps cache all Add() and Move() and then Execute() at the end of the loop?
-//     -  tasks or threadpool is probably the way to go
-//     -  Add() should only be single threaded... but needs lock() because its multi-entrant.
-//     - Queries can be multithreaded because many branches of the same depth can be visible at once.
-//     - INCONSISTANT CRASH OCCURS 
-			/* Unhandled exception. System.AggregateException: One or more errors occurred. (Object reference not set to an instance of an object.)
-			 ---> System.NullReferenceException: Object reference not set to an instance of an object.
-			   at HelloBoids.BoidSimulation.<>c__DisplayClass28_0.<DoFlocking>b__0(Int32 i)
-			   at System.Threading.Tasks.Parallel.<>c__DisplayClass19_0`2.<ForWorker>b__1(RangeWorker& currentWorker, Int64 timeout, Boolean& replicationDelegateYieldedBeforeCompletion)
-			--- End of stack trace from previous location ---
-			   at System.Threading.Tasks.Parallel.<>c__DisplayClass19_0`2.<ForWorker>b__1(RangeWorker& currentWorker, Int64 timeout, Boolean& replicationDelegateYieldedBeforeCompletion)
-			   at System.Threading.Tasks.TaskReplicator.Replica.Execute()
-			   --- End of inner exception stack trace ---
-			   at System.Threading.Tasks.TaskReplicator.Run[TState](ReplicatableUserAction`1 action, ParallelOptions options, Boolean stopOnFirstFailure)
-			   at System.Threading.Tasks.Parallel.ForWorker[TLocal,TInt](TInt fromInclusive, TInt toExclusive, ParallelOptions parallelOptions, Action`1 body, Action`2 bodyWithState, Func`4 bodyWithLocal, Func`1 localInit, Action`1 localFinally)
-			--- End of stack trace from previous location ---
-			   at System.Threading.Tasks.Parallel.ForWorker[TLocal,TInt](TInt fromInclusive, TInt toExclusive, ParallelOptions parallelOptions, Action`1 body, Action`2 bodyWithState, Func`4 bodyWithLocal, Func`1 localInit, Action`1 localFinally)
-			   at System.Threading.Tasks.Parallel.For(Int32 fromInclusive, Int32 toExclusive, Action`1 body)
-			   at HelloBoids.BoidSimulation.DoFlocking(ComponentStore`1 store, Object[] parameters, Int32 seed, GameTime gt)
-			   at HelloBoids.DataProcessorsStore.Update(GameTime gt, EntityNode[] entities)
-			   at HelloBoids.BoidSimulation.Update(GameTime gt)
-			   at HelloBoids.EntryClass.Update(GameTime gt)
-			   at HelloBoids.EntryClass.GameLoop()
-			   at System.Threading.Thread.StartCallback()
-			Command terminated by signal 6
-			Last Run:	6:20:36 pm
-			Compile:	0.104s
-			Execute:	0.2s
-			Memory:	13.47Mb
-			CPU:	0.304s
-			*/
-
-
 // 2 - Test determinism of spawning with a parallel.For() loop and using the ThreadedRandom.cs
+
 // 3 - Instead of just one buffer accessed through ComponentStore<>.Span, create two buffers 
 //     ComponentStore.ReadOnlySpan  and ComponentStore.WriteOnlySpan, ComponentStore.SwapBuffers()
 //     for double buffering.  This means we can multithread the updates and not worry about the state
 //     of each EntityNode changing until all parallel threads are complete and then we can SwapBuffers.
-// 4 - Replay system with single step FWD and REVS functions
-// 5 - procedural generation of a Colony : IEntitySystem -> both proc generation with seeds/THreaded<Random> and updates
-// 6 - SIMD code
-// 7 - Added destructor to Transform.cs for freeing up the memory of Memory<T>... i think this still needs work to keep the Memory<T> blocks packed correctly.
-// 
-// 
 
+// 4 - Replay system with single step FWD and REVS functions
+
+// 5 - procedural generation of a Colony : IEntitySystem -> both proc generation with seeds/THreaded<Random> and updates
+
+// 6 - Status Effect System - for both attributes (eg +2 morale to subordinates), spells, weapon uses (eg lasers), and items
+//     For KeystoneGameBlocks, the idea is to keep the code modified in the same way as our DataProcessor system.
+//
+//     https://www.gamedev.net/forums/topic/692150-status-effects-buffs-debuffs-in-an-ecs-architecture/
+//     https://www.gamedev.net/forums/topic/719143-stucked-on-creating-statuseffects/
+//
+//     https://www.reddit.com/r/gamedev/comments/50rrcs/code_design_for_an_ability_status_effect_system/
+//     https://github.com/Improx/ModifiedValues
+//     https://stackoverflow.com/questions/2197966/designing-a-clean-flexible-way-for-a-character-to-cast-different-spells-in-a-r
+//     https://gamedev.stackexchange.com/questions/147873/creating-a-robust-item-system
+//     https://medium.com/@kryzarel/character-stats-attributes-in-unity-pt-1-70f90ade9788
+
+// 6 - SIMD code
+
+// 7 - OCTREE 				
+//     - octree Add and Moves should probably Enqueue and then get applied all at once
+//       in fact i believe this does occur in our main KeystoneGameBlocks src branch because
+//       we use a method named FinalizeMovement()
+
+
+
+
+// FIXES Feb.8.2026
+//   - started adding code for Laser fire damage effects processing 
+//   - Added destructor and IDisposable Dispose() to ComponentStoreCollection.cs and ComponentStore.cs and BoidSimulation.cs
+//   - Added destructor to Transform.cs for freeing up the memory of Memory<T>... i think this still needs work to keep the Memory<T> blocks packed correctly.
+//   - Fixed Semaphore.Wait(-1) which means wait indefinetely for ComponentStoreCollection.CheckOut() and ComponentStore.CheckOut()
+
+
+			
+// TODO: THE SAMPLE FROM GITHUB https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
+// and simply uses System.Drawing to draw the boids.  I will want to just use a simple 3d pyramid type boid .obj instead.
+// https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
 
 // NOTE: The primary purpose of this is to demonstrate the use of Memory<T>
 // via ComponentStore.cs (ComponentStore.ReadOnlySpan and ComponentStore.WriteOnlySpan)
@@ -146,39 +147,17 @@ namespace HelloBoids
     // https://vscode.dev/github/MichaelOliveTree/KeystoneGameBlocks
     public class EntryClass
     {
-		public static string mSimulationOutputFile;
-		public static string OUTPUT_FILENAME = "hello_output.txt";
-		
-        public static HelloBoids.ComponentStoreCollection mCStoreCol = new HelloBoids.ComponentStoreCollection();
-        public static BoidSimulation bSim;
+		private static string MODE = MODE = "Memory<T>"; // Classes or Memory<T> and is set at RunTime but defaults to Memory<T> unless #define Memory_T is commented out		
+
         // NOTE: cube shaped otrees are MUCH faster than non cubed octreesbecause they are easier to keep balanced when inserting entityNodes
         public static double WIDTH = 800d;
         public static double HEIGHT = 800d;
         public static double DEPTH = 800d;
-		public static double BOID_SIZE = 2d; // since this is 2D, we need a size for the Octree's Z depth 
-		
-        private static string MODE = MODE = "Memory<T>"; // Classes or Memory<T> and is set at RunTime but defaults to Memory<T> unless #define Memory_T is commented out
-        private static bool useOctree = false;
-		private static uint OctreeMaxDepth = 12; // NOTE: this is ignored if Octree.EnforceMaxDepth == false in which case the splitthreshHold and radius of the entity being added is the main determinant
-		private static uint OctreeSplitThreshold = 8;
-		
+		public static double BOID_SIZE = 2d;             // since this is 2D, we need a size for the Octree's Z depth 
 		public static uint NUM_ENTRIES = 768;
-        public static uint NUM_ITERATIONS = 2000;
-        public static double MAX_RUNTIME_SECONDS = 2.5;
-		// fragment the memory to account for fact that our
-        // Boid objects wont be instantiated contiguously like this in production code
-        public const int FRAGMENTED_OBJ_SIZE = 128;
-		public const int NUM_TO_PIN = 0;
+        public static uint NUM_ITERATIONS = 20;
+        public static double MAX_RUNTIME_SECONDS = 5.5;
 		
-        public static double step;
-        private static double mTotalRuntime;
-
-        public static long mCurrentFrame;
-        private static bool mIsRunning;
-        private static object mGameThreadLockObject = new object(); // used by GameLoop()
-        private static object mSyncLock; // used by Main() 
-
-		// global settings
 		// Note: the larger the various distance values below,
         // the more cpu cycles needed. Tweak these values
         // to find a good balance between performance and
@@ -193,43 +172,59 @@ namespace HelloBoids
 		public static double TURN_FACTOR = 0.1d; // For boundary avoidance
 		public static double MAX_SPEED = 5d;
 		
+        
+		
+		private static bool useOctree = false;
+		private static uint OctreeMaxDepth = 12;         // NOTE: this is ignored if Octree.EnforceMaxDepth == false in which case the splitthreshHold and radius of the entity being added is the main determinant
+		private static uint OctreeSplitThreshold = 8;
+		
+	
+        public static HelloBoids.ComponentStoreCollection mCStoreCol;
+        public static BoidSimulation bSim;
+		
+        public static double step;
+        private static double mTotalRuntime;
+        public static long mCurrentFrame;
+		
+        private static bool mMainLoopIsRunning;
+		private static bool mGameLoopIsRunning;
+		
+		       
+        private static object mMainLoopLock; 
+		private static object mGameLoopLock; 
+		private static object mRenderLoopLock;
+		
+			
 		// Debugging Aids
+		// fragment the memory to account for fact that our
+        // Boid objects wont be instantiated contiguously like this in production code
+        public const int FRAGMENTED_OBJ_SIZE = 128;
+		public const int NUM_TO_PIN = 0;
+		
 		public static Profiler CodeProfiler;
         public static string output;
+		public static string mSimulationOutputFile;
+		public static string OUTPUT_FILENAME = "hello_output.txt";
 
-
+		
+		
         public static void Main()
-        {
-            mSyncLock = new object();
-
+        {			
             MODE = "Memory<T>";
             bool structs = false;
 
 #if USE_MEMORY_T == false
             MODE = "Classes";
-#if USE_STRUCT
+   #if USE_STRUCT
             structs = true;
+   #endif
 #endif
-#endif
+	   
 #if SPATIAL_SEARCH
             useOctree = true;
 #endif
 
-			mSimulationOutputFile = Utils.CreateFile(OUTPUT_FILENAME);
-			
-            double targetFrameRatePerSecond = 60d;
-            step = 1d / targetFrameRatePerSecond; // aka dt or "deltaTime"
 
-            // 100FPS uses a step of 1 / 100d == 0.01 seconds 
-            // or 10.00 milliseconds per framer
-            //
-            // 60FPS uses a step of 1 / 60d == 0.0166666666666667 seconds 
-            // or 16.66 milliseconds per framer
-            //
-            // 30FPS uses a step of 1 / 30d == 0.0333333333333333 seconds
-            // or 33.33 milliseconds per frame
-
-            // how do we profile in other classes if the profiler is not static in Core?
             CodeProfiler = new Profiler();
             CodeProfiler.ProfilerEnabled = true;
             CodeProfiler.ShowFramesPerSecond = true;
@@ -290,57 +285,65 @@ namespace HelloBoids
 
 
             System.Threading.Thread renderThread = new System.Threading.Thread(RenderLoop);
-            Console.WriteLine("Render thread created.");
+            Console.WriteLine("Main() - Render thread created.");
 
             System.Threading.Thread animationThread = new System.Threading.Thread(AnimationLoop);
-            Console.WriteLine("Animation thread created.");
+            Console.WriteLine("Main() - Animation thread created.");
 
             System.Threading.Thread gameThread = new System.Threading.Thread(GameLoop);
-            Console.WriteLine("Game loop thread created.");
+            Console.WriteLine("Main() - Game loop thread created.");
             output = "____________________________________________";
             Console.WriteLine(output);
             Debug.WriteLine(output);
+			
 
+            mSimulationOutputFile = Utils.CreateFile(OUTPUT_FILENAME);
             
-
             // Set as background so the application can exit when the main thread ends
             // TODO: this may not be necessary if I just set the exit condition to the known
             // number of iterations that will be performed so the sentinel "mIsRunning" can be
             // set to = false;
-			mIsRunning = true;
             gameThread.IsBackground = true;
             gameThread.Start();
 
             Console.WriteLine("");
-            Console.WriteLine("Performance Test #1 STARTED in Game thread.");
+            Console.WriteLine("Main() - Performance Test #1 STARTED in Game thread.");
             Console.WriteLine("");
 
+			
 			// This main thread waits for user input to stop the application OR for the gameLoop
 			// to finish
-            while (mIsRunning)
+			mMainLoopLock = new object();
+			mMainLoopIsRunning = true;
+            while (mMainLoopIsRunning)
             {
                 if (Console.ReadKey(true).Key == ConsoleKey.Q)
                 {
-                    lock (mSyncLock)
+                    lock (mMainLoopLock)
                     {
-                        mIsRunning = false;
+                        mMainLoopIsRunning = false;
                     }
                     break; // Exit the main thread's loop
                 }
             }
+			
+			//Console.WriteLine("Waiting to Join Main Thread... Loop #1");
 
             // Ensure the game thread has time to stop gracefully (optional for background threads)
             gameThread.Join();
 
-            Console.WriteLine("Game Loop #1 COMPLETED.");
+            Console.WriteLine("Main() - Game Loop #1 COMPLETED.");
             
             
             ///////////////////////////////////////////////////////////////////////////////////////////////
 
-            // Reset Variables and Prepare to start GameLoop again for Test #2
-            mCurrentFrame = 0;
-            mTotalRuntime = 0;
-            mIsRunning = true;
+            // Reset Game Thread and start GameLoop again for Test #2                      
+			
+            Console.WriteLine("");
+			output = "____________________________________________";
+			Console.WriteLine(output);
+			Console.WriteLine("Main() - Performance Test #2 STARTED in Game thread.");
+            Console.WriteLine("");
 
             gameThread = new System.Threading.Thread(GameLoop);
             // Set as background so the application can exit when the main thread ends
@@ -350,18 +353,17 @@ namespace HelloBoids
             gameThread.IsBackground = true;
             gameThread.Start();
 
-            Console.WriteLine("Performance Test #2 STARTED in Game thread.");
-            Console.WriteLine("");
 
             // This main thread waits for user input to stop the application OR for the gameLoop
 			// to finish
-            while (mIsRunning)
+			mMainLoopIsRunning = true;
+            while (mMainLoopIsRunning)
             {
                 if (Console.ReadKey(true).Key == ConsoleKey.Q)
                 {
-                    lock (mSyncLock)
+                    lock (mMainLoopLock)
                     {
-                        mIsRunning = false;
+                        mMainLoopIsRunning = false;
                     }
                     break; // Exit the main thread's loop
                 }
@@ -369,8 +371,12 @@ namespace HelloBoids
 
             gameThread.Join();
 
-            Console.WriteLine("Game Loop #2 COMPLETED.");
-            output = "Goodbye Boids! - " + Utils.GetTimeString();
+            Console.WriteLine("Main() - Game Loop #2 COMPLETED.");
+			
+			Console.WriteLine("");
+			output = "____________________________________________";
+			Console.WriteLine(output);
+            output = "Main() - Goodbye Boids! - " + Utils.GetTimeString();
             Console.WriteLine(output);
         }
 
@@ -378,16 +384,15 @@ namespace HelloBoids
         // simulation updates
         private static void GameLoop()
         {
-         	// TODO: THE SAMPLE FROM GITHUB https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
-         	// and simply uses System.Drawing to draw the boids.  I will want to just use a simple 3d pyramid type boid .obj instead.
-         	// https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
-           	bSim = new BoidSimulation((int)NUM_ENTRIES, WIDTH, HEIGHT, DEPTH, useOctree);
-
-            output = "Performance Test RUNNING - " + NUM_ENTRIES.ToString() + " boids @ " + NUM_ITERATIONS.ToString() + " iterations.";
+			output = "____________________________________________";
+			Console.WriteLine(output);
+            Debug.WriteLine(output);
+			
+            output = "GameLoop() - Entered. Test RUNNING - " + NUM_ENTRIES.ToString() + " boids @ " + NUM_ITERATIONS.ToString() + " iterations.";
             Console.WriteLine(output);
             Debug.WriteLine(output);
 
-            output = "Please Wait...";
+            output = "GameLoop() - Please Wait...";
             Console.WriteLine(output);
             Debug.WriteLine(output);
 
@@ -415,17 +420,37 @@ namespace HelloBoids
              Console.WriteLine("WARM-UP - COMPLETED.");
              */
 			
+			
+			mGameLoopLock = new object();
+           	mCStoreCol = new HelloBoids.ComponentStoreCollection();
+           	bSim = new BoidSimulation((int)NUM_ENTRIES, WIDTH, HEIGHT, DEPTH, useOctree);
+			
             CodeProfiler.StartLoop();
             Stopwatch sw = Stopwatch.StartNew();
             double lastElapsedTime = sw.Elapsed.TotalSeconds;
 			GameTime gt = new GameTime();
-						
+			double targetFrameRatePerSecond = 60d;
+            step = 1d / targetFrameRatePerSecond; // aka dt or "deltaTime"
+
+            // 100FPS uses a step of 1 / 100d == 0.01 seconds 
+            // or 10.00 milliseconds per framer
+            //
+            // 60FPS uses a step of 1 / 60d == 0.0166666666666667 seconds 
+            // or 16.66 milliseconds per framer
+            //
+            // 30FPS uses a step of 1 / 30d == 0.0333333333333333 seconds
+            // or 33.33 milliseconds per frame
+			
+			mCurrentFrame = 0;
+            mTotalRuntime = 0;
+			mGameLoopIsRunning = true;
+			
             while (true)
             {
                 bool runningStatus;
-                lock (mGameThreadLockObject)
+                lock (mGameLoopLock)
                 {
-                    runningStatus = mIsRunning;
+                    runningStatus = mGameLoopIsRunning;
                 }
 
                 if (!runningStatus)
@@ -436,7 +461,7 @@ namespace HelloBoids
                 double elapsedSeconds = totalElapsedSeconds - lastElapsedTime;
                 lastElapsedTime = totalElapsedSeconds;
 
-                //HACK - make it always fixed step
+                //HACK - make the elapsedSeconds always equal to fixed step
                 elapsedSeconds = step;
 				gt.Update(elapsedSeconds);
 
@@ -450,12 +475,17 @@ namespace HelloBoids
                 //Console.WriteLine("TOTAL = " + totalElapsedSeconds.ToString() + " Frame Time = " + lastElapsedTime.ToString() + "  Runtime elapsed == " + mTotalRuntime.ToString() + " of " + MAX_RUNTIME_SECONDS.ToString() + " seconds.");
                // if (mTotalRuntime >= MAX_RUNTIME_SECONDS)
                if (mCurrentFrame >= NUM_ITERATIONS)
-                    mIsRunning = false;
+                    mGameLoopIsRunning = false;
 
                 // Simple throttling to prevent maxing out the CPU (adjust as needed)
                 //System.Threading.Thread.Sleep(15);
-            }
-
+            } // end While loop
+			
+			lock (mMainLoopLock)
+			{
+				mMainLoopIsRunning = false;
+			}
+			
             CodeProfiler.EndLoop();
 
             TimeSpan timeSpan = sw.Elapsed;
@@ -466,31 +496,55 @@ namespace HelloBoids
                 timeSpan.Milliseconds / 10);
 
 
-            // regardless of the NUM_ITERATIONS used, the FPS should typically all be very close 
-            // if the NUM_ENTRIES stays the same
-            double fps = mCurrentFrame / timeSpan.TotalSeconds;
-
-            output = "Performance Test COMPLETED - " + Utils.GetTimeString();
+ 
+            output = "GameLoop() - Performance Test COMPLETED - " + Utils.GetTimeString();
             System.Diagnostics.Debug.WriteLine(output);
             Console.WriteLine(output);
 
-            // LOG THE RESULTS
-            // =====================
-            output = "RunTime Mode: " + MODE + " - " + elapsedTimeString;
+
+            Console.WriteLine("");
+            output = "GameLoop() - Clearing Resources (" + MODE + ")";
             Console.WriteLine(output);
             Debug.WriteLine(output);
-            output = "FPS = " + fps.ToString();
+			
+			output = "____________________________________________";
+			Console.WriteLine(output);
+            Debug.WriteLine(output);
+			
+			
+			// Dispose Simulation and ComponentStores
+			bSim.Dispose();
+            bSim = null;
+            
+        	mCStoreCol.Dispose();
+        	mCStoreCol = null;
+			
+			output = "____________________________________________";
+			Console.WriteLine(output);
+            Debug.WriteLine(output);
+			
+			
+			// regardless of the NUM_ITERATIONS used, the FPS should typically all be very close 
+            // if the NUM_ENTRIES stays the same
+            double fps = mCurrentFrame / timeSpan.TotalSeconds;
+			
+            // LOG THE RESULTS
+            // =====================
+            output = "GameLoop() - RunTime Mode: " + MODE + " - " + elapsedTimeString;
+            Console.WriteLine(output);
+            Debug.WriteLine(output);
+            output = "GameLoop() - FPS = " + fps.ToString();
             Console.WriteLine(output);
             Debug.WriteLine(output);
 
-            output = "Remote Computer Has " + Environment.ProcessorCount.ToString() + " processors.";
+            output = "GameLoop() - Remote Computer Has " + Environment.ProcessorCount.ToString() + " processors.";
             Console.WriteLine(output);
             Debug.WriteLine(output);
 			
 			output = "____________________________________________";
 
             Console.WriteLine("");
-            output = "Begin Profiler Output (" + MODE + ")";
+            output = "GameLoop() - Begin Profiler Output (" + MODE + ")";
             Console.WriteLine(output);
             Debug.WriteLine(output);
 
@@ -533,6 +587,8 @@ namespace HelloBoids
             //     Validate(store, classes);
 
             // TODO:implement a https://en.wikipedia.org/wiki/K-d_tree
+
+			
         }
 
         private static void Update(GameTime gt)
@@ -549,11 +605,14 @@ namespace HelloBoids
             // Use lock when accessing shared data
         }
 
+				
         private static void RenderLoop()
         {
+			mRenderLoopLock = new object();
+			
             // TODO: Insert console drawing logic
             // Use lock when writing to the console to avoid conflicts
-            lock (mSyncLock)
+            lock (mRenderLoopLock)
             {
                 //Console.SetCursorPosition(0, 1);
                 // Console.WriteLine($"Game running. Time: {DateTime.Now}");
@@ -567,7 +626,7 @@ namespace HelloBoids
     }
 
 
-    public class BoidSimulation
+    public class BoidSimulation : IDisposable
     {
 #if USE_MEMORY_T
         public DataProcessorsStore mDataProcessor;
@@ -597,8 +656,6 @@ namespace HelloBoids
         {
             Boids = new List<Boid>(); //NOTE: we do not preallocate the list here
 				
-			mTHRandom = new ThreadedRandom(Seed);
-	
 			SeparationDistance = EntryClass.SEPERATION_DISTANCE;
         	SeparationFactor = EntryClass.SEPARATION_FACTOR;
         	AlignmentDistance = EntryClass.ALIGNMENT_DISTANCE;
@@ -643,21 +700,34 @@ namespace HelloBoids
 
             DataProcessorsStore.Processor<Transform.Transform_Struct> flockingBehavior = DoFlocking;
             mDataProcessor.Add("FLOCKING", flockingBehavior);
+	
+			DataProcessorsStore.Processor<Boid.Laser_Struct> lasersBehavior = DoWeaponTest;
+            mDataProcessor.Add("LASERS", lasersBehavior);
+			
+				
+				
 #endif
 
             // SPAWN INITIAL SET OF BOIDS UP TO EntryClass.NUM_ENTRIES
 			//System.Numerics.BigInteger bint = 0;
             decimal bint = 0;
 
-
 			System.Diagnostics.Debug.Assert(EntryClass.NUM_ENTRIES == numBoids);
 	
-	
-			// TODO: adding these to the Octree will cause System.AggregateException() until we 
-			//       make Add() to the Octree thread-safe
+			mTHRandom = new ThreadedRandom(this.Seed);
+			Console.WriteLine("BoidSimulation.ctor() - Preparing to Spawn " + numBoids + " with SEED == " + this.Seed.ToString());
+
+			
+
+			//NOTE: List<> which stores our Boids is not threadsafe and so for .Add() we must prefill it with 
+			// null items so we can use direct assignment (eg Boids[i] = b;  rather than Boids.Add(b); when spawning them
+			// NOTE: either of the below two lines of code will work to fill the list to the desired amount with nulls
+			Boids = new List<Boid>(new Boid[numBoids]);
+			//Boids = Enumerable.Repeat<Boid>(null, numBoids).ToList();
+
 			// Spawn the Boids using Parallel.For() and optional memory fragmenting
-			//System.Threading.Tasks.Parallel.For(0, numBoids, i=>
-            for (int i = 0; i < numBoids; i++)
+			System.Threading.Tasks.Parallel.For(0, numBoids, i=>
+            //for (int i = 0; i < numBoids; i++)
             {
                 // todo: the above doesn't make a diff, but perhaps
                 // if i added dummy objects into the array instead..?
@@ -665,20 +735,50 @@ namespace HelloBoids
                 for (int j = 0; j < tmp.Length; j++)
                     bint += tmp[j].GetHashCode();
 
-                if (EntryClass.NUM_TO_PIN > 0)
+     			if(EntryClass.NUM_TO_PIN > 0)
                     MemoryFragmenter.Fragment(EntryClass.NUM_TO_PIN, 512, EntryClass.NUM_TO_PIN / 2, 128);
 
 				// spawn will add to the Octree 
 				Boid b = Spawn(mTHRandom, i, width, height, depth);
-                Boids.Add(b);
+				// NOTE: direct assignment since List<> is not threadsafe
+                Boids[i] = b;
+                //Boids.Add(b);
 
                 if (EntryClass.NUM_TO_PIN > 0)
                     MemoryFragmenter.Cleanup();
-            }//);
+            });
 	
-            Console.WriteLine("BoidSimulation.ctor() - " + numBoids + " Boids Created.  Big Hash = " + bint.ToString());
+            Console.WriteLine("BoidSimulation.ctor() - " + numBoids + " Boids Created. " + (numBoids == Boids.Count).ToString() + "  Big Hash = " + bint.ToString());
         }
+        
+        ~BoidSimulation()
+        {
+            Dispose();
+        }
+        
+        bool mIsDisposed;
+        public void Dispose()
+        {
+            if (!mIsDisposed)
+            {
+                Console.WriteLine("BoidSimulation.~dtor() - Detroying all boids");
+            
+				if (this.Boids != null)
+					for (int i = 0; i < this.Boids.Count; i++)
+					{
+						// todo: do we need to remove from SpatialNode here or should
+						//       the BoidSimulation do that?  I think the Simulation should on notification
+						//       that it's been removed from the Scene which is how we will do it in KeystoneGameBlocks.
+				#if MEMORY_T
+						this.Boids[i].Dispose();
+				#endif
+						this.Boids[i] = null;
+					}
 
+					mIsDisposed = true;
+			}
+        }
+		
         /// <summary>
         /// Update simulation using either Data Oriented Technique or Object Oriented Technique
 		/// </summary>
@@ -687,36 +787,78 @@ namespace HelloBoids
 			double elapsedSeconds = gt.ElapsedSeconds; 
             mIntervalTimers.Update(elapsedSeconds);
 
-			// TODO: I should probably just add a setting for whether we are doing CLASSES or MEMORYT so that
-			//       we can run both Tests in one run.
-#if USE_MEMORY_T == false
-            // TEST CLASSES (Object Oriented Technique)
-            // =====================
-            this.UpdateClasses(gt,
-                               this.Boids,
-                               this.SeparationDistance,
-                               this.SeparationFactor,
-                               this.AlignmentDistance,
-                               this.AlignmentFactor,
-                               this.CohesionDistance,
-                               this.CohesionFactor,
-                               this.MaxSpeed,
-                               this.TurnFactor);
-#else
+			try
+			{
+				// TODO: I should probably just add a setting for whether we are doing CLASSES or MEMORYT so that
+				//       we can run both Tests in one run.
+	#if USE_MEMORY_T == false
+				// TEST CLASSES (Object Oriented Technique)
+				// =====================
+				this.UpdateClasses(gt); 
+				
+				/*
+								   this.Boids,
+								   this.SeparationDistance,
+								   this.SeparationFactor,
+								   this.AlignmentDistance,
+								   this.AlignmentFactor,
+								   this.CohesionDistance,
+								   this.CohesionFactor,
+								   this.MaxSpeed,
+								   this.TurnFactor);
+				*/
+	#else
 
-            // TEST MEMORY<T> (Data Oriented Technique)
-            // ====================
-            mDataProcessor.Update(gt, Boids.ToArray());
-#endif
-        }
-
+				// TEST MEMORY<T> (Data Oriented Technique)
+				// ====================
+				mDataProcessor.Update(gt, Boids.ToArray());
+	#endif
+			}
+			catch (AggregateException ae)
+        	{
+				foreach (var innerEx in ae.InnerExceptions)
+				{
+					// Get line number from the stack trace's top frame for the exception with source file information
+					// BAH, line numbers wont print when using the online compilers like www.dotnetfiddle.net
+					// "Because the .NET Fiddle environment is designed for quick online execution and not full application
+					// deployment with debug symbols, you generally have to trace the error by the method names provided 
+					// in the stack trace, or by adding your own print statements (Console.WriteLine) to narrow down the 
+					// exact location of the error."
+					
+    				int linenumber = (new StackTrace(innerEx, true)).GetFrame(0).GetFileLineNumber();
+					Console.WriteLine(innerEx.TargetSite.ToString());
+						
+					Console.WriteLine($"Update() - Caught inner exception: {innerEx.Message}" + " Line Number: " + linenumber);
+					Console.WriteLine($"Update() - Stack Trace: {innerEx.StackTrace}");
+					
+					// You can add specific handling logic here based on exception type
+					if (innerEx is UnauthorizedAccessException)
+					{
+						// Handle access denied case
+					}
+					else if (innerEx is ArgumentException)
+					{
+						// Handle invalid argument case
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				// General exception handler (less common with async/await)
+				Console.WriteLine($"Update() - A general exception occurred: {ex.Message}");
+				//Console.WriteLine(ex.Message.)
+			}
+		}
+		
 		/// <summary>
 		/// Run the simulation using Update method for data stored in CLASSES  in a typical way, as opposed to Memory<T> based storage which allows us to use (D)ata (O)riented processing of Entities
 		/// </summary>
-        public void UpdateClasses(GameTime gt, List<Boid> allBoids, double separationDistance, double separationFactor, double alignmentDistance, double alignmentFactor, 
-								  double cohesionDistance, double cohesionFactor, double maxSpeed, double turnFactor)
-        {
-						
+        //public void UpdateClasses(GameTime gt, List<Boid> allBoids, double separationDistance, double separationFactor, double alignmentDistance, double alignmentFactor, 
+		//						  double cohesionDistance, double cohesionFactor, double maxSpeed, double turnFactor)
+		
+		public void UpdateClasses(GameTime gt)
+		 {
+									  
             //////////////////////////////////////////////////////////////////
             // Life Cycle
             //////////////////////////////////////////////////////////////////
@@ -727,7 +869,6 @@ namespace HelloBoids
                 mIntervalTimers.Reset("LifeCycle", "spawn");
             }
 
-			
             //////////////////////////////////////////////////////////////////
             // Flocking
             //////////////////////////////////////////////////////////////////		
@@ -828,8 +969,9 @@ namespace HelloBoids
 					Boids[i].Velocity += v;
 					Boids[i].Translation += Boids[i].Velocity;
 					
-					// TODO: uncomment... currently Octree is NOT THREAD SAFE
+			#if SPATIAL_MOVE_UPDATES // this define needs to remain FALSE because currently Octree is NOT THREAD SAFE
 					Boids[i].SpatialNode.OnEntityNode_Moved(Boids[i]);
+			#endif
 
 			#if DEBUG_OUTPUT
 					const string SEPERATOR = "|";
@@ -842,10 +984,15 @@ namespace HelloBoids
 
 				} // end for loop
 			});  // end using "FlockingRules"   NOTE: Close Parenthesis and Semicolon here is needed after close curly brace only when using Parallel.For()
-        }
+        } 
 
 #if USE_MEMORY_T
 
+		private void DoWeaponTest(ComponentStore<Boid.Laser_Struct> store, object[] parameters, int seed, GameTime gt)
+        {
+			Console.WriteLine("Do lasers...");
+		}
+		
         private void DoLifeCycle(ComponentStore<Transform.Living_Entity> store, object[] parameters, int seed, GameTime gt)
         {
 			// TODO: until both paths use DoLifeCycle(), this will throw off deterministism for Memory<T> path
@@ -919,6 +1066,7 @@ namespace HelloBoids
 		
         private void DoFlocking(ComponentStore<Transform.Transform_Struct> store, object[] parameters, int seed, GameTime gt)
         {
+			//return;
 			double elapsedSeconds = gt.ElapsedSeconds;
 			
             //using (EntryClass.CodeProfiler.HookUp("AssignSpan"))
@@ -929,7 +1077,8 @@ namespace HelloBoids
             // HOWEVER, using the following line mem = Store.Span is faster than using Store.Span[i].#### everywhere!
             
             //}
-
+			
+			//Console.WriteLine("parameters count == " + parameters.Length.ToString());
 			// NOTE: these values derived from passed in parameters
 			double separationDistance = (double)parameters[0];
 			double alignmentDistance = (double)parameters[1];
@@ -941,6 +1090,8 @@ namespace HelloBoids
             double cohesionFactor = (double)parameters[5];
 			double turnFactor = (double)parameters[6]; // For boundary avoidance
 			double maxSpeed = (double)parameters[7];
+            
+            //Console.WriteLine("parameters count OK");
             
             double seperatationDistanceSquare = separationDistance * separationDistance;
             double alignmentDistanceSquared = alignmentDistance * alignmentDistance;
@@ -956,21 +1107,28 @@ namespace HelloBoids
 			
 			
 			int length = store.Span.Length;
+			//Console.WriteLine ("Span and Store Size Agree == " + (store.Span.Length == store.Size).ToString());
+			
 			System.Threading.Tasks.Parallel.For(0, length, i =>
 			//for (int i = 0; i < memSpan.Length; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
             {
+				
 				// NOTE: inside of the Parallel.For(), Span<T> cannot be passed in
 				//      because the code inside the Paralle.For() is treated as a Lambda
 				Span<Transform.Transform_Struct> memSpan = store.Span;
 				List<int> neighbors = new List<int>(8);
 		#if SPATIAL_SEARCH == false
+
+			   if (i > Boids.Count - 1)
+				   Console.WriteLine("Out of range i == " + i.ToString() + " but count == " + Boids.Count.ToString());
+
 				neighbors = GetNeighbors(Boids[i], largestDistance, largestDistanceSquared);
 		#endif
+				
 			
 		#if SPATIAL_SEARCH
 				Stack<OctreeOctant> stack = new Stack<OctreeOctant>(32);
             	
-				
 				
 				// INLINING of "GetNeighbors" in order to avoid have to load the memSpan onto the stack for each iteration
 				EntityNode currentBoid = Boids[(int)i];
@@ -1002,13 +1160,14 @@ namespace HelloBoids
                     neighbors.Clear();
                     stack.Clear();
 											
-					stack.Push(root);//currentBoid.SpatialNode);
+					stack.Push(root); 
 
 					while (stack.Count > 0)
                     {
 						OctreeOctant currentOctant = stack.Pop();
 						if (currentOctant.BoundingBox.Intersects(searchArea))
 						{
+							// TODO: the following call to currentOcant.EntityNodes needs to be thread safe... the EntityNodes assigned can move within this DoFlocking()  method
 							EntityNode[] ents = currentOctant.EntityNodes;
 							if (ents != null)
 							{
@@ -1081,6 +1240,13 @@ namespace HelloBoids
                 if (neighbors != null)
                     nCount = neighbors.Count;
 
+				// DEBUG TEST
+				for (int z = 0; z < nCount; z++)
+					if (neighbors[z] > length  - 1)
+						Console.WriteLine("Neighbor value is OUT OF RANGE " + neighbors[z].ToString());
+				
+				// END TEST
+				
 				 //if (i == 8)
 				//	Console.WriteLine("DoFlocking() - #954 - Neighbor Count = " + nCount.ToString());
 				
@@ -1194,16 +1360,16 @@ namespace HelloBoids
 					memSpan[(int)i].Translation += memSpan[(int)i].Velocity;
                 } // end profiler FlockingRules
 
-                // todo: all these octree update should probably
-                // occur last all at once... in fact i believe 
-                // this does occur in our main src branch because
-                // we use a method named FinalizeMovement()
 
+				
+				
+				//Console.WriteLine($"DoFlocking() - OnEntityNode_Moved()");
+		#if SPATIAL_MOVE_UPDATES // this define needs to remain FALSE because currently Octree is NOT THREAD SAFE
 //              // making this thread safe is going to be a problem if we also want to maintain performance
 				// i could maybe only add locks to depth = 1 and not any further.
 				currentBoid.SpatialNode.OnEntityNode_Moved(currentBoid);
-
-			
+				//Console.WriteLine($"DoFlocking() - Moved Completed...");
+		#endif	
                 // Apply boundary rules (wrap around)
                 // (You'd need to define boundary dimensions here)
                 // If X > maxX, X = minX, etc.
@@ -1263,6 +1429,9 @@ namespace HelloBoids
 			//       an Entity was removed, update its entity.Index, and then change the count 
 			//       of the Memory<T> store to previousCount - 1;
 			// TODO: we need to release all Memory<T> used by Transform_Struct and Living_Entity structs.
+		#if MEMORY_T
+			this.Boids[entity.Index].Dispose();
+		#endif
 			this.Boids[entity.Index] = null;
 			this.Boids[entity.Index] = this.Boids[lastIndex];
 			this.Boids[entity.Index].Index = lastIndex;
@@ -1275,9 +1444,13 @@ namespace HelloBoids
 		}
 
 		
+		///<summary>
+		/// Called by UpdateClasses() regardless of whether Octree is used or not.
+		/// Called by Memory<T> ONLY if Octree is NOT used.  Otherwise it uses non-recursive Octree code within the DoFlocking() method.
+		/// </summary>
         private List<int> GetNeighbors(Boid currentBoid, double largestDistance, double largestDistanceSquared)
         {
-            List<int> neighbors;
+            List<int> neighbors = null;
 
 #if USE_MEMORY_T
             /*   Func<int, int, double, Transform.Transform_Struct, Transform.Transform_Struct, bool> findNeighborsFunc = (index, referenceIndex, distanceSquared, boid, referenceBoid) =>
@@ -1314,7 +1487,7 @@ namespace HelloBoids
             };
 #endif
 
-            // SPATIAL SEARCH
+            // SPATIAL SEARCH ///////////////////////////////////////////////////////////////////////////////////
 #if SPATIAL_SEARCH
 
             BoundingBox searchArea = new BoundingBox(currentBoid.Translation, largestDistance * 0.5d);
@@ -1328,6 +1501,7 @@ namespace HelloBoids
             };
 
 #if USE_MEMORY_T
+			Console.WriteLine ("GetNeighbors - Memory<T> Using SpatialQueryLocal()");
             ComponentStore<Transform.Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
             List<EntityNode> found = SpatialQueryLocal(store.Span, currentBoid.SpatialNode, currentBoid.SpanIndex, largestDistanceSquared, true, searchArea);
 
@@ -1337,7 +1511,7 @@ namespace HelloBoids
 #endif
 
             if (found == null || found.Count == 0) return null;
-//Console.WriteLine("nc = " + found.Count.ToString());
+			//Console.WriteLine("nc = " + found.Count.ToString());
 
             neighbors = new List<int>(found.Count);
             for (int j = 0; j < found.Count; j++)
@@ -1345,12 +1519,19 @@ namespace HelloBoids
                 neighbors.Add(found[j].Index);
             }
 
-#else      // NEIGHBOR SEARCH USING DISTANCE CHECK                       
-
+#else      // NON-SPATIAL ASSISTED DISTANCE CHECK  ///////////////////////////////////////////////////////////////////////////////////                     
+			// Console.WriteLine ("GetNeighbors - Memory<T> NON SPATIAL LINQ CALL TO Boid.FindNeighbors() being used.");
 
 #if USE_MEMORY_T
-					//neighbors = Boid.FindNeighbors(store, numBoids, largestDistance, currentIndex, findNeighborsFunc);
-					neighbors = Boid.FindNeighbors(this.Boids, largestDistanceSquared, currentBoid.Index, ff);
+			//neighbors = Boid.FindNeighbors(store, numBoids, largestDistance, currentIndex, findNeighborsFunc);
+			try 
+			{
+				neighbors = Boid.FindNeighbors(this.Boids, largestDistanceSquared, currentBoid.Index, ff);
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine ("bSim.GetNeighbors() - Memory<T> - attempted to call Boid.FindNeighbors() - " + ex.Message);	
+			}
 #else
 #if USE_MEMORY_T == false
             List<Boid> found = Boid.FindNeighbors(this.Boids, largestDistance, currentBoid.Index, ff);
@@ -1361,12 +1542,11 @@ namespace HelloBoids
             {
                 neighbors.Add(found[j].Index);
             }
-#else // DO NOT USE A NEIGHBOR FINDING FUNCTION, JUST BRUTE FORCE ALL BOIDS
+#else // DO NOT USE A NEIGHBOR FINDING FUNCTION, JUST BRUTE FORCE ALL BOIDS ///////////////////////////////////////////////////////////////////////////////////                     
 						
-
 	  // WARNING: iterating through ALL boids
 	  // for each CURRENT boid is O(n^2) and is too expensive
-	  // neighors = allBoids;
+	  //	neighors = allBoids;
 						
 #endif
 #endif
@@ -1381,8 +1561,6 @@ namespace HelloBoids
         {
             if (refSpatialNode == null) throw new ArgumentNullException("SpatialQueryLocal() - reference Entity cannot be null.");
             if (!refSpatialNode.BoundingBox.Intersects(searchArea)) return null; // early exit
-
-            // TODO: // TODO: https://daeken.dev/a-stupidly-simple-fast-octree-traversal-for-ray-intersection
 
             List<EntityNode> results = new List<EntityNode>();
 
@@ -1465,6 +1643,8 @@ namespace HelloBoids
     {
         private const double BOID_WIDTH = 2.0d;
         
+		
+		
         public struct LivingEntity
         {
             public double BornDate;
@@ -1475,15 +1655,96 @@ namespace HelloBoids
             {
                 return currentTime - currentTime;
             }
-
-
         }
 
+	#if	USE_MEMORY_T
+		public Memory<Laser_Struct> mMemStore_Laser; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
+		public int SpanIndexLaser = -1;
+		
+		public struct Laser_Struct
+		{
+			// common component properties
+			public int TL;
+			public string Quality; // todo: this needs to be a coefficient of 0.0 to 1.0
+			public bool Ruggedized;
+			
+			// common component stats
+			public double HitPoints;
+			public int DR;  // todo: if we use complex armor, is DR (damage resistance) used?
+			
+			public double Cost;
+			public double Weight;
+			public double SurfaceArea;
+			public double Volume;
+			
+			// beam specific
+			public int Type;
+			public int Duration;   // duration in seconds
+			
+			public bool EnergyDrill;
+			public bool FTL;
+			public bool Reliable;
+			public bool Compact;
+			public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
+			
 
+			public string Range; // string description of range (eg: "very long range")
+						
+			public float BeamOutput;
+			public float CyclicRate;
+			public int Accuracy;
+			public int SnapShot;
+			public string Shots;
+			public string RoF;
+			public double PowerReqt;
+			public string Mount;
+			public string Direction;
+
+			// TODO: these are like "internal" items and can be used if another power source is no longer connected
+			public string PowerCellType;  // TOOD: Need an ENUM
+			public int PowerCellQuantity;
+			public double PowerCellWeight;
+			
+			public string TypeDamage;     // TOOD: Need an ENUM
+			public string Damage;         // this is dice of damage, but often contains a multiplier like (100) afterwards.  We don't need the multiplier since we just compute a min/max damage range or maybe we compute a single damage that then gets modified based on the target evasive maneuvers and such
+			public double KEDamage;
+			public double HalfDamage; 
+			public double VacuumHalfDamage;
+			public double VacuumMaxRange;
+			
+			public double MaxRange;
+			public double MaxRange2;
+			public double VacuumMaxRange2;
+
+
+		}
+		
+		
+
+		
+
+
+	
+	#endif		
+		
         public Boid(int index, double x, double y, double z,  double xV, double yV)
             : base(index, x, y, z, xV, yV)
         {
 
+				
+#if USE_MEMORY_T
+			ComponentStore<Laser_Struct> store = EntryClass.mCStoreCol.CheckOut<Laser_Struct>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
+            int checkOutIndex = -1;
+            mMemStore_Laser = store.CheckOut(out checkOutIndex);
+            SpanIndexLaser = checkOutIndex;
+            
+			// initialize the memory store
+			mMemStore_Laser.Span[0].TL = 1;
+				
+            // todo do we need destructor for Repository.CheckIn mMemstore?
+
+#endif
+	
             Vector3d v;
             v.x = xV;
             v.y = yV;
@@ -1881,20 +2142,31 @@ return (0,0);
 
             return (result.x, result.y);
         }
-
+		
+		
+		//////////////////////////////////////////////////////
         public static List<int> FindNeighbors(ComponentStore<Transform.Transform_Struct> store, uint numBoids, double distance, int currentIndex, Func<int, int, double, Transform.Transform_Struct, Transform.Transform_Struct, bool> condition)
         {
-            //Span<Transform.Transform_Struct> mem = store.Span;
-            Span<Transform.Transform_Struct> mem = BoidSimulation.Store.Span;
+            Span<Transform.Transform_Struct> mem = store.Span;
 
             List<int> neighbors = new List<int>();
 
-            for (int i = 0; i < numBoids; i++)
-            {
-                if (condition(i, currentIndex, distance, mem[i], mem[currentIndex]))
-                    neighbors.Add(i);
+			if (currentIndex < 0 || currentIndex > store.Span.Length)
+				Console.WriteLine("Boid.FindNeighbors() - Index '" + currentIndex + "' out of range ");
+			
+			try 
+			{
+            	for (int i = 0; i < numBoids; i++)
+            	{
+                	if (condition(i, currentIndex, distance, mem[i], mem[currentIndex]))
+                    	neighbors.Add(i);
 
-            }
+            	}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine("Boid.FindNeighbors() - Index '" + currentIndex + "' out of range ");
+			}
             return neighbors;
         }
 
@@ -1902,12 +2174,25 @@ return (0,0);
         {
             List<int> neighbors = new List<int>();
 
-            for (int i = 0; i < allBoids.Count; i++)
-            {
-                if (condition(allBoids[i], allBoids[currentIndex], distance))
-                    neighbors.Add(i);
+			int debug = 0;
+			
+			try
+			{
+				
+				for (int i = 0; i < allBoids.Count; i++)
+				{
+					debug = i;
+					if (i > allBoids.Count - 1) continue;
+					if (currentIndex > allBoids.Count - 1) continue;
+					if (condition(allBoids[i], allBoids[currentIndex], distance))
+						neighbors.Add(i);
 
-            }
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine("Boid.FindNeighbors() - Generic Find 'i iterator == " + debug.ToString() + "current boid index that has adjacents == " + currentIndex.ToString() + " total boids count == " + allBoids.Count.ToString());	
+			}
             return neighbors;
         }
 #else
@@ -2059,7 +2344,6 @@ return (0,0);
         protected Vector3d mGlobalScale, mGlobalTranslation;
         protected Quaternion mGlobalRotation;
 
-
         // cached matrix will automatically include derived versions if enabled
         protected Matrix mMatrix; // RegionMatrix
         protected Matrix mLocalMatrix;
@@ -2110,6 +2394,7 @@ return (0,0);
             //public Matrix RegionMatrix;
         }
 #endif
+
 
         protected Transform()
         {
@@ -3065,21 +3350,28 @@ return (0,0);
 
         #region Disposable members
 #if USE_MEMORY_T
+bool mIsDisposed;
         public void Dispose()
         {
+            DisposeManagedResources();
 		}
 
         public void DisposeManagedResources()
         {
-            ComponentStore<Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
+           if (!mIsDisposed)
+           {
+                ComponentStore<Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
 			store.CheckIn(mMemStore_Transform);
             //SpanIndex ;
-            Console.WriteLine ("DisposeManagedResources() - Checked In Transform_Struct");
+            //Console.WriteLine ("Transform.cs.DisposeManagedResources() - Checked In Transform_Struct");
 			
 			ComponentStore<Living_Entity> storeLE = EntryClass.mCStoreCol.CheckOut<Living_Entity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
             storeLE.CheckIn(mMemStore_LivingEntity);
             //SpanIndexLE ;
-			Console.WriteLine ("DisposeManagedResources() - Checked In Living_Entity struct");
+			//Console.WriteLine ("Transform.cs.DisposeManagedResources() - Checked In Living_Entity struct");
+			
+			        mIsDisposed = true;
+			      }
         }
 #endif
 
@@ -3454,7 +3746,6 @@ return (0,0);
     /// </summary>
     public class OctreeOctant //: ISpatialNode //, ITraversable, IBoundVolume
     {
-
         #region Static variables
         //public static BoundingBox WorldBox;
         public static uint MaxDepth = 7;            // try ~7 - 9
@@ -3473,6 +3764,7 @@ return (0,0);
         };
 
         #endregion
+			
         private bool mEnforceMaxDepth = false;
         private int _depth;
         private double mOctantRadius;
@@ -3481,14 +3773,14 @@ return (0,0);
 
         private BoundingBox mBox;
         private OctreeOctant mParent;
-        private OctreeOctant[] mChildOctants;
-
-		private object mAddLock;
+        private OctreeOctant[] mChildOctants;	
 		
         // TODO: switch to linked list?
         private List<EntityNode> mEntityNodesCollection;
 
-
+		private static System.Threading.SemaphoreSlim mSemaphoreSlim = new System.Threading.SemaphoreSlim(1);
+		private object mAddLock;
+		
         public OctreeOctant(int index, int depth, BoundingBox box, OctreeOctant parent)
             : this()
         {
@@ -3504,7 +3796,7 @@ return (0,0);
 
 			mAddLock =  new object();
 				
-            System.Diagnostics.Debug.WriteLine("OctreeOctant.ctor() -- Created at index " + index.ToString());
+            //System.Diagnostics.Debug.WriteLine("OctreeOctant.ctor() -- Created at index " + index.ToString());
         }
 
         public OctreeOctant()
@@ -3552,7 +3844,6 @@ return (0,0);
         {
             get 
             { 
-                
                 return mOctantRadius;
             }
         }
@@ -3625,33 +3916,55 @@ return (0,0);
         {
             get
             {
-                if (mEntityNodesCollection == null) return null;
+                try
+                {
+                    mSemaphoreSlim.Wait(-1);
+                
+if (mEntityNodesCollection == null) return null;
                 return mEntityNodesCollection.ToArray();
+            
+                 }
+                 finally
+                 {
+                     mSemaphoreSlim.Release();
+                     
+                 }
+            
             }
         }
 
         public void Add(EntityNode entityNode, bool forceRoot = false)
         {
-			lock(mAddLock)
+			//lock(mAddLock)
+     		try
 			{
-				if (forceRoot)
+				mSemaphoreSlim.Wait(-1); // -1 waits indefinetly, otherwise parameter represents maximum milliseconds to wait
 				{
-					this.AddEntityNodeToCollection((EntityNode)entityNode);
-					//System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName + " at Address " + this.Address + " Forced into Root");
+					if (forceRoot)
+					{
+						this.AddEntityNodeToCollection((EntityNode)entityNode);
+						//System.Diagnostics.Debug.WriteLine ("OctreeOctant.Add() - " + entityNode.Entity.TypeName + " at Address " + this.Address + " Forced into Root");
+					}
+					else
+					{
+						// TODO: we might have optional param to EnQueue this Add() rather than try to Add it immediately
+						this.Add(entityNode);
+					}
 				}
-				else
-				{
-					// TODO: we might have optional param to EnQueue this Add() rather than try to Add it immediately
-					this.Add(entityNode);
-				}
+			}
+			finally
+			{
+				mSemaphoreSlim.Release();
 			}
         }
 
         private void Add(EntityNode entityNode)
         {
-			lock(mAddLock)
+			//lock(mAddLock)
+			try
 			{
-				System.Diagnostics.Debug.Assert(this.BoundingBox != null, "OctreeOctant.Add() - BoundingBox is null.");
+				//mSemaphoreSlim.Wait(-1); // -1 waits indefinetly, otherwise parameter represents maximum milliseconds to wait
+				//System.Diagnostics.Debug.Assert(this.BoundingBox != null, "OctreeOctant.Add() - BoundingBox is null.");
 	#if DEBUG
 				// only support square octree octants for performance
 	//            // TODO: we are going to see if this "performance" concern is no longer valid.  non square octrees are useful 
@@ -3660,6 +3973,7 @@ return (0,0);
 	//            this.BoundingBox.Max.x - this.BoundingBox.Min.x == 
 	//            this.BoundingBox.Max.z - this.BoundingBox.Min.z);
 	#endif
+
 
 				// https://stackoverflow.com/questions/4324703/should-an-octree-be-rebuilt-every-frame
 
@@ -3734,38 +4048,36 @@ return (0,0);
 					this.AddEntityNodeToCollection(entityNode);
 					return;
 				}
-
-				Vector3d octantCenter = this.BoundingBox.Center;
-				Vector3d entityCenter = entityNode.BoundingBox.Center; // TODO: is the entityNode box initialized at this point?
-				int code = 0;
-				if (entityCenter.x > octantCenter.x)
-					code |= 1;
-				if (entityCenter.y > octantCenter.y)
-					code |= 2;
-
-				// TODO: if this is a 2D Octree which should just use a quadtree of course... then we should skip the following entityCenter.z test
-				if (entityCenter.z >= octantCenter.z)
-					code |= 4;
-
+				
+				
+				//  BEGIN PATH #1 which should be functionally equivalent to PATH #2
 				// TODO: surely a FOR LOOP here is not needed?  We just
 				//       need: if (code < MAX_)
 				//      int i = code;
 				//      // then leave the rest of the code the same... 
-				System.Diagnostics.Debug.Assert (code >= 0 && code <= MAX_CHILD_COUNT, "code out of range.");
+				
+				int bestFitChildOctantIndex = GetBestFitOctant(this.BoundingBox.Center, entityNode.BoundingBox.Center);
+				System.Diagnostics.Debug.Assert (bestFitChildOctantIndex >= 0 && bestFitChildOctantIndex <= MAX_CHILD_COUNT, "OctreeOctant.Add() - Octant code/index out of range.");
+				
+				Vector3d offset = OctreeOctant.BoundsOffsetTable[bestFitChildOctantIndex] * octantRadius;
+				Vector3d childOctantCenter = this.BoundingBox.Center + offset;
 
-				int testIndex = -1;
+				BoundingBox childOctantBox = new BoundingBox(childOctantCenter, (float)childOctantRadius);
+
+				if (mChildOctants[bestFitChildOctantIndex] == null)
+					mChildOctants[bestFitChildOctantIndex] =
+					new OctreeOctant(bestFitChildOctantIndex, _depth + 1, childOctantBox, this);
+
+				// Recursive Add() until max depth is reached or the entity's radius > octant's loose radius
+				mChildOctants[bestFitChildOctantIndex].Add(entityNode);
+				
+				/* // BEGIN PATH #2 which should be functionally equivalent to PATH #1
 				for (int i = 0; i < MAX_CHILD_COUNT; i++)
 				{
 					// the bitflag combination created above MUST ALWAYS evaluate to
 					// values of 0 thru 7 which represents the 8 octants
-
 					if (code != i) continue;
-					if (testIndex == -1) 
-						testIndex = i;
-					else 
-						Console.WriteLine("UNEXPECTED OCTANT INDEX.................................");
-					// todo: add code to get a string value of the depth and octants within the octree that an EntityNode has been placed
-					//       so that we can do a DETERMINISM test.
+
 					Vector3d offset = OctreeOctant.BoundsOffsetTable[i] * octantRadius;
 					Vector3d center = octantCenter + offset;
 
@@ -3778,6 +4090,8 @@ return (0,0);
 					// Recursive Add() until max depth is reached or the entity's radius > octant's loose radius
 					mChildOctants[i].Add(entityNode);
 				}
+				*/ // END PATH #2
+				
 
 				// Remove nodes that already exist 
 				if (mEntityNodesCollection != null)
@@ -3790,8 +4104,28 @@ return (0,0);
 					}
 				}
 			}
+			finally
+			{
+				//mSemaphoreSlim.Release();
+			}
    		}
 
+		private int GetBestFitOctant(Vector3d parentOctantCenter, Vector3d entityCenter)
+		{
+			int code = 0;
+			if (entityCenter.x > parentOctantCenter.x)
+				code |= 1;
+			if (entityCenter.y > parentOctantCenter.y)
+				code |= 2;
+
+			// TODO: if this is a 2D Octree which should just use a quadtree of course... then we should skip the following entityCenter.z test
+			if (entityCenter.z >= parentOctantCenter.z)
+				code |= 4;
+			
+			return code;
+		}
+		
+		
 		private void AddEntityNodeToCollection(EntityNode entityNode)
         {
             if (mEntityNodesCollection == null)
@@ -3817,13 +4151,13 @@ return (0,0);
             OnEntityNode_Removed(entityNode);
         }
            
-
+		// Split() is called by this.Add()
         private bool Split()
         {	
             // cannot split because we're at max depth
             if (mEnforceMaxDepth && _depth == OctreeOctant.MaxDepth)
 			{
-                Console.WriteLine("Max Depth reached ... " + _depth.ToString());
+                //Console.WriteLine("Max Depth reached ... " + _depth.ToString());
 				return false;
 			}
 			
@@ -3853,26 +4187,50 @@ return (0,0);
 
         public void OnEntityNode_Moved(EntityNode entityNode)
         {
-			lock(mAddLock)
+			//lock(mAddLock)
+			try
 			{
-				// is the entity still in this bounds?
-				// we dont have to test the radius of the entityNode because
-				// we already know it fits.
-				//    System.Console.WriteLine("m");
-				if (mBox.Contains(entityNode.BoundingBox.Center)) return;
+				{
+					mSemaphoreSlim.Wait(-1); // -1 waits indefinetly, otherwise parameter represents maximum milliseconds to wait
 
-				// inform the parent that the entity in this octant no longer fits
-				// NOTE: we do not add/remove the entityNode here.  The parent must do it
-				// so that we don't trigger collapse of all 8 of it's children before parent can 
-				// have a chance to fit it into one of its other 7 children
-				if (this.IsRoot == false)
-					mParent.Move(this, entityNode); // calls on Parent
+					// is the entity still in this bounds?
+					// we dont have to test the radius of the entityNode because
+					// we already know it fits.
+					if (mBox.Contains(entityNode.BoundingBox.Center)) return;
+
+					// inform the parent that the entity in this octant no longer fits
+					// NOTE: we do not add/remove the entityNode here.  The parent must do it
+					// so that we don't trigger collapse of all 8 of it's children before parent can 
+					// have a chance to fit it into one of its other 7 children
+					if (this.IsRoot == false)
+					{
+						mParent.Move(this, entityNode); // calls updward to Parent
+					}
+				}
+			}
+			finally
+			{
+				mSemaphoreSlim.Release();
 			}
         }
 
+		///<summary>
+		/// PreviousOctant should always be a child of the OctreeOctant executing this method
+		/// </summary>
         private void Move(OctreeOctant previousOctant, EntityNode entityNode)
         {
-
+			#if DEBUG
+				bool found = false;
+				for (int i = 0; i < mChildOctants.Length; i++)
+					if (mChildOctants[i] == previousOctant)
+					{
+						found = true;
+						break;
+					}
+			if (!found) throw new Exception("OctreeOctant.Move() - Invalid previousOctant.");
+			#endif
+			
+			
 			//System.Diagnostics.Debug.WriteLine ("OctreeOctant.Move() - " + entityNode.Entity.TypeName);
 			// NOTE: Here we clear the .SpatialNode first but we must not call OnEntityNode_Removed()
 			//       until AFTER .Add() is called.
@@ -3890,6 +4248,9 @@ return (0,0);
 			// is large enought to contain it if the entityNode's center is with in it.
 
 			// 
+			
+			
+			
 			OctreeOctant newOctant = previousOctant;
 			if (previousOctant.mParent != null)
 				newOctant = previousOctant.mParent;
@@ -3903,13 +4264,42 @@ return (0,0);
 				newOctant = newOctant.Parent;
 			}
 
-			//System.Console.WriteLine("OctreeOctant.Move() - Entity '" + entityNode.Index.ToString() + "' at OctreeOcant " + previousOctant.Address + " Moved to new octant");
-			newOctant.Add(entityNode);// Add must always occur before Remove() because we dont want to collapse branches before we've had a chance to determine if the child will move there!
+			newOctant.Add(entityNode);    // Add must always occur before Remove() because we dont want to collapse branches before we've had a chance to determine if the child will move there!
 			previousOctant.OnEntityNode_Removed(entityNode);
-
 		}
 
-        public void OnEntityNode_Resized(EntityNode entityNode)
+        internal void OnEntityNode_Removed(EntityNode entityNode)
+        {
+			//lock (mAddLock)
+			try
+			{
+				//mSemaphoreSlim.Wait(-1); // -1 waits indefinetly, otherwise parameter represents maximum milliseconds to wait
+				{
+					// remove the entityNode
+					if (mEntityNodesCollection == null) return;
+					mEntityNodesCollection.Remove(entityNode);
+
+					// can we collapse this octant?
+					if (mEntityNodesCollection.Count == 0)
+					{
+						mEntityNodesCollection = null;
+						// must now notify the parent that this octant can be destroyed
+						// TODO: nov.27.2012 - i think when an entityNode is added to octree root node, there is no parent
+						//       so how do we prevent this?  should i just return if null?  will do for now
+						// TODO: however i also think part of the problem this seems to keep being called for non moving
+						//       think like a manually place directional light is our physics update
+						if (mParent == null) return;
+						mParent.OnChildOctant_Empty(this);
+					}
+				}
+			}
+			finally
+			{
+				//mSemaphoreSlim.Release();
+			}
+        }
+
+		public void OnEntityNode_Resized(EntityNode entityNode)
         {
             // does this entityNode still fit in this octant?
             // we must test against entire box since this entity may now be too big to fit
@@ -3945,48 +4335,31 @@ return (0,0);
             newOctant.Add(entityNode);
             childOctant.OnEntityNode_Removed(entityNode);
         }
-
-        internal void OnEntityNode_Removed(EntityNode entityNode)
-        {
-            // remove the entityNode
-            if (mEntityNodesCollection == null) return;
-            mEntityNodesCollection.Remove(entityNode);
-
-            // can we collapse this octant?
-            if (mEntityNodesCollection.Count == 0)
-            {
-                mEntityNodesCollection = null;
-                // must now notify the parent that this octant can be destroyed
-                // TODO: nov.27.2012 - i think when an entityNode is added to octree root node, there is no parent
-                //       so how do we prevent this?  should i just return if null?  will do for now
-                // TODO: however i also think part of the problem this seems to keep being called for non moving
-                //       think like a manually place directional light is our physics update
-                if (mParent == null) return;
-                mParent.OnChildOctant_Empty(this);
-            }
-        }
-
+		
         private void OnChildOctant_Empty(OctreeOctant childOctant)
         {
-            int nullCount = 0;
-            for (int i = 0; i < mChildOctants.Length; i++)
-                if (mChildOctants[i] == childOctant)
-                {
-                    mChildOctants[i].Parent = null; // or mChildOctants[i].Dispose() ?
-                    mChildOctants[i] = null;
-                    nullCount++;
-                }
-                else if (mChildOctants[i] == null)
-                    nullCount++;
+			//lock (mAddLock)
+			{
+				int nullCount = 0;
+				for (int i = 0; i < mChildOctants.Length; i++)
+					if (mChildOctants[i] == childOctant)
+					{
+						mChildOctants[i].Parent = null; // or mChildOctants[i].Dispose() ?
+						mChildOctants[i] = null;
+						nullCount++;
+					}
+					else if (mChildOctants[i] == null)
+						nullCount++;
 
-            // if all child octants are null, we can delete the entire child array
-            // and potentially it's parents too
-            if (nullCount == MAX_CHILD_COUNT)
-            {
-                mChildOctants = null;
-                if (IsRoot == false && mEntityNodesCollection == null)
-                    mParent.OnChildOctant_Empty(this); // recurse upwards
-            }
+				// if all child octants are null, we can delete the entire child array
+				// and potentially it's parents too
+				if (nullCount == MAX_CHILD_COUNT)
+				{
+					mChildOctants = null;
+					if (IsRoot == false && mEntityNodesCollection == null)
+						mParent.OnChildOctant_Empty(this); // recurse upwards
+				}
+			}
         }
         #endregion
 
@@ -9065,7 +9438,6 @@ return (0,0);
 
         public DataProcessorsStore(ComponentStoreCollection col)
         {
-
             mComponentStoreCollection = col;
             mProcessors = new Dictionary<string, object>();
         }
@@ -9099,11 +9471,8 @@ return (0,0);
         public void Update(GameTime gt, EntityNode[] entities)
         {
            
-            
-            
             foreach (string key in mProcessors.Keys)
             {
-                
                 var func = mProcessors[key];
 				int seed = 0;
 			
@@ -9114,16 +9483,19 @@ return (0,0);
 				switch (key)
 				{
 					case "FLOCKING":
-						
-			Processor<Transform.Transform_Struct> flocking = (Processor<Transform.Transform_Struct>)func;
+						Processor<Transform.Transform_Struct> flocking = (Processor<Transform.Transform_Struct>)func;
                         ComponentStore<Transform.Transform_Struct> store0 = mComponentStoreCollection.CheckOut<Transform.Transform_Struct>(0);
   		                flocking.Invoke(store0, args, seed, gt);
 						break;
 					case "LIFECYCLE":
-		Processor<Transform.Living_Entity> life = (Processor<Transform.Living_Entity>)func;
-               ComponentStore<Transform.Living_Entity> store1 = mComponentStoreCollection.CheckOut<Transform.Living_Entity>(0);
-  		    
- life.Invoke(store1, args, seed, gt);
+						Processor<Transform.Living_Entity> life = (Processor<Transform.Living_Entity>)func;
+				   		ComponentStore<Transform.Living_Entity> store1 = mComponentStoreCollection.CheckOut<Transform.Living_Entity>(0);
+ 						life.Invoke(store1, args, seed, gt);
+						break;
+					case "LASERS":
+						Processor<Boid.Laser_Struct> lazer = (Processor<Boid.Laser_Struct>)func;
+				   		ComponentStore<Boid.Laser_Struct> storeLasers = mComponentStoreCollection.CheckOut<Boid.Laser_Struct>(0);
+ 						lazer.Invoke(storeLasers, args, seed, gt);
 						break;
 					default:
 						throw new NotImplementedException();
@@ -9173,6 +9545,8 @@ return (0,0);
                     break;
                 case "COLLIDE":
                     break;
+				case "LASERS":
+					break;
                 default:
                     throw new NotImplementedException("DataProcessors.GetParameters() - No store for key '" + key + "'");
             }
@@ -9349,7 +9723,7 @@ return (0,0);
              //    // walls and floors and ceilings.  <-- This is mostly for when our view is such that
              //    // we cannot first determine the closest edge and use that to find any wall on that edge
              //    // For instance, imagine a camera that is more like a FPS view or a bullet or laser hits a Walls
-             //    // 
+
              //    - storing data on interior Walls and Floors and Ceilings "damage"
 
 
@@ -9369,60 +9743,112 @@ return (0,0);
     /// This StoreCollection object will host ComponentStores<T> for both 
     /// Intrinsic and UserComponents
     /// </summary>
-    public class ComponentStoreCollection
+    public class ComponentStoreCollection : IDisposable
     {
-        private Dictionary<Type, object> mUserComponentsCollection;
-
+        private System.Collections.Concurrent.ConcurrentDictionary<Type, object> mUserComponentsCollection;
+		private static System.Threading.SemaphoreSlim mSlim = new System.Threading.SemaphoreSlim(1);
+				
+		
         public ComponentStoreCollection()
         {
-            mUserComponentsCollection = new Dictionary<Type, object>();
+            mUserComponentsCollection = new System.Collections.Concurrent.ConcurrentDictionary<Type, object>();
         }
-
+		
+		
         public ComponentStore<T> CheckOut<T>(uint size = 64)
         {
-            object value;
-            bool success = mUserComponentsCollection.TryGetValue(typeof(T), out value);
+			try 
+			{
+				mSlim.Wait(-1); // wait parameter is in milliseconds to Wait, BUT -1 means wait indefinetely
+				// Feb.13.2026 - switched to ConcurrentDictionary<>
+				ComponentStore<T> store = (ComponentStore<T>) mUserComponentsCollection.GetOrAdd(typeof(T), result =>  new ComponentStore<T>(size));
+								
+				//object value;
+				//bool success = mUserComponentsCollection.TryGetValue(typeof(T), out value);
+				//if (success)
+				//    return (ComponentStore<T>)value; // throw new Exception("ComponentStoreCollection.CheckOut() - Dictionary Key Already Exists.");
 
-            if (success)
-                return (ComponentStore<T>)value; // throw new Exception("ComponentStoreCollection.CheckOut() - Dictionary Key Already Exists.");
-
-            ComponentStore<T> store = new ComponentStore<T>(size);
-
-            mUserComponentsCollection.Add(typeof(T), store);
-            return store;
+				//mUserComponentsCollection.Add(typeof(T), store);
+				return store;
+			}
+			finally
+			{
+				mSlim.Release();
+				//Console.WriteLine ("ComponentStore.CheckOut() - Completed " + typeof(T).ToString());
+			}
         }
-
+		
         public void CheckIn<T>(T type, object store)
         {
-            if (store == null) throw new ArgumentOutOfRangeException("ComponentStoreCollection.CheckIn() - Dictionary is NULL.");
+			try 
+			{
+				mSlim.Wait(-1);  // wait parameter is in milliseconds to Wait, BUT -1 means wait indefinetely
+				
+				object existing;
+				bool result = mUserComponentsCollection.TryRemove(type.GetType(), out existing);
 
-            object value;
-            bool success = mUserComponentsCollection.TryGetValue(type.GetType(), out value);
+				//System.Diagnotistics.Debug.Assert (result == true && existing == store, "ComponentStoreCollection.CheckIn()  - Dictionary item does not exist.");
 
-            if (!success) throw new ArgumentOutOfRangeException("ComponentStoreCollection.CheckIn() - ComponentStore for Type '" + typeof(T).Name + " ' is NULL.");
+				/*
+				if (store == null) throw new ArgumentOutOfRangeException("ComponentStoreCollection.CheckIn() - Dictionary is NULL.");
 
-            mUserComponentsCollection.Remove(type.GetType());
-            //value.Dispose();
+				object value;
+				bool success = mUserComponentsCollection.TryGetValue(type.GetType(), out value);
+
+				if (!success) throw new ArgumentOutOfRangeException("ComponentStoreCollection.CheckIn() - ComponentStore for Type '" + typeof(T).Name + " ' is NULL.");
+
+				mUserComponentsCollection.Remove(type.GetType());
+				//value.Dispose();
+				*/
+			}
+			finally
+			{
+				mSlim.Release();
+			}
+        }
+        
+        
+        bool mIsDisposed;
+        
+        public void Dispose()
+        {
+            if (!mIsDisposed)
+            {
+                 
+				foreach(object obj in mUserComponentsCollection.Values)
+				{
+					((IDisposable)obj).Dispose();
+				}
+
+				mIsDisposed= true;
+				mUserComponentsCollection=null;
+				Console.WriteLine("ComponentStoreCollection.~dtor() - " + this.GetType().ToString() + " Disposed.");
+            }
+            
         }
     } // ComponentStoreCollection.cs
 
+	
     ///<summary>
     /// Components are essentially data stores for Intrinsic or User game objects.
     /// They are always stored as struct within contiguous Memory<T> for
     /// fast processing of their data.
     ///</summary>
-    public class ComponentStore<T>
+    public class ComponentStore<T> :IDisposable
     {
         private uint STARTING_SIZE = 64;
         private const uint MIN_SIZE = 64;
         private const uint MAX_SIZE = 1024;
         private uint EXPAND_INCREMENT = MIN_SIZE; // expand by this amount when needed.  if 0, it will double the size of Components
         
+		// NOTE: there is no System.Collections.Concurrent.ConcurrentList<>
 		private Memory<T> Components;
 		private Stack<int> mAvailableForCheckOut;
 		private bool[] InUse;       
 
         private object mSync;
+		private static System.Threading.SemaphoreSlim mSlim = new System.Threading.SemaphoreSlim(1);
+		
         private Dictionary<string, bool[]> mViews;
 		
         /*Span<T> in C# is a value type that provides a safe and efficient way to work with 
@@ -9477,6 +9903,8 @@ return (0,0);
         {
             STARTING_SIZE = size;
             mSync = new object();
+						
+			
             mAvailableForCheckOut = new Stack<int>();
 
             for (int i = (int)STARTING_SIZE; i >= 0; i--)
@@ -9489,7 +9917,8 @@ return (0,0);
 			//Console.WriteLine("ComponentStore.ctor() - " + totalAllocated.ToString() + " allocated.");
 			
 			long totalUsed = Utils.GetUsedMemory(false);
-			Console.WriteLine("ComponentStore.ctor() - " + Utils.SizeSuffix(totalUsed) + " used.");
+			//Console.WriteLine("ComponentStore.ctor() - " + Utils.SizeSuffix(totalUsed) + " used.");
+			Console.WriteLine( "ComponentStore.ctor() - Type == '" + (typeof(T)).ToString() + " Starting size == " + size.ToString());
         }
 
 		
@@ -9517,60 +9946,84 @@ return (0,0);
         // will get stored.
         public Memory<T> CheckOut(out int index) // aka: MemoryPool<T>.Rent() 
         {
-            lock (mSync)
-            {
+			
+			
+			
+            //lock (mSync)
+			try
+			{
+				mSlim.Wait(-1);  // wait parameter is in milliseconds to Wait, BUT -1 means wait indefinetely
+				{
+					const int HOW_MANY = 1;
+					index = -1;
+					try
+					{
+						try
+						{
+							if (Components.Equals(null))
+								Expand();
+						}
+						catch (Exception ex)
+						{
+							//Console.WriteLine("ComponentStore.CheckOut() - line 1" + ex.Message);
+						}
+						
 
-                const int HOW_MANY = 1;
-                index = -1;
-                try
-                {
+						// using stack<int> of available indices
+						if (mAvailableForCheckOut.Count > 0)
+						{
+							
+							int i = mAvailableForCheckOut.Pop();
+							try
+							{
+								InUse[i] = true;
+							}
+							catch (Exception ex)
+							{
+								//Console.WriteLine("ComponentStore.CheckOut() - i == " + i + " InUse[i] == " + InUse[i] + " - " + ex.Message);
+							}
+							
+							index = i;
+							return Components.Slice(index, HOW_MANY);
+						}
 
-                    if (Components.Equals(null))
-                        Expand();
+						// NOTE: we start searching from mLastCheckOutIndex + 1 otherwise
+						//       finding an available slot is very slow.  This works great
+						//       but when we also start to CheckIn() items, we need to maintain
+						//       a list of those as well.  
+						//       In fact, all we need is to initially create a stack<> of available
+						//       generated by adding initially all indices from bottom to top so that
+						//       we grab from the top first.  Then any item's that are "CheckIn" get 
+						//       their indices added back to the stack.
+						//for (int i = mLastCheckOutIndex + 1; i < Components.Length; i++)
+						//    if (!InUse[i])
+						//    {
+						//        InUse[i] = true;
+						//        mLastCheckOutIndex = i;
+						//        return Components.Slice(i, HOW_MANY);    
+						//    }
 
-                    // using stack<int> of available indices
-                    if (mAvailableForCheckOut.Count > 0)
-                    {
-                        int i = mAvailableForCheckOut.Pop();
-                        InUse[i] = true;
-                        index = i;
-                        return Components.Slice(i, HOW_MANY);
-                    }
-
-                    // NOTE: we start searching from mLastCheckOutIndex + 1 otherwise
-                    //       finding an available slot is very slow.  This works great
-                    //       but when we also start to CheckIn() items, we need to maintain
-                    //       a list of those as well.  
-                    //       In fact, all we need is to initially create a stack<> of available
-                    //       generated by adding initially all indices from bottom to top so that
-                    //       we grab from the top first.  Then any item's that are "CheckIn" get 
-                    //       their indices added back to the stack.
-                    //for (int i = mLastCheckOutIndex + 1; i < Components.Length; i++)
-                    //    if (!InUse[i])
-                    //    {
-                    //        InUse[i] = true;
-                    //        mLastCheckOutIndex = i;
-                    //        return Components.Slice(i, HOW_MANY);    
-                    //    }
-
-                    // if still here, we need to expand first
-                    Expand();
-                    return CheckOut(out index);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("componentStore.Checkout" + ex.Message);
-                    return null;
-                }
-
-            }
+						// if still here, we need to expand first
+						Expand();
+						return CheckOut(out index);
+					}
+					catch (Exception ex)
+					{
+						//Console.WriteLine("ComponentStore.Checkout()" + ex.Message);
+						return null;
+					}
+				}
+			}
+			finally
+			{
+				mSlim.Release();
+			}
         }
 
         public void CheckIn(Memory<T> mem)
         {
             lock (mSync)
             {
-
                 // find the index of this mem being checked In
                 for (int i = 0; i < Components.Length; i++)
                     if (!InUse[i] && (mem.Equals(this.Components.Slice(i, 1))))
@@ -9578,7 +10031,6 @@ return (0,0);
                         InUse[i] = false;
 						
 						// CheckIn(); 
-						
 						
                         mAvailableForCheckOut.Push(i);
                         return;
@@ -9735,6 +10187,25 @@ return (0,0);
 
                 // assign the new expanded view
                 mViews[key] = indices;
+            }
+        }
+        
+        bool mIsDisposed;
+        
+        public void Dispose()
+        {
+            if (!mIsDisposed)
+            {
+				for(int i = 0; i <  Components.Length;i++)
+				{
+					//ComponentStore<T> store = (ComponentStore<T>)
+					CheckIn (Components.Slice(i, 1));
+				}
+
+				mIsDisposed = true;
+				Components = null; 
+				
+				Console.WriteLine("ComponentStore.~dtor() - " + this.GetType().ToString() + " Disposed.");
             }
         }
 

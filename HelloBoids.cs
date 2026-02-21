@@ -991,6 +991,28 @@ namespace HelloBoids
 		private void DoWeaponTest(ComponentStore<Boid.Laser_Struct> store, object[] parameters, int seed, GameTime gt)
         {
 			Console.WriteLine("Do lasers...");
+
+
+            // we need for scripts to call RegisterConsumption(productID) and RegisterConsumptionProcesssor delegate 
+            //  - the RegisterConsumption(entityID, productID) is usefull for not having to iterate through all Entities to find one
+            //    where entity.Script.Consumers (<-- consumers just contains delegates to handlers) IS NOT NULL and then that is a successful
+            //    find.  But it's better to just have a list of all consumers of a type of productID. 
+            //  - 
+
+
+            // Radar sensor will RegisterConsumer (entityID, microwaveID) and it will Produce() a type of 
+            // product called "contact(s)"  as contactProductID
+            // 
+
+            // TODO: we need to keep in mind that Production and Consumption should occur over the NETWORK as well.
+            //       _or_ only the changes need to be transmitted
+            // 
+            //  the components can define and create the Memory<T> structs it needs such as
+            //  Memory<Laser_Struct> lasers;  and then define the various processors that will use that struct
+            //  Those processors will also be defined via script (potentially) and the scripts will know how to 
+            //  grab that Memory<Laser_Struct> out of a UserData object.
+
+
 		}
 		
         private void DoLifeCycle(ComponentStore<Transform.Living_Entity> store, object[] parameters, int seed, GameTime gt)

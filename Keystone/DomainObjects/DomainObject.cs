@@ -58,7 +58,7 @@ namespace Keystone.DomainObjects
 
         // TODO: these could be made into c# bitflag arrays for unlimited length
         // NOTE: values bitwsise ORd in AddTransmitter(); RemoveTransmitter(); AddProduction(); AddConsumption();
-        internal uint mProductionTypeFlags;  // production/consumption product type flags
+        internal uint mProductionTypeFlags;  // production/consumption product type flags  // <- todo: delete these vars... we just need an array of productIDs that the entities represented by this Script will consume
         internal uint mConsumptionFlags;
         //internal uint mEmissionTransmissionFlags; // transmission/reception emission type flags
         //internal uint mEmissionReceptionFlags;
@@ -649,6 +649,7 @@ namespace Keystone.DomainObjects
             if (mConsumers == null) mConsumers = new Dictionary<uint, KeyCommon.Simulation.Consumption_Delegate>();
             mConsumers.Add(productionTypeFlag, consumptionHandler);
 
+            // todo: delete this... we just need an array of productIDs that the entities represented by this Script will consume
             mProductionTypeFlags |= productionTypeFlag;
         }
 

@@ -55,13 +55,26 @@ public class Tactical : BaseScript
 	// but we can't rely on it for finding and cacheing other Entity IDs because we don't know the order in which they are deserialized.
 	public static void InitializeEntity(string entityID)
 	{
+		// TODO: we need to rename this to OnAddedToScene()
+		//                                 OnRemovedFromScene()
+		//                                 OnParentChanged()
+		//                                 OnOwnerChanged()
+		
 
 		KeyCommon.Data.UserData data = new KeyCommon.Data.UserData(); 
 		
 		data.SetBool("cache_required", true);
-		data.SetDouble ("fireelapsed", 0d);
-		data.SetDouble ("sensor_contact_prune_hz", 5d);
-		data.SetDouble("sensor_contact_last_prune", 0d);
+		
+	
+		string vehicleID = EntityAPI.GetOwnerID(entityID);
+		data.SetString("owner", vehicleID);
+					
+
+		TimingAPI.Register_Interval(entityID, "fire", 5000); // time is in milliseconds
+		bool repeating = true;
+		TimingAPI.Register_Interval(entityID, "prune_sensor_contacts", 5d, repeating); // time is in Hz (times per second)
+		bool active = false;
+		TimingAPI.Register_Interval(entityID, "last_contacts_prune", 0d, active); // time is in Hz (times per second)
 		
 		EntityAPI.SetAIBlackboardData(entityID, data);
 	}
@@ -98,38 +111,6 @@ public class Tactical : BaseScript
 	#region PlacementTool related
 	public static uint QueryPlacementBrushType () { return (uint)UserConstants.BRUSH_TYPE.BRUSH_SINGLE_DROP;}
 		
-	// todo: where do we return a bool indicating whether placement is valid?  I cant just hardcode
-	// within Interior validity checking reqts for all component types?
-	// a Validate function needs to be added to this script and for it to be called by the Interior during assetplacement and during
-	// restore from saved file.
-	
-	public static Vector3d[] QueryCellPlacement (string entityID, string interiorID, Vector3d position, byte cellRotation)
-	{
-		const double TO_DEGREES = 360d / 256d;
-		Vector3d scale, rotation;
-		scale.x = 1;
-		scale.y = 1;
-		scale.z = 1;
-		
-		
-		rotation.x = 0;
-		rotation.y = (double)(cellRotation * TO_DEGREES);
-		rotation.z = 0;
-				
-		// tile location is basically x, z pixel coordinate with y as floor level
-		// we need to convert this to a celledRegion relative coordinate which will give us
-		// a 3D position that represents the CENTER of that tile (not the top/left corner)
-		//position = EntityAPI.CellMap_GetTilePosition3D(interiorID, tileLocation);
-		Vector3d size = EntityAPI.CellMap_GetTileSize (interiorID);
-		
-		// assuming this generic component has it's Y position at floor (not centered in it's bbox)
-		// then we need to lower position.y we return to be on the floor of the cell.		
-		double floorHeight = position.y - (size.y * 0.5);
-		position.y = floorHeight;
-		
-		// return values and dont use EntityAPI to set, since it's a Query and not an Update
-		return new Vector3d[] {position, scale, rotation}; 
-	}
 	
 	#endregion
 
@@ -169,11 +150,17 @@ public class Tactical : BaseScript
 	public static void OnUpdate (string entityID, double elapsedSeconds)
 	{
 		// perhaps here we can interpolate the contacts new position since sensors operate at a lower frequency and Update() occurs every frame
+		// TODO: we need to cache vehicleID in UserData so that we can quickly check if this tactical station is attached
+		//       to a vehicleID or not.
 		string vehicleID = EntityAPI.GetOwnerID(entityID);
 		if (string.IsNullOrEmpty(vehicleID)) return;
 					
 		KeyCommon.Data.UserData data = EntityAPI.GetAIBlackboardData(entityID);
 		
+		string vehicleID = data.GetString("ownerID");
+		if (string.IsNullOrEmpty(vehicleID)) return;
+
+
 		// if this is the first call to OnUpdate(), cache the operatorID, turret, sensors, weapons, and launchers
 		bool cacheRequired = data.GetBool ("cache_required");
 		if (cacheRequired) 
@@ -197,6 +184,8 @@ public class Tactical : BaseScript
 		string operatorID = data.GetString("operator");
 		if (string.IsNullOrEmpty(operatorID)) 
 		{
+			// TODO: perhaps implement a cooldown for how often we search for a new operator
+
 			//todo: how is the turret aimed/moving without an operator and no target set?
 			System.Diagnostics.Debug.WriteLine("crew_station_tactical.css.OnUpdate() - operator is NULL");
 			data.SetBool("cache_required", true);
@@ -221,8 +210,11 @@ public class Tactical : BaseScript
 			return;
 		}
 
-		contacts = PruneContacts(contacts, data, elapsedSeconds);
-		EntityAPI.SetCustomPropertyValue(entityID, "contacts", contacts);
+        if (TimingAPI.Interval_IsReady(entityID, "prune_sensor_contacts");)
+		{
+			contacts = PruneContacts(contacts, data, elapsedSeconds);
+			EntityAPI.SetCustomPropertyValue(entityID, "contacts", contacts);
+	    }
 			
 		string targetID = null;
 		for (int i = 0; i < contacts.Length; i++)
@@ -345,44 +337,38 @@ public class Tactical : BaseScript
 				
 				for (int j = 0; j < currentWeapons.Length; j++)
 				{
+				    
+				    // TODO: beamID needs to be cached once we've found currentWeapons
 					string beamID = EntityAPI.FindDescendantByName(currentWeapons[j], "beam");
-					bool isFiring = EntityAPI.GetFlag(beamID, "enable");
+					//bool isFiring = EntityAPI.GetFlag(beamID, "enable");
+					bool isFiring = !TimingAPI.Interval_IsReady(currentWeapons[j], "firing");
+					
 					if (isFiring)
 					{
-						double elapsed = (double)EntityAPI.GetCustomPropertyValue(currentWeapons[j], "fireelapsed");
-						elapsed += elapsedSeconds;
-						
-						if (elapsed >= (double)EntityAPI.GetCustomPropertyValue(currentWeapons[j], "fireduration"))
-						{
-							elapsed = 0d;
-							EntityAPI.SetCustomPropertyValue(currentWeapons[j], "cooldownelapsed", 0d);
-														
+						// TODO: maybe we can do a visual fx that shows the damage that was already computed
+						//       on initial "fire" to be shown as occurring over the Interval_Duration
 							EntityAPI.SetFlag (beamID, "enable", false);
-						}
-						EntityAPI.SetCustomPropertyValue(currentWeapons[j], "fireelapsed", elapsed);
 						continue;
 					}
 					else 
 					{
-						// track the cooldown period
-						double elapsed = (double)EntityAPI.GetCustomPropertyValue(currentWeapons[j], "cooldownelapsed");
-						elapsed += elapsedSeconds;						
-						if (elapsed >= (double)EntityAPI.GetCustomPropertyValue(currentWeapons[j], "cooldowntime"))
+						bool isReadyToFire = TimingAPI.Interval_IsReady(currentWeapons[j], "cooldown");
+						
+						if (isReadyToFire)
 						{
 							string stationID = entityID;
 							GameAPI.PerformRangedAttack(stationID, currentWeapons[j], targetID);
 		
 							//System.Diagnostics.Debug.WriteLine("crew_station_tactical.OnUpdate() - Firing beam: " + beamID);
-							elapsed = 0d;
 							// todo: set the end pointlight position and the beam scale to target positin														
 							EntityAPI.SetFlag (beamID, "enable", true);
+							// NOTE: all cached weapons must have their appropriate Intervals registered via TimingAPI.
+							TimingAPI.Interval_Reset(currentWeapons[j], "cooldown");
 						}
 						else 
 						{
 							EntityAPI.SetFlag (beamID, "enable", false);
 						}
-						
-						EntityAPI.SetCustomPropertyValue(currentWeapons[j], "cooldownelapsed", elapsed);
 					}
 					// can the weapon be fired? (damaged, "breaker" =false)
 					
@@ -463,13 +449,7 @@ public class Tactical : BaseScript
 			contacts[i].Age += elapsedSeconds;
 		}
 		
-		double hz = data.GetDouble ("sensor_contact_prune_hz");
-		double pruneElapsed = data.GetDouble("sensor_contact_last_prune");
-		pruneElapsed += elapsedSeconds;
-		data.SetDouble("sensor_contact_last_prune", pruneElapsed);
-		
-		if (pruneElapsed < hz) return contacts;
-		
+				
 		// remove stale contacts and destroyed contacts
 		System.Collections.Generic.List<SensorContact> tmp = new System.Collections.Generic.List<SensorContact>();
 		for (int i = 0; i < contacts.Length; i++)
@@ -481,8 +461,8 @@ public class Tactical : BaseScript
 				contacts = RemoveContact(contacts, tmp[i]);
 		}
 		
-		data.SetDouble("sensor_contact_last_prune", 0d);
-		
+		TimingAPI.Interval_Reset(entityID, "prune_sensor_contacts");
+
 		// todo: i think the weapon (eg turret) needs to update it's IsAimed too when the target changes including when target = null
 		//       the "IsAimed" data.Bool should revert to false if the target changes.  If the target is null, we should move turret to rest position
 		
@@ -524,9 +504,50 @@ public class Tactical : BaseScript
 		return contacts;
 	}
 	
+
+
+	// TODO: Tactical Needs to track
+	// 1 - Alert Condition (Green, Yellow, Red)
+	// 2 - Rules of Engagement (can be a list of simple conditions like for an email filter)
+	// 3  - Current Orders
+	// 4 - Operator
+	// 5 - Targeting Computer(s)
+	// 6 - Contacts
+	//     - unknowns
+	//     - friends
+	//     - foes
+	//       - mines
+	//       - missiles
+	//       - ships 
+	///      - stations
+	//       - bases \ worlds
+	//       - satelites
+
+	// 7 - Turrets
+	// 8 - Weapons - GetAvailable() { return !malfunctions/jammed && !cooldown or exceeding RoF, !tooDamaged && breaker==On HasPower && HasOperator && HasRangeToTarget}
+	// 		- lasers  
+	//      - kinetic
+	//      - launchers
+	//        - ammunition
+	//        - crewman loaders
+	// 9 - Sensors
+	// 10 - Damage To Tactical Systems (Sensors, Turrets, Weapons, targeting computer)
+
 	private static void CacheComponents(string entityID, KeyCommon.Data.UserData data)
 	{
 		string vehicleID = EntityAPI.GetOwnerID(entityID);
+		data.SetString("owner", vehicleID);
+
+		// the user friendly name  of the character/operator who is assigned to the crew station custom properties 
+		// which we can then use to get the operatorID which is a GUID and thus not typically possible to remember
+		string name = (string)EntityAPI.GetCustomPropertyValue(entityID, "operator");
+		if (!string.IsNullOrEmpty(name)) 
+		{
+			string operatorID = EntityAPI.FindDescendantByName(vehicleID, name);
+			data.SetString("operator", operatorID);
+		}
+
+
 		// todo: we might be able to re-initialize during "refit" 
 
 		// cache sensors
@@ -609,4 +630,3 @@ public class Tactical : BaseScript
 		// the Beam needs a distance parameter so we can move the endpoint vertices.  We will not use scaling of the z axis.
 	}
 }
-

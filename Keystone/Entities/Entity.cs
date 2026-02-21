@@ -2083,6 +2083,14 @@ namespace Keystone.Entities
             }
         }
 
+        // called from Simulation.Update()
+        // ORDER  SEE KeystoneGameBlocks/Editor/Simulation.cs
+        // TODO: UpdatePhysics() should move as first thing so correct ORDER is maintained
+            // ORDER -
+            //      1 - physics
+            //      2 - logic / rules   <-- occurs in Entity.Script.Exeucte("OnUpdate" currently)
+            //      3 - AI, Behavior    <-- occurs in Entity.UpdateAI() currently
+            //      5 - Animations      <-- occurs in Entity.Update() 
         public virtual void UpdateAI(double elapsedSeconds)
         {
             //System.Diagnostics.Debug.WriteLine("Entity.UpdateAI - " + mFriendlyName);
@@ -2187,6 +2195,22 @@ namespace Keystone.Entities
             }
 
 
+            if (Core._Core.ScriptsEnabled)
+                if (this.Script != null && mScriptIsInitialized) 
+                {
+                    System.Diagnostics.Debug.Assert(this.Scene != null);
+
+                    // TODO: is there a way to do fixed frequency updates?
+                    // Is it bad that scripts execute at frame rate speeds?  I'm not talking about
+                    // fixed step updates, im talking about guaranteeing same amount of updates
+                    // per second across all users' hardware. (eg: 30 fps) but do we have a problem 
+                    // if the physics runs faster say at 100fps? Animations can run as fast as possible
+                    using (CoreClient._CoreClient.Profiler.HookUp("OnUpdate"))
+                        Execute("OnUpdate", new object[] { this.ID, elapsedSeconds });
+                }
+
+
+            // TODO: move to this.UpdateAnimations() as we already have this.UpdateAI() here
             if (mAnimationController != null)// && mAnimationSet.OverrideBehaviors)
             {
                 // skip running behavior and instead follow animation playback
@@ -2200,21 +2224,6 @@ namespace Keystone.Entities
                 // etc
 
                 mAnimationController.Update(elapsedSeconds);
-            }
-
-            if (!Core._Core.ScriptsEnabled) return;
-
-            if (this.Script != null && mScriptIsInitialized) 
-            {
-                System.Diagnostics.Debug.Assert(this.Scene != null);
-
-                // TODO: is there a way to do fixed frequency updates?
-                // Is it bad that scripts execute at frame rate speeds?  I'm not talking about
-                // fixed step updates, im talking about guaranteeing same amount of updates
-                // per second across all users' hardware. (eg: 30 fps) but do we have a problem 
-                // if the physics runs faster say at 100fps? Animations can run as fast as possible
-                using (CoreClient._CoreClient.Profiler.HookUp("OnUpdate"))
-                    Execute("OnUpdate", new object[] { this.ID, elapsedSeconds });
             }
         }
 

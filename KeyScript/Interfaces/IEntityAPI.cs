@@ -16,16 +16,11 @@ namespace KeyScript.Interfaces
         string GetName(string nodeID);
         string GetTypename(string nodeID);
 
+        KeyCommon.Data.UserData GetAIBlackboardData(string entityID);
+        void SetAIBlackboardData(string entityID, KeyCommon.Data.UserData data);
+
         object GetPropertyValue(string entityID, string propertyName);
         void SetPropertyValue(string entityID, string propertyName, object propertyValue);
-
-        // execution of scripted methods in other entities (eg child entities being added)
-        object Execute(string entityID, string methodName, object[] args);
-
-        string FindDescendantByName(string nodeID, string name);
-        string GetDescendantOfType (string startingNodeID, string descendantTypename);
-        string[] GetComponentsOfType(string vehicleID, uint componentClassID);
-        
 
         void SetEntityFlag(string entityID, uint flag, bool value);
         bool GetEntityFlag(string entityID, uint flag);
@@ -38,10 +33,28 @@ namespace KeyScript.Interfaces
         void SetComponentFlagValue(string domainObjectID, uint flag, bool value);
         bool GetComponentFlagValue(string domainObjectID, uint flag);
 
-        KeyCommon.Data.UserData GetAIBlackboardData(string entityID);
-        void SetAIBlackboardData(string entityID, KeyCommon.Data.UserData data);
+        // TODO: the following set of Get/Set property or propertyValue methods
+        // should work against any custom or intrinsic property of Entity or an Entity's script
+        void AddCustomProperties(string scriptID, Settings.PropertySpec[] properties);
+        Settings.PropertySpec[] GetCustomProperties(string entityID, bool specOnly);
+        object GetCustomPropertyValue(string entityID, string propertyName);
 
-        Vector3d GetRegionOffsetRelative (string regionA, string regionB);
+        void SetCustomPropertyValues(string entityID, string[] propertyNames, object[] values, bool raiseEvent = false);
+        
+        void SetCustomPropertyValue(string entityID, string propertyName, object value, bool raiseEvent = false);
+        
+
+        // execution of scripted methods in other entities (eg child entities being added)
+        object Execute(string entityID, string methodName, object[] args);
+
+        string FindDescendantByName(string nodeID, string name);
+        string GetDescendantOfType (string startingNodeID, string descendantTypename);
+        string[] GetComponentsOfType(string vehicleID, uint componentClassID);
+        
+
+       
+
+       
 
 
         // these GetPosition/SetPosition are shortcuts for the general purpose GetProperty/SetProperty functions
@@ -79,6 +92,9 @@ namespace KeyScript.Interfaces
         void SetRotationGlobalSpace(string entityID, Quaternion rotation);
         void SetRotationLocalSpace(string entityID, Quaternion rotation);
 
+         Vector3d GetRegionOffsetRelative (string regionA, string regionB);
+
+
         Vector3d GetVelocity(string entityID);
         void SetVelocity(string entityID, Vector3d velocity);
         Vector3d GetAcceleration(string entityID);
@@ -87,6 +103,51 @@ namespace KeyScript.Interfaces
         void SetAngularVelocity(string entityID, Vector3d velocity);
         Vector3d GetAngularAcceleration(string entityID);
         void SetAngularAcceleration(string entityID, Vector3d acceleration);
+
+        
+        
+        void AddRule(string scriptID, string propertyName, Rule rule);
+        
+        //////////////////////////////////////////////////////////////////
+        // Entity Scripting related
+        //////////////////////////////////////////////////////////////////
+        void PropertyChangedEventAdd(string scriptID, string propertyName, KeyScript.Events.PropertyChangedEventDelegate handler);
+        
+        void PropertyChangedEventSubscribe(string subscriberID, string entityThatGeneratesTheEvent, string eventName, KeyScript.Events.PropertyChangedEventDelegate eventHandler);
+
+        void EventAdd(string scriptID, string eventName, KeyScript.Events.EventDelegate eventHandler);
+        
+        void EventRaise(string entityThatGeneratedTheEvent, string eventName);
+      
+        void EventSubscribe(string subscriberID, string entityThatGeneratesTheEvent, string eventName, KeyScript.Events.EventDelegate eventHandler);
+
+        void AnimationEventSubscribe(string entityThatGeneratesTheEvent, string subscriberID, string animationName, KeyScript.Events.AnimatioCompletedEventDelegate eventHandler);
+
+
+        //////////////////////////////////////////////////////////////////
+        // Production and Consumption
+        //////////////////////////////////////////////////////////////////
+        //        void AssignForceProductionHandler(string scriptID, KeyCommon.Simulation.Production_Delegate productionHandler); // ForceProductionHandler is for gravity and engine thrust which must run at high Hz
+        void AssignProductionHandler(uint productID, KeyCommon.Simulation.Production_Delegate productionHandler); // UserProduction can run at different Hz for different product types.
+        //void CreateProductionStore (string scriptID, string productID, double capacity);
+
+        void AssignConsumptionHandler(string productID, KeyCommon.Simulation.Consumption_Delegate consumptionHandler);
+
+
+        
+        
+        
+        void RegisterConsumption(string entityID, uint productID);
+        void UnRegisterConsumption(string entityID, uint productID);
+
+        void RegisterProduction(string entityID, uint productID);
+        void UnRegisterProduction(string entityID, uint productID);
+
+        void CreateProductionStore (string entityID, uint productID, double capactiy);
+
+        //void CreateTransmitter(string scriptID, string transmitterName, uint flag);
+        //void CreateReceiver(string scriptID, string receiverName, uint flag);
+
 
         // celled region specific
         void CellMap_RegisterObserver(string interiorID, string entityID, string layerName);
@@ -132,41 +193,7 @@ namespace KeyScript.Interfaces
             
 
               
-
-        // Entity Scripting related
-        // TODO: the following set of Get/Set property or propertyValue methods
-        // should work against any custom or intrinsic property of Entity or an Entity's script
-        void AddCustomProperties(string scriptID, Settings.PropertySpec[] properties);
-        Settings.PropertySpec[] GetCustomProperties(string entityID, bool specOnly);
-        object GetCustomPropertyValue(string entityID, string propertyName);
-
-        void SetCustomPropertyValues(string entityID, string[] propertyNames, object[] values, bool raiseEvent = false);
         
-        void SetCustomPropertyValue(string entityID, string propertyName, object value, bool raiseEvent = false);
-        void AddRule(string scriptID, string propertyName, Rule rule);
         
-        void PropertyChangedEventAdd(string scriptID, string propertyName, KeyScript.Events.PropertyChangedEventDelegate handler);
-        
-        void PropertyChangedEventSubscribe(string subscriberID, string entityThatGeneratesTheEvent, string eventName, KeyScript.Events.PropertyChangedEventDelegate eventHandler);
-
-        void EventAdd(string scriptID, string eventName, KeyScript.Events.EventDelegate eventHandler);
-        
-        void EventRaise(string entityThatGeneratedTheEvent, string eventName);
-      
-        void EventSubscribe(string subscriberID, string entityThatGeneratesTheEvent, string eventName, KeyScript.Events.EventDelegate eventHandler);
-
-        void AnimationEventSubscribe(string entityThatGeneratesTheEvent, string subscriberID, string animationName, KeyScript.Events.AnimatioCompletedEventDelegate eventHandler);
-
-        // production and consumption
-        //        void AssignForceProductionHandler(string scriptID, KeyCommon.Simulation.Production_Delegate productionHandler); // ForceProductionHandler is for gravity and engine thrust which must run at high Hz
-        void AssignProductionHandler(string scriptID, uint productID, KeyCommon.Simulation.Production_Delegate productionHandler); // UserProduction can run at different Hz for different product types.
-        //void CreateProductionStore (string scriptID, string productID, double capacity);
-        void CreateConsumption(string scriptID, string productID, uint productType, KeyCommon.Simulation.Consumption_Delegate consumptionHandler);
-
-        void RegisterProduction(string entityID, uint productID);
-        void UnRegisterProduction(string entityID, uint productID);
-
-        //void CreateTransmitter(string scriptID, string transmitterName, uint flag);
-        //void CreateReceiver(string scriptID, string receiverName, uint flag);
     }
 }

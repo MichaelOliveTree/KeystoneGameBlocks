@@ -50,7 +50,6 @@ public class Star : BaseScript
 		// add the properties to the entity's domain object
 		EntityAPI.AddCustomProperties(scriptID, properties);
 		
-		
 		// create a test rule using an inline delegate 
 		//EntityAPI.AddRule (scriptID, "description", 
 		// new SimpleRule(1, delegate {return ((string)properties[0].DefaultValue).Length != 0; }));
@@ -64,10 +63,13 @@ public class Star : BaseScript
 		//EntityAPI.AddRule (); // todo: maybe this version is not necessary?
 					
 		// force production handler runs every physics tick
-//		EntityAPI.AssignForceProductionHandler(scriptID, Force_Production_Update);
+//		EntityAPI.AssignForceProductionHandler((uint)UserConstants.Product.Gravity, Force_Production_Update);
 		
 		// regular production handler runs at seperate hz (possibly once per 1/10 second)
-		EntityAPI.AssignProductionHandler(scriptID, (uint)UserConstants.Product.Gravity, Production_Update);
+		// todo: generic Production_Update now needs to be for light production only and NOT for all types of products this Star will generate
+		//       since our switch to a Data Oriented model of updating Entities.
+		//       Also, some of these functions should probably just exist in Game01.Rules.Processors.***  
+		EntityAPI.AssignProductionHandler((uint)UserConstants.Product.Light, Production_Update);
 		
 		// add heat production
 		

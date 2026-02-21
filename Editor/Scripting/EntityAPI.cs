@@ -234,526 +234,7 @@ namespace KeyEdit.Scripting
         }
         #endregion
 
-        #region CelledRegions
-
-        void IEntityAPI.CellMap_RegisterObserver(string interiorID, string entityID, string layerName)
-        {
-            Keystone.Portals.Interior interior = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(interiorID);
-            if (interior == null) return;
-
-            Keystone.Entities.Entity child = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(entityID);
-
-            interior.RegisterObserver(child, layerName);
-        }
-
-        void IEntityAPI.CellMap_UnregisterObserver(string interiorID, string entityID, string layerName)
-        {
-            Keystone.Portals.Interior interior = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(interiorID);
-            if (interior == null) return;
-
-            Keystone.Entities.Entity child = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(entityID);
-
-            interior.UnregisterObserver(child, layerName);
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="interiorID"></param>
-        /// <param name="position">mouse pick location in local space used to find nearest edge</param>
-        /// <param name="rotation">x,y,z rotation in degrees</param>
-        /// <returns></returns>
-        Vector3d IEntityAPI.CellMap_GetEdgePosition(string interiorID, Vector3d position, out Vector3d rotation, out int edgeID)
-        {
-            Keystone.Portals.Interior interior = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(interiorID);
-            position = interior.GetEdgePosition(position, out edgeID, out rotation);
-
-            return position;
-        }
-
-        bool IEntityAPI.CellMap_EdgeHasWall(string interiorID, int edgeID)
-        {
-            Keystone.Portals.Interior interior = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(interiorID);
-            bool result = interior.WallExists((uint)edgeID);
-            return result;
-        }
-
-        int[] IEntityAPI.CellMap_GetEdgeAdjacents(string interiorID, int edgeID, bool parallelsOnly)
-        {
-            Keystone.Portals.Interior interior = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(interiorID);
-            if (parallelsOnly)
-                return interior.GetParrallelAdjacentEdges((uint)edgeID);
-            else
-                return interior.GetAllAdjacentEdges((uint)edgeID);
-        }
-
-        uint[] IEntityAPI.CellMap_GetMapDimensions(string interiorID)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(interiorID);
-            return new uint[] { celledRegion.CellCountX, celledRegion.CellCountY, celledRegion.CellCountZ };
-        }
-
-        Vector3d IEntityAPI.CellMap_GetTileSnapPosition(string interiorID, string childID, Vector3d position, byte rotation)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(interiorID);
-            Keystone.Entities.Entity child = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(childID);
-
-            // BonedEntities do not have a footprint with any data because they do not get added to the TileMapGrid.
-            // todo: maybe they should have a default empty footprint?
-            if (child.Footprint == null || child.Footprint.Data == null) return position;
-
-            Vector3d result = celledRegion.GetTileSnapPosition(child.Footprint.Data, position, child.Rotation.GetComponentYRotationIndex());
-            return result;
-
-        }
-
-        /// <summary>
-        /// Gets the Cell Index of a given entityID's position in world space // TODO: shouldn't this read in "region space" since the cellmap is using it's own Region's coordinate system?
-        /// </summary>
-        /// <param name="interiorID"></param>
-        /// <param name="entityID"></param>
-        /// <returns></returns>
-        uint IEntityAPI.CellMap_GetCellIndexFromWorldPosition(string interiorID, string entityID)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(interiorID);
-            Keystone.Entities.Entity entity = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(entityID);
-            return celledRegion.CellIndexFromPoint(entity.Translation);
-        }
-
-        uint IEntityAPI.CellMap_GetCellIndexFromWorldPosition(string interiorID, Vector3d position)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(interiorID);
-            return celledRegion.CellIndexFromPoint(position);
-        }
-
-        Vector3d IEntityAPI.CellMap_GetCellSize(string entityID)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
-            return celledRegion.CellSize;
-        }
-
-        Vector3d IEntityAPI.CellMap_GetTileSize(string entityID)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
-            return celledRegion.TileSize;
-        }
-
-        CellEdge IEntityAPI.CellMap_GetEdge(string celledRegionID, uint edgeID)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(celledRegionID);
-            return CellEdge.CreateEdge(edgeID, celledRegion.CellCountX, celledRegion.CellCountY, celledRegion.CellCountZ);
-        }
-
-        // NOTE: the user could call this directly from Script since Utilities.KeyMath is directly accessible however
-        //       they do not get the cellCountX, cellCountZ easily that way.  They'd have to query those properties seperately
-        //       before they could pass them to KeyMath.UnflattenIndex()
-        uint[] IEntityAPI.CellMap_Unflatten(string celledRegionID, uint cellID)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(celledRegionID);
-            uint x, y, z;
-            Keystone.Utilities.MathHelper.UnflattenIndex(cellID, celledRegion.CellCountX, celledRegion.CellCountZ, out x, out y, out z);
-            return new uint[] { x, y, z };
-        }
-
-
-        // TODO: fix calling script to take float
-        float[] IEntityAPI.CellMap_GetStartIndices(string entityID)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
-            return new float[] { celledRegion.StartX, celledRegion.StartY, celledRegion.StartZ };
-        }
-
-        /// <summary>
-        /// Returns the center position of cell.
-        /// </summary>
-        /// <param name="interiorID"></param>
-        /// <param name="cellID"></param>
-        /// <returns></returns>
-        Vector3d IEntityAPI.CellMap_GetCellPosition(string interiorID, uint cellID)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(interiorID);
-            uint x, y, z;
-            Keystone.Utilities.MathHelper.UnflattenIndex(cellID, celledRegion.CellCountX, celledRegion.CellCountZ, out x, out y, out z);
-
-            Vector3d position;
-            position.x = (celledRegion.StartX + x) * celledRegion.CellSize.x;
-            // NOTE: y position here is at center of cell and not on the floor of the deck/level.
-            // If the caller wants the y position of the floor, they should call EntityAPI.CellMap_GetCellSize(interiorID) and do position.y = position.y - (size.y / 2d) 
-            position.y = (celledRegion.StartY + y) * celledRegion.CellSize.y;
-            position.z = (celledRegion.StartZ + z) * celledRegion.CellSize.z;
-            return position;
-        }
-
-        Vector3d IEntityAPI.CellMap_GetTilePosition3D(string entityID, Vector3i tileLocation)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
-
-            return new Vector3d((celledRegion.TileStartX + tileLocation.X) * celledRegion.TileSize.x,
-                                  (celledRegion.TileStartY + tileLocation.Y) * celledRegion.TileSize.y,
-                                  (celledRegion.TileStartZ + tileLocation.Z) * celledRegion.TileSize.z);
-        }
-
-
-        void IEntityAPI.CellMap_SetDataLayerValue(string entityID, string layerName, uint elementIndex, bool value)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
-            celledRegion.Layer_SetValue(layerName, elementIndex, value);
-        }
-
-        object IEntityAPI.CellMap_GetDataLayerValue(string entityID, string layerName, uint elementIndex)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
-            return celledRegion.Layer_GetValue(layerName, elementIndex);
-        }
-
-        void IEntityAPI.CellMap_UpdateLinkNetwork(string entityID, uint tileID, string layerName, bool value)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
-
-            switch (layerName)
-            {
-                case "powerlink":
-                    celledRegion.Database.DoLinkSearch(tileID, Keystone.Portals.Interior.TILE_ATTRIBUTES.LINE_POWER, value);
-                    break;
-                default:
-                    System.Diagnostics.Debug.WriteLine("EntityAPI.CellMap_UpdateLinkNetwork() - unexpected layerName '" + layerName + "'");
-                    break;
-            }
-        }
-        // OBSOLETE - this does nothing.
-        //void IEntityAPI.CellMap_SetCellBoundsValue(string entityID, uint cellID, bool value)
-        //{
-        //    Keystone.Portals.CelledRegion celledRegion = (Keystone.Portals.CelledRegion)Keystone.Resource.Repository.Get(entityID);
-
-        //    // if true, we must set TILEMASK_FLAGS.BOUNDS_IN for the entire cell
-        //    // else, we must clear all flags because this cell is now out of bounds
-        //    // TODO: somewhere in validation perhaps (CommandProcessor i suspect) if this cell
-        //    // is not empty, we must abort.
-        //    uint x, y, z;
-        //    celledRegion.UnflattenCellIndex(cellID, out x, out y, out z);
-        //    byte rotation = 0; //ceilings and floor tile segments have no rotation
-
-        //    if (celledRegion.IsCellInBounds(x, y, z))
-        //        if (celledRegion.IsCellExists(x, y, z))
-        //        {
-        //            int[,] footprint = new int[celledRegion.TilesPerCellX, celledRegion.TilesPerCellZ];
-        //            for (int i = 0; i < celledRegion.TilesPerCellX; i++)
-        //                for (int j = 0; j < celledRegion.TilesPerCellZ; j++)
-        //                    if (value)
-        //                        footprint[i, j] |= (int)Keystone.Portals.CelledRegion.TILEMASK_FLAGS.BOUNDS_IN;
-        //                    else
-        //                        // we do not OR the value for out of bounds, we replace it
-        //                        footprint[i, j] = (int)Keystone.Portals.CelledRegion.TILEMASK_FLAGS.NONE;
-
-
-        //            int[,] rotatedFootprint = celledRegion.GetRotatedFootprint(footprint, rotation);
-
-        //            // BOTTOM/LEFT TILE FLOOR FOOTPRINT of the current floor
-        //            celledRegion.ApplyFootprint((int)cellID, rotatedFootprint);
-
-        //            // TOP/RIGHT TILE CEILING FOOTPRINT of the floor below
-        //            celledRegion.ApplyFootprint((int)cellID, rotatedFootprint);
-        //        }
-        //}
-
-        object IEntityAPI.CellMap_GetTileSegmentState(string entityID, uint cellID)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
-            return null;
-        }
-
-        void IEntityAPI.CellMap_SetTileSegmentState(string entityID, uint cellID, object segment_state)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
-        }
-
-        void IEntityAPI.CellMap_SetTileSegmentStyle(string entityID, uint tileID, object value)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
-
-            Keystone.Portals.EdgeStyle style = (Keystone.Portals.EdgeStyle)value;
-
-            int atlasIndex = 0;
-            bool deleteTile = style.StyleID == -1;
-
-            if (deleteTile == false)
-            {
-                atlasIndex = style.FloorAtlasIndex;// int.Parse(style.FloorAtlasIndex);
-                if (atlasIndex < 0) atlasIndex = 0;
-                ((IEntityAPI)this).CellMap_SetFloorAtlasTexture(entityID, tileID, (uint)atlasIndex);
-
-                atlasIndex = style.CeilingAtlasIndex; // int.Parse(style.CeilingAtlasIndex);
-                if (atlasIndex < 0) atlasIndex = 0;
-                ((IEntityAPI)this).CellMap_SetCeilingAtlasTexture(entityID, tileID, (uint)atlasIndex);
-            }
-
-            SetCollapseState(entityID, Keystone.Portals.Interior.PREFIX_FLOOR, tileID, deleteTile);
-            SetCollapseState(entityID, Keystone.Portals.Interior.PREFIX_CEILING, tileID, deleteTile);
-
-        }
-
-
-        //uint[] edges = EntityAPI.CellMap_Unflatten (entityID, elementIndex);
-        // TODO: here we're trying to find a model assuming that the same model is used
-        // over the entire floor when instead, we should be discriminating by floor AND mesh style.
-        // (texture of same style should be sharing atlases thus can use same minimesh?)
-        void IEntityAPI.CellMap_SetEdgeSegmentStyle(string entityID, uint edgeID, object style)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
-
-            //Keystone.Portals.MinimeshMap minimeshMap = (Keystone.Portals.MinimeshMap)map;
-            Keystone.Portals.EdgeStyle edgeStyle = (Keystone.Portals.EdgeStyle)style;
-
-            // NOTE: this isn't just for visual style, it also modifies the underlying data.  It has to be this way
-            //       because changes to one edge can affect adjacent edges, and those edges may need to have
-            //       their models changed and thus their underlying data as well.
-            //       That's why I removed from the ship_interior.cs script, the seperate applying of the data.
-            //   
-            // TODO: the trick i need to solve is when there are multiple wall operations within a single Tool call
-            //       and I dont want to recalc things like connectivity graph after each individual wall, but rather only
-            //       when all wall operations have completed.
-
-            // TODO: i think any call here should result in calls to run logic when a cell's bounds status changes
-            //       or when any of it's segments have changed (added/removed/changed)
-            // NOTE: ApplyEdgeSegmentStyle can also apply a NULL style to delete an existing style and replace with nothing
-            celledRegion.ApplyEdgeSegmentStyle(edgeID, edgeStyle);
-        }
-
-
-
-        void IEntityAPI.CellMap_ApplyFootprint(string entityID, uint index, object styleObject)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
-
-            Keystone.Portals.EdgeStyle style = null;
-
-            // TODO: we need to determine if index is a Edge ID or a flattened Tile index.
-            // TODO: how do we do that? we could add a seperate parameter to this method
-            //       eg. bool isEdge.  But maybe not, because i think in our new implementation
-            //       ApplyEdgeSegmentStyle() dynamically computes the footprint of the edge wall and
-            //       applies or unapplies the footprint.  This method is no longer required for
-            //       EdgeStyles.  Then we would only need to call ApplyTileSegmentFootprint() here.
-            //if (styleObject is Keystone.Portals.EdgeStyle)
-            //{
-            //    style = (Keystone.Portals.EdgeStyle)styleObject;  
-            //    // unapply of footprint is also done in the following call
-            //    ApplyEdgeSegmentFootprint(celledRegion, index, style);                        
-            //}
-            //else
-            //{
-            style = (Keystone.Portals.EdgeStyle)styleObject;
-            // unapply of footprint is also done in the following call
-            ApplyTileSegmentFootprint(celledRegion, index, style);
-            //}
-        }
-
-        // todo: this method i think is obsolete - edge wall segment footprints are dynamically computed now based on sub model index for the prefab's ModelSelector
-        private void ApplyEdgeSegmentFootprint(Keystone.Portals.Interior celledRegion, uint edgeID, Keystone.Portals.EdgeStyle style)
-        {
-            Keystone.CSG.CellEdge e = Keystone.CSG.CellEdge.CreateEdge(edgeID, celledRegion.CellCountX, celledRegion.CellCountY, celledRegion.CellCountZ);
-
-            // compute the rotation based on the orientation for use with footprints
-            byte leftRotation, rightRotation;
-            e.GetByteRotation(out leftRotation, out rightRotation);
-
-            // NOTE: For Client/Server, the server
-            //       runs the same validation so client simply places when server responds ok.
-            // if both left and right cells are -1 there is a problem
-            // if both left and right cells are painted as "out of bounds" there is a problem
-            //  - at least one or the other must be in bounds
-            uint adjacentX, adjacentY, adjacentZ;
-            celledRegion.UnflattenCellIndex((uint)e.BottomLeftCell, out adjacentX, out adjacentY, out adjacentZ);
-            // NOTE: For edges, footprints typically will fall on both cells that share the edge    
-            // So we test if the cells adjacent to this EDGE are available to have footprints set on them
-            // i.e. they are in bounds and they have floors under them
-            if (celledRegion.IsCellInBounds(adjacentX, adjacentY, adjacentZ))
-            {
-                // BOTTOM/LEFT CELL EDGE FOOTPRINT
-                if (celledRegion.IsCellExists(adjacentX, adjacentY, adjacentZ))
-                {
-                    // NOTE: by having call to apply footprint outside of CelledRegion and inside of Command Processor
-                    // we are saying that the rules/logic for when to do these things is determined by the app
-                    // and is not hardcoded into the CelledRegion.  This allows us to have variable resolution
-                    // footprint data.
-                    int[,] rotatedFootprint = celledRegion.GetRotatedFootprint(style.BottomLeftFootprint, leftRotation);
-
-                    if (style.StyleID > -1)
-                        celledRegion.ApplyFootprint(e.BottomLeftCell, rotatedFootprint);
-                    else
-                        celledRegion.UnApplyFootprint(e.BottomLeftCell, rotatedFootprint);
-                }
-            }
-
-            celledRegion.UnflattenCellIndex((uint)e.TopRightCell, out adjacentX, out adjacentY, out adjacentZ);
-            if (celledRegion.IsCellInBounds(adjacentX, adjacentY, adjacentZ))
-            {
-                // TOP/RIGHT CELL EDGE FOOTPRINT
-                if (celledRegion.IsCellExists(adjacentX, adjacentY, adjacentZ))
-                {
-                    int[,] rotatedFootprint = celledRegion.GetRotatedFootprint(style.TopRightFootprint, rightRotation);
-                    if (style.StyleID > -1)
-                        celledRegion.ApplyFootprint(e.TopRightCell, rotatedFootprint);
-                    else
-                        celledRegion.UnApplyFootprint(e.TopRightCell, rotatedFootprint);
-                }
-            }
-        }
-
-        private void ApplyTileSegmentFootprint(Keystone.Portals.Interior celledRegion, uint cellID, Keystone.Portals.EdgeStyle style)
-        {
-            uint x, y, z;
-            celledRegion.UnflattenCellIndex(cellID, out x, out y, out z);
-            byte rotation = 0; //ceilings and floor tile segments have no rotation
-
-            if (celledRegion.IsCellInBounds(x, y, z))
-                if (celledRegion.IsCellExists(x, y, z))
-                {
-                    // NOTE: by having call to apply footprint outside of CelledRegion and inside of Command Processor
-                    // we are saying that the rules/logic for when to do these things is determined by the app
-                    // and is not hardcoded into the CelledRegion
-
-                    int[,] rotatedFootprint = celledRegion.GetRotatedFootprint(style.BottomLeftFootprint, rotation);
-
-                    // BOTTOM/LEFT TILE FLOOR FOOTPRINT of the current floor
-                    if (style.StyleID > -1)
-                        celledRegion.ApplyFootprint((int)cellID, rotatedFootprint);
-                    else
-                        celledRegion.UnApplyFootprint((int)cellID, rotatedFootprint);
-
-                    rotatedFootprint = celledRegion.GetRotatedFootprint(style.TopRightFootprint, rotation);
-
-                    // TOP/RIGHT TILE CEILING FOOTPRINT of the floor below
-                    if (style.StyleID > -1)
-                        celledRegion.ApplyFootprint((int)cellID, rotatedFootprint);
-                    else
-                        celledRegion.UnApplyFootprint((int)cellID, rotatedFootprint);
-
-                }
-
-        }
-
-        object IEntityAPI.CellMap_GetEdgeSegmentState(string entityID, uint edgeID)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
-            return null;
-        }
-
-        void IEntityAPI.CellMap_SetEdgeSegmentState(string entityID, uint edgeID, object segment_state)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
-        }
-        void IEntityAPI.CellMap_SetFloorCollapseState(string entityID, uint cellIndex, bool collapse)
-        {
-            SetCollapseState(entityID, Keystone.Portals.Interior.PREFIX_FLOOR, cellIndex, collapse);
-        }
-
-        void IEntityAPI.CellMap_SetCeilingCollapseState(string entityID, uint cellIndex, bool collapse)
-        {
-            SetCollapseState(entityID, Keystone.Portals.Interior.PREFIX_CEILING, cellIndex, collapse);
-        }
-
-        void SetCollapseState(string entityID, string modelDescription, uint cellIndex, bool collapse)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
-
-            uint x, y, z;
-            celledRegion.UnflattenCellIndex(cellIndex, out x, out y, out z);
-
-            string modelID = Keystone.Portals.Interior.GetInteriorElementPrefix(entityID, modelDescription, typeof(Keystone.Elements.Model), (int)y);
-
-            Keystone.Elements.Model model = (Keystone.Elements.Model)Keystone.Resource.Repository.Get(modelID);
-            if (model == null) return;
-
-            Keystone.Elements.Mesh3d mesh = (Keystone.Elements.Mesh3d)model.Geometry;
-            // TODO: Note, this is not updating the footprint attributes in the tilemap.
-            //       That particular call is done from the Script's call to CellMap_ApplyFootprint()
-            //      but i think that's not a good way to handle it.  Footprint changes should be done here and not left up to the script... right?
-            Keystone.Celestial.ProceduralHelper.CellGrid_CellSetCollapseState(celledRegion.CellCountX, celledRegion.CellCountZ, x, z, mesh, collapse);
-        }
-
-        void IEntityAPI.CellMap_SetFloorAtlasTexture(string entityID, uint cellIndex, uint atlasTextureIndex)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
-
-            uint x, y, z;
-            celledRegion.UnflattenCellIndex(cellIndex, out x, out y, out z);
-            string floorModelID = Keystone.Portals.Interior.GetInteriorElementPrefix(entityID, Keystone.Portals.Interior.PREFIX_FLOOR, typeof(Keystone.Elements.Model), (int)y);
-            SetAtlasTile(celledRegion, floorModelID, x, z, atlasTextureIndex);
-        }
-
-        void IEntityAPI.CellMap_SetCeilingAtlasTexture(string entityID, uint cellIndex, uint atlasTextureIndex)
-        {
-            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
-
-            uint x, y, z;
-            celledRegion.UnflattenCellIndex(cellIndex, out x, out y, out z);
-            string ceilingModelID = Keystone.Portals.Interior.GetInteriorElementPrefix(entityID, Keystone.Portals.Interior.PREFIX_CEILING, typeof(Keystone.Elements.Model), (int)y);
-            SetAtlasTile(celledRegion, ceilingModelID, x, z, atlasTextureIndex);
-        }
-
-        void SetAtlasTile(Keystone.Portals.Interior celledRegion, string modelID, uint x, uint z, uint atlasTileIndex)
-        {
-            Keystone.Elements.Model model = (Keystone.Elements.Model)Keystone.Resource.Repository.Get(modelID);
-            if (model == null) return;
-
-            Keystone.Elements.Mesh3d mesh = (Keystone.Elements.Mesh3d)model.Geometry;
-            Keystone.Appearance.Appearance appearance = model.Appearance;
-
-            if (appearance == null) return; // warning: no atlas set
-
-            if (appearance.Layers == null) return;
-            if (appearance.Layers.Length == 0) return;
-            if (appearance.Layers[0].Texture == null) return;
-            if (appearance.Layers[0].Texture is Keystone.Appearance.TextureAtlas == false) return;
-
-            Keystone.Appearance.TextureAtlas atlas = (Keystone.Appearance.TextureAtlas)appearance.Layers[0].Texture;
-            // TODO: if instead we pass the atlas Texture node ID and an index into the atlas
-            //       then we can easily compute new UV's 
-            // TODO: we must either pass the atlas dimensions or pass the atlas so it can be queried
-            Keystone.Celestial.ProceduralHelper.CellGrid_SetCellUV(celledRegion.CellCountX, celledRegion.CellCountZ, x, z, mesh, atlas, atlasTileIndex);
-        }
-
-        //void IEntityAPI.CellMap_SetInteriorEdgeSegmentStyle(string entityID, uint cellIndex)
-        //{ 
-        //}
-
-        //void IEntityAPI.CellMap_SetExteriorEdgeSegmentStyle(string entityID, uint cellIndex)
-        //{
-        //}
-
-        //void IEntityAPI.Mesh_GridCell_SetCollapseState(string entityID, string modelID, uint x, uint z, bool unCollapsed)
-        //{
-        //    Keystone.Portals.CelledRegion celledRegion = (Keystone.Portals.CelledRegion)Keystone.Resource.Repository.Get(entityID);
-        //    Keystone.Elements.Model model = (Keystone.Elements.Model)Keystone.Resource.Repository.Get(modelID);
-        //    if (model == null) return; 
-
-        //    Keystone.Elements.Mesh3d mesh = (Keystone.Elements.Mesh3d)model.Geometry;
-        //    Keystone.Celestial.ProceduralHelper.CellGrid_CellSetCollapseState(celledRegion, x, z, mesh, unCollapsed);
-        //}
-
-        //void IEntityAPI.Mesh_GridCell_SetAtlasTile(string entityID, string modelID, uint x, uint z, uint atlasTileIndex)
-        //{
-        //    Keystone.Portals.CelledRegion celledRegion = (Keystone.Portals.CelledRegion)Keystone.Resource.Repository.Get(entityID);
-        //    Keystone.Elements.Model model = (Keystone.Elements.Model)Keystone.Resource.Repository.Get(modelID);
-        //    if (model == null) return; 
-
-        //    Keystone.Elements.Mesh3d mesh = (Keystone.Elements.Mesh3d)model.Geometry;
-        //    Keystone.Appearance.Appearance appearance = model.Appearance;
-
-        //    if (appearance == null) return; // warning: no atlas set
-
-        //    if (appearance.Layers == null) return;
-        //    if (appearance.Layers.Length == 0) return;
-        //    if (appearance.Layers[0].Texture == null) return;
-        //    if (appearance.Layers[0].Texture is Keystone.Appearance.TextureAtlas == false) return;
-
-        //    Keystone.Appearance.TextureAtlas atlas = (Keystone.Appearance.TextureAtlas)appearance.Layers[0].Texture;
-        //    // TODO: if instead we pass the atlas Texture node ID and an index into the atlas
-        //    //       then we can easily compute new UV's 
-        //    // TODO: we must either pass the atlas dimensions or pass the atlas so it can be queried
-        //    Keystone.Celestial.ProceduralHelper.CellGrid_SetCellUV(celledRegion, x, z, mesh, atlas, atlasTileIndex);
-        //}
-        #endregion
+        
 
         #region IEntityAPI Queries
         uint IEntityAPI.GetBrushStyle(string entityID)
@@ -1349,23 +830,7 @@ namespace KeyEdit.Scripting
             return ent.GetCustomFlagValue(flag);
         }
 
-        void IEntityAPI.RegisterProduction(string entityID, uint productID)
-        {
-            Keystone.Entities.Entity ent = GetEntity(entityID);
-            if (ent.Scene != null)
-                AppMain._core.SceneManager.Scenes[0].Simulation.RegisterProducer(productID, ent);
-           // TODO: I think maybe there's a problem here because the Entity has yet to be added to the Scene and Simulation.  
-           // So i cant use the below call, i have to use the above call.
-            // ent.Scene.Simulation.RegisterProducer(productID, ent);
-        }
-
-        void IEntityAPI.UnRegisterProduction(string entityID, uint productID)
-        {
-            Keystone.Entities.Entity ent = GetEntity(entityID);
-            if (ent.Scene != null)
-                AppMain._core.SceneManager.Scenes[0].Simulation.UnRegisterProducer(productID, ent);
-            //ent.Scene.Simulation.UnRegisterProducer(productID, ent);
-        }
+        
 
         //        private Keystone.Entities.Entity mRecentEntity;
         internal static Keystone.Entities.Entity GetEntity(string entityID)
@@ -1387,6 +852,39 @@ namespace KeyEdit.Scripting
         #endregion
 
         #region Production & Consumption
+        void IEntityAPI.RegisterProduction(string entityID, uint productID)
+        {
+            Keystone.Entities.Entity ent = GetEntity(entityID);
+            if (ent.Scene != null)
+                AppMain._core.SceneManager.Scenes[0].Simulation.RegisterProducer(productID, ent);
+           // TODO: I think maybe there's a problem here because the Entity has yet to be added to the Scene and Simulation.  
+           // So i cant use the below call, i have to use the above call.
+            // ent.Scene.Simulation.RegisterProducer(productID, ent);
+        }
+
+        void IEntityAPI.UnRegisterProduction(string entityID, uint productID)
+        {
+            Keystone.Entities.Entity ent = GetEntity(entityID);
+            if (ent.Scene != null)
+                AppMain._core.SceneManager.Scenes[0].Simulation.UnRegisterProducer(productID, ent);
+            //ent.Scene.Simulation.UnRegisterProducer(productID, ent);
+        }
+
+        
+        void IEntityAPI.RegisterConsumption(string entityID, uint productID)
+        {
+            Keystone.Entities.Entity ent = GetEntity(entityID);
+            if (ent.Scene != null)
+                AppMain._core.SceneManager.Scenes[0].Simulation.RegisterConsumption(productID, ent);
+        }
+
+        void IEntityAPI.UnRegisterConsumption(string entityID, uint productID)
+        {
+            Keystone.Entities.Entity ent = GetEntity(entityID);
+            if (ent.Scene != null)
+                AppMain._core.SceneManager.Scenes[0].Simulation.UnRegisterConsumption(productID, ent);
+        }
+
         ///// <summary>
         ///// Force Production handler runs at physics update frequency.
         ///// </summary>
@@ -1406,39 +904,45 @@ namespace KeyEdit.Scripting
         /// </summary>
         /// <param name="domainObjectID"></param>
         /// <param name="productionHandler"></param>
-        void IEntityAPI.AssignProductionHandler(string domainObjectID, uint productID, KeyCommon.Simulation.Production_Delegate productionHandler)
+        void IEntityAPI.AssignProductionHandler(uint productID, KeyCommon.Simulation.Production_Delegate productionHandler)
         {
-            Keystone.DomainObjects.DomainObject domainObj = (Keystone.DomainObjects.DomainObject)Keystone.Resource.Repository.Get(domainObjectID);
-
-            //TODO: what if i specified the frequency of this production here upon creation
-            // of the production?
-            if (domainObj == null) return;
-            domainObj.AddProduction(productionHandler, productID);
-
-            //	- and consumption is a broad term for any stimulus or product (synonymous i think)
-            //    such as antimatter fuel or kinetic damage consumption
-            //	- radar or other active sensor scan (and may emit a return signal)
+            // todo: scripts should probably use a Game01.Rules.Processors.*****   method for the handler rather than one from the script
+        //       if the handler already exists for this ProductID that is DIFFERENT from the existing, we should show/log a warning
+        //       and resume? or throw an error so we can fix?
+            if (ent.Scene != null)
+                AppMain._core.SceneManager.Scenes[0].Simulation.AddProductionHandler(productID, productionHandler);
             //  
+        }
+
+        // todo: scripts should probably use a Game01.Rules.Processors.*****   method for the handler rather than one from the script
+        //       if the handler already exists for this ProductID that is DIFFERENT from the existing, we should show/log a warning
+        //       and resume? or throw an error so we can fix?
+        void IEntityAPI.AssignConsumptionHandler(string productID, KeyCommon.Simulation.Consumption_Delegate consumptionHandler)
+        {
+            // TODO: the current thinking is, we should NOT store these in the Script(aka DomainObject because all Entities that can
+            //       conume this productID should do so in the same way.  For example, if a Microwave creates a beam
+            //       then we create seperate productIDs for MicrowaveEmission, microwaveReflection and microwaveDamage so that here we only need 
+            //       one handler for every component that can respond to ONE of these productIDs.  So a crew member can consume both a
+            //       MicrowaveEmission (and reflect a MicrowaveReflection back... note a seperate MicrowaveReflection is created so that we dont end
+            //       up with infinite loop of MicrowaveEmissions going back and forth as well as consume MicrowaveDamage))
+
+            if (ent.Scene != null)
+                AppMain._core.SceneManager.Scenes[0].Simulation.AddConsumptionHandler(productID, consumptionHandler);
         }
 
         // TODO: i think the following is irrelevant?  A production store is just a var in
         // the Entity to where the Production update part of the script will store units created
         // during that tick. Then that update can either erase that var at start of tick or
         // add to it depending on the capacity and nature of the storage.  
-        //void IEntityAPI.CreateProductionStore(string domainObjectID, string productID, double capacity)
-        //{
-        //    //	- and consumption is a broad term for any stimulus or product (synonymous i think)
-        //    //    such as antimatter fuel or kinetic damage consumption
-        //    //	- radar or other active sensor scan (and may emit a return signal)
-        //    //  
-        //}
-
-        void IEntityAPI.CreateConsumption(string domainObjectID, string productID, uint productType, KeyCommon.Simulation.Consumption_Delegate consumptionHandler)
+        void IEntityAPI.CreateProductionStore(string entityID, string productID, double capacity)
         {
-            Keystone.DomainObjects.DomainObject domainObj = (Keystone.DomainObjects.DomainObject)Keystone.Resource.Repository.Get(domainObjectID);
-            domainObj.AddConsumption(consumptionHandler, productType);
+            Keystone.Entities.Entity ent = GetEntity(entityID);
+            throw new NotImplementedException();
+        //    does the store exist in the struct for  'struct Producer_Struct {}'  ?
+        //    //  
         }
 
+        
 
         //void IEntityAPI.CreateTransmitter(string domainObjID, string transmitterName, uint emmissionTypeFlag)
         //{
@@ -1495,6 +999,527 @@ namespace KeyEdit.Scripting
         //    ent.Animations.SetCurrentAnimation(animationIndex);
         //    //ent.Animations.Play();
 
+        //}
+        #endregion
+
+        #region CelledRegions
+
+        void IEntityAPI.CellMap_RegisterObserver(string interiorID, string entityID, string layerName)
+        {
+            Keystone.Portals.Interior interior = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(interiorID);
+            if (interior == null) return;
+
+            Keystone.Entities.Entity child = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(entityID);
+
+            interior.RegisterObserver(child, layerName);
+        }
+
+        void IEntityAPI.CellMap_UnregisterObserver(string interiorID, string entityID, string layerName)
+        {
+            Keystone.Portals.Interior interior = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(interiorID);
+            if (interior == null) return;
+
+            Keystone.Entities.Entity child = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(entityID);
+
+            interior.UnregisterObserver(child, layerName);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="interiorID"></param>
+        /// <param name="position">mouse pick location in local space used to find nearest edge</param>
+        /// <param name="rotation">x,y,z rotation in degrees</param>
+        /// <returns></returns>
+        Vector3d IEntityAPI.CellMap_GetEdgePosition(string interiorID, Vector3d position, out Vector3d rotation, out int edgeID)
+        {
+            Keystone.Portals.Interior interior = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(interiorID);
+            position = interior.GetEdgePosition(position, out edgeID, out rotation);
+
+            return position;
+        }
+
+        bool IEntityAPI.CellMap_EdgeHasWall(string interiorID, int edgeID)
+        {
+            Keystone.Portals.Interior interior = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(interiorID);
+            bool result = interior.WallExists((uint)edgeID);
+            return result;
+        }
+
+        int[] IEntityAPI.CellMap_GetEdgeAdjacents(string interiorID, int edgeID, bool parallelsOnly)
+        {
+            Keystone.Portals.Interior interior = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(interiorID);
+            if (parallelsOnly)
+                return interior.GetParrallelAdjacentEdges((uint)edgeID);
+            else
+                return interior.GetAllAdjacentEdges((uint)edgeID);
+        }
+
+        uint[] IEntityAPI.CellMap_GetMapDimensions(string interiorID)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(interiorID);
+            return new uint[] { celledRegion.CellCountX, celledRegion.CellCountY, celledRegion.CellCountZ };
+        }
+
+        Vector3d IEntityAPI.CellMap_GetTileSnapPosition(string interiorID, string childID, Vector3d position, byte rotation)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(interiorID);
+            Keystone.Entities.Entity child = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(childID);
+
+            // BonedEntities do not have a footprint with any data because they do not get added to the TileMapGrid.
+            // todo: maybe they should have a default empty footprint?
+            if (child.Footprint == null || child.Footprint.Data == null) return position;
+
+            Vector3d result = celledRegion.GetTileSnapPosition(child.Footprint.Data, position, child.Rotation.GetComponentYRotationIndex());
+            return result;
+
+        }
+
+        /// <summary>
+        /// Gets the Cell Index of a given entityID's position in world space // TODO: shouldn't this read in "region space" since the cellmap is using it's own Region's coordinate system?
+        /// </summary>
+        /// <param name="interiorID"></param>
+        /// <param name="entityID"></param>
+        /// <returns></returns>
+        uint IEntityAPI.CellMap_GetCellIndexFromWorldPosition(string interiorID, string entityID)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(interiorID);
+            Keystone.Entities.Entity entity = (Keystone.Entities.Entity)Keystone.Resource.Repository.Get(entityID);
+            return celledRegion.CellIndexFromPoint(entity.Translation);
+        }
+
+        uint IEntityAPI.CellMap_GetCellIndexFromWorldPosition(string interiorID, Vector3d position)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(interiorID);
+            return celledRegion.CellIndexFromPoint(position);
+        }
+
+        Vector3d IEntityAPI.CellMap_GetCellSize(string entityID)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
+            return celledRegion.CellSize;
+        }
+
+        Vector3d IEntityAPI.CellMap_GetTileSize(string entityID)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
+            return celledRegion.TileSize;
+        }
+
+        CellEdge IEntityAPI.CellMap_GetEdge(string celledRegionID, uint edgeID)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(celledRegionID);
+            return CellEdge.CreateEdge(edgeID, celledRegion.CellCountX, celledRegion.CellCountY, celledRegion.CellCountZ);
+        }
+
+        // NOTE: the user could call this directly from Script since Utilities.KeyMath is directly accessible however
+        //       they do not get the cellCountX, cellCountZ easily that way.  They'd have to query those properties seperately
+        //       before they could pass them to KeyMath.UnflattenIndex()
+        uint[] IEntityAPI.CellMap_Unflatten(string celledRegionID, uint cellID)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(celledRegionID);
+            uint x, y, z;
+            Keystone.Utilities.MathHelper.UnflattenIndex(cellID, celledRegion.CellCountX, celledRegion.CellCountZ, out x, out y, out z);
+            return new uint[] { x, y, z };
+        }
+
+
+        // TODO: fix calling script to take float
+        float[] IEntityAPI.CellMap_GetStartIndices(string entityID)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
+            return new float[] { celledRegion.StartX, celledRegion.StartY, celledRegion.StartZ };
+        }
+
+        /// <summary>
+        /// Returns the center position of cell.
+        /// </summary>
+        /// <param name="interiorID"></param>
+        /// <param name="cellID"></param>
+        /// <returns></returns>
+        Vector3d IEntityAPI.CellMap_GetCellPosition(string interiorID, uint cellID)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(interiorID);
+            uint x, y, z;
+            Keystone.Utilities.MathHelper.UnflattenIndex(cellID, celledRegion.CellCountX, celledRegion.CellCountZ, out x, out y, out z);
+
+            Vector3d position;
+            position.x = (celledRegion.StartX + x) * celledRegion.CellSize.x;
+            // NOTE: y position here is at center of cell and not on the floor of the deck/level.
+            // If the caller wants the y position of the floor, they should call EntityAPI.CellMap_GetCellSize(interiorID) and do position.y = position.y - (size.y / 2d) 
+            position.y = (celledRegion.StartY + y) * celledRegion.CellSize.y;
+            position.z = (celledRegion.StartZ + z) * celledRegion.CellSize.z;
+            return position;
+        }
+
+        Vector3d IEntityAPI.CellMap_GetTilePosition3D(string entityID, Vector3i tileLocation)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
+
+            return new Vector3d((celledRegion.TileStartX + tileLocation.X) * celledRegion.TileSize.x,
+                                  (celledRegion.TileStartY + tileLocation.Y) * celledRegion.TileSize.y,
+                                  (celledRegion.TileStartZ + tileLocation.Z) * celledRegion.TileSize.z);
+        }
+
+
+        void IEntityAPI.CellMap_SetDataLayerValue(string entityID, string layerName, uint elementIndex, bool value)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
+            celledRegion.Layer_SetValue(layerName, elementIndex, value);
+        }
+
+        object IEntityAPI.CellMap_GetDataLayerValue(string entityID, string layerName, uint elementIndex)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
+            return celledRegion.Layer_GetValue(layerName, elementIndex);
+        }
+
+        void IEntityAPI.CellMap_UpdateLinkNetwork(string entityID, uint tileID, string layerName, bool value)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
+
+            switch (layerName)
+            {
+                case "powerlink":
+                    celledRegion.Database.DoLinkSearch(tileID, Keystone.Portals.Interior.TILE_ATTRIBUTES.LINE_POWER, value);
+                    break;
+                default:
+                    System.Diagnostics.Debug.WriteLine("EntityAPI.CellMap_UpdateLinkNetwork() - unexpected layerName '" + layerName + "'");
+                    break;
+            }
+        }
+        // OBSOLETE - this does nothing.
+        //void IEntityAPI.CellMap_SetCellBoundsValue(string entityID, uint cellID, bool value)
+        //{
+        //    Keystone.Portals.CelledRegion celledRegion = (Keystone.Portals.CelledRegion)Keystone.Resource.Repository.Get(entityID);
+
+        //    // if true, we must set TILEMASK_FLAGS.BOUNDS_IN for the entire cell
+        //    // else, we must clear all flags because this cell is now out of bounds
+        //    // TODO: somewhere in validation perhaps (CommandProcessor i suspect) if this cell
+        //    // is not empty, we must abort.
+        //    uint x, y, z;
+        //    celledRegion.UnflattenCellIndex(cellID, out x, out y, out z);
+        //    byte rotation = 0; //ceilings and floor tile segments have no rotation
+
+        //    if (celledRegion.IsCellInBounds(x, y, z))
+        //        if (celledRegion.IsCellExists(x, y, z))
+        //        {
+        //            int[,] footprint = new int[celledRegion.TilesPerCellX, celledRegion.TilesPerCellZ];
+        //            for (int i = 0; i < celledRegion.TilesPerCellX; i++)
+        //                for (int j = 0; j < celledRegion.TilesPerCellZ; j++)
+        //                    if (value)
+        //                        footprint[i, j] |= (int)Keystone.Portals.CelledRegion.TILEMASK_FLAGS.BOUNDS_IN;
+        //                    else
+        //                        // we do not OR the value for out of bounds, we replace it
+        //                        footprint[i, j] = (int)Keystone.Portals.CelledRegion.TILEMASK_FLAGS.NONE;
+
+
+        //            int[,] rotatedFootprint = celledRegion.GetRotatedFootprint(footprint, rotation);
+
+        //            // BOTTOM/LEFT TILE FLOOR FOOTPRINT of the current floor
+        //            celledRegion.ApplyFootprint((int)cellID, rotatedFootprint);
+
+        //            // TOP/RIGHT TILE CEILING FOOTPRINT of the floor below
+        //            celledRegion.ApplyFootprint((int)cellID, rotatedFootprint);
+        //        }
+        //}
+
+        object IEntityAPI.CellMap_GetTileSegmentState(string entityID, uint cellID)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
+            return null;
+        }
+
+        void IEntityAPI.CellMap_SetTileSegmentState(string entityID, uint cellID, object segment_state)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
+        }
+
+        void IEntityAPI.CellMap_SetTileSegmentStyle(string entityID, uint tileID, object value)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
+
+            Keystone.Portals.EdgeStyle style = (Keystone.Portals.EdgeStyle)value;
+
+            int atlasIndex = 0;
+            bool deleteTile = style.StyleID == -1;
+
+            if (deleteTile == false)
+            {
+                atlasIndex = style.FloorAtlasIndex;// int.Parse(style.FloorAtlasIndex);
+                if (atlasIndex < 0) atlasIndex = 0;
+                ((IEntityAPI)this).CellMap_SetFloorAtlasTexture(entityID, tileID, (uint)atlasIndex);
+
+                atlasIndex = style.CeilingAtlasIndex; // int.Parse(style.CeilingAtlasIndex);
+                if (atlasIndex < 0) atlasIndex = 0;
+                ((IEntityAPI)this).CellMap_SetCeilingAtlasTexture(entityID, tileID, (uint)atlasIndex);
+            }
+
+            SetCollapseState(entityID, Keystone.Portals.Interior.PREFIX_FLOOR, tileID, deleteTile);
+            SetCollapseState(entityID, Keystone.Portals.Interior.PREFIX_CEILING, tileID, deleteTile);
+
+        }
+
+
+        //uint[] edges = EntityAPI.CellMap_Unflatten (entityID, elementIndex);
+        // TODO: here we're trying to find a model assuming that the same model is used
+        // over the entire floor when instead, we should be discriminating by floor AND mesh style.
+        // (texture of same style should be sharing atlases thus can use same minimesh?)
+        void IEntityAPI.CellMap_SetEdgeSegmentStyle(string entityID, uint edgeID, object style)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
+
+            //Keystone.Portals.MinimeshMap minimeshMap = (Keystone.Portals.MinimeshMap)map;
+            Keystone.Portals.EdgeStyle edgeStyle = (Keystone.Portals.EdgeStyle)style;
+
+            // NOTE: this isn't just for visual style, it also modifies the underlying data.  It has to be this way
+            //       because changes to one edge can affect adjacent edges, and those edges may need to have
+            //       their models changed and thus their underlying data as well.
+            //       That's why I removed from the ship_interior.cs script, the seperate applying of the data.
+            //   
+            // TODO: the trick i need to solve is when there are multiple wall operations within a single Tool call
+            //       and I dont want to recalc things like connectivity graph after each individual wall, but rather only
+            //       when all wall operations have completed.
+
+            // TODO: i think any call here should result in calls to run logic when a cell's bounds status changes
+            //       or when any of it's segments have changed (added/removed/changed)
+            // NOTE: ApplyEdgeSegmentStyle can also apply a NULL style to delete an existing style and replace with nothing
+            celledRegion.ApplyEdgeSegmentStyle(edgeID, edgeStyle);
+        }
+
+
+
+        void IEntityAPI.CellMap_ApplyFootprint(string entityID, uint index, object styleObject)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
+
+            Keystone.Portals.EdgeStyle style = null;
+
+            // TODO: we need to determine if index is a Edge ID or a flattened Tile index.
+            // TODO: how do we do that? we could add a seperate parameter to this method
+            //       eg. bool isEdge.  But maybe not, because i think in our new implementation
+            //       ApplyEdgeSegmentStyle() dynamically computes the footprint of the edge wall and
+            //       applies or unapplies the footprint.  This method is no longer required for
+            //       EdgeStyles.  Then we would only need to call ApplyTileSegmentFootprint() here.
+            //if (styleObject is Keystone.Portals.EdgeStyle)
+            //{
+            //    style = (Keystone.Portals.EdgeStyle)styleObject;  
+            //    // unapply of footprint is also done in the following call
+            //    ApplyEdgeSegmentFootprint(celledRegion, index, style);                        
+            //}
+            //else
+            //{
+            style = (Keystone.Portals.EdgeStyle)styleObject;
+            // unapply of footprint is also done in the following call
+            ApplyTileSegmentFootprint(celledRegion, index, style);
+            //}
+        }
+
+        // todo: this method i think is obsolete - edge wall segment footprints are dynamically computed now based on sub model index for the prefab's ModelSelector
+        private void ApplyEdgeSegmentFootprint(Keystone.Portals.Interior celledRegion, uint edgeID, Keystone.Portals.EdgeStyle style)
+        {
+            Keystone.CSG.CellEdge e = Keystone.CSG.CellEdge.CreateEdge(edgeID, celledRegion.CellCountX, celledRegion.CellCountY, celledRegion.CellCountZ);
+
+            // compute the rotation based on the orientation for use with footprints
+            byte leftRotation, rightRotation;
+            e.GetByteRotation(out leftRotation, out rightRotation);
+
+            // NOTE: For Client/Server, the server
+            //       runs the same validation so client simply places when server responds ok.
+            // if both left and right cells are -1 there is a problem
+            // if both left and right cells are painted as "out of bounds" there is a problem
+            //  - at least one or the other must be in bounds
+            uint adjacentX, adjacentY, adjacentZ;
+            celledRegion.UnflattenCellIndex((uint)e.BottomLeftCell, out adjacentX, out adjacentY, out adjacentZ);
+            // NOTE: For edges, footprints typically will fall on both cells that share the edge    
+            // So we test if the cells adjacent to this EDGE are available to have footprints set on them
+            // i.e. they are in bounds and they have floors under them
+            if (celledRegion.IsCellInBounds(adjacentX, adjacentY, adjacentZ))
+            {
+                // BOTTOM/LEFT CELL EDGE FOOTPRINT
+                if (celledRegion.IsCellExists(adjacentX, adjacentY, adjacentZ))
+                {
+                    // NOTE: by having call to apply footprint outside of CelledRegion and inside of Command Processor
+                    // we are saying that the rules/logic for when to do these things is determined by the app
+                    // and is not hardcoded into the CelledRegion.  This allows us to have variable resolution
+                    // footprint data.
+                    int[,] rotatedFootprint = celledRegion.GetRotatedFootprint(style.BottomLeftFootprint, leftRotation);
+
+                    if (style.StyleID > -1)
+                        celledRegion.ApplyFootprint(e.BottomLeftCell, rotatedFootprint);
+                    else
+                        celledRegion.UnApplyFootprint(e.BottomLeftCell, rotatedFootprint);
+                }
+            }
+
+            celledRegion.UnflattenCellIndex((uint)e.TopRightCell, out adjacentX, out adjacentY, out adjacentZ);
+            if (celledRegion.IsCellInBounds(adjacentX, adjacentY, adjacentZ))
+            {
+                // TOP/RIGHT CELL EDGE FOOTPRINT
+                if (celledRegion.IsCellExists(adjacentX, adjacentY, adjacentZ))
+                {
+                    int[,] rotatedFootprint = celledRegion.GetRotatedFootprint(style.TopRightFootprint, rightRotation);
+                    if (style.StyleID > -1)
+                        celledRegion.ApplyFootprint(e.TopRightCell, rotatedFootprint);
+                    else
+                        celledRegion.UnApplyFootprint(e.TopRightCell, rotatedFootprint);
+                }
+            }
+        }
+
+        private void ApplyTileSegmentFootprint(Keystone.Portals.Interior celledRegion, uint cellID, Keystone.Portals.EdgeStyle style)
+        {
+            uint x, y, z;
+            celledRegion.UnflattenCellIndex(cellID, out x, out y, out z);
+            byte rotation = 0; //ceilings and floor tile segments have no rotation
+
+            if (celledRegion.IsCellInBounds(x, y, z))
+                if (celledRegion.IsCellExists(x, y, z))
+                {
+                    // NOTE: by having call to apply footprint outside of CelledRegion and inside of Command Processor
+                    // we are saying that the rules/logic for when to do these things is determined by the app
+                    // and is not hardcoded into the CelledRegion
+
+                    int[,] rotatedFootprint = celledRegion.GetRotatedFootprint(style.BottomLeftFootprint, rotation);
+
+                    // BOTTOM/LEFT TILE FLOOR FOOTPRINT of the current floor
+                    if (style.StyleID > -1)
+                        celledRegion.ApplyFootprint((int)cellID, rotatedFootprint);
+                    else
+                        celledRegion.UnApplyFootprint((int)cellID, rotatedFootprint);
+
+                    rotatedFootprint = celledRegion.GetRotatedFootprint(style.TopRightFootprint, rotation);
+
+                    // TOP/RIGHT TILE CEILING FOOTPRINT of the floor below
+                    if (style.StyleID > -1)
+                        celledRegion.ApplyFootprint((int)cellID, rotatedFootprint);
+                    else
+                        celledRegion.UnApplyFootprint((int)cellID, rotatedFootprint);
+
+                }
+
+        }
+
+        object IEntityAPI.CellMap_GetEdgeSegmentState(string entityID, uint edgeID)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
+            return null;
+        }
+
+        void IEntityAPI.CellMap_SetEdgeSegmentState(string entityID, uint edgeID, object segment_state)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
+        }
+        void IEntityAPI.CellMap_SetFloorCollapseState(string entityID, uint cellIndex, bool collapse)
+        {
+            SetCollapseState(entityID, Keystone.Portals.Interior.PREFIX_FLOOR, cellIndex, collapse);
+        }
+
+        void IEntityAPI.CellMap_SetCeilingCollapseState(string entityID, uint cellIndex, bool collapse)
+        {
+            SetCollapseState(entityID, Keystone.Portals.Interior.PREFIX_CEILING, cellIndex, collapse);
+        }
+
+        void SetCollapseState(string entityID, string modelDescription, uint cellIndex, bool collapse)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
+
+            uint x, y, z;
+            celledRegion.UnflattenCellIndex(cellIndex, out x, out y, out z);
+
+            string modelID = Keystone.Portals.Interior.GetInteriorElementPrefix(entityID, modelDescription, typeof(Keystone.Elements.Model), (int)y);
+
+            Keystone.Elements.Model model = (Keystone.Elements.Model)Keystone.Resource.Repository.Get(modelID);
+            if (model == null) return;
+
+            Keystone.Elements.Mesh3d mesh = (Keystone.Elements.Mesh3d)model.Geometry;
+            // TODO: Note, this is not updating the footprint attributes in the tilemap.
+            //       That particular call is done from the Script's call to CellMap_ApplyFootprint()
+            //      but i think that's not a good way to handle it.  Footprint changes should be done here and not left up to the script... right?
+            Keystone.Celestial.ProceduralHelper.CellGrid_CellSetCollapseState(celledRegion.CellCountX, celledRegion.CellCountZ, x, z, mesh, collapse);
+        }
+
+        void IEntityAPI.CellMap_SetFloorAtlasTexture(string entityID, uint cellIndex, uint atlasTextureIndex)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
+
+            uint x, y, z;
+            celledRegion.UnflattenCellIndex(cellIndex, out x, out y, out z);
+            string floorModelID = Keystone.Portals.Interior.GetInteriorElementPrefix(entityID, Keystone.Portals.Interior.PREFIX_FLOOR, typeof(Keystone.Elements.Model), (int)y);
+            SetAtlasTile(celledRegion, floorModelID, x, z, atlasTextureIndex);
+        }
+
+        void IEntityAPI.CellMap_SetCeilingAtlasTexture(string entityID, uint cellIndex, uint atlasTextureIndex)
+        {
+            Keystone.Portals.Interior celledRegion = (Keystone.Portals.Interior)Keystone.Resource.Repository.Get(entityID);
+
+            uint x, y, z;
+            celledRegion.UnflattenCellIndex(cellIndex, out x, out y, out z);
+            string ceilingModelID = Keystone.Portals.Interior.GetInteriorElementPrefix(entityID, Keystone.Portals.Interior.PREFIX_CEILING, typeof(Keystone.Elements.Model), (int)y);
+            SetAtlasTile(celledRegion, ceilingModelID, x, z, atlasTextureIndex);
+        }
+
+        void SetAtlasTile(Keystone.Portals.Interior celledRegion, string modelID, uint x, uint z, uint atlasTileIndex)
+        {
+            Keystone.Elements.Model model = (Keystone.Elements.Model)Keystone.Resource.Repository.Get(modelID);
+            if (model == null) return;
+
+            Keystone.Elements.Mesh3d mesh = (Keystone.Elements.Mesh3d)model.Geometry;
+            Keystone.Appearance.Appearance appearance = model.Appearance;
+
+            if (appearance == null) return; // warning: no atlas set
+
+            if (appearance.Layers == null) return;
+            if (appearance.Layers.Length == 0) return;
+            if (appearance.Layers[0].Texture == null) return;
+            if (appearance.Layers[0].Texture is Keystone.Appearance.TextureAtlas == false) return;
+
+            Keystone.Appearance.TextureAtlas atlas = (Keystone.Appearance.TextureAtlas)appearance.Layers[0].Texture;
+            // TODO: if instead we pass the atlas Texture node ID and an index into the atlas
+            //       then we can easily compute new UV's 
+            // TODO: we must either pass the atlas dimensions or pass the atlas so it can be queried
+            Keystone.Celestial.ProceduralHelper.CellGrid_SetCellUV(celledRegion.CellCountX, celledRegion.CellCountZ, x, z, mesh, atlas, atlasTileIndex);
+        }
+
+        //void IEntityAPI.CellMap_SetInteriorEdgeSegmentStyle(string entityID, uint cellIndex)
+        //{ 
+        //}
+
+        //void IEntityAPI.CellMap_SetExteriorEdgeSegmentStyle(string entityID, uint cellIndex)
+        //{
+        //}
+
+        //void IEntityAPI.Mesh_GridCell_SetCollapseState(string entityID, string modelID, uint x, uint z, bool unCollapsed)
+        //{
+        //    Keystone.Portals.CelledRegion celledRegion = (Keystone.Portals.CelledRegion)Keystone.Resource.Repository.Get(entityID);
+        //    Keystone.Elements.Model model = (Keystone.Elements.Model)Keystone.Resource.Repository.Get(modelID);
+        //    if (model == null) return; 
+
+        //    Keystone.Elements.Mesh3d mesh = (Keystone.Elements.Mesh3d)model.Geometry;
+        //    Keystone.Celestial.ProceduralHelper.CellGrid_CellSetCollapseState(celledRegion, x, z, mesh, unCollapsed);
+        //}
+
+        //void IEntityAPI.Mesh_GridCell_SetAtlasTile(string entityID, string modelID, uint x, uint z, uint atlasTileIndex)
+        //{
+        //    Keystone.Portals.CelledRegion celledRegion = (Keystone.Portals.CelledRegion)Keystone.Resource.Repository.Get(entityID);
+        //    Keystone.Elements.Model model = (Keystone.Elements.Model)Keystone.Resource.Repository.Get(modelID);
+        //    if (model == null) return; 
+
+        //    Keystone.Elements.Mesh3d mesh = (Keystone.Elements.Mesh3d)model.Geometry;
+        //    Keystone.Appearance.Appearance appearance = model.Appearance;
+
+        //    if (appearance == null) return; // warning: no atlas set
+
+        //    if (appearance.Layers == null) return;
+        //    if (appearance.Layers.Length == 0) return;
+        //    if (appearance.Layers[0].Texture == null) return;
+        //    if (appearance.Layers[0].Texture is Keystone.Appearance.TextureAtlas == false) return;
+
+        //    Keystone.Appearance.TextureAtlas atlas = (Keystone.Appearance.TextureAtlas)appearance.Layers[0].Texture;
+        //    // TODO: if instead we pass the atlas Texture node ID and an index into the atlas
+        //    //       then we can easily compute new UV's 
+        //    // TODO: we must either pass the atlas dimensions or pass the atlas so it can be queried
+        //    Keystone.Celestial.ProceduralHelper.CellGrid_SetCellUV(celledRegion, x, z, mesh, atlas, atlasTileIndex);
         //}
         #endregion
     }

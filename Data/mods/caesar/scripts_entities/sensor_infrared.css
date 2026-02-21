@@ -96,13 +96,13 @@ public class SensorInfrared : BaseScript
 				
 				
 		// add production
-		// EntityAPI.AssignProductionHandler(scriptID, (uint)UserConstants.Product.Microwaves, Production_Microwaves);
+		// EntityAPI.AssignProductionHandler((uint)UserConstants.Product.Microwaves, Production_Microwaves);
 
 		// add power consumption
-		EntityAPI.CreateConsumption(scriptID, "power", (uint)UserConstants.Product.Power, Consumption_Power);
+		EntityAPI.AssignConsumptionHandler((uint)UserConstants.Product.Power, Consumption_Power);
 
 		// add radar signature consumption
-		EntityAPI.CreateConsumption(scriptID, "radarsignature", (uint)UserConstants.Product.RadarSignature, Consumption_RadarSignature);
+		EntityAPI.AssignConsumptionHandler((uint)UserConstants.Product.RadarSignature, Consumption_RadarSignature);
 	}
 	
 	#region Rules

@@ -96,13 +96,13 @@ public class SensorRadio : BaseScript
 				
 				
 		// add production
-		EntityAPI.AssignProductionHandler(scriptID, (uint)UserConstants.Product.Radiowaves, Production_RadioWaves);
+		EntityAPI.AssignProductionHandler((uint)UserConstants.Product.Radiowaves, Production_RadioWaves);
 
 		// add power consumption
-		EntityAPI.CreateConsumption(scriptID, "power", (uint)UserConstants.Product.Power, Consumption_Power);
+		EntityAPI.AssignConsumptionHandler((uint)UserConstants.Product.Power, Consumption_Power);
 
 		// add radar signature consumption - consumption must occur in the object that absorbs the RadioWaves
-		//EntityAPI.CreateConsumption(scriptID, "radiosignature", (uint)UserConstants.Product.Radiowaves, Consumption_RadarSignature);
+		//EntityAPI.AssignConsumptionHandler((uint)UserConstants.Product.Radiowaves, Consumption_RadarSignature);
 	}
 	
 	#region Rules

@@ -4,7 +4,9 @@
 namespace KeyCommon.Simulation
 {
     /// <summary>
-    /// 
+    /// // TODO: this delegate has to be modified to look like our DataProcessors as in 
+    /// // KeyCommon.Processors -> public delegate void Processor<T>(ComponentStore<T> store, object parameters, int seed, GameTime gt);
+    /// // because we are using a Data Oriented processing model that will accept all of the entities that will produce a particular productIDs.
     /// </summary>
     /// <param name="entityID"></param>
     /// <param name="production"></param>

@@ -1,6 +1,6 @@
 using System;
 using Keystone.Entities;
-using KeyCommon.DatabaseEntities;
+using KeyCommon.Processors;
 
 namespace Keystone.Simulation
 {
@@ -34,8 +34,13 @@ namespace Keystone.Simulation
 
         void UnRegisterProducer(uint productID, Entity entity);
         void RegisterProducer(uint productID, Entity entity);
-
+        void UnRegisterConsumer(uint productID, Entity entity);
+        void RegisterConsumer(uint productID, Entity entity);
 		
+        void AssignConsumptionHandler(string productID, KeyCommon.Simulation.Consumption_Delegate consumptionHandler);
+        void AssignProductionHandler(uint productID, KeyCommon.Simulation.Production_Delegate productionHandler);
+
+
         void AddPlayer(Player p);
         void RemovePlayer(Player p);
 

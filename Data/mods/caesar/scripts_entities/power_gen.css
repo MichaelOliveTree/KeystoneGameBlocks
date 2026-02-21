@@ -137,7 +137,7 @@ public class PowerGenerator : BaseScript
 		// regular production handler runs at seperate hz (possibly once per frame)
 		// todo: i think this should also pass a productID as well as have seperate
 		//       handlers for each productID.
-		EntityAPI.AssignProductionHandler(scriptID, (uint)UserConstants.Product.Power, Production_Power);
+		EntityAPI.AssignProductionHandler((uint)UserConstants.Product.Power, Production_Power);
 
 		// add fuel consumption - todo: why didn't i name this AssignConsumptionHandler ?
 		// and is it even necessary as we can deduct fuel during regular Update() surely?
@@ -149,7 +149,7 @@ public class PowerGenerator : BaseScript
 		// There is no fuel "production" there is just fuel "storage" and on whatever frequency "tick" we
 		// need to deduct from that "storage."
 		// todo: in the near term, ignore fuel availability and just produce power at each tick frequency.
-		EntityAPI.CreateConsumption(scriptID, "fuel", (uint)UserConstants.Product.Fuel, Consumption_Fuel);
+		EntityAPI.AssignConsumptionHandler((uint)UserConstants.Product.Fuel, Consumption_Fuel);
 		
 		// create any stores.  Is this necessary?  The idea is that most production is emitted and used
 		// or lost.  But a store defines a place where production can be stored and then used later.

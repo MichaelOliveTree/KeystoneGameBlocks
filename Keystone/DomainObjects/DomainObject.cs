@@ -56,15 +56,6 @@ namespace Keystone.DomainObjects
         // nice aspect of these DomainObjects
         protected Dictionary<string, RuleSet> mRuleSet;  
 
-        // TODO: these could be made into c# bitflag arrays for unlimited length
-        // NOTE: values bitwsise ORd in AddTransmitter(); RemoveTransmitter(); AddProduction(); AddConsumption();
-        internal uint mProductionTypeFlags;  // production/consumption product type flags  // <- todo: delete these vars... we just need an array of productIDs that the entities represented by this Script will consume
-        internal uint mConsumptionFlags;
-        //internal uint mEmissionTransmissionFlags; // transmission/reception emission type flags
-        //internal uint mEmissionReceptionFlags;
- //       private KeyCommon.Simulation.Production_Delegate mForceProduction;
-        private Dictionary<uint, KeyCommon.Simulation.Production_Delegate> mUserProduction;
-        private Dictionary<uint, KeyCommon.Simulation.Consumption_Delegate> mConsumers;
 
         //internal int[,] mFootPrint; // having FootPrint here allows us to share the data. //--TODO: footprint is obsolete, now we use shareable CellFootprint node
                 
@@ -599,64 +590,6 @@ namespace Keystone.DomainObjects
             }
         }
         
-        
-  #region Production, Consumption, Tranmission & Reception
-        //public KeyCommon.Simulation.Production_Delegate ForceProduction
-        //{
-        //    get { return mForceProduction;}
-        //}
-
-        public Dictionary<uint, KeyCommon.Simulation.Production_Delegate> UserProduction
-        {
-            get { return mUserProduction; }
-        }
-
-        public Dictionary<uint, KeyCommon.Simulation.Consumption_Delegate> Consumers 
-        {
-            get { return mConsumers; }
-        }
-
-        //public void AddForceProduction(KeyCommon.Simulation.Production_Delegate productionHandler)
-        //{
-        //    mForceProduction = productionHandler;
-        //}
-
-        public void AddProduction(KeyCommon.Simulation.Production_Delegate productionHandler, uint productionID)
-        {
-            if (mUserProduction == null) mUserProduction = new Dictionary<uint, KeyCommon.Simulation.Production_Delegate>();
-            mUserProduction.Add(productionID, productionHandler);
-
-
-            // now then, as far as registering, i think that must occur
-            // when the entity is Activated, not here.  The entity itself
-            // can look at it's mProductionTypeFlags and register accordingly. 
-            // But there has to be a point to registering... what is the performance benefit?
-
-            // TODO: but what about production that is per entity?  are we ensuring that production is
-            // running properly based on the specific entity instance this script is attached to?
-        }
-
-        // TODO: generally speaking, there's no need to remove these from the DomainObject
-        // remember this a shared domainboject and we couldnt remove a production temporarily from
-        // one Entity instance without doing it to all of them.
-        public void RemoveProduction()
-        {
-        }
-
-
-        public void AddConsumption(KeyCommon.Simulation.Consumption_Delegate consumptionHandler, uint productionTypeFlag)
-        {
-            if (mConsumers == null) mConsumers = new Dictionary<uint, KeyCommon.Simulation.Consumption_Delegate>();
-            mConsumers.Add(productionTypeFlag, consumptionHandler);
-
-            // todo: delete this... we just need an array of productIDs that the entities represented by this Script will consume
-            mProductionTypeFlags |= productionTypeFlag;
-        }
-
-        public void RemoveConsumption()
-        {
-        }
-        #endregion
 
         #region IPageableTVNode Members
         public object SyncRoot { get { return mSyncRoot; } }

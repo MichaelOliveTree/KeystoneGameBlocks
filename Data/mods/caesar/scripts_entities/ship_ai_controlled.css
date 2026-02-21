@@ -84,23 +84,25 @@ public class Carrier_Ship_AI : BaseScript
 		// 
 		
 
+		// NOTE: all these  handlers should probalby exist in Game01.Rules.Processors.*****
 		// regular production handler runs at seperate hz (possibly once per frame)
 		EntityAPI.AssignProductionHandler(scriptID, (uint)UserConstants.Product.VisibleLight, Production_VisibleLight);
 		
 		// add consumptions
 
+		// NOTE: all these  handlers should probalby exist in Game01.Rules.Processors.*****
 		// todo: if thrusters are built in, we need to have Consumption_Power and/or Consumption_Fuel
-		EntityAPI.CreateConsumption(scriptID, "gravity", (uint)UserConstants.Product.Gravity, Consumption_Gravity);
-		EntityAPI.CreateConsumption(scriptID, "thrust", (uint)UserConstants.Product.Thrust, Consumption_Thrust);
-		EntityAPI.CreateConsumption(scriptID, "angularthrust", (uint)UserConstants.Product.Angular_Thrust, Consumption_Thrust);
-		EntityAPI.CreateConsumption(scriptID, "microwaves", (uint)UserConstants.Product.Microwaves, Consumption_Microwaves);
+		EntityAPI.AssignConsumptionHandler((uint)UserConstants.Product.Gravity, Consumption_Gravity);
+		EntityAPI.AssignConsumptionHandler((uint)UserConstants.Product.Thrust, Consumption_Thrust);
+		EntityAPI.AssignConsumptionHandler((uint)UserConstants.Product.Angular_Thrust, Consumption_Thrust);
+		EntityAPI.AssignConsumptionHandler((uint)UserConstants.Product.Microwaves, Consumption_Microwaves);
 		
 		// create any stores.  Is this necessary?  The idea is that most production is emitted and used
 		// or lost.  But a store defines a place where production can be stored and then used later.
 		// A battery for example doesn't produce, but it can store production but really that just makes it
 		// a consumer.  It's "Production" is then limited to the supply it has on hand... it cant make more on it's own.
 		// but i suppose we dont need a special method for this, we can just have the "store" as a customproperty???
-		//EntityAPI.CreateStore(scriptID, productID, capacity);
+		//EntityAPI.CreateStore(entityID, productID, capacity);
 		
 		VisualFXAPI.RegisterParticleSystem(scriptID, "explosion", "caesar\\particles\\blastwave.kgbentity");
 		

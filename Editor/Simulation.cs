@@ -52,7 +52,19 @@ namespace KeyEdit
         
         private Scene mScene;
         
-        private Dictionary<uint, List<Entity>> mProduction;
+        private Dictionary<uint, List<Entity>> mProducers;
+        private Dictionary<uint, List<Entity>> mConsumers;
+        
+        // TODO: these could be made into c# bitflag arrays for unlimited length
+        // NOTE: values bitwsise ORd in AddTransmitter(); RemoveTransmitter(); AddProduction(); AddConsumption();
+        //internal uint mProductionTypeFlags;  // production/consumption product type flags  // <- todo: delete these vars... we just need an array of productIDs that the entities represented by this Script will consume
+        //internal uint mConsumptionFlags;
+        //internal uint mEmissionTransmissionFlags; // transmission/reception emission type flags
+        //internal uint mEmissionReceptionFlags;
+ //       private KeyCommon.Simulation.Production_Delegate mForceProduction;
+        private Dictionary<uint, KeyCommon.Simulation.Production_Delegate> mUserProduction;
+        private Dictionary<uint, KeyCommon.Simulation.Consumption_Delegate> mUserConsumption;
+
 
         private Keystone.Simulation.Missions.Mission mCurrentMission;
 
@@ -406,24 +418,233 @@ namespace KeyEdit
 #endif
         }
 
-        public void UnRegisterProducer(uint productID, Entity entity)
-        {
-            mProduction[productID].Remove(entity);
-        }
-
+#region Consumption and Production
         public void RegisterProducer(uint productID, Entity entity)
         {
-            if (mProduction == null) mProduction = new Dictionary<uint, List<Entity>>();
+            if (mProducers == null) mProducers = new Dictionary<uint, List<Entity>>();
             List<Entity> producers;
-            bool exists = mProduction.TryGetValue(productID, out producers);
+            bool exists = mProducers.TryGetValue(productID, out producers);
             if (!exists)
-                mProduction[productID] = new List<Entity>();
+                mProducers[productID] = new List<Entity>();
 
-            mProduction[productID].Add(entity);
+            mProducers[productID].Add(entity);
 
             // todo: ideally this ISimulation implementation should be in the EXE because we need to know the game specific productIDs and what they refer to
             // todo: how and where is the Hz for each productID defined?  Perhaps its just the job of this Simulation implementation which should be implemented in the EXE, not Keystone.dll
         }
+
+        public void RegisterConsumer(uint productID, Entity entity)
+        {
+            if (mConsumers == null) mConsumers = new Dictionary<uint, List<Entity>>();
+            Entity> consumers;
+            bool exists = mConsumers.TryGetValue(productID, out consumer);
+            if (!exists)
+                mConsumers[productID] = new List<Entity>();
+
+            mConsumers[productID].Add(entity);
+
+            // todo: ideally this ISimulation implementation should be in the EXE because we need to know the game specific productIDs and what they refer to
+            // todo: how and where is the Hz for each productID defined?  Perhaps its just the job of this Simulation implementation which should be implemented in the EXE, not Keystone.dll
+        }
+
+        // TODO: when an Entity is detached from the Scene, it should be removed as a Producer
+        public void UnRegisterProducer(uint productID, Entity entity)
+        {
+            mProducers[productID].Remove(entity);
+        }
+
+        // TODO: when an Entity is detached from the Scene, it should be removed as a Consumer
+        public void UnRegisterConsumer(uint productID, Entity entity)
+        {
+            mConsumers[productID].Remove(entity);
+        }
+
+
+
+
+        //public KeyCommon.Simulation.Production_Delegate ForceProduction
+        //{
+        //    get { return mForceProduction;}
+        //}
+
+        public void AssignConsumptionHandler(string productID, KeyCommon.Simulation.Consumption_Delegate consumptionHandler)
+        {
+            if (mUserConsumption == null) mUserConsumption = new Dictionary<uint, KeyCommon.Simulation.Consumption_Delegate>();
+            mUserConsumption.Add(productionTypeFlag, consumptionHandler);
+        }
+
+
+        public void AssignProductionHandler(uint productID, KeyCommon.Simulation.Production_Delegate productionHandler)
+        {
+             // now then, as far as registering, i think that must occur
+            // when the entity is Activated, not here.  The entity itself
+            // can look at it's mProductionTypeFlags and register accordingly. 
+            // But there has to be a point to registering... what is the performance benefit?
+
+            // TODO: but what about production that is per entity?  are we ensuring that production is
+            // running properly based on the specific entity instance this script is attached to?
+
+             if (mUserProduction == null) mUserProduction = new Dictionary<uint, KeyCommon.Simulation.Production_Delegate>();
+            mUserProduction.Add(productionID, productionHandler);
+        }
+
+        public Dictionary<uint, KeyCommon.Simulation.Production_Delegate> UserProduction
+        {
+            get { return mUserProduction; }
+        }
+
+        public Dictionary<uint, KeyCommon.Simulation.Consumption_Delegate> UserConsumption 
+        {
+            get { return mUserConsumption; }
+        }
+
+        //public void AddForceProduction(KeyCommon.Simulation.Production_Delegate productionHandler)
+        //{
+        //    mForceProduction = productionHandler;
+        //}
+
+
+        private Entity[] GetProducers(uint productID)
+        {
+            if (mProducers == null) return null;
+            List<Entity> results;
+            mProducers.TryGetValue(productID, out results);
+
+            if (results == null) return null;
+
+            return results.ToArray();
+        }
+
+        private List<Entity> FindConsumers(Keystone.Scene.Scene scene, Entity sourceEntity, KeyCommon.Simulation.Production production)
+        {
+            // TODO: re sensor contacts, see notes in Vehicle.cs
+            // TODO: these "Distribution Type" is I think a weakness.  I think in the case of a
+            //       emission that can be detected by opposing players sensors, distribution then
+            //       requires specific logic that is specific for a particular sensor / emission pair.
+            //       The "detection" logic is in a sense, the consumption of that sensor.  But that
+            //       detection should be done server side and then the result returned to relevant clients.
+            //       This way clients dont get to test if detection is made and have to be trusted to
+            //       ignore information about source and direction of that detection if detection fails.
+            //
+            // TODO: could use a lambda instead of this 
+            //       select case
+            bool temp = false;
+          
+                // test using the scripted filter function, if this entity meets the criteria
+                // to receive this production to consume
+                //bool pass = production.DistributionFilter(production, target.ID);
+                
+                // TODO: i think since the distribution filter is a scripted function and because
+                // scripts cannot instance entities and must go through the API, then
+                // that distribution filter in turn will need to make EntityAPI calls
+
+                // So i want to do a filter for sensor contact where we have say
+                // a omnidirectional radar picking up a "radar emission" product,
+                // with configurable range via custom property
+                // that has a bonus depending on the skill of the sensor operator
+                // (the notion being that running a sensor requires being able to screen out false positives
+                // the fact that this equipment is not perfect, the fact that tuning sensors is 
+                // something that must be done continuously, 
+                // So the range of a sensor is not the whole story.  
+                //    - the other issue is thta previous sensor contact gives a bonus to 
+                //      getting picked up on subsequent radar ticks.  
+                //      - how does this look in script?  You have to query
+                //      the parent vehicle entity's "contact" property and i think a "contact"
+                //      being a Simulation.Contact (like Simulation.Product) that is a custom property in Vehicle
+                //      we can grab the contact object directly.
+                // struct Contact
+                // {
+                //      string ContactID;
+                //      string[] Sensors; // the sensors that have detected this contact.  ships can have many sensors and of various types, but we only track one contact instance right?
+                //      int Time;         // the time this Contact struct was created and thus we know the elapsed time this contact has been tracked.  The longer it's detected the better the odds of maintaining the contact detection on subsequent sensor ticks
+                //      Vector3d Position;
+                //      Orientation Heading; 
+                //      Vector3d Acceleration;
+                // }
+                //
+                // - radar emission production
+                // - simulation runs updateproduction
+                //   - UpdateProduction() runs a Query using the DistributionFilter function and DistributionType
+                //     to determine the Consumers.
+                // - Consumer list is sent to clients for production types that are performed server side only
+                // - Consumer creates or updates a "Contact" object and adds it to the 
+                //   Vehicle.CustomProperties["contacts"] property
+                
+            
+// TODO: ConsumptionResults for distibutiontypes that are the same (and same location)
+//       for multiple entities should be cached and saved to avoid re-computing?
+            switch (production.DistributionMode)
+            {
+                case KeyCommon.Simulation.DistributionType.Self :
+                    return new List<Entity> { sourceEntity};
+
+                case KeyCommon.Simulation.DistributionType.Parent:
+                    return new List<Entity> { sourceEntity.Parent};
+
+                case KeyCommon.Simulation.DistributionType.Container :
+                    //string vehicleID = sourceEntity.Container.ID; 
+                    return new List<Entity> { sourceEntity.Container}; // scene.GetEntity(vehicleID) };
+
+                case KeyCommon.Simulation.DistributionType.List: // "power links" populate this list and require DistributionType to be of type List 
+                                                                 // but the problem at the moment is that these productions 
+                    string[] entityIDs = production.DistributionList;
+                    List<Entity> entities = new List<Entity> (entityIDs.Length);
+                    for (int i = 0; i < entities.Count; i++)
+                    	entities.Add (scene.GetEntity(entityIDs[i]));
+
+                    return entities;
+
+                case KeyCommon.Simulation.DistributionType.Region: 
+
+                    if (sourceEntity.Region == null) return null;
+
+                    Predicate<Entity> match;
+
+                    // TODO: can we speed this up for spatial queries like collision where we can include a bbox, rect, or sphere? or even tilemap cell?
+                    if (production.DistributionFilterFunc != null)
+                    {
+                        match = e=>
+                        {
+                            if (e.Script == null) return false;
+                            if (e.Script.Consumers == null) return false;
+                            if (e.Script.Consumers.ContainsKey(production.ProductID) == false) return false;
+                            return production.DistributionFilterFunc(production, e.ID);
+                        };
+                    }
+                    else 
+                    {
+                        match = e =>
+                        {
+                            if (e.Script == null) return false;
+                            if (e.Script.Consumers == null) return false;
+                            if (e.Script.Consumers.ContainsKey(production.ProductID) == false) return false;
+                            return true;
+                        };
+                    }
+
+                    return sourceEntity.Region.RegionNode.Query(true, match);
+                    // TODO: above query fails on Navigation tab planet view
+                    return null;
+
+                case KeyCommon.Simulation.DistributionType.Primitive: 
+                    return null;
+
+                    // TODO: proximity based collisions as well?
+                    
+                case KeyCommon.Simulation.DistributionType.Collision: // seperate enum types for CollisionRay, CollisionSphere, CollisionBox, CollisionCone?
+                    // and many of these types of production, we probably want to seperate from "product" production and put it more on par with "force" production
+                    // since collision usually means explosion or something we're trying to do and those should be done at higher hz than what we might end up doing
+                    // for goods production.
+					// no consumers yet. we will skip until / if a collision response occurs for this production                     
+                    return null;
+                    
+                default:
+                    return null;
+            }
+        }
+
+#endregion
+
 
         Keystone.Vehicles.Vehicle mSpawnedVehicle;
         FileStream mFileStream;
@@ -719,7 +940,7 @@ namespace KeyEdit
           // todo: August.21.2025 - I don't think we need a mGame.Update() because Game01.dll for example is
           // just a library and mostly only contains rules and gameObjects.
           // But we perform the actual processing here in the EXE
-          mGame.Update(mGameTime.ElapsedSeconds); // <-- NOTE: THis is mGame NOT mGameTIME
+          mGame.Update(mGameTime.ElapsedSeconds); // <-- NOTE: This is mGame NOT mGameTIME
 
 
           mScene.FinalizeEntityMovement(gameTime.Ticks);
@@ -751,6 +972,15 @@ namespace KeyEdit
                     }
 
                 }
+
+
+
+
+            // ORDER
+            // entity.Update()
+            // 
+
+
 
                 // todo: spawnpoints should exist but they should be initiated by loopback i think
                 
@@ -824,8 +1054,14 @@ namespace KeyEdit
             // across clients if you don't do this
             UpdateProduction(gameTime.ElapsedSeconds);
             
-            
-            // updates force production & consumption, physics if fixedStep
+            // TODO: UpdatePhysics() should move as first thing so correct ORDER is maintained
+            // ORDER -
+            //      1 - physics
+            //      2 - logic / rules   <-- occurs in Entity.Script.Exeucte("OnUpdate" currently)
+            //      3 - AI, Behavior    <-- occurs in Entity.UpdateAI() currently
+            //      5 - Animations      <-- occurs in Entity.Update() 
+
+            // updates Physics Forces production & Physics Forces consumption, physics if fixedStep
 			// adds elapsed to remainder seconds from prev UpdatePhysics()
             double fixedTimeStepRatio 
                 = UpdatePhysics(gameTime.ElapsedSeconds);
@@ -864,6 +1100,11 @@ namespace KeyEdit
                         entity.UpdateAI(gameTime.ElapsedSeconds);
                     }
                 }
+
+
+            // todo: to keep ORDER correct, add entity.UpdateAnimations() rather than just have it at end of entity.Update()
+            // where it currently occurs before UpdateAI() above since Update() occurs first and executes after Scripts.Execute(OnUpdate) as well
+            
 
             // IMPORTANT: Filter out the Viewpoints only, then process Viewpoint AI every frame AFTER we've updated all other non-Viewpoint Entities. 
             // This way our Chase cam will be using the target entity's latest position
@@ -1061,7 +1302,6 @@ namespace KeyEdit
         // http://answers.unity3d.com/questions/10993/whats-the-difference-between-update-and-fixedupdat.html
         private double UpdatePhysics(double elapsedSeconds)
         {
-
             //if (_singleStep == true && keyState.IsKeyDown(Keys.Space) == false) 
             //{
             //    // don't intergrate so we can step at will
@@ -1255,145 +1495,7 @@ namespace KeyEdit
             }
         }
 
-        private Entity[] GetProducers(uint productID)
-        {
-            if (mProduction == null) return null;
-            List<Entity> results;
-            mProduction.TryGetValue(productID, out results);
-
-            if (results == null) return null;
-
-            return results.ToArray();
-        }
-
-        private List<Entity> FindConsumers(Keystone.Scene.Scene scene, Entity sourceEntity, KeyCommon.Simulation.Production production)
-        {
-            // TODO: re sensor contacts, see notes in Vehicle.cs
-            // TODO: these "Distribution Type" is I think a weakness.  I think in the case of a
-            //       emission that can be detected by opposing players sensors, distribution then
-            //       requires specific logic that is specific for a particular sensor / emission pair.
-            //       The "detection" logic is in a sense, the consumption of that sensor.  But that
-            //       detection should be done server side and then the result returned to relevant clients.
-            //       This way clients dont get to test if detection is made and have to be trusted to
-            //       ignore information about source and direction of that detection if detection fails.
-            //
-            // TODO: could use a lambda instead of this 
-            //       select case
-            bool temp = false;
-          
-                // test using the scripted filter function, if this entity meets the criteria
-                // to receive this production to consume
-                //bool pass = production.DistributionFilter(production, target.ID);
-                
-                // TODO: i think since the distribution filter is a scripted function and because
-                // scripts cannot instance entities and must go through the API, then
-                // that distribution filter in turn will need to make EntityAPI calls
-
-                // So i want to do a filter for sensor contact where we have say
-                // a omnidirectional radar picking up a "radar emission" product,
-                // with configurable range via custom property
-                // that has a bonus depending on the skill of the sensor operator
-                // (the notion being that running a sensor requires being able to screen out false positives
-                // the fact that this equipment is not perfect, the fact that tuning sensors is 
-                // something that must be done continuously, 
-                // So the range of a sensor is not the whole story.  
-                //    - the other issue is thta previous sensor contact gives a bonus to 
-                //      getting picked up on subsequent radar ticks.  
-                //      - how does this look in script?  You have to query
-                //      the parent vehicle entity's "contact" property and i think a "contact"
-                //      being a Simulation.Contact (like Simulation.Product) that is a custom property in Vehicle
-                //      we can grab the contact object directly.
-                // struct Contact
-                // {
-                //      string ContactID;
-                //      string[] Sensors; // the sensors that have detected this contact.  ships can have many sensors and of various types, but we only track one contact instance right?
-                //      int Time;         // the time this Contact struct was created and thus we know the elapsed time this contact has been tracked.  The longer it's detected the better the odds of maintaining the contact detection on subsequent sensor ticks
-                //      Vector3d Position;
-                //      Orientation Heading; 
-                //      Vector3d Acceleration;
-                // }
-                //
-                // - radar emission production
-                // - simulation runs updateproduction
-                //   - UpdateProduction() runs a Query using the DistributionFilter function and DistributionType
-                //     to determine the Consumers.
-                // - Consumer list is sent to clients for production types that are performed server side only
-                // - Consumer creates or updates a "Contact" object and adds it to the 
-                //   Vehicle.CustomProperties["contacts"] property
-                
-            
-// TODO: ConsumptionResults for distibutiontypes that are the same (and same location)
-//       for multiple entities should be cached and saved to avoid re-computing?
-            switch (production.DistributionMode)
-            {
-                case KeyCommon.Simulation.DistributionType.Self :
-                    return new List<Entity> { sourceEntity};
-
-                case KeyCommon.Simulation.DistributionType.Parent:
-                    return new List<Entity> { sourceEntity.Parent};
-
-                case KeyCommon.Simulation.DistributionType.Container :
-                    //string vehicleID = sourceEntity.Container.ID; 
-                    return new List<Entity> { sourceEntity.Container}; // scene.GetEntity(vehicleID) };
-
-                case KeyCommon.Simulation.DistributionType.List: // "power links" populate this list and require DistributionType to be of type List 
-                                                                 // but the problem at the moment is that these productions 
-                    string[] entityIDs = production.DistributionList;
-                    List<Entity> entities = new List<Entity> (entityIDs.Length);
-                    for (int i = 0; i < entities.Count; i++)
-                    	entities.Add (scene.GetEntity(entityIDs[i]));
-
-                    return entities;
-
-                case KeyCommon.Simulation.DistributionType.Region: 
-
-                    if (sourceEntity.Region == null) return null;
-
-                    Predicate<Entity> match;
-
-                    // TODO: can we speed this up for spatial queries like collision where we can include a bbox, rect, or sphere? or even tilemap cell?
-                    if (production.DistributionFilterFunc != null)
-                    {
-                        match = e=>
-                        {
-                            if (e.Script == null) return false;
-                            if (e.Script.Consumers == null) return false;
-                            if (e.Script.Consumers.ContainsKey(production.ProductID) == false) return false;
-                            return production.DistributionFilterFunc(production, e.ID);
-                        };
-                    }
-                    else 
-                    {
-                        match = e =>
-                        {
-                            if (e.Script == null) return false;
-                            if (e.Script.Consumers == null) return false;
-                            if (e.Script.Consumers.ContainsKey(production.ProductID) == false) return false;
-                            return true;
-                        };
-                    }
-
-                    return sourceEntity.Region.RegionNode.Query(true, match);
-                    // TODO: above query fails on Navigation tab planet view
-                    return null;
-
-                case KeyCommon.Simulation.DistributionType.Primitive: 
-                    return null;
-
-                    // TODO: proximity based collisions as well?
-                    
-                case KeyCommon.Simulation.DistributionType.Collision: // seperate enum types for CollisionRay, CollisionSphere, CollisionBox, CollisionCone?
-                    // and many of these types of production, we probably want to seperate from "product" production and put it more on par with "force" production
-                    // since collision usually means explosion or something we're trying to do and those should be done at higher hz than what we might end up doing
-                    // for goods production.
-					// no consumers yet. we will skip until / if a collision response occurs for this production                     
-                    return null;
-                    
-                default:
-                    return null;
-            }
-        }
-
+       
         private void UpdateCollisions()
         {
             // TODO: Scene.FinalizeEntityMovement() -> Scene.EntityMoved() occurs and manages sceneNode test

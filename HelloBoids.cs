@@ -631,6 +631,45 @@ namespace HelloBoids
 #if USE_MEMORY_T
         public DataProcessorsStore mDataProcessor;
 #endif
+
+        public enum PRODUCTS : uint
+        {
+            None = 0,
+            MicrowaveEmission = 1,
+            MicrowaveReflection = 2,
+            MicrowaveDamage = 3
+        }
+
+        /// <summary>
+        /// // TODO: this delegate has to be modified to look like our DataProcessors as in 
+        /// // KeyCommon.Processors -> public delegate void Processor<T>(ComponentStore<T> store, object parameters, int seed, GameTime gt);
+        /// // because we are using a Data Oriented processing model that will accept all of the entities that will produce a particular productIDs.
+        /// </summary>
+        /// <param name="entityID"></param>
+        /// <param name="production"></param>
+        /// <param name="elapsedSeconds"></param>
+        /// <returns>Consumption Result array so that they can be sent to other players</returns>
+        public delegate Consumption[] Consumption_Delegate(string entityID, Production production, double elapsedSeconds);
+        
+        /// // TODO: this delegate has to be modified to look like our DataProcessors as in 
+        /// // KeyCommon.Processors -> public delegate void Processor<T>(ComponentStore<T> store, object parameters, int seed, GameTime gt);
+        /// // because we are using a Data Oriented processing model that will accept all of the entities that will produce a particular productIDs.
+        /// TODO: we have a bit more thinking to do here because we know that for some components, we want to produce multiple things like
+        /// MicrowaveEmission and MicrowaveDamage.    I think to do this, the Entity via its script will just register seperatelyh for BOTH types of production
+        /// and then the handlers will determine how much emission and damage is produced by this particular component.
+        public delegate Production[] Production_Delegate(string entityID, double elapsedSeconds);
+
+        public Dictionary<uint, List<Production>> mProducers;
+        public Dictionary<uint, List<string>> mConsumers;
+
+        private Dictionary<uint, List<Entity>> mProducers;
+        private Dictionary<uint, List<Entity>> mConsumers;
+        
+ //       private KeyCommon.Simulation.Production_Delegate
+        private Dictionary<uint, Production_Delegate> mUserProduction;
+        private Dictionary<uint, Consumption_Delegate> mUserConsumption;
+
+
         public List<Boid> Boids { get; set; }
         public int Seed { get; set; } = 123;
 		public ThreadedRandom mTHRandom;
@@ -756,6 +795,113 @@ namespace HelloBoids
             Dispose();
         }
         
+
+        
+#region Consumption and Production
+       public void RegisterProducer(uint productID, Entity entity)
+        {
+            if (mProducers == null) mProducers = new Dictionary<uint, List<Entity>>();
+            List<Entity> producers;
+            bool exists = mProducers.TryGetValue(productID, out producers);
+            if (!exists)
+                mProducers[productID] = new List<Entity>();
+
+            mProducers[productID].Add(entity);
+
+            // todo: ideally this ISimulation implementation should be in the EXE because we need to know the game specific productIDs and what they refer to
+            // todo: how and where is the Hz for each productID defined?  Perhaps its just the job of this Simulation implementation which should be implemented in the EXE, not Keystone.dll
+        }
+
+        public void RegisterConsumer(uint productID, Entity entity)
+        {
+            if (mConsumers == null) mConsumers = new Dictionary<uint, List<Entity>>();
+            Entity> consumers;
+            bool exists = mConsumers.TryGetValue(productID, out consumer);
+            if (!exists)
+                mConsumers[productID] = new List<Entity>();
+
+            mConsumers[productID].Add(entity);
+
+            // todo: ideally this ISimulation implementation should be in the EXE because we need to know the game specific productIDs and what they refer to
+            // todo: how and where is the Hz for each productID defined?  Perhaps its just the job of this Simulation implementation which should be implemented in the EXE, not Keystone.dll
+        }
+        
+        // TODO: when an Entity is detached from the Scene, it should be removed as a Producer
+        public void UnRegisterProducer(uint productID, Entity entity)
+        {
+            mProducers[productID].Remove(entity);
+        }
+
+        // TODO: when an Entity is detached from the Scene, it should be removed as a Consumer
+        public void UnRegisterConsumer(uint productID, Entity entity)
+        {
+            mConsumers[productID].Remove(entity);
+        }
+
+
+
+
+        //public KeyCommon.Simulation.Production_Delegate ForceProduction
+        //{
+        //    get { return mForceProduction;}
+        //}
+
+        public void AssignConsumptionHandler(string productID, KeyCommon.Simulation.Consumption_Delegate consumptionHandler)
+        {
+            if (mUserConsumption == null) mUserConsumption = new Dictionary<uint, KeyCommon.Simulation.Consumption_Delegate>();
+            mUserConsumption.Add(productionTypeFlag, consumptionHandler);
+        }
+
+
+        public void AssignProductionHandler(uint productID, KeyCommon.Simulation.Production_Delegate productionHandler)
+        {
+             // now then, as far as registering, i think that must occur
+            // when the entity is Activated, not here.  The entity itself
+            // can look at it's mProductionTypeFlags and register accordingly. 
+            // But there has to be a point to registering... what is the performance benefit?
+
+            // TODO: but what about production that is per entity?  are we ensuring that production is
+            // running properly based on the specific entity instance this script is attached to?
+
+             if (mUserProduction == null) mUserProduction = new Dictionary<uint, KeyCommon.Simulation.Production_Delegate>();
+            mUserProduction.Add(productionID, productionHandler);
+        }
+
+        public Dictionary<uint, KeyCommon.Simulation.Production_Delegate> UserProduction
+        {
+            get { return mUserProduction; }
+        }
+
+        public Dictionary<uint, KeyCommon.Simulation.Consumption_Delegate> UserConsumption 
+        {
+            get { return mUserConsumption; }
+        }
+
+        //public void AddForceProduction(KeyCommon.Simulation.Production_Delegate productionHandler)
+        //{
+        //    mForceProduction = productionHandler;
+        //}
+
+
+        private Entity[] GetProducers(uint productID)
+        {
+            if (mProducers == null) return null;
+            List<Entity> results;
+            mProducers.TryGetValue(productID, out results);
+
+            if (results == null) return null;
+
+            return results.ToArray();
+        }
+
+        private List<Entity> FindConsumers(Entity sourceEntity, KeyCommon.Simulation.Production production)
+        {
+
+            return null;
+        }
+        #endregion
+
+
         bool mIsDisposed;
         public void Dispose()
         {
@@ -1013,6 +1159,9 @@ namespace HelloBoids
             //  grab that Memory<Laser_Struct> out of a UserData object.
 
 
+
+            // NOTE: in KeystoneGameBlocks we would then potentially send the result to the clients if this is processing on the server
+            // FormMainBase.SendNetMessage(msg)
 		}
 		
         private void DoLifeCycle(ComponentStore<Transform.Living_Entity> store, object[] parameters, int seed, GameTime gt)

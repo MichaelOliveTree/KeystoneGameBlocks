@@ -4,15 +4,19 @@ MichaelWalksWithGod@gmail.com)
 
 If you've found any of this source code anywhere else but at this GitHub repository (excluding those of the open source libraries used therein), BE WARNED THAT, THAT CODE IS STOLEN.  
 
-NOTE: This source code was originally uploaded by me to www.github.com/WalksWithGod/KeystoneGameBlocks , however after having my phone stolen again, I was locked out of that site due to not having access to the 2FA devise, so I've created this GitHub.com/MichaelOliveTree/KeystoneGameBlocks
+NOTE: This source code was originally uploaded by me to www.github.com/WalksWithGod/KeystoneGameBlocks , however after having my phone stolen again, I was locked out of that site due to not having access to the 2FA devise, so I've created this repository www.GitHub.com/MichaelOliveTree/KeystoneGameBlocks
 
 The relevant source code contained within this repository that is copyright by me, has currently NOT BEEN LICENSED to any persons, organizations or businesses.
 
-Please report any illegal distributions of my work to me at TP_WalksWithGod@proton.me
+Please report any illegal distributions of my work to me at 
+hypnotron.v1.0@gmail.com  
+or
+TP_WalksWithGod@proton.me
 or
 MichaelWalksWithGod@gmail.com
 
-Also, if you are interested in licensing from me the applicable code contained within this Game Framework (the code to which I have full copyrights), contact me via either of the previous email addresses provided.  I am very busy these days, but I will try to get back to you ASAP.
+
+Also, if you are interested in licensing from me the applicable code contained within this Game Framework (the code to which I have full copyrights), contact me via the previous email addresses provided.  I am very busy these days, but I will try to get back to you ASAP.
 
 _______________________________________________________________________________________________________________________
 Keystone Game Blocks(KGB) is a 3D Game Framework written in C#.  The primary goal was to make a 3D game framework that met the following criteria:
@@ -22,7 +26,7 @@ Keystone Game Blocks(KGB) is a 3D Game Framework written in C#.  The primary goa
 - PERFORMANT is the third consideration because this framework is designed for AA games that focus on GAMEPLAY and not AAA games that often focus on GRAPHICS and AESTHETICS.
 - NEWORKING/MULTIPLAYER - the entire framework currently uses LOOPBACK messaging for virtually everything.  This means making real network enabled games will be as simple as changing the HOST to target a remote server instead of LOCALHOST.  This will also eventually allow for the EDITOR to support collaborative EDITING and UNDO/REDO options very easily.  Keystone Game Blocks can use either the Lidgren UDP Connection objects or a custom derived version of the base Lidgren Connection object, which I developed myself, that uses TCP instead of UDP, and does so in an agnostic way so that the calling application does need to care whether it's working with a UDP Lidren Connection or the custom TCP Connection object.
 
- KGB features typical game framework things:
+ KGB features typical game framework things, such as...
  
 * 3D Editor
 * Hybrid Scene Graph (Nodes not ECS) with Scene Management functions including
@@ -49,7 +53,7 @@ Keystone Game Blocks(KGB) is a 3D Game Framework written in C#.  The primary goa
 
 WARNING: All code in the \\stage\\ folder needs to be integrated into the main branch but I can't do it at this time as I'm working to buy a new laptop computer.
 
-I'm most interested in getting the Generic Memory<T> code integrated to replace the slow per-Entity 'updates()' (for movement for example) to a "Data Processing Model" that iterates once per frame over contiguous memory of all relevant Entities' data with a single Memory<T> instance.  This should result in significant CPU performance improvements.  I  will start by adding to KeystoneGameBlocks\Keystone\Elements\Transform.cs a #USE_MEMORY_T define at the top of that file and then in the ctor include an #if USE_MEMORY_T path for checkout of "internal Memory<TestStruct> mMemStore;" for the Transform's data (*****SEE \\stage\\HelloMemoryT.cs ***** for how this will eventually work) as well as similar path for all places where Memory<T> is used in place of local vars.  The #if USE_MEMORY_T is so that I can easily test the performance difference between the two paths.
+I'm most interested in getting the Generic Memory<<T>> code integrated to replace the slow per-Entity 'updates()' (for movement for example) to a "Data Processing Model" that iterates once per frame over contiguous memory of all relevant Entities' data with a single Memory<<T>> instance.  This should result in significant CPU performance improvements.  I  will start by adding to KeystoneGameBlocks\Keystone\Elements\Transform.cs a #USE_MEMORY_T define at the top of that file and then in the ctor include an #if USE_MEMORY_T path for checkout of "internal Memory<TestStruct> mMemStore;" for the Transform's data (*****SEE \\stage\\HelloMemoryT.cs ***** for how this will eventually work) as well as similar path for all places where Memory<<T>> is used in place of local vars.  The #if USE_MEMORY_T is so that I can easily test the performance difference between the two paths.
 
 Thank you.
 

@@ -503,7 +503,12 @@ namespace Keystone.DomainObjects
         // 
         internal object Execute(string eventName, object[] args)
         {
-            lock (mSyncRoot) // TODO: domainobject is shared now and we shouldn't lock it's Execute since it's scripts are using seperate data per Entity anyways!  We only need to lock for resource loading
+            // TODO: domainobject is shared now and we shouldn't lock it's Execute since it's scripts are using
+            // seperate data per Entity anyways!  We only need to lock for resource loading
+            // For parallel updates however, and for DETERMINISTIC results, we need to make sure the
+            // order of Entities is always the same. This may require updating by Entity.Memory<T>.Index value
+            // 
+            lock (mSyncRoot) 
             {
                 if (!Core._Core.ScriptsEnabled) return null;
                 
@@ -516,8 +521,7 @@ namespace Keystone.DomainObjects
                     System.Diagnostics.Debug.WriteLine ("DomainObject.Execute() - ERROR: Cannot execute script '" + location + "'");
                     return null; // BehaviorResult.Fail;
                 }
-                if (mMethods == null) return null; // BehaviorResult.Fail;
-
+               
                 System.Diagnostics.Debug.Assert (mScript != null && mScript.asm != null, "DomainObject.Execute() - Script should be loaded but is not!");
                 
                 // we must not allow execution to continue if not loaded because it is possible
@@ -532,8 +536,12 @@ namespace Keystone.DomainObjects
 
         private object ExecuteInternal (string eventName, object[] args)
         {
-        	CSScriptLibrary.MethodDelegate result;
-            if (!mMethods.TryGetValue(eventName, out result))
+
+        	CSScriptLibrary.MethodDelegate foundMethod = null;
+             
+             if (mMethods == null) return null; // BehaviorResult.Fail;
+
+            if (!mMethods.TryGetValue(eventName, out foundMethod))
             {
                 // TODO: our scripts dont return BehaviorResults, only our
                 // nodes do.  It's up to our nodes to define when
@@ -558,15 +566,15 @@ namespace Keystone.DomainObjects
                     // call overloaded version that accepts no args
                     // or maybe throw exception if null args passed is better?
                     // or maybe just returning error is best?
-                    return result();
+                    return foundMethod();
                     //throw new ArgumentNullException();
                     // BehaviorResult.Error_Script_Invalid_Arguments;
                 }
                 else
                 {
-                    return result(args);
+                    return foundMethod(args);
                     // BehaviorResult.Success;
-                    //return (BehaviorResult)result(args);
+                    //return (BehaviorResult)foundMethod(args);
                 }
             }
             catch (InvalidCastException ex)
@@ -592,7 +600,7 @@ namespace Keystone.DomainObjects
         
 
         #region IPageableTVNode Members
-        public object SyncRoot { get { return mSyncRoot; } }
+        public object SyncRoot { get { return mSyncRoot; } } 
 
         public int TVIndex
         {

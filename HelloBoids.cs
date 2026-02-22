@@ -640,7 +640,38 @@ namespace HelloBoids
             MicrowaveDamage = 3
         }
 
-        /// <summary>
+		public struct FireDamage
+		{
+			int Damage;
+			float Duration;  // a time in seconds? or number of rounds along with a ROUND_LENGTH?
+			
+		}
+		
+		public struct ImpalingDamage
+		{
+			int Damage;
+			
+		}
+		
+//        public Dictionary<uint, List<string> mProducers;
+//        public Dictionary<uint, List<string> mConsumers;
+
+		
+		// TODO: These will probably just be part of a ComponentStore<> which are
+		//       in turn part of ComponentStoreCollection<>
+        private Dictionary<uint, List<EntityNode>> mProducers;
+        private Dictionary<uint, List<EntityNode>> mConsumers;
+        
+		// NOTE: These mUserProduction and mUserConsumption should be perhaps another 
+		//       DataProcessorsStore mDataProcessor;  
+		//       eg. DataProcessorStore mUserProduction;
+		//       eg. DataProcessorStore mUserConsumption;
+		//       
+ //       private KeyCommon.Simulation.Production_Delegate
+        private Dictionary<uint, Production_Delegate> mUserProduction;
+        private Dictionary<uint, Consumption_Delegate> mUserConsumption;
+
+		        /// <summary>
         /// // TODO: this delegate has to be modified to look like our DataProcessors as in 
         /// // KeyCommon.Processors -> public delegate void Processor<T>(ComponentStore<T> store, object parameters, int seed, GameTime gt);
         /// // because we are using a Data Oriented processing model that will accept all of the entities that will produce a particular productIDs.
@@ -650,25 +681,21 @@ namespace HelloBoids
         /// <param name="elapsedSeconds"></param>
         /// <returns>Consumption Result array so that they can be sent to other players</returns>
         public delegate Consumption[] Consumption_Delegate(string entityID, Production production, double elapsedSeconds);
-        
+        public delegate void Processor<T>(ComponentStore<T> store, object parameters, int seed, GameTime gt);
+		
         /// // TODO: this delegate has to be modified to look like our DataProcessors as in 
         /// // KeyCommon.Processors -> public delegate void Processor<T>(ComponentStore<T> store, object parameters, int seed, GameTime gt);
         /// // because we are using a Data Oriented processing model that will accept all of the entities that will produce a particular productIDs.
         /// TODO: we have a bit more thinking to do here because we know that for some components, we want to produce multiple things like
         /// MicrowaveEmission and MicrowaveDamage.    I think to do this, the Entity via its script will just register seperatelyh for BOTH types of production
+		/// (OR, Scene.OnEntityAttached() may get the available ProductIDs (with Production_Struct for those types of products)
+		/// from the Entity.Script (if it's loaded?) and register them itself so the script
+		///  doesnt need to remember to do this, nor does it need to unregister the ProductIDs
         /// and then the handlers will determine how much emission and damage is produced by this particular component.
         public delegate Production[] Production_Delegate(string entityID, double elapsedSeconds);
-
-        public Dictionary<uint, List<Production>> mProducers;
-        public Dictionary<uint, List<string>> mConsumers;
-
-        private Dictionary<uint, List<Entity>> mProducers;
-        private Dictionary<uint, List<Entity>> mConsumers;
-        
- //       private KeyCommon.Simulation.Production_Delegate
-        private Dictionary<uint, Production_Delegate> mUserProduction;
-        private Dictionary<uint, Consumption_Delegate> mUserConsumption;
-
+		public delegate void Processor<T>(ComponentStore<T> store, object parameters, int seed, GameTime gt);
+		
+		
 
         public List<Boid> Boids { get; set; }
         public int Seed { get; set; } = 123;
@@ -743,7 +770,17 @@ namespace HelloBoids
 			DataProcessorsStore.Processor<Boid.Laser_Struct> lasersBehavior = DoWeaponTest;
             mDataProcessor.Add("LASERS", lasersBehavior);
 			
-				
+			// TODO:
+			// OnEntityDetached(EntityNode e)
+			//       {
+			//			RemoveProduction(e)
+			//	        RemoveConsumption(e);
+			//       }
+			// OnEntityAttached(EntityNode e)
+			//       {
+			//			AddProduction(e)
+			//	        AddConsumption(e);
+			//       }
 				
 #endif
 
@@ -798,13 +835,13 @@ namespace HelloBoids
 
         
 #region Consumption and Production
-       public void RegisterProducer(uint productID, Entity entity)
+       public void RegisterProducer(uint productID, EntityNode entity)
         {
-            if (mProducers == null) mProducers = new Dictionary<uint, List<Entity>>();
-            List<Entity> producers;
+            if (mProducers == null) mProducers = new Dictionary<uint, List<EntityNode>>();
+            List<EntityNode> producers;
             bool exists = mProducers.TryGetValue(productID, out producers);
             if (!exists)
-                mProducers[productID] = new List<Entity>();
+                mProducers[productID] = new List<EntityNode>();
 
             mProducers[productID].Add(entity);
 
@@ -812,13 +849,13 @@ namespace HelloBoids
             // todo: how and where is the Hz for each productID defined?  Perhaps its just the job of this Simulation implementation which should be implemented in the EXE, not Keystone.dll
         }
 
-        public void RegisterConsumer(uint productID, Entity entity)
+        public void RegisterConsumer(uint productID, EntityNode entity)
         {
-            if (mConsumers == null) mConsumers = new Dictionary<uint, List<Entity>>();
-            Entity> consumers;
-            bool exists = mConsumers.TryGetValue(productID, out consumer);
+            if (mConsumers == null) mConsumers = new Dictionary<uint, List<EntityNode>>();
+            List<EntityNode> consumers;
+            bool exists = mConsumers.TryGetValue(productID, out consumers);
             if (!exists)
-                mConsumers[productID] = new List<Entity>();
+                mConsumers[productID] = new List<EntityNode>();
 
             mConsumers[productID].Add(entity);
 
@@ -827,13 +864,13 @@ namespace HelloBoids
         }
         
         // TODO: when an Entity is detached from the Scene, it should be removed as a Producer
-        public void UnRegisterProducer(uint productID, Entity entity)
+        public void UnRegisterProducer(uint productID, EntityNode entity)
         {
             mProducers[productID].Remove(entity);
         }
 
         // TODO: when an Entity is detached from the Scene, it should be removed as a Consumer
-        public void UnRegisterConsumer(uint productID, Entity entity)
+        public void UnRegisterConsumer(uint productID, EntityNode entity)
         {
             mConsumers[productID].Remove(entity);
         }
@@ -846,14 +883,14 @@ namespace HelloBoids
         //    get { return mForceProduction;}
         //}
 
-        public void AssignConsumptionHandler(string productID, KeyCommon.Simulation.Consumption_Delegate consumptionHandler)
+        public void AssignConsumptionHandler(string productID, Consumption_Delegate consumptionHandler)
         {
-            if (mUserConsumption == null) mUserConsumption = new Dictionary<uint, KeyCommon.Simulation.Consumption_Delegate>();
+            if (mUserConsumption == null) mUserConsumption = new Dictionary<uint, Consumption_Delegate>();
             mUserConsumption.Add(productionTypeFlag, consumptionHandler);
         }
 
 
-        public void AssignProductionHandler(uint productID, KeyCommon.Simulation.Production_Delegate productionHandler)
+        public void AssignProductionHandler(uint productID, Production_Delegate productionHandler)
         {
              // now then, as far as registering, i think that must occur
             // when the entity is Activated, not here.  The entity itself
@@ -863,16 +900,24 @@ namespace HelloBoids
             // TODO: but what about production that is per entity?  are we ensuring that production is
             // running properly based on the specific entity instance this script is attached to?
 
-             if (mUserProduction == null) mUserProduction = new Dictionary<uint, KeyCommon.Simulation.Production_Delegate>();
-            mUserProduction.Add(productionID, productionHandler);
+             if (mUserProduction == null) mUserProduction = new Dictionary<uint, Production_Delegate>();
+             mUserProduction.Add(productID, productionHandler);
         }
 
-        public Dictionary<uint, KeyCommon.Simulation.Production_Delegate> UserProduction
+		// TODO: these should be OBSOLETE since these should just be within DataProcessors even
+		//       if we use unique DataProcessors like DataProcessor mUserProduction; and DataProcessor mUserConsumption;
+		//       So during AILogic for instance, if a laser fires, we would produce a FireDamage and BurnDamage struct
+		//       and add those to the ComponentStores for <> affected (eg in range) Consumers of those respective productIDs
+		//       Any particular FireDamage may remain in the list of FireDamage.Records[] if the duration of the fire has not
+		//       expired.  
+		//       Similarly, gravity production of Jupiter would not need to be added to the Gravity.Records every frame 
+		//       
+        public Dictionary<uint, Production_Delegate> UserProduction
         {
             get { return mUserProduction; }
         }
 
-        public Dictionary<uint, KeyCommon.Simulation.Consumption_Delegate> UserConsumption 
+        public Dictionary<uint, Consumption_Delegate> UserConsumption 
         {
             get { return mUserConsumption; }
         }
@@ -883,10 +928,10 @@ namespace HelloBoids
         //}
 
 
-        private Entity[] GetProducers(uint productID)
+        private EntityNode[] GetProducers(uint productID)
         {
             if (mProducers == null) return null;
-            List<Entity> results;
+            List<EntityNode> results;
             mProducers.TryGetValue(productID, out results);
 
             if (results == null) return null;
@@ -894,7 +939,7 @@ namespace HelloBoids
             return results.ToArray();
         }
 
-        private List<Entity> FindConsumers(Entity sourceEntity, KeyCommon.Simulation.Production production)
+        private List<EntityNode> FindConsumers(EntityNode sourceEntity, uint productID)
         {
 
             return null;
@@ -1134,11 +1179,72 @@ namespace HelloBoids
 
 #if USE_MEMORY_T
 
-		private void DoWeaponTest(ComponentStore<Boid.Laser_Struct> store, object[] parameters, int seed, GameTime gt)
+		private void Do_Droid_Logic(ThreadedRandom random, double maxDistance)
+		{
+
+			int count = Boids.Count;
+            System.Threading.Tasks.Parallel.For(0, count, i => 
+            //for (int i = 0; i < Boids.Count; i++)
+            {
+				// generate Droids with some variance for size, and speed
+				// create a "cooldown" interval that is based on the droid
+				// 
+				// if can fire
+				//		findtarget(bool closest = true)
+				//      fire(i, targetID) <-- performs production (there is a chance of FireDamage that has it's own cooldown and incurs someDamagePerSecond
+				// 			how are these productions added to the struct fireDamage {}   and struct burningDamage { } 
+				//      firingAnimationCooldown
+				// else if alreadyfiring
+				//     wait for complete and cooldown of firingAnimation
+				//     wait for complete of RoF cooldown
+				// 
+				// 
+				
+				
+			});
+		}
+		
+		/// <summary>
+		/// FireDamage can last for several seconds and so any one particular FireDamage record is
+		/// not removed from the ComponentStore<> until it's expired
+		/// </summary>
+		private void DoFireDamage(ComponentStore<BoidSimulation.FireDamage> store, object[] parameters, int seed, GameTime gt)
         {
-			Console.WriteLine("Do lasers...");
+			
+			ThreadedRandom r = (ThreadedRandom) parameters[0];
+			double maxDistance = (double)parameters[1];
+	
+	
+			int count = Boids.Count;
+            System.Threading.Tasks.Parallel.For(0, count, i => 
+            //for (int i = 0; i < Boids.Count; i++)
+            {
+				// generate Droids with some variance for size, and speed
+				// create a "cooldown" interval that is based on the droid
+				// 
+				// if can fire
+				//		findtarget(bool closest = true)
+				//      fire(i, targetID) <-- performs production (there is a chance of FireDamage that has it's own cooldown and incurs someDamagePerSecond
+				// 			how are these productions added to the struct fireDamage {}   and struct burningDamage { } 
+				//      firingAnimationCooldown
+				// else if alreadyfiring
+				//     wait for complete and cooldown of firingAnimation
+				//     wait for complete of RoF cooldown
+				// 
+				// 
+				
+				
+				
+				
+                List<int> found;
+                List<Boid> neighbors;
 
-
+				double separationDistance = EntryClass.SEPERATION_DISTANCE;
+				double alignmentDistance = EntryClass.ALIGNMENT_DISTANCE;
+				double cohesionDistance = EntryClass.COHESION_DISTANCE;
+				
+			});
+	
             // we need for scripts to call RegisterConsumption(productID) and RegisterConsumptionProcesssor delegate 
             //  - the RegisterConsumption(entityID, productID) is usefull for not having to iterate through all Entities to find one
             //    where entity.Script.Consumers (<-- consumers just contains delegates to handlers) IS NOT NULL and then that is a successful
@@ -1148,7 +1254,7 @@ namespace HelloBoids
 
             // Radar sensor will RegisterConsumer (entityID, microwaveID) and it will Produce() a type of 
             // product called "contact(s)"  as contactProductID
-            // 
+             
 
             // TODO: we need to keep in mind that Production and Consumption should occur over the NETWORK as well.
             //       _or_ only the changes need to be transmitted
@@ -1832,15 +1938,43 @@ namespace HelloBoids
 		public Memory<Laser_Struct> mMemStore_Laser; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
 		public int SpanIndexLaser = -1;
 		
+		
+		public enum DAMAGE_TYPE
+		{
+			
+			Impaling,
+			Burning
+				
+		}
+		
+		// material quality
+		public enum QUALITY_
+		{
+			
+			Cheap,
+			BelowAverage,
+			Average,
+			
+			Fine,
+			VeryFine
+				
+		}
+		
+		
+		
 		public struct Laser_Struct
 		{
 			// common component properties
 			public int TL;
-			public string Quality; // todo: this needs to be a coefficient of 0.0 to 1.0
+			
+			public float Quality_;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
+			//public string Quality; // todo: this needs to be a coefficient of 0.0 to 1.0
+			
+			
 			public bool Ruggedized;
 			
-			// common component stats
-			public double HitPoints;
+			// common component stats 
+			public int HitPoints;
 			public int DR;  // todo: if we use complex armor, is DR (damage resistance) used?
 			
 			public double Cost;
@@ -1849,45 +1983,51 @@ namespace HelloBoids
 			public double Volume;
 			
 			// beam specific
-			public int Type;
-			public int Duration;   // duration in seconds
+			public int Type;       // type is really just about what types of Damage(s) (ProductID(s)) it results in such as Paralysis, Crushing, Burning, Impaling
+			public float Duration;   // duration in seconds
 			
 			public bool EnergyDrill;
 			public bool FTL;
 			public bool Reliable;
 			public bool Compact;
-			public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
 			
-
-			public string Range; // string description of range (eg: "very long range")
-						
-			public float BeamOutput;
+			public float Malfunction_ ; // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
+			//public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
+									
+			public float BeamOutput;    // what is the difference between this and kW of power... is it the convsion rate of the input power to the output power?
 			public float CyclicRate;
 			public int Accuracy;
 			public int SnapShot;
-			public string Shots;
-			public string RoF;
+//			public string Shots;
+			
+			public double CoolDown_;
+//			public string RoF;
+			
 			public double PowerReqt;
-			public string Mount;
-			public string Direction;
+//			
+//			public string Mount;
+//			public string Direction;
 
 			// TODO: these are like "internal" items and can be used if another power source is no longer connected
-			public string PowerCellType;  // TOOD: Need an ENUM
-			public int PowerCellQuantity;
-			public double PowerCellWeight;
+//			public string PowerCellType;  // TOOD: Need an ENUM
+//			public int PowerCellQuantity;
+//			public double PowerCellWeight;
 			
-			public string TypeDamage;     // TOOD: Need an ENUM
-			public string Damage;         // this is dice of damage, but often contains a multiplier like (100) afterwards.  We don't need the multiplier since we just compute a min/max damage range or maybe we compute a single damage that then gets modified based on the target evasive maneuvers and such
-			public double KEDamage;
-			public double HalfDamage; 
-			public double VacuumHalfDamage;
-			public double VacuumMaxRange;
+			// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
+			// https://gamedev.stackexchange.com/questions/148961/how-to-design-a-damage-formula-in-an-rpg-which-keeps-weapons-with-different-atta
+			public DAMAGE_TYPE TypeDamage;     // TOOD: Need an ENUM
+			//public string Damage;         // this is dice of damage, but often contains a multiplier like (100) afterwards.  We don't need the multiplier since we just compute a min/max damage range or maybe we compute a single damage that then gets modified based on the target evasive maneuvers and such
+			public int AverageDamage;       
+//			public double KEDamage;
+//			public double HalfDamage; 
+//			public double VacuumHalfDamage;
+
 			
+//			public string Range; // string description of range (eg: "very long range")
 			public double MaxRange;
-			public double MaxRange2;
-			public double VacuumMaxRange2;
-
-
+//			public double MaxRange2;
+//			public double VacuumMaxRange;
+//			public double VacuumMaxRange2;
 		}
 		
 		
@@ -1911,6 +2051,66 @@ namespace HelloBoids
             
 			// initialize the memory store
 			mMemStore_Laser.Span[0].TL = 1;
+			mMemStore_Laser.Span[0].Quality_ = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
+			//public string Quality; // todo: this needs to be a coefficient of 0.0 to 1.0
+			mMemStore_Laser.Span[0].Ruggedized = true;
+			mMemStore_Laser.Span[0].HitPoints = 100;
+			mMemStore_Laser.Span[0].DR = 20;  // todo: if we use complex armor, is DR (damage resistance) used?
+			mMemStore_Laser.Span[0].Cost = 10d;
+			mMemStore_Laser.Span[0].Weight = 2.5d;
+			mMemStore_Laser.Span[0].SurfaceArea = 1d;
+			mMemStore_Laser.Span[0].Volume = 0.2d;
+			
+			// beam specific
+			mMemStore_Laser.Span[0].Type = 1;     
+			mMemStore_Laser.Span[0].Duration = 0.25f;   // duration in seconds
+			
+			mMemStore_Laser.Span[0].EnergyDrill = false;
+			mMemStore_Laser.Span[0].FTL = true;
+			mMemStore_Laser.Span[0].Reliable = true;
+			mMemStore_Laser.Span[0].Compact = true;
+			
+			mMemStore_Laser.Span[0].Malfunction_ = 0.2f; // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
+			//public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
+									
+			mMemStore_Laser.Span[0].BeamOutput = 10f; // kW
+			mMemStore_Laser.Span[0].CyclicRate = 1;
+			mMemStore_Laser.Span[0].Accuracy = 10;
+			mMemStore_Laser.Span[0].SnapShot = 2;
+//			public string Shots;
+			
+			mMemStore_Laser.Span[0].CoolDown_ = 0.3f;
+//			public string RoF;
+			
+			mMemStore_Laser.Span[0].PowerReqt = 0.0f;
+//			
+//			public string Mount;
+//			public string Direction;
+
+			// TODO: these are like "internal" items and can be used if another power source is no longer connected
+//			public string PowerCellType;  // TOOD: Need an ENUM
+//			public int PowerCellQuantity;
+//			public double PowerCellWeight;
+			
+			// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
+			mMemStore_Laser.Span[0].TypeDamage = DAMAGE_TYPE.Burning;     // TOOD: Need an ENUM
+			//public string Damage;         // this is dice of damage, but often contains a multiplier like (100) afterwards.  We don't need the multiplier since we just compute a min/max damage range or maybe we compute a single damage that then gets modified based on the target evasive maneuvers and such
+			mMemStore_Laser.Span[0].AverageDamage = 40;       
+//			public double KEDamage;
+//			public double HalfDamage; 
+//			public double VacuumHalfDamage;
+
+			
+//			public string Range; // string description of range (eg: "very long range")
+			mMemStore_Laser.Span[0].MaxRange = 10;
+//			public double MaxRange2;
+//			public double VacuumMaxRange;
+//			public double VacuumMaxRange2;
+
+
+		
+		
+				
 				
             // todo do we need destructor for Repository.CheckIn mMemstore?
 

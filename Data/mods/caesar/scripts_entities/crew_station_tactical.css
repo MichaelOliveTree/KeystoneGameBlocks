@@ -145,6 +145,35 @@ public class Tactical : BaseScript
 	}
 	#endregion
 
+
+	
+	// TODO: Tactical Needs to track
+	// 1 - Alert Condition (Green, Yellow, Red)
+	// 2 - Rules of Engagement (can be a list of simple conditions like for an email filter)
+	// 3  - Current Orders
+	// 4 - Operator
+	// 5 - Targeting Computer(s)
+	// 6 - Contacts
+	//     - unknowns
+	//     - friends
+	//     - foes
+	//       - mines
+	//       - missiles
+	//       - ships 
+	///      - stations
+	//       - bases \ worlds
+	//       - satelites
+
+	// 7 - Turrets
+	// 8 - Weapons - GetAvailable() { return !malfunctions/jammed && !cooldown or exceeding RoF, !tooDamaged && breaker==On HasPower && HasOperator && HasRangeToTarget}
+	// 		- lasers  
+	//      - kinetic
+	//      - launchers
+	//        - ammunition
+	//        - crewman loaders
+	// 9 - Sensors
+	// 10 - Damage To Tactical Systems (Sensors, Turrets, Weapons, targeting computer)
+
 	// todo: i should pass the UserData to OnUpdate() as well as perhaps the custom properties which avoids having to
 	//       make calls to get them.  I will still probably have to make calls to assign new values to custom properties
 	public static void OnUpdate (string entityID, double elapsedSeconds)
@@ -504,34 +533,6 @@ public class Tactical : BaseScript
 		return contacts;
 	}
 	
-
-
-	// TODO: Tactical Needs to track
-	// 1 - Alert Condition (Green, Yellow, Red)
-	// 2 - Rules of Engagement (can be a list of simple conditions like for an email filter)
-	// 3  - Current Orders
-	// 4 - Operator
-	// 5 - Targeting Computer(s)
-	// 6 - Contacts
-	//     - unknowns
-	//     - friends
-	//     - foes
-	//       - mines
-	//       - missiles
-	//       - ships 
-	///      - stations
-	//       - bases \ worlds
-	//       - satelites
-
-	// 7 - Turrets
-	// 8 - Weapons - GetAvailable() { return !malfunctions/jammed && !cooldown or exceeding RoF, !tooDamaged && breaker==On HasPower && HasOperator && HasRangeToTarget}
-	// 		- lasers  
-	//      - kinetic
-	//      - launchers
-	//        - ammunition
-	//        - crewman loaders
-	// 9 - Sensors
-	// 10 - Damage To Tactical Systems (Sensors, Turrets, Weapons, targeting computer)
 
 	private static void CacheComponents(string entityID, KeyCommon.Data.UserData data)
 	{

@@ -668,8 +668,8 @@ namespace HelloBoids
 		//       eg. DataProcessorStore mUserConsumption;
 		//       
  //       private KeyCommon.Simulation.Production_Delegate
-        private Dictionary<uint, Production_Delegate> mUserProduction;
-        private Dictionary<uint, Consumption_Delegate> mUserConsumption;
+//        private Dictionary<uint, Production_Delegate> mUserProduction;
+//        private Dictionary<uint, Consumption_Delegate> mUserConsumption;
 
 		        /// <summary>
         /// // TODO: this delegate has to be modified to look like our DataProcessors as in 
@@ -680,8 +680,8 @@ namespace HelloBoids
         /// <param name="production"></param>
         /// <param name="elapsedSeconds"></param>
         /// <returns>Consumption Result array so that they can be sent to other players</returns>
-        public delegate Consumption[] Consumption_Delegate(string entityID, Production production, double elapsedSeconds);
-        public delegate void Processor<T>(ComponentStore<T> store, object parameters, int seed, GameTime gt);
+//        public delegate Consumption[] Consumption_Delegate(string entityID, Production production, double elapsedSeconds);
+//        public delegate void Processor<T>(ComponentStore<T> store, object parameters, int seed, GameTime gt);
 		
         /// // TODO: this delegate has to be modified to look like our DataProcessors as in 
         /// // KeyCommon.Processors -> public delegate void Processor<T>(ComponentStore<T> store, object parameters, int seed, GameTime gt);
@@ -692,13 +692,17 @@ namespace HelloBoids
 		/// from the Entity.Script (if it's loaded?) and register them itself so the script
 		///  doesnt need to remember to do this, nor does it need to unregister the ProductIDs
         /// and then the handlers will determine how much emission and damage is produced by this particular component.
-        public delegate Production[] Production_Delegate(string entityID, double elapsedSeconds);
-		public delegate void Processor<T>(ComponentStore<T> store, object parameters, int seed, GameTime gt);
+//        public delegate Production[] Production_Delegate(string entityID, double elapsedSeconds);
+//		public delegate void Processor<T>(ComponentStore<T> store, object parameters, int seed, GameTime gt);
 		
 		
 
         public List<Boid> Boids { get; set; }
-        public int Seed { get; set; } = 123;
+        public Seeds Seeds { get; set; }
+		public int LocalSeed_DroidLogic {get; set;} = 123 + 1;
+										 
+										 
+										 
 		public ThreadedRandom mTHRandom;
 		
         private double SeparationDistance;
@@ -721,7 +725,9 @@ namespace HelloBoids
         public BoidSimulation(int numBoids, double width, double height, double depth, bool useOctree = false)
         {
             Boids = new List<Boid>(); //NOTE: we do not preallocate the list here
-				
+			Seeds = new Seeds(123);
+	
+	
 			SeparationDistance = EntryClass.SEPERATION_DISTANCE;
         	SeparationFactor = EntryClass.SEPARATION_FACTOR;
         	AlignmentDistance = EntryClass.ALIGNMENT_DISTANCE;
@@ -736,8 +742,7 @@ namespace HelloBoids
             mDataProcessor = new DataProcessorsStore(EntryClass.mCStoreCol);
 #endif
             mIntervalTimers = new IntervalTimers();
-            mIntervalTimers.Register("LifeCycle", "spawn", 0.06d);
-		
+            		
             if (useOctree)
             {
 				//Console.WriteLine ("Width = " + width.ToString() + " Height = " + height.ToString());
@@ -767,8 +772,12 @@ namespace HelloBoids
             DataProcessorsStore.Processor<Transform.Transform_Struct> flockingBehavior = DoFlocking;
             mDataProcessor.Add("FLOCKING", flockingBehavior);
 	
-			DataProcessorsStore.Processor<Boid.Laser_Struct> lasersBehavior = DoWeaponTest;
-            mDataProcessor.Add("LASERS", lasersBehavior);
+			
+			//DataProcessorsStore.Processor<BoidSimulation.ImpalingDamage> lasersBehavior = DoWeaponTest;
+            //mDataProcessor.Add("LASERS", lasersBehavior);
+	
+			DataProcessorsStore.Processor<BoidSimulation.ImpalingDamage> laserImpalingDamageBehavior = DoImpalingDamage;
+            mDataProcessor.Add("LASER_IMPALING_DAMAGE", laserImpalingDamageBehavior);
 			
 			// TODO:
 			// OnEntityDetached(EntityNode e)
@@ -790,8 +799,8 @@ namespace HelloBoids
 
 			System.Diagnostics.Debug.Assert(EntryClass.NUM_ENTRIES == numBoids);
 	
-			mTHRandom = new ThreadedRandom(this.Seed);
-			Console.WriteLine("BoidSimulation.ctor() - Preparing to Spawn " + numBoids + " with SEED == " + this.Seed.ToString());
+			mTHRandom = new ThreadedRandom(this.Seeds.Master);
+			Console.WriteLine("BoidSimulation.ctor() - Preparing to Spawn " + numBoids + " with SEED == " + this.Seeds.Master.ToString());
 
 			
 
@@ -883,7 +892,8 @@ namespace HelloBoids
         //    get { return mForceProduction;}
         //}
 
-        public void AssignConsumptionHandler(string productID, Consumption_Delegate consumptionHandler)
+/*
+		public void AssignConsumptionHandler(string productID, Consumption_Delegate consumptionHandler)
         {
             if (mUserConsumption == null) mUserConsumption = new Dictionary<uint, Consumption_Delegate>();
             mUserConsumption.Add(productionTypeFlag, consumptionHandler);
@@ -926,7 +936,8 @@ namespace HelloBoids
         //{
         //    mForceProduction = productionHandler;
         //}
-
+*/
+		
 
         private EntityNode[] GetProducers(uint productID)
         {
@@ -1053,13 +1064,15 @@ namespace HelloBoids
             //////////////////////////////////////////////////////////////////
             // Life Cycle
             //////////////////////////////////////////////////////////////////
-            bool spawnReady = mIntervalTimers.IsReady("LifeCycle", "spawn");
+			/*
+            bool spawnReady = mIntervalTimers.IsReady(i, "droid_spawn");
             if (spawnReady)
             {
                 //Console.WriteLine("Spawn Ready == " + spawnReady.ToString());
-                mIntervalTimers.Reset("LifeCycle", "spawn");
+                mIntervalTimers.Reset(i, "droid_spawn");
             }
-
+			*/
+			
             //////////////////////////////////////////////////////////////////
             // Flocking
             //////////////////////////////////////////////////////////////////		
@@ -1178,20 +1191,75 @@ namespace HelloBoids
         } 
 
 #if USE_MEMORY_T
-
-		private void Do_Droid_Logic(ThreadedRandom random, double maxDistance)
+	
+		/// <summary>
+		/// Seed would typically be Seeds.Local_Droid_Logic + mCurrentFrame;
+		/// </summary>
+		private void Do_Droid_Logic(int seed, double maxDistance)
 		{
-
+	
+			ThreadedRandom random = new ThreadedRandom(seed);
+			const double MAX_SEARCH_DISTANCE = 35d;
+	
+			// ComponentStore<Transform.Living_Entity> store, object[] parameters, int seed, GameTime gt
+	
+			// todo: we could pass in an array of store to our Processor functions... rather than just one.
+			//       but it would have to be an array of object[] like parameters and we'd have to cast them
+	
+			// todo: we need to be able to access all of these from just the single Droid EntityNode
+			//       this means they must exist in a UserData object perhaps that we can grab them from?
+	
+	
+			//Transform.Transform_Struct
+			//Transform.Living_Entity
+			//Boid.Laser_Struct
+			
+				
+			// todo: during Spawn()
+			// todo: generate Droids with some variance for age, size, and speed
+			// todo: create a "cooldown" interval that is based on the droid's size
+				
+				
 			int count = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 
             //for (int i = 0; i < Boids.Count; i++)
             {
-				// generate Droids with some variance for size, and speed
-				// create a "cooldown" interval that is based on the droid
-				// 
-				// if can fire
-				//		findtarget(bool closest = true)
-				//      fire(i, targetID) <-- performs production (there is a chance of FireDamage that has it's own cooldown and incurs someDamagePerSecond
+				Boid currentBoid = Boids[i];
+				
+				string timerID = currentBoid.SpanIndex.ToString();
+				bool canFire = mIntervalTimers.IsReady(timerID, "droid_canfire");
+            	if (canFire)
+           	 	{
+                	// Console.WriteLine("CanFire = " + canFire.ToString());
+                	mIntervalTimers.Reset(timerID, "droid_canfire");
+            					
+					Boid target = (Boid)FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE);
+					if (target == null) return; // continue; //NOTE: for parallel.For we use "return" for regular for() loop we use "continue"
+					
+					Boid.Laser_Struct laser = currentBoid.GetStruct("LASER_STRUCT");
+					
+					//Damage[] damages = CalculateDamage(); // <-- returns 1 or more Products (eg ImpalingDamage and FireDamage)
+					//for (int j = 0; j < damages.Length; j++)
+					//{
+					//	int d = QueueDamage (damages[j]);
+					//}
+				}
+				else 
+				{
+					
+					bool isFiring = mIntervalTimers.IsReady(timerID, "droid_isfiring");
+					
+					if (isFiring)
+					{
+						// animation continues
+						
+					}
+					
+				}
+				
+			
+				
+				//      fire(i, targetID) 
 				// 			how are these productions added to the struct fireDamage {}   and struct burningDamage { } 
 				//      firingAnimationCooldown
 				// else if alreadyfiring
@@ -1204,6 +1272,110 @@ namespace HelloBoids
 			});
 		}
 		
+		private EntityNode FindNearestTarget (EntityNode source, double maxDistance)
+		{
+			EntityNode result = null;
+			
+			//
+			
+			return result;
+			
+		}
+		
+		private bool CanHit()
+		{
+			bool result = false;
+			
+			// evasive
+			
+			
+			// stealth
+			
+			
+			
+			// counter measures
+			
+			
+			
+			// sensorLockElapsed // how much time has this  target been tracked by sensors already
+			
+			
+			
+			// distance
+			
+			
+			
+			
+			return result;
+		}
+		
+        private object[] CalculateDamage(EntityNode weapon, Boid.Laser_Struct weaponData, EntityNode target)
+        {
+			int result  = 0;
+			
+			
+			// target Armor
+			
+			
+			
+			
+			
+			// target Evasive?
+			
+			
+			
+			
+			
+			// target distance
+			
+			
+			
+			
+			// target last acquisition
+			
+			
+			
+			
+			
+			// operator skill
+			
+			
+			
+			
+			
+			// operator Health
+			
+			
+			
+			
+			
+			
+			// weapon %power of maxpower being used vs weapon output
+			
+			
+			
+			
+			
+			
+			// weapon Hitpoints
+			
+			
+			
+			
+			
+			return result;
+        }
+
+
+		/// <summary>
+		/// ImpalingDamage from Lasers can last for several seconds and so any one particular FireDamage record is
+		/// not removed from the ComponentStore<> until it's expired
+		/// </summary>
+		private void DoImpalingDamage(ComponentStore<BoidSimulation.ImpalingDamage> store, object[] parameters, int seed, GameTime gt)
+		{
+			
+		}
+
 		/// <summary>
 		/// FireDamage can last for several seconds and so any one particular FireDamage record is
 		/// not removed from the ComponentStore<> until it's expired
@@ -1270,6 +1442,9 @@ namespace HelloBoids
             // FormMainBase.SendNetMessage(msg)
 		}
 		
+		
+			
+			
         private void DoLifeCycle(ComponentStore<Transform.Living_Entity> store, object[] parameters, int seed, GameTime gt)
         {
 			// TODO: until both paths use DoLifeCycle(), this will throw off deterministism for Memory<T> path
@@ -1284,6 +1459,15 @@ namespace HelloBoids
 	
             for (int i = 0; i < memSpan.Length; i++)
 			{
+				int timerID = 0; // TODO:  memSpan[i].SpanIndex.ToString();
+				
+				bool spawnReady = mIntervalTimers.IsReady(timerID, "droid_spawn");
+            	if (spawnReady)
+            	{
+               		// Console.WriteLine("Spawn Ready == " + spawnReady.ToString());
+                	mIntervalTimers.Reset(timerID, "droid_spawn");
+            	}
+				
 				// todo: i think we need to check to see if this record is for
 				//       an Entity that is enabled
 				// todo: i think this needs to use a GameTime not a Tick() because if the simulation pauses
@@ -1301,12 +1485,7 @@ namespace HelloBoids
 				}
 			}
          
-            bool spawnReady = mIntervalTimers.IsReady("LifeCycle", "spawn");
-            if (spawnReady)
-            {
-                // Console.WriteLine("Spawn Ready == " + spawnReady.ToString());
-                mIntervalTimers.Reset("LifeCycle", "spawn");
-            }
+           
 	
 			// spawn new ones up to max spawn number per frame
 			double width = (double)parameters[0];
@@ -1389,7 +1568,6 @@ namespace HelloBoids
 			System.Threading.Tasks.Parallel.For(0, length, i =>
 			//for (int i = 0; i < memSpan.Length; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
             {
-				
 				// NOTE: inside of the Parallel.For(), Span<T> cannot be passed in
 				//      because the code inside the Paralle.For() is treated as a Lambda
 				Span<Transform.Transform_Struct> memSpan = store.Span;
@@ -1678,6 +1856,14 @@ namespace HelloBoids
             double vY = (rand.NextDouble() - 0.5d) * 2d;
 
             Boid b = new Boid(index, posX, posY, posZ, vX, vY);
+	
+			// Register (nodeID, interval_name)
+			int id = b.Index.ToString();
+	
+			mIntervalTimers.Register(id, "droid_spawn", 0.06d);
+			mIntervalTimers.Register(id, "droid_canfire", 0.26d);
+			mIntervalTimers.Register(id, "droid_isfiring", 0.06d);
+	
 	
 	
 		    if (this.Octree != null)
@@ -9868,6 +10054,11 @@ if (mEntityNodesCollection == null) return null;
 				   		ComponentStore<Boid.Laser_Struct> storeLasers = mComponentStoreCollection.CheckOut<Boid.Laser_Struct>(0);
  						lazer.Invoke(storeLasers, args, seed, gt);
 						break;
+					case "LASER_IMPALING_DAMAGE":
+						Processor<BoidSimulation.ImpalingDamage> laserImpalingDamage = (Processor<BoidSimulation.ImpalingDamage>)func;
+				   		ComponentStore<BoidSimulation.ImpalingDamage> storeLaserImpalingDamage = mComponentStoreCollection.CheckOut<BoidSimulation.ImpalingDamage>(0);
+ 						laserImpalingDamage.Invoke(storeLaserImpalingDamage, args, seed, gt);
+						break;
 					default:
 						throw new NotImplementedException();
 				}
@@ -9918,6 +10109,9 @@ if (mEntityNodesCollection == null) return null;
                     break;
 				case "LASERS":
 					break;
+				case "LASER_IMPALING_DAMAGE":
+					break;
+					
                 default:
                     throw new NotImplementedException("DataProcessors.GetParameters() - No store for key '" + key + "'");
             }
@@ -11613,6 +11807,26 @@ if (mEntityNodesCollection == null) return null;
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // BEGIN MEMORY STORES
 
+
+	public class Seeds
+	{
+		private int mMaster;
+		private int mLocal_DroidLogic;
+		//public int Local_D
+		
+		public Seeds (int seed)
+		{
+			mMaster = seed;
+			mLocal_DroidLogic = mMaster + 1;
+			
+		}
+		
+		public int Master {get {return mMaster;}}
+		public int Local_Droid_Logic {get {return mLocal_DroidLogic;}}
+		
+		
+	}
+	
     public class Utils
     {
         static uint frame_count = 0;

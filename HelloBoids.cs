@@ -632,7 +632,7 @@ namespace HelloBoids
 #if USE_MEMORY_T
         public DataProcessorsStore mDataProcessor;
 #endif
-
+		
         public enum PRODUCTS : uint
         {
             None = 0,
@@ -641,16 +641,157 @@ namespace HelloBoids
             MicrowaveDamage = 3
         }
 
-		public struct FireDamage
+		public struct HealthSystem
 		{
-			int Damage;
-			float Duration;  // a time in seconds? or number of rounds along with a ROUND_LENGTH?
+			public struct DamageResult
+			{
+				public int EntityIndex;
+				public int Amount;
+			}
 			
+			public void Process(ComponentStore<Boid.LivingEntity> store, object[] parameters, int seed, GameTime gt)
+			{
+				List<DamageResult> records = (List<DamageResult>)parameters[0];				  
+				
+				if (records != null)
+				{
+					
+				}
+			}
 		}
 		
-		public struct ImpalingDamage
+		
+		
+		public struct DamageSystem
 		{
-			int Damage;
+			public struct Damage
+			{
+				public int EntityIndex;
+				public int Amount;
+			}
+			
+			List<Damage> mRecords;
+			List<HealthSystem.DamageResult> mDamageResults;
+			
+			public DamageSystem()
+			{
+				mRecords = new List<Damage>();
+				mDamageResults = new List<HealthSystem.DamageResult>();
+			}
+			
+			public void Add (Damage d)
+			{
+				mRecords.Add (d);
+			}
+					
+			public void Process(ComponentStore<Boid.LivingEntity> store, object[] parameters, int seed, GameTime gt)
+			{
+				//Span memSpan = store.Span;
+				
+				if (mRecords != null)
+					for (int i = 0; i < mRecords.Count; i++)
+					{
+						int amount = mRecords[i].Amount;
+						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = mRecords[i].EntityIndex, Amount = amount});
+					}
+				
+				BoidSimulation.mHealthSystem.Process(null, new object[] {mDamageResults}, seed, gt);
+			}
+		}
+		
+		
+		public struct DamageOverTimeSystem
+		{
+			public int Amount;
+			public float Duration;  // a time in seconds? or number of rounds along with a ROUND_LENGTH?
+			
+			public struct DamageOverTime
+			{
+				public int EntityIndex;
+				public int Amount;
+				public float Duration;
+			}
+			
+			List<DamageOverTime> mRecords;
+			List<HealthSystem.DamageResult> mDamageResults;
+			
+			
+			/// <summary>
+			/// FireDamage for example, can last for several seconds and so any one particular FireDamage record is
+			/// not removed from the ComponentStore<> until it's expired
+			/// </summary>
+			public void Process(ComponentStore<Boid.LivingEntity> store, object[] parameters, int seed, GameTime gt)
+			{
+				//Span memSpan = store.Span;
+				if (mRecords != null)
+					for (int i = 0; i < mRecords.Count; i++)
+					{
+						int amount = mRecords[i].Amount;
+						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = mRecords[i].EntityIndex, Amount = amount});
+					}
+
+				BoidSimulation.mHealthSystem.Process(null, new object[]{ mDamageResults }, seed, gt);
+			}
+			
+			
+			/*
+			ThreadedRandom r = (ThreadedRandom) parameters[0];
+			double maxDistance = (double)parameters[1];
+		
+			int count = Boids.Count;
+            System.Threading.Tasks.Parallel.For(0, count, i => 
+            //for (int i = 0; i < Boids.Count; i++)
+            {
+				// generate Droids with some variance for size, and speed
+				// create a "cooldown" interval that is based on the droid
+				// 
+				// if can fire
+				//		findtarget(bool closest = true)
+				//      fire(i, targetID) <-- performs production (there is a chance of FireDamage that has it's own cooldown and incurs someDamagePerSecond
+				// 			how are these productions added to the struct fireDamage {}   and struct burningDamage { } 
+				//      firingAnimationCooldown
+				// else if alreadyfiring
+				//     wait for complete and cooldown of firingAnimation
+				//     wait for complete of RoF cooldown
+				// 
+				// 
+				
+								
+				
+                List<int> found;
+                List<Boid> neighbors;
+
+				double separationDistance = EntryClass.SEPERATION_DISTANCE;
+				double alignmentDistance = EntryClass.ALIGNMENT_DISTANCE;
+				double cohesionDistance = EntryClass.COHESION_DISTANCE;
+				
+			});
+			*/
+			
+            // we need for scripts to call RegisterConsumption(productID) and RegisterConsumptionProcesssor delegate 
+            //  - the RegisterConsumption(entityID, productID) is usefull for not having to iterate through all Entities to find one
+            //    where entity.Script.Consumers (<-- consumers just contains delegates to handlers) IS NOT NULL and then that is a successful
+            //    find.  But it's better to just have a list of all consumers of a type of productID. 
+            //  - 
+
+
+            // Radar sensor will RegisterConsumer (entityID, microwaveID) and it will Produce() a type of 
+            // product called "contact(s)"  as contactProductID
+             
+
+            // TODO: we need to keep in mind that Production and Consumption should occur over the NETWORK as well.
+            //       _or_ only the changes need to be transmitted
+            // 
+            //  the components can define and create the Memory<T> structs it needs such as
+            //  Memory<Laser_Struct> lasers;  and then define the various processors that will use that struct
+            //  Those processors will also be defined via script (potentially) and the scripts will know how to 
+            //  grab that Memory<Laser_Struct> out of a UserData object.
+
+
+
+            // NOTE: in KeystoneGameBlocks we would then potentially send the result to the clients if this is processing on the server
+            // FormMainBase.SendNetMessage(msg)
+			
 			
 		}
 		
@@ -672,7 +813,7 @@ namespace HelloBoids
 //        private Dictionary<uint, Production_Delegate> mUserProduction;
 //        private Dictionary<uint, Consumption_Delegate> mUserConsumption;
 
-		        /// <summary>
+		/// <summary>
         /// // TODO: this delegate has to be modified to look like our DataProcessors as in 
         /// // KeyCommon.Processors -> public delegate void Processor<T>(ComponentStore<T> store, object parameters, int seed, GameTime gt);
         /// // because we are using a Data Oriented processing model that will accept all of the entities that will produce a particular productIDs.
@@ -723,6 +864,13 @@ namespace HelloBoids
         public static ComponentStore<Transform.Transform_Struct> Store;
 #endif
 
+		public static DamageSystem mDamageSystem = new DamageSystem();
+		public static DamageOverTimeSystem mDamageOverTimeSystem = new DamageOverTimeSystem();
+		
+		public static HealthSystem mHealthSystem = new HealthSystem();
+		
+		
+		
         public BoidSimulation(int numBoids, double width, double height, double depth, bool useOctree = false)
         {
             Boids = new List<Boid>(); //NOTE: we do not preallocate the list here
@@ -777,8 +925,10 @@ namespace HelloBoids
 			//DataProcessorsStore.Processor<BoidSimulation.ImpalingDamage> lasersBehavior = DoWeaponTest;
             //mDataProcessor.Add("LASERS", lasersBehavior);
 	
-			DataProcessorsStore.Processor<BoidSimulation.ImpalingDamage> laserImpalingDamageBehavior = DoImpalingDamage;
-            mDataProcessor.Add("LASER_IMPALING_DAMAGE", laserImpalingDamageBehavior);
+			//DataProcessorsStore.Processor<BoidSimulation.ImpalingDamage> laserImpalingDamageBehavior = DoImpalingDamage;
+            //mDataProcessor.Add("LASER_IMPALING_DAMAGE", laserImpalingDamageBehavior);
+			
+			
 			
 			// TODO:
 			// OnEntityDetached(EntityNode e)
@@ -1400,81 +1550,6 @@ namespace HelloBoids
 			return result;
         }
 
-
-		/// <summary>
-		/// ImpalingDamage from Lasers can last for several seconds and so any one particular FireDamage record is
-		/// not removed from the ComponentStore<> until it's expired
-		/// </summary>
-		private void DoImpalingDamage(ComponentStore<BoidSimulation.ImpalingDamage> store, object[] parameters, int seed, GameTime gt)
-		{
-			
-		}
-
-		/// <summary>
-		/// FireDamage can last for several seconds and so any one particular FireDamage record is
-		/// not removed from the ComponentStore<> until it's expired
-		/// </summary>
-		private void DoFireDamage(ComponentStore<BoidSimulation.FireDamage> store, object[] parameters, int seed, GameTime gt)
-        {
-			
-			ThreadedRandom r = (ThreadedRandom) parameters[0];
-			double maxDistance = (double)parameters[1];
-		
-			int count = Boids.Count;
-            System.Threading.Tasks.Parallel.For(0, count, i => 
-            //for (int i = 0; i < Boids.Count; i++)
-            {
-				// generate Droids with some variance for size, and speed
-				// create a "cooldown" interval that is based on the droid
-				// 
-				// if can fire
-				//		findtarget(bool closest = true)
-				//      fire(i, targetID) <-- performs production (there is a chance of FireDamage that has it's own cooldown and incurs someDamagePerSecond
-				// 			how are these productions added to the struct fireDamage {}   and struct burningDamage { } 
-				//      firingAnimationCooldown
-				// else if alreadyfiring
-				//     wait for complete and cooldown of firingAnimation
-				//     wait for complete of RoF cooldown
-				// 
-				// 
-				
-								
-				
-                List<int> found;
-                List<Boid> neighbors;
-
-				double separationDistance = EntryClass.SEPERATION_DISTANCE;
-				double alignmentDistance = EntryClass.ALIGNMENT_DISTANCE;
-				double cohesionDistance = EntryClass.COHESION_DISTANCE;
-				
-			});
-	
-            // we need for scripts to call RegisterConsumption(productID) and RegisterConsumptionProcesssor delegate 
-            //  - the RegisterConsumption(entityID, productID) is usefull for not having to iterate through all Entities to find one
-            //    where entity.Script.Consumers (<-- consumers just contains delegates to handlers) IS NOT NULL and then that is a successful
-            //    find.  But it's better to just have a list of all consumers of a type of productID. 
-            //  - 
-
-
-            // Radar sensor will RegisterConsumer (entityID, microwaveID) and it will Produce() a type of 
-            // product called "contact(s)"  as contactProductID
-             
-
-            // TODO: we need to keep in mind that Production and Consumption should occur over the NETWORK as well.
-            //       _or_ only the changes need to be transmitted
-            // 
-            //  the components can define and create the Memory<T> structs it needs such as
-            //  Memory<Laser_Struct> lasers;  and then define the various processors that will use that struct
-            //  Those processors will also be defined via script (potentially) and the scripts will know how to 
-            //  grab that Memory<Laser_Struct> out of a UserData object.
-
-
-
-            // NOTE: in KeystoneGameBlocks we would then potentially send the result to the clients if this is processing on the server
-            // FormMainBase.SendNetMessage(msg)
-		}
-		
-		
 			
 			
         private void DoLifeCycle(ComponentStore<Transform.Living_Entity> store, object[] parameters, int seed, GameTime gt)
@@ -1565,6 +1640,12 @@ namespace HelloBoids
 			// TODO: Temp HACK. The below call already threads the update logic of all the Droids				
 			Do_Droid_Logic (seed, elapsedSeconds);
 					
+			mDamageSystem.Process(null, null, Seeds.Master, gt);
+			mDamageOverTimeSystem.Process(null, null, Seeds.Master, gt);
+			
+			
+			
+			
 			
 			
             //using (EntryClass.CodeProfiler.HookUp("AssignSpan"))
@@ -10115,11 +10196,11 @@ if (mEntityNodesCollection == null) return null;
 				   		ComponentStore<Boid.Laser_Struct> storeLasers = mComponentStoreCollection.CheckOut<Boid.Laser_Struct>(0);
  						lazer.Invoke(storeLasers, args, seed, gt);
 						break;
-					case "LASER_IMPALING_DAMAGE":
-						Processor<BoidSimulation.ImpalingDamage> laserImpalingDamage = (Processor<BoidSimulation.ImpalingDamage>)func;
-				   		ComponentStore<BoidSimulation.ImpalingDamage> storeLaserImpalingDamage = mComponentStoreCollection.CheckOut<BoidSimulation.ImpalingDamage>(0);
- 						laserImpalingDamage.Invoke(storeLaserImpalingDamage, args, seed, gt);
-						break;
+					//case "LASER_IMPALING_DAMAGE":
+					//	Processor<BoidSimulation.ImpalingDamage> laserImpalingDamage = (Processor<BoidSimulation.ImpalingDamage>)func;
+				    //	ComponentStore<BoidSimulation.ImpalingDamage> storeLaserImpalingDamage = mComponentStoreCollection.CheckOut<BoidSimulation.ImpalingDamage>(0);
+ 					//  laserImpalingDamage.Invoke(storeLaserImpalingDamage, args, seed, gt);
+					//	break;
 					default:
 						throw new NotImplementedException();
 				}

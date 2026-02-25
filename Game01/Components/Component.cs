@@ -64,7 +64,29 @@ namespace Game01.Components
             - power generators 
         - Hyperdrive / JumpDrive / StarDrive
         */
-            
+
+    public struct Build_Struct
+	{
+		public string PersistString;
+		
+		
+		public string Serialize()
+		{
+			// javascript object notation
+			Laser_Struct laser = new Laser_Struct();
+			// TODO: test whether this saves all the different types of data we need with our complex structs/class properties
+			string persistedString = System.Text.Json.JsonSerializer.Serialize(laser);
+			
+			return persistedString;
+		}
+		
+		public bool Deserialize(string persistString)
+		{
+			return true;
+		}	
+		
+	}
+
     public struct Component  // aka: "Useable Component"
     {
         public int Interfaces; // 32 bit flags for the various interfaces (Build and Runtime) used by this component
@@ -112,6 +134,7 @@ namespace Game01.Components
 
 		        
         //  build 
+        public string BuildPersistString;
         public bool StatsChanged;
         public bool BuildChanged;
 

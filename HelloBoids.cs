@@ -7,8 +7,8 @@
 						// went down to 465 FPS from 2800 FPS.  The "OnEntityMoved()" needs to be made much faster.
 						
 #define CONCURRENT_TIMERS
-#define SPATIAL_SEARCH       // this define enables adding to Octree
-#define SPATIAL_MOVE_UPDATES // this define enables update of the Octree as moving of Entities occurs
+#define SPATIAL_SEARCH       // this define enables adding to Octree 
+#define SPATIAL_MOVE_UPDATES // this define enables update of the Octree as moving of Entities occurs (430fps WITHOUT vs 150fps WITH)
 
 //#define DEBUG_OUTPUT
 
@@ -641,6 +641,30 @@ namespace HelloBoids
             MicrowaveDamage = 3
         }
 
+		// todo: might exist in Game01.Rules.Processors
+		public struct ComponentModificationSystem
+		{
+			public void AddRecord()
+			{
+			}
+			
+			public void RemoveRecord()
+			{
+			}
+			
+			
+			public void Process()
+			{
+				
+				
+			}
+			
+			public void Produce()
+			{
+				
+			}
+		}
+		
 		public struct HealthSystem
 		{
 			public struct DamageResult
@@ -649,19 +673,35 @@ namespace HelloBoids
 				public int Amount;
 			}
 			
-			public void Process(ComponentStore<Boid.LivingEntity> store, object[] parameters, int seed, GameTime gt)
+			// todo: rename Apply() ?
+			public void Process(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
 			{
 				List<DamageResult> records = (List<DamageResult>)parameters[0];				  
 				
+				// NOTE: the store used here must refer to the actual memStore the Droid uses
+				//       to store it's data or else there is no way to update that Droid...Duh!
+				//       This is OK though!  We just need to know that although all the RECORDS
+				//       will be used in List<DamageResult>records, NOT ALL of the SPAN records
+				//       will be used.  No problem.  We just use memSpan[records[i].EntityIndex] 
+				//       to know which ones to use
+				//       
+				if (store == null) return;
+				Span<LivingEntity> memSpan = store.Span;
+								
+				
 				if (records != null)
 				{
-					
+					for (int i = 0; i < records.Count; i++)
+					{
+						LivingEntity e = (LivingEntity)memSpan[records[i].EntityIndex];
+						e.Hitpoints += records[i].Amount;
+					}
 				}
 			}
 		}
 		
-		
-		
+		//see Keystone.Game01.Messages.   public class AttackResults since
+		// we need results going over the network
 		public struct DamageSystem
 		{
 			public struct Damage
@@ -684,9 +724,9 @@ namespace HelloBoids
 				mRecords.Add (d);
 			}
 					
-			public void Process(ComponentStore<Boid.LivingEntity> store, object[] parameters, int seed, GameTime gt)
+			public void Process(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
 			{
-				//Span memSpan = store.Span;
+				Span<LivingEntity> memSpan = store.Span;
 				
 				if (mRecords != null)
 					for (int i = 0; i < mRecords.Count; i++)
@@ -695,11 +735,13 @@ namespace HelloBoids
 						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = mRecords[i].EntityIndex, Amount = amount});
 					}
 				
-				BoidSimulation.mHealthSystem.Process(null, new object[] {mDamageResults}, seed, gt);
+				// use the same LivingEntityStore as the one passed in, for applying health changes to the Droid
+				BoidSimulation.mHealthSystem.Process(store, new object[] {mDamageResults}, seed, gt);
 			}
 		}
 		
-		
+		//see Keystone.Game01.Messages.   public class AttackResults since
+		// we need results going over the network
 		public struct DamageOverTimeSystem
 		{
 			public int Amount;
@@ -720,17 +762,19 @@ namespace HelloBoids
 			/// FireDamage for example, can last for several seconds and so any one particular FireDamage record is
 			/// not removed from the ComponentStore<> until it's expired
 			/// </summary>
-			public void Process(ComponentStore<Boid.LivingEntity> store, object[] parameters, int seed, GameTime gt)
+			public void Process(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
 			{
-				//Span memSpan = store.Span;
+				Span<LivingEntity> memSpan = store.Span;
+				
 				if (mRecords != null)
 					for (int i = 0; i < mRecords.Count; i++)
 					{
-						int amount = mRecords[i].Amount;
+						int amount = mRecords[i].Amount; // TODO: * gt.ElapsedSeconds;
 						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = mRecords[i].EntityIndex, Amount = amount});
 					}
 
-				BoidSimulation.mHealthSystem.Process(null, new object[]{ mDamageResults }, seed, gt);
+				// use the same LivingEntityStore as the one passed in, for applying health changes to the Droid
+				BoidSimulation.mHealthSystem.Process(store, new object[]{ mDamageResults }, seed, gt);
 			}
 			
 			
@@ -791,7 +835,7 @@ namespace HelloBoids
 
             // NOTE: in KeystoneGameBlocks we would then potentially send the result to the clients if this is processing on the server
             // FormMainBase.SendNetMessage(msg)
-			
+
 			
 		}
 		
@@ -915,7 +959,7 @@ namespace HelloBoids
 #if USE_MEMORY_T
 
             // add data processors
-            DataProcessorsStore.Processor<Transform.Living_Entity> lifeCycleBehavior = DoLifeCycle;
+            DataProcessorsStore.Processor<LivingEntity> lifeCycleBehavior = DoLifeCycle;
             mDataProcessor.Add("LIFECYCLE", lifeCycleBehavior);
 
             DataProcessorsStore.Processor<Transform.Transform_Struct> flockingBehavior = DoFlocking;
@@ -1165,7 +1209,16 @@ namespace HelloBoids
 
 				// TEST MEMORY<T> (Data Oriented Technique)
 				// ====================
+		
+				Do_Droid_Logic (Seeds.Master, elapsedSeconds);
+
+				ComponentStore<LivingEntity> livingEntityStore = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
+				mDamageSystem.Process(livingEntityStore, null, Seeds.Master, gt);
+				mDamageOverTimeSystem.Process(livingEntityStore, null, Seeds.Master, gt);
+				
+				
 				mDataProcessor.Update(gt, Boids.ToArray());
+				
 	#endif
 			}
 			catch (AggregateException ae)
@@ -1389,7 +1442,7 @@ namespace HelloBoids
 					if (target == null) return; // continue; //NOTE: for parallel.For we use "return" for regular for() loop we use "continue"
 					
 					double distanceToTargetSquared = Vector3d.GetDistance3dSquared(currentBoid.Translation, target.Translation);
-					Boid.Laser_Struct laser = (Boid.Laser_Struct)currentBoid.GetUserStruct(typeof(Boid.Laser_Struct).Name);
+					Laser_Struct laser = (Laser_Struct)currentBoid.GetUserStruct(typeof(Laser_Struct).Name);
 					
 					if (CanHit(target))
 					{
@@ -1404,8 +1457,6 @@ namespace HelloBoids
 								//int d = QueueDamage (damages[j]);
 							}
 					}
-					
-					
 				}
 				else 
 				{
@@ -1421,7 +1472,6 @@ namespace HelloBoids
 					{
 						
 					}
-					
 				}
 				
 			
@@ -1437,6 +1487,9 @@ namespace HelloBoids
 				
 				
 			});
+	
+			//see Keystone.Game01.Messages.   public class AttackResults since
+			// we need results going over the network
 		}
 		
 		///<summary>
@@ -1467,6 +1520,18 @@ namespace HelloBoids
 			
 			bool result = false;
 			
+			
+        // todo: for tactical station, the logic for determining hit+damage should rely on the crew station.css script and not the operator.  Instead, we just grab bonuses or minuses from the operator crew member.
+        //  - time to get a lock
+        //  - bonus for time 
+        //  - bonus for damage
+        //  and remember, it's the tactical station that keeps track of all the weapons available and the targets (including friendlies)
+        // time for turret to rotate towards target
+
+
+        // todo: the ai captain needs a "mission" or "objectives" for each mission
+			
+			
 			// evasive
 			
 			
@@ -1493,7 +1558,7 @@ namespace HelloBoids
 		/// The resulting damage types and amounts (and duration for damage that can be applied overtime)
 		/// that occur on this successful hit.
 		/// </summary>
-        private object[] CalculateDamage(EntityNode droid, Boid.Laser_Struct weaponStruct, EntityNode target)
+        private object[] CalculateDamage(EntityNode droid, Laser_Struct weaponStruct, EntityNode target)
         {
 			object[] result = null;
 			
@@ -1546,18 +1611,19 @@ namespace HelloBoids
 			
 			
 			
-			
+			//see Keystone.Game01.Messages.   public class AttackResults since
+			// we need results going over the network
 			return result;
         }
 
 			
 			
-        private void DoLifeCycle(ComponentStore<Transform.Living_Entity> store, object[] parameters, int seed, GameTime gt)
+        private void DoLifeCycle(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
         {
 			// TODO: until both paths use DoLifeCycle(), this will throw off deterministism for Memory<T> path
     		return;
     
-			Span<Transform.Living_Entity> memSpan = store.Span;
+			Span<LivingEntity> memSpan = store.Span;
 	
 			// todo: maxAge and minAge need to be set in Parameters
 	        double maxAge = 0.9d;
@@ -1629,24 +1695,13 @@ namespace HelloBoids
 		
         private void DoFlocking(ComponentStore<Transform.Transform_Struct> store, object[] parameters, int seed, GameTime gt)
         {
+		
 			
 			double elapsedSeconds = gt.ElapsedSeconds;
 			OctreeOctant root = this.Octree;
 			int length = store.Span.Length;
-			
+		
 			//Console.WriteLine ("Span and Store Size Agree == " + (store.Span.Length == store.Size).ToString());
-			
-			
-			// TODO: Temp HACK. The below call already threads the update logic of all the Droids				
-			Do_Droid_Logic (seed, elapsedSeconds);
-					
-			mDamageSystem.Process(null, null, Seeds.Master, gt);
-			mDamageOverTimeSystem.Process(null, null, Seeds.Master, gt);
-			
-			
-			
-			
-			
 			
             //using (EntryClass.CodeProfiler.HookUp("AssignSpan"))
             //{
@@ -2225,121 +2280,10 @@ namespace HelloBoids
     {
         private const double BOID_WIDTH = 2.0d;
         
-		
-		
-        public struct LivingEntity
-        {
-            public double BornDate;
-            public double MaxAge;
-            //public double
-
-            public double GetAge(double currentTime)
-            {
-                return currentTime - currentTime;
-            }
-        }
-
 	#if	USE_MEMORY_T
 		public Memory<Laser_Struct> mMemStore_Laser; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
 		public int SpanIndexLaser = -1;
 		
-		
-		public enum DAMAGE_TYPE
-		{
-			
-			Impaling,
-			Burning
-				
-		}
-		
-		// material quality
-		public enum QUALITY_
-		{
-			
-			Cheap,
-			BelowAverage,
-			Average,
-			
-			Fine,
-			VeryFine
-				
-		}
-		
-		
-		
-		public struct Laser_Struct
-		{
-			// common component properties
-			public int TL;
-			
-			public float Quality_;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
-			//public string Quality; // todo: this needs to be a coefficient of 0.0 to 1.0
-			
-			
-			public bool Ruggedized;
-			
-			// common component stats 
-			public int HitPoints;
-			public int DR;  // todo: if we use complex armor, is DR (damage resistance) used?
-			
-			public double Cost;
-			public double Weight;
-			public double SurfaceArea;
-			public double Volume;
-			
-			// beam specific
-			public int Type;       // type is really just about what types of Damage(s) (ProductID(s)) it results in such as Paralysis, Crushing, Burning, Impaling
-			public float Duration;   // duration in seconds
-			
-			public bool EnergyDrill;
-			public bool FTL;
-			public bool Reliable;
-			public bool Compact;
-			
-			public float Malfunction_ ; // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
-			//public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
-									
-			public float BeamOutput;    // what is the difference between this and kW of power... is it the convsion rate of the input power to the output power?
-			public float CyclicRate;
-			public int Accuracy;
-			public int SnapShot;
-//			public string Shots;
-			
-			public double CoolDown_;
-//			public string RoF;
-			
-			public double PowerReqt;
-//			
-//			public string Mount;
-//			public string Direction;
-
-			// TODO: these are like "internal" items and can be used if another power source is no longer connected
-//			public string PowerCellType;  // TOOD: Need an ENUM
-//			public int PowerCellQuantity;
-//			public double PowerCellWeight;
-			
-			// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
-			// https://gamedev.stackexchange.com/questions/148961/how-to-design-a-damage-formula-in-an-rpg-which-keeps-weapons-with-different-atta
-			public DAMAGE_TYPE TypeDamage;     // TOOD: Need an ENUM
-			//public string Damage;         // this is dice of damage, but often contains a multiplier like (100) afterwards.  We don't need the multiplier since we just compute a min/max damage range or maybe we compute a single damage that then gets modified based on the target evasive maneuvers and such
-			public int AverageDamage;       
-//			public double KEDamage;
-//			public double HalfDamage; 
-//			public double VacuumHalfDamage;
-
-			
-//			public string Range; // string description of range (eg: "very long range")
-			public double MaxRange;
-//			public double MaxRange2;
-//			public double VacuumMaxRange;
-//			public double VacuumMaxRange2;
-		}
-		
-		
-
-		
-
-
 	
 	#endif		
 		
@@ -2416,10 +2360,6 @@ namespace HelloBoids
 //			public double VacuumMaxRange2;
 
 
-		
-		
-				
-				
             // todo do we need destructor for Repository.CheckIn mMemstore?
 
 #endif
@@ -3054,20 +2994,11 @@ return (0,0);
 
 #if USE_MEMORY_T
         public Memory<Transform_Struct> mMemStore_Transform; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
-		public Memory<Living_Entity> mMemStore_LivingEntity; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
+		public Memory<LivingEntity> mMemStore_LivingEntity; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
 
         public int SpanIndex = -1;
 		public int SpanIndexLE = -1;
 				
-				
-		//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
-		public struct Living_Entity
-		{
-			public long Age;            // technically, this probably doesnt need to be stored... we only need the CreationDate?  
-			public long CreationDateTime;   // assign using Utils.GetAge() and find Age via 'age = Utils.GetAge(entity.CreationDate);'
-			
-			
-		}
 				
         //[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
         public struct Transform_Struct
@@ -3108,7 +3039,7 @@ return (0,0);
 
             // todo do we need destuuctor for Repository.CheckIn mMemstore?
 
-			ComponentStore<Living_Entity> storeLE = EntryClass.mCStoreCol.CheckOut<Living_Entity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
+			ComponentStore<LivingEntity> storeLE = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
             index = -1;
             mMemStore_LivingEntity = storeLE.CheckOut(out index);
             SpanIndexLE = index;
@@ -4064,7 +3995,7 @@ bool mIsDisposed;
             //SpanIndex ;
             //Console.WriteLine ("Transform.cs.DisposeManagedResources() - Checked In Transform_Struct");
 			
-			ComponentStore<Living_Entity> storeLE = EntryClass.mCStoreCol.CheckOut<Living_Entity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
+			ComponentStore<LivingEntity> storeLE = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
             storeLE.CheckIn(mMemStore_LivingEntity);
             //SpanIndexLE ;
 			//Console.WriteLine ("Transform.cs.DisposeManagedResources() - Checked In Living_Entity struct");
@@ -4076,11 +4007,15 @@ bool mIsDisposed;
 
         #endregion
     }
+	////////////////////////////////////////////////////////////////////////////////////////////////
+    // END NODES
+	
 
-
-
-
-    // https://boristhebrave.github.io/DeBroglie/
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// STRUCTS AND IENTITYSYSTEMS
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
+	// https://boristhebrave.github.io/DeBroglie/
     // https://github.com/BorisTheBrave/DeBroglie
     // LibNoise
     // IEntitySystem proc gen
@@ -4127,11 +4062,137 @@ bool mIsDisposed;
 
     }
 
-    public struct UpdateContext
-    {
-        // see SelectionNode or Elements.SwitchNode for help
 
-    }
+	public struct Living_Entity
+	{	
+		public long CreationDateTime;   		
+	}
+	
+	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
+	public struct LivingEntity
+	{
+		public long CreationDateTime;
+		public long Age;            // technically, this probably doesnt need to be stored... we only need the CreationDate?  // assign using Utils.GetAge() and find Age via 'age = Utils.GetAge(entity.CreationDate);'
+		public double MaxAge;
+		public int Hitpoints;
+
+		//public double
+
+		public double GetAge(double currentTime)
+		{
+			return currentTime - CreationDateTime;
+		}
+	}
+		
+
+	public enum DAMAGE_TYPE
+	{
+		Impaling,
+		Burning				
+	}
+		
+		// material quality
+	public enum QUALITY_
+	{
+		Cheap,
+		BelowAverage,
+		Average,
+			
+		Fine,
+		VeryFine				
+	}
+		
+	public struct Build_Struct
+	{
+		public string PersistString;
+		
+		
+		public string Serialize()
+		{
+			// javascript object notation
+			Laser_Struct laser = new Laser_Struct();
+			// TODO: test whether this saves all the different types of data we need with our complex structs/class properties
+			string persistedString = System.Text.Json.JsonSerializer.Serialize(laser);
+			
+			return persistedString;
+		}
+		
+		public bool Deserialize(string persistString)
+		{
+			return true;
+		}	
+	}
+	
+	// In \\KeystoneGameBlocks\\ see \\game01\\Components\\Weapon
+	public struct Laser_Struct
+	{
+		// common component properties
+		public int TL;
+
+		public float Quality_;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
+		//public string Quality; // todo: this needs to be a coefficient of 0.0 to 1.0
+
+		public bool Ruggedized;
+
+		// common component stats 
+		public int HitPoints; // from LivingEntity
+		public double Cost;
+		public double Weight;
+		public double SurfaceArea;
+		public double Volume;
+		public int DR;  // todo: if we use complex armor, is DR (damage resistance) used?
+
+		// beam specific
+		public int Type;       // type is really just about what types of Damage(s) (ProductID(s)) it results in such as Paralysis, Crushing, Burning, Impaling
+		public float Duration;   // duration in seconds
+
+		public bool EnergyDrill;
+		public bool FTL;
+		public bool Reliable;
+		public bool Compact;
+
+		public float Malfunction_ ; // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
+		//public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
+
+		public float BeamOutput;    // what is the difference between this and kW of power... is it the convsion rate of the input power to the output power?
+		public float CyclicRate;
+		public int Accuracy;
+		public int SnapShot;
+		//			public string Shots;
+
+		public double CoolDown_;
+		//			public string RoF;
+
+		public double PowerReqt;
+		//			
+		//			public string Mount;
+		//			public string Direction;
+
+		// TODO: these are like "internal" items and can be used if another power source is no longer connected
+		//			public string PowerCellType;  // TOOD: Need an ENUM
+		//			public int PowerCellQuantity;
+		//			public double PowerCellWeight;
+
+		// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
+		// https://gamedev.stackexchange.com/questions/148961/how-to-design-a-damage-formula-in-an-rpg-which-keeps-weapons-with-different-atta
+		public DAMAGE_TYPE TypeDamage;     // TOOD: Need an ENUM
+		//public string Damage;         // this is dice of damage, but often contains a multiplier like (100) afterwards.  We don't need the multiplier since we just compute a min/max damage range or maybe we compute a single damage that then gets modified based on the target evasive maneuvers and such
+		public int AverageDamage;       
+		//			public double KEDamage;
+		//			public double HalfDamage; 
+		//			public double VacuumHalfDamage;
+
+
+		//			public string Range; // string description of range (eg: "very long range")
+		public double MaxRange;
+		//			public double MaxRange2;
+		//			public double VacuumMaxRange;
+		//			public double VacuumMaxRange2;
+	}
+		
+	
+	
+	
     public interface IEntitySystem
     {
         // 1) an IEntitySystem of type "City{World.Country.Province.County}" might include many different types of child IEntitySystem within it.
@@ -4143,7 +4204,12 @@ bool mIsDisposed;
         //        - these Systems also CONSUME from "Stores"... how do we assign Stores and make them available to something like a "City?"
         // 2) Stores - food, supplies, medicines, clothing, energy
         // 3) Do we need to support rendering Proxies here (2D and 3D?)
-
+		public struct EntitySystemUpdateContext
+    	{
+        	// see SelectionNode or Elements.SwitchNode for help
+	
+    	}
+	
 
         int Seed { get; }
         int EntityCount { get; }
@@ -4163,18 +4229,18 @@ bool mIsDisposed;
         IProcGeneratedItem GetItem(int index);
         IProcGeneratedItem GetItem(string guid, int seed);
 
-        void Update(double elapsedSeconds, UpdateContext context);
+        void Update(double elapsedSeconds, EntitySystemUpdateContext context);
         void Read();
         void Write();
     }
 
-
+	
 
     public abstract class EntitySystemBase : EntityNode, IEntitySystem
     {
         public delegate IProcGeneratedItem CreateEntityHandler(int seed, string path);
         public delegate void GenerateSystemHandler(int seed);
-        public delegate void UpdateHandler(double elapsedSeconds, UpdateContext context);
+        public delegate void UpdateHandler(double elapsedSeconds, IEntitySystem.EntitySystemUpdateContext context);
 
         // private variables
         protected string mPath;
@@ -4199,7 +4265,7 @@ bool mIsDisposed;
         {
         }
 
-        public virtual void Update(double elapsedSeconds, UpdateContext context)
+        public virtual void Update(double elapsedSeconds, IEntitySystem.EntitySystemUpdateContext context)
         {
             // select from mUpdateHandlers based on context... its essentially like update LOD where the
             // update simulation can be simpler when this IEntitySystem is far away or has no players near it...
@@ -4239,12 +4305,11 @@ bool mIsDisposed;
         public virtual void Write()
         {
         }
-
     }
+
 
     public class City : EntitySystemBase
     {
-
         // City specific structs
         private struct Terrain
         {
@@ -4286,7 +4351,7 @@ bool mIsDisposed;
             //public Product[] Commodities;
 
         }
-
+		
         /*Factories_Light; // produce finished goods
         Factories_Medium;
         Factories_Heavy; 
@@ -4379,7 +4444,7 @@ bool mIsDisposed;
         {
         }
 
-        public override void Update(double elapsedSeconds, UpdateContext context)
+        public override void Update(double elapsedSeconds, IEntitySystem.EntitySystemUpdateContext context)
         {
 
         }
@@ -4429,9 +4494,9 @@ bool mIsDisposed;
 
         public int Seed { get { return mSeed; } }
     }
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    // END NODES
+
 
 
 
@@ -10187,13 +10252,13 @@ if (mEntityNodesCollection == null) return null;
   		                flocking.Invoke(store0, args, seed, gt);
 						break;
 					case "LIFECYCLE":
-						Processor<Transform.Living_Entity> life = (Processor<Transform.Living_Entity>)func;
-				   		ComponentStore<Transform.Living_Entity> store1 = mComponentStoreCollection.CheckOut<Transform.Living_Entity>(0);
+						Processor<LivingEntity> life = (Processor<LivingEntity>)func;
+				   		ComponentStore<LivingEntity> store1 = mComponentStoreCollection.CheckOut<LivingEntity>(0);
  						life.Invoke(store1, args, seed, gt);
 						break;
 					case "LASERS":
-						Processor<Boid.Laser_Struct> lazer = (Processor<Boid.Laser_Struct>)func;
-				   		ComponentStore<Boid.Laser_Struct> storeLasers = mComponentStoreCollection.CheckOut<Boid.Laser_Struct>(0);
+						Processor<Laser_Struct> lazer = (Processor<Laser_Struct>)func;
+				   		ComponentStore<Laser_Struct> storeLasers = mComponentStoreCollection.CheckOut<Laser_Struct>(0);
  						lazer.Invoke(storeLasers, args, seed, gt);
 						break;
 					//case "LASER_IMPALING_DAMAGE":

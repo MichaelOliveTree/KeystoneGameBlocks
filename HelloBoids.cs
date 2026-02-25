@@ -6,6 +6,7 @@
 						// once we added a lock() or semaphore to the re-entrant OctreeOcant.Add() and OctreeOctant.OnEntityMove(), the FPS 
 						// went down to 465 FPS from 2800 FPS.  The "OnEntityMoved()" needs to be made much faster.
 						
+#define CONCURRENT_TIMERS
 #define SPATIAL_SEARCH       // this define enables adding to Octree
 #define SPATIAL_MOVE_UPDATES // this define enables update of the Octree as moving of Entities occurs
 
@@ -989,6 +990,7 @@ namespace HelloBoids
 			double elapsedSeconds = gt.ElapsedSeconds; 
             mIntervalTimers.Update(elapsedSeconds);
 
+			
 			try
 			{
 				// TODO: I should probably just add a setting for whether we are doing CLASSES or MEMORYT so that
@@ -1236,13 +1238,24 @@ namespace HelloBoids
 					Boid target = (Boid)FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE);
 					if (target == null) return; // continue; //NOTE: for parallel.For we use "return" for regular for() loop we use "continue"
 					
-					Boid.Laser_Struct laser = currentBoid.GetStruct("LASER_STRUCT");
+					double distanceToTargetSquared = Vector3d.GetDistance3dSquared(currentBoid.Translation, target.Translation);
+					Boid.Laser_Struct laser = (Boid.Laser_Struct)currentBoid.GetUserStruct(typeof(Boid.Laser_Struct).Name);
 					
-					//Damage[] damages = CalculateDamage(); // <-- returns 1 or more Products (eg ImpalingDamage and FireDamage)
-					//for (int j = 0; j < damages.Length; j++)
-					//{
-					//	int d = QueueDamage (damages[j]);
-					//}
+					if (CanHit(target))
+					{
+						Console.WriteLine("Droid " + currentBoid.SpanIndex.ToString() + " firing on Droid " + target.SpanIndex.ToString());
+						
+						// NOTE: here we assume the Fire() occurs immediately using a lightspeed laser and the damage is instantaneous 
+						//       and does not need any travel time to reach the target
+						object[] damages = CalculateDamage(currentBoid, laser, target); // <-- returns 1 or more Products (eg ImpalingDamage and FireDamage)
+						if (damages != null)
+							for (int j = 0; j < damages.Length; j++)
+							{
+								//int d = QueueDamage (damages[j]);
+							}
+					}
+					
+					
 				}
 				else 
 				{
@@ -1252,6 +1265,10 @@ namespace HelloBoids
 					if (isFiring)
 					{
 						// animation continues
+						
+					}
+					else if (mIntervalTimers.IsReady(timerID, "droid_fireanimationcooldown"))
+					{
 						
 					}
 					
@@ -1272,18 +1289,32 @@ namespace HelloBoids
 			});
 		}
 		
+		///<summary>
+		/// This is the target that the operator (either crew member or computer) of a Targeting Crew Station
+		/// will be attempting to fire upon.  
+		/// </summary>
 		private EntityNode FindNearestTarget (EntityNode source, double maxDistance)
 		{
 			EntityNode result = null;
 			
-			//
+			BoundingBox searchArea = new BoundingBox (source.SpatialNode.BoundingBox.Center, maxDistance * 0.5d);
+			double maxDistanceSquared = maxDistance * maxDistance;
 			
-			return result;
+			Func<EntityNode, EntityNode, bool> match = (current, neighbor) =>            {
+                if (current == neighbor) return false;
+                if (Vector3d.GetDistance3dSquared(neighbor.Translation, current.Translation) <= maxDistanceSquared) return true;
+                return false;
+            };
 			
+			
+			this.Octree.Query(source, true, searchArea, match);
+			return result;		
 		}
 		
-		private bool CanHit()
+		///
+		private bool CanHit(EntityNode target)
 		{
+			
 			bool result = false;
 			
 			// evasive
@@ -1303,15 +1334,18 @@ namespace HelloBoids
 			
 			// distance
 			
-			
-			
-			
+						
+			result = true;
 			return result;
 		}
 		
-        private object[] CalculateDamage(EntityNode weapon, Boid.Laser_Struct weaponData, EntityNode target)
+		/// <summary>
+		/// The resulting damage types and amounts (and duration for damage that can be applied overtime)
+		/// that occur on this successful hit.
+		/// </summary>
+        private object[] CalculateDamage(EntityNode droid, Boid.Laser_Struct weaponStruct, EntityNode target)
         {
-			int result  = 0;
+			object[] result = null;
 			
 			
 			// target Armor
@@ -1385,8 +1419,7 @@ namespace HelloBoids
 			
 			ThreadedRandom r = (ThreadedRandom) parameters[0];
 			double maxDistance = (double)parameters[1];
-	
-	
+		
 			int count = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 
             //for (int i = 0; i < Boids.Count; i++)
@@ -1405,8 +1438,7 @@ namespace HelloBoids
 				// 
 				// 
 				
-				
-				
+								
 				
                 List<int> found;
                 List<Boid> neighbors;
@@ -1459,7 +1491,7 @@ namespace HelloBoids
 	
             for (int i = 0; i < memSpan.Length; i++)
 			{
-				int timerID = 0; // TODO:  memSpan[i].SpanIndex.ToString();
+				string timerID = i.ToString(); // TODO:  memSpan[i].SpanIndex.ToString();
 				
 				bool spawnReady = mIntervalTimers.IsReady(timerID, "droid_spawn");
             	if (spawnReady)
@@ -1522,8 +1554,18 @@ namespace HelloBoids
 		
         private void DoFlocking(ComponentStore<Transform.Transform_Struct> store, object[] parameters, int seed, GameTime gt)
         {
-			//return;
+			
 			double elapsedSeconds = gt.ElapsedSeconds;
+			OctreeOctant root = this.Octree;
+			int length = store.Span.Length;
+			
+			//Console.WriteLine ("Span and Store Size Agree == " + (store.Span.Length == store.Size).ToString());
+			
+			
+			// TODO: Temp HACK. The below call already threads the update logic of all the Droids				
+			Do_Droid_Logic (seed, elapsedSeconds);
+					
+			
 			
             //using (EntryClass.CodeProfiler.HookUp("AssignSpan"))
             //{
@@ -1559,11 +1601,7 @@ namespace HelloBoids
 			double searchRadius = largestDistance * 0.5d;
 
 			
-			OctreeOctant root = this.Octree;
 			
-			
-			int length = store.Span.Length;
-			//Console.WriteLine ("Span and Store Size Agree == " + (store.Span.Length == store.Size).ToString());
 			
 			System.Threading.Tasks.Parallel.For(0, length, i =>
 			//for (int i = 0; i < memSpan.Length; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
@@ -1858,7 +1896,7 @@ namespace HelloBoids
             Boid b = new Boid(index, posX, posY, posZ, vX, vY);
 	
 			// Register (nodeID, interval_name)
-			int id = b.Index.ToString();
+			string id = b.Index.ToString();
 	
 			mIntervalTimers.Register(id, "droid_spawn", 0.06d);
 			mIntervalTimers.Register(id, "droid_canfire", 0.26d);
@@ -2235,6 +2273,9 @@ namespace HelloBoids
             mMemStore_Laser = store.CheckOut(out checkOutIndex);
             SpanIndexLaser = checkOutIndex;
             
+			this.AddUserStruct(typeof(Laser_Struct).Name, mMemStore_Laser);
+				
+				
 			// initialize the memory store
 			mMemStore_Laser.Span[0].TL = 1;
 			mMemStore_Laser.Span[0].Quality_ = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
@@ -2829,7 +2870,27 @@ return (0,0);
         protected int mIndex;
         protected BoundingBox _box;
         protected OctreeOctant _octant;
-
+		protected Dictionary<string, object> mUserStructs;
+		
+		public void AddUserStruct(string typename, object memStore)
+		{
+			if (mUserStructs == null) mUserStructs = new Dictionary<string, object>();
+			
+			mUserStructs.Add(typename, memStore);
+			
+		}
+		
+		public object GetUserStruct(string typename)
+		{
+			if (mUserStructs == null) return null;
+			
+			object result;
+			if (mUserStructs.TryGetValue(typename, out result))
+				return result;
+				
+			return null;
+		}
+		
         public BoundingBox BoundingBox
         {
             get { return _box; }
@@ -10902,11 +10963,13 @@ if (mEntityNodesCollection == null) return null;
     }
 
     public class IntervalTimers
-    {
+    {			
         public delegate string IntervalCompleted(string nodeID, string name);
         //private List<TimePeriod> mTimePeriods;
         private Dictionary<string, TimePeriod> mKeyedTimePeriods;
-
+		private System.Collections.Concurrent.ConcurrentDictionary<string, TimePeriod> mIntervals;
+		
+		
         // NOTE: Using a class for TimePeriod instead of a struct allows us to easily
         //       increment timePeriod.Elapsed and decrement timePeriod.RepeatsRemaining without
         //       having to update this timePeriod within the Dictionary.
@@ -10933,7 +10996,12 @@ if (mEntityNodesCollection == null) return null;
             public IntervalCompleted IntervalCompletedCB;
 
 
-            public bool IsReady { get { return Elapsed >= Duration; } }
+            public bool IsReady 
+			{ 
+				get 
+				{ 
+					return Elapsed >= Duration; } 
+			}
 
             ///<summary>
             /// Rather than delete a Timer, sometimes we just want to 
@@ -10948,11 +11016,17 @@ if (mEntityNodesCollection == null) return null;
                     Elapsed = 0;            // always reset the Elapsed to 0
                 }
             }
-
-
         }
 
+		/// ctor()
+		public IntervalTimers()
+		{
+		#if CONCURRENT_TIMERS
+			if (mIntervals == null) mIntervals = new System.Collections.Concurrent.ConcurrentDictionary<string, TimePeriod>();
+		#endif
+		}
 
+		
 
         public void Register(string nodeID, string name, double durationInSeconds, bool activateImmediately = true, bool repeating = false, int repeatCount = 0)
         {
@@ -10973,9 +11047,15 @@ if (mEntityNodesCollection == null) return null;
             tp.IsActive = activateImmediately;
 
             string key = GetKey(nodeID, name);
+	
+#if CONCURRENT_TIMERS
+			if (!mIntervals.TryAdd(key, tp))
+				throw new Exception();
+#else
             if (mKeyedTimePeriods == null) mKeyedTimePeriods = new Dictionary<string, TimePeriod>();
             mKeyedTimePeriods.Add(key, tp);
-        }
+#endif   
+		}
 
         public void UnRegister(string nodeID, string name)
         {
@@ -11012,6 +11092,17 @@ if (mEntityNodesCollection == null) return null;
 
         public void Reset(string nodeID, string name)
         {
+#if CONCURRENT_TIMERS
+			string key = GetKey(nodeID, name);
+            TimePeriod tp;
+			
+			if (!mIntervals.TryGetValue(key, out tp))
+				throw new Exception();
+			
+			tp.Elapsed = 0d;
+#else
+	
+	
             if (mKeyedTimePeriods == null)
             {
                 System.Diagnostics.Debug.WriteLine("GameTime.Reset() - " + nodeID + " using name " + name + " does not exist.");
@@ -11024,20 +11115,27 @@ if (mEntityNodesCollection == null) return null;
                 tp.Elapsed = 0d;
             else
                 System.Diagnostics.Debug.WriteLine("GameTime.Reset() - " + nodeID + " using name " + name + " does not exist.");
-
+#endif
         }
 
         public bool IsReady(string nodeID, string name)
         {
+	#if CONCURRENT_TIMERS
+			string key = GetKey(nodeID, name);
+            TimePeriod tp;
+			
+			bool success = mIntervals.TryGetValue(key, out tp);
+	#else
             if (mKeyedTimePeriods == null)
             {
                 //Console.WriteLine("GameTime.IsReady() - " + nodeID + " using name " + name + " does not exist.");
                 return false;
             }
+
             string key = GetKey(nodeID, name);
             TimePeriod tp;
             bool success = mKeyedTimePeriods.TryGetValue(key, out tp);
-
+	#endif
             if (success)
             {
                 bool result = !tp.IsPaused && tp.IsActive && tp.Elapsed >= tp.Duration;
@@ -11045,12 +11143,21 @@ if (mEntityNodesCollection == null) return null;
                 //Console.WriteLine("GameTime.IsReady() - " + nodeID + " using name ''" + name + "'' isReady = " + result.ToString());
                 return result;
             }
-
             return false;
         }
 
         public bool IsActive(string nodeID, string name)
         {
+			
+	#if CONCURRENT_TIMERS
+			string key = GetKey(nodeID, name);
+            TimePeriod tp;
+			
+			bool success = mIntervals.TryGetValue(key, out tp);
+				
+			tp.Elapsed = 0d;
+	#else
+		
             if (mKeyedTimePeriods == null)
             {
                 System.Diagnostics.Debug.WriteLine("GameTime.IsActive() - " + nodeID + " using name " + name + " does not exist.");
@@ -11060,7 +11167,8 @@ if (mEntityNodesCollection == null) return null;
             string key = GetKey(nodeID, name);
             TimePeriod tp;
             bool success = mKeyedTimePeriods.TryGetValue(key, out tp);
-
+	#endif
+		
             if (success) return tp.IsActive;
 
             return false;
@@ -11073,9 +11181,17 @@ if (mEntityNodesCollection == null) return null;
 
         public void Update(double elapsedSeconds)
         {
+			
+	#if CONCURRENT_TIMERS
+			if (mIntervals == null || mIntervals.Count == 0) return;
+			
+			foreach (TimePeriod period in mIntervals.Values)
+	#else
+		
             if (mKeyedTimePeriods == null || mKeyedTimePeriods.Count == 0) return;
 
             foreach (TimePeriod period in mKeyedTimePeriods.Values)
+	#endif
             {
                 if (!period.IsActive || period.IsPaused) continue;
                 period.Elapsed += elapsedSeconds;
@@ -11099,7 +11215,7 @@ if (mEntityNodesCollection == null) return null;
                     if (period.DeActivateAfterCompleted)
                         period.IsActive = true;
                     //else
-                    //    todo: cant unregister it befire callet can
+                    //    todo: cant unregister it before caller can
                     //     check if IsReady== true !!
                     //     unless a delegate or event is raised
 

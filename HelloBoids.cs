@@ -676,8 +676,6 @@ namespace HelloBoids
 			// todo: rename Apply() ?
 			public void Process(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
 			{
-				List<DamageResult> records = (List<DamageResult>)parameters[0];				  
-				
 				// NOTE: the store used here must refer to the actual memStore the Droid uses
 				//       to store it's data or else there is no way to update that Droid...Duh!
 				//       This is OK though!  We just need to know that although all the RECORDS
@@ -687,7 +685,7 @@ namespace HelloBoids
 				//       
 				if (store == null) return;
 				Span<LivingEntity> memSpan = store.Span;
-								
+				List<DamageResult> records = (List<DamageResult>)parameters[0];					
 				
 				if (records != null)
 				{
@@ -726,17 +724,25 @@ namespace HelloBoids
 					
 			public void Process(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
 			{
+				if (store == null) return;
 				Span<LivingEntity> memSpan = store.Span;
 				
 				if (mRecords != null)
+				{
+					mDamageResults.Clear();
+					
 					for (int i = 0; i < mRecords.Count; i++)
 					{
 						int amount = mRecords[i].Amount;
 						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = mRecords[i].EntityIndex, Amount = amount});
+						
+						// todo: remove damage that has been processed....
+						
 					}
 				
-				// use the same LivingEntityStore as the one passed in, for applying health changes to the Droid
-				BoidSimulation.mHealthSystem.Process(store, new object[] {mDamageResults}, seed, gt);
+					// use the same LivingEntityStore as the one passed in, for applying health changes to the Droid
+					BoidSimulation.mHealthSystem.Process(store, new object[] {mDamageResults}, seed, gt);
+				}
 			}
 		}
 		
@@ -758,23 +764,42 @@ namespace HelloBoids
 			List<HealthSystem.DamageResult> mDamageResults;
 			
 			
+			public DamageOverTimeSystem()
+			{
+				mRecords = new List<DamageOverTime>();
+			}
+			
+			public void Add (DamageOverTime d)
+			{
+				mRecords.Add (d);
+			}
+					
+			
 			/// <summary>
 			/// FireDamage for example, can last for several seconds and so any one particular FireDamage record is
 			/// not removed from the ComponentStore<> until it's expired
 			/// </summary>
 			public void Process(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
 			{
+				if (store == null) return;
 				Span<LivingEntity> memSpan = store.Span;
 				
 				if (mRecords != null)
+				{
+					mDamageResults.Clear();
 					for (int i = 0; i < mRecords.Count; i++)
 					{
 						int amount = mRecords[i].Amount; // TODO: * gt.ElapsedSeconds;
 						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = mRecords[i].EntityIndex, Amount = amount});
+						
+						// remove damages that have expired
+						
+						
 					}
 
-				// use the same LivingEntityStore as the one passed in, for applying health changes to the Droid
-				BoidSimulation.mHealthSystem.Process(store, new object[]{ mDamageResults }, seed, gt);
+					// use the same LivingEntityStore as the one passed in, for applying health changes to the Droid
+					BoidSimulation.mHealthSystem.Process(store, new object[]{ mDamageResults }, seed, gt);
+				}
 			}
 			
 			
@@ -885,10 +910,7 @@ namespace HelloBoids
 
         public List<Boid> Boids { get; set; }
         public Seeds Seeds { get; set; }
-		public int LocalSeed_DroidLogic {get; set;} = 123 + 1;
-										 
-										 
-										 
+						 
 		public ThreadedRandom mTHRandom;
 		
         private double SeparationDistance;
@@ -910,7 +932,6 @@ namespace HelloBoids
 
 		public static DamageSystem mDamageSystem = new DamageSystem();
 		public static DamageOverTimeSystem mDamageOverTimeSystem = new DamageOverTimeSystem();
-		
 		public static HealthSystem mHealthSystem = new HealthSystem();
 		
 		
@@ -919,7 +940,6 @@ namespace HelloBoids
         {
             Boids = new List<Boid>(); //NOTE: we do not preallocate the list here
 			Seeds = new Seeds(123);
-	
 	
 			SeparationDistance = EntryClass.SEPERATION_DISTANCE;
         	SeparationFactor = EntryClass.SEPARATION_FACTOR;
@@ -1039,6 +1059,92 @@ namespace HelloBoids
 
         
 #region Consumption and Production
+	
+		public struct Production
+    	{
+			// todo: should i have a frequency or Hz?  Gravitation would be at Physics frequency, but other's should be 1 hz or every 1000 ms
+			// production is not serialized to XML because they are created by the scripts in code
+			public int EntityID;
+			public uint ProductID;
+			public Vector3d Location; // location where this production is occurring (eg. explosion, heat signature, etc)
+			public object Value;  // eg. for thrust this contains double, for radar echos, UnitValue is a Vector3d position
+			public int Amount; // infitie = -1, else number of unit's 
+			// public DistributionType DistributionMode; 
+			// public Func<Production, string, bool> DistributionFilterFunc; // accepts Production and an EntityID and returns true if the test is passed
+			// used when DistributionType is List.  Contains id of entities consuming this product.  
+			// No searches (spatial or otherwise) reqt. "power links" and other "links" are good examples of their use.
+			public string[] DistributionList;  
+			public object SearchPrimitive;   // used with DistributionMode is a spatial search of some kind.
+			
+	//		public float Rate;    // amount of units consumed per second
+
+	//        // confused on some of these vars because where does the machine/entity pass in
+	//        // vars used for the computation, and which exist here?  I think one good argument
+	//        // to keep them here is that a machine that produces/consumes multiple things
+	//        // may have seperate throttle values and efficiency values and even different enable/disable
+	//        // states
+	//        // But why not have some of these custom properties in the Entity then?
+	//        public bool Enabled;
+	//        public float Efficiency; // at same throttle, increased efficiency will produce more
+	//                                 // as the machine wears out between mainteneance efficiency
+	//                                 // will drop.  It is also possible to increase efficiency
+
+	//        public float Throttle;  // value typically 0 -1.0 but can exceed 1.0 with potential risk
+	//                                // of damaging the machine (is Damage a customProperty in Entity?)
+			
+			
+		}
+	
+		public enum PropertyOperation : byte
+		{
+			Replace = 0,
+			Add,        // typically for adding an array element
+			Remove,     // typically for removing an array element
+			Union,      // merge two arrays with no duplicates
+			Increment,  // for numeric propertyspec values to add the propertySpec value to the existing value within the Entity
+			Decrement,
+			Additive_Multiply,
+			Additive_Divide
+		}
+
+    // consumption is more charged with the algorithm for computing how much consumption
+    // of the particular product the Entity will use.  This includes everything from 
+    // consuming damage or gravity to consuming electricity, water or fuel.
+    // It will take into account modifiers such as "stealth" to determine consumption if any. 
+    // For instance, a "microwaves" consumption could result in 0 consumption if the distance between
+    // producer and consumer is too great or there is an applicable "stealth" modifier
+    
+    //  It will also take into account modifiers from the crew operator at a station for example.
+    
+    // TODO: should our Consumption_Delegate return "ConsumptionResult" so that these changes
+    // can be sent to other players over the network?
+    
+    // details information about how much this device will consume.  This is returned
+    // when Consumption delegate is invoked in a script for a particular entity.
+    // todo: maybe we should think of this as ConsumptionResults and host all the changes that need to be applied to the target entities
+    //       so we could include an array of PropertySpec and corresponding nodeIDs
+    public struct Consumption // todo: rename this to ConsumptionResult
+    {
+        // Consumption here is really PRODUCT CONSUMPTION RESULT struct that gets filled so that
+        // other players in the networked game can receive the "results" of 
+        // having consumed a product
+        public int EntityID; // the entity that is consuming a product
+        public int ProducerID; // the producer of the product that is being consumed by entity.ID == EntityID.
+        public uint ProductID;     // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer
+        public object Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
+
+           
+        //public string TargetID; // NOTE: this does mean that an entity performing consumption can change properties of other nodes and not just itself. Typically though, its only for entities within a single ship hierarchy from Exterior to Interior components
+        public PropertyOperation[] Operations;
+ //       public Settings.PropertySpec[] Properties; // todo: what about HelmState and TacticalState properties? Well, "tacticalstate" and "helmstate" are properties in the ship.css and they are serializable over the wire.
+        // todo: do we need to be able to send this over the wire with NetBuffer Read and Write?
+        // todo: we should probably need to know whether the property values are meant to replace, increment, or decrement the existing value.  "store" is a good example. If we're multithreaded, we might need to lock each node before we apply changes
+        //       I could include an array of int[] operation; that is same length and specifiy 0=replace, 1=increment and 2= decrement, 3 = add array element, 4 = remove array element
+        // todo: maybe instead of seperate objects like HelmState and NavPoints we just use regular custompropertyspec for each member.  This will make it easier for ConsumptionResult handling without keystone.dll needing to know anything about those custom types.
+        // todo: well first, lets just use PropertySpec with intrinsic types.  
+    }
+		
+		
        public void RegisterProducer(uint productID, EntityNode entity)
         {
             if (mProducers == null) mProducers = new Dictionary<uint, List<EntityNode>>();
@@ -1435,14 +1541,16 @@ namespace HelloBoids
 				bool canFire = mIntervalTimers.IsReady(timerID, "droid_canfire");
             	if (canFire)
            	 	{
-                	// Console.WriteLine("CanFire = " + canFire.ToString());
+                	Console.WriteLine("CanFire = " + canFire.ToString());
                 	mIntervalTimers.Reset(timerID, "droid_canfire");
             					
 					Boid target = (Boid)FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE);
+					Console.WriteLine("Target found == " + (target != null).ToString());
+					
 					if (target == null) return; // continue; //NOTE: for parallel.For we use "return" for regular for() loop we use "continue"
 					
 					double distanceToTargetSquared = Vector3d.GetDistance3dSquared(currentBoid.Translation, target.Translation);
-					Laser_Struct laser = (Laser_Struct)currentBoid.GetUserStruct(typeof(Laser_Struct).Name);
+					Laser_Struct laser = (Laser_Struct)currentBoid.mMemStore_Laser.Span[0];
 					
 					if (CanHit(target))
 					{
@@ -1454,7 +1562,12 @@ namespace HelloBoids
 						if (damages != null)
 							for (int j = 0; j < damages.Length; j++)
 							{
-								//int d = QueueDamage (damages[j]);
+								if (damages[j] is DamageSystem.Damage)
+									mDamageSystem.Add((DamageSystem.Damage)damages[j]);
+								else if (damages[j] is DamageOverTimeSystem.DamageOverTime)
+									mDamageOverTimeSystem.Add ((DamageOverTimeSystem.DamageOverTime)damages[j]);
+								else 
+									throw new Exception("Do_Droid_Logic() - Unexpected Damge type. " + damages[j].GetType().Name);
 							}
 					}
 				}
@@ -1510,7 +1623,15 @@ namespace HelloBoids
             };
 			
 			
-			this.Octree.Query(source, true, searchArea, match);
+			List<EntityNode> found  = this.Octree.Query(source, true, searchArea, match);
+			if (found == null) return null;
+			
+			if (found.Count == 1)
+				return found[0];
+			else 
+			{
+				Console.WriteLine("FindNearestTarget found count == " + found.Count.ToString());
+			}
 			return result;		
 		}
 		
@@ -1560,7 +1681,34 @@ namespace HelloBoids
 		/// </summary>
         private object[] CalculateDamage(EntityNode droid, Laser_Struct weaponStruct, EntityNode target)
         {
-			object[] result = null;
+			object[] result = new object[2];
+			
+			/*
+			Production laserDamage;
+			laserDamage.Amount = 5;
+			laserDamage.DistributionList = null;
+			laserDamage.EntityID = droid.Index;
+			laserDamage.Location = Vector3d.Zero();
+			laserDamage.ProductID = (uint)PRODUCTS.MicrowaveDamage;
+			laserDamage.SearchPrimitive = null;
+			laserDamage.Value = 1;
+			
+			result[0] = laserDamage;
+			*/
+			
+			DamageSystem.Damage d;
+			d.Amount = 5;  // weaponStruct.BeamOutput;
+			d.EntityIndex = droid.Index;
+			result[0] = d;
+			
+			
+			Console.WriteLine("CalculateDamage() - Created DamageSystem.Damage.");
+			
+			DamageOverTimeSystem.DamageOverTime dot;
+			dot.Amount = 1;  // weaponStruct.BeamOutput;
+			dot.EntityIndex = droid.Index;
+			dot.Duration = 0.05f;
+			result[1] = dot;
 			
 			
 			// target Armor
@@ -2034,8 +2182,8 @@ namespace HelloBoids
 			// Register (nodeID, interval_name)
 			string id = b.Index.ToString();
 	
-			mIntervalTimers.Register(id, "droid_spawn", 0.06d);
-			mIntervalTimers.Register(id, "droid_canfire", 0.26d);
+			mIntervalTimers.Register(id, "droid_spawn", 0.14d);
+			mIntervalTimers.Register(id, "droid_canfire", 0.04d);
 			mIntervalTimers.Register(id, "droid_isfiring", 0.06d);
 	
 	
@@ -4062,9 +4210,11 @@ bool mIsDisposed;
 
     }
 
-
+				
+		
 	public struct Living_Entity
-	{	
+	{
+			
 		public long CreationDateTime;   		
 	}
 	
@@ -4111,7 +4261,7 @@ bool mIsDisposed;
 		{
 			// javascript object notation
 			Laser_Struct laser = new Laser_Struct();
-			// TODO: test whether this saves all the different types of data we need with our complex structs/class properties
+			// TODO: test t
 			string persistedString = System.Text.Json.JsonSerializer.Serialize(laser);
 			
 			return persistedString;
@@ -4120,7 +4270,10 @@ bool mIsDisposed;
 		public bool Deserialize(string persistString)
 		{
 			return true;
-		}	
+		}
+		
+			
+		
 	}
 	
 	// In \\KeystoneGameBlocks\\ see \\game01\\Components\\Weapon
@@ -4131,6 +4284,7 @@ bool mIsDisposed;
 
 		public float Quality_;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
 		//public string Quality; // todo: this needs to be a coefficient of 0.0 to 1.0
+
 
 		public bool Ruggedized;
 
@@ -4206,7 +4360,7 @@ bool mIsDisposed;
         // 3) Do we need to support rendering Proxies here (2D and 3D?)
 		public struct EntitySystemUpdateContext
     	{
-        	// see SelectionNode or Elements.SwitchNode for help
+        // see SelectionNode or Elements.SwitchNode for help
 	
     	}
 	
@@ -4305,11 +4459,12 @@ bool mIsDisposed;
         public virtual void Write()
         {
         }
-    }
 
+    }
 
     public class City : EntitySystemBase
     {
+
         // City specific structs
         private struct Terrain
         {

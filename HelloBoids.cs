@@ -12,6 +12,9 @@
 
 //#define DEBUG_OUTPUT
 
+
+
+
 using System.Runtime.CompilerServices; // needed for using "[MethodImpl(MethodImplOptions.AggressiveInlining)]"
 using System.Diagnostics;
 using System; 
@@ -22,6 +25,9 @@ using System.Collections.Generic;
 using System.Linq;
 // using System.Numerics;
 // using System.Runtime.Intrinsics; // for SIMD enabled code
+using Microsoft.CodeAnalysis;
+using Microsoft.CSharp;
+using System.IO;
 
 
 // // https://erikmcclure.com/blog/multithreading-problems-in-game-design/
@@ -720,6 +726,13 @@ namespace HelloBoids
 			public void Add (Damage d)
 			{
 				mRecords.Add (d);
+				//Console.WriteLine ("DamageSystem.Add() - Record count == " + mRecords.Count.ToString());
+			}
+			
+			public void Clear()
+			{
+				mRecords.Clear();
+				mDamageResults.Clear();
 			}
 					
 			public void Process(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
@@ -767,13 +780,20 @@ namespace HelloBoids
 			public DamageOverTimeSystem()
 			{
 				mRecords = new List<DamageOverTime>();
+				mDamageResults = new List<HealthSystem.DamageResult>();
 			}
 			
 			public void Add (DamageOverTime d)
 			{
+				if (mRecords == null) mRecords = new List<DamageOverTime>();
 				mRecords.Add (d);
 			}
 					
+			public void Clear()
+			{
+				mRecords.Clear();
+				mDamageResults.Clear();
+			}
 			
 			/// <summary>
 			/// FireDamage for example, can last for several seconds and so any one particular FireDamage record is
@@ -792,7 +812,7 @@ namespace HelloBoids
 						int amount = mRecords[i].Amount; // TODO: * gt.ElapsedSeconds;
 						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = mRecords[i].EntityIndex, Amount = amount});
 						
-						// remove damages that have expired
+						// todo: remove damages that have expired
 						
 						
 					}
@@ -804,29 +824,13 @@ namespace HelloBoids
 			
 			
 			/*
-			ThreadedRandom r = (ThreadedRandom) parameters[0];
-			double maxDistance = (double)parameters[1];
 		
 			int count = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 
             //for (int i = 0; i < Boids.Count; i++)
             {
 				// generate Droids with some variance for size, and speed
-				// create a "cooldown" interval that is based on the droid
-				// 
-				// if can fire
-				//		findtarget(bool closest = true)
-				//      fire(i, targetID) <-- performs production (there is a chance of FireDamage that has it's own cooldown and incurs someDamagePerSecond
-				// 			how are these productions added to the struct fireDamage {}   and struct burningDamage { } 
-				//      firingAnimationCooldown
-				// else if alreadyfiring
-				//     wait for complete and cooldown of firingAnimation
-				//     wait for complete of RoF cooldown
-				// 
-				// 
-				
-								
-				
+
                 List<int> found;
                 List<Boid> neighbors;
 
@@ -860,8 +864,6 @@ namespace HelloBoids
 
             // NOTE: in KeystoneGameBlocks we would then potentially send the result to the clients if this is processing on the server
             // FormMainBase.SendNetMessage(msg)
-
-			
 		}
 		
 //        public Dictionary<uint, List<string> mProducers;
@@ -992,20 +994,6 @@ namespace HelloBoids
 			//DataProcessorsStore.Processor<BoidSimulation.ImpalingDamage> laserImpalingDamageBehavior = DoImpalingDamage;
             //mDataProcessor.Add("LASER_IMPALING_DAMAGE", laserImpalingDamageBehavior);
 			
-			
-			
-			// TODO:
-			// OnEntityDetached(EntityNode e)
-			//       {
-			//			RemoveProduction(e)
-			//	        RemoveConsumption(e);
-			//       }
-			// OnEntityAttached(EntityNode e)
-			//       {
-			//			AddProduction(e)
-			//	        AddConsumption(e);
-			//       }
-				
 #endif
 
             // SPAWN INITIAL SET OF BOIDS UP TO EntryClass.NUM_ENTRIES
@@ -1315,15 +1303,58 @@ namespace HelloBoids
 
 				// TEST MEMORY<T> (Data Oriented Technique)
 				// ====================
-		
-				Do_Droid_Logic (Seeds.Master, elapsedSeconds);
-
-				ComponentStore<LivingEntity> livingEntityStore = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
-				mDamageSystem.Process(livingEntityStore, null, Seeds.Master, gt);
-				mDamageOverTimeSystem.Process(livingEntityStore, null, Seeds.Master, gt);
+		ComponentStore<LivingEntity> livingEntityStore = null;
+				
+				try
+				{
+					Do_Droid_Logic (Seeds.Master, elapsedSeconds);
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("Update 1 " + ex.Message);
+				}
+				
+				try
+				{
+					livingEntityStore = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("Update 2 " + ex.Message);
+				}
 				
 				
-				mDataProcessor.Update(gt, Boids.ToArray());
+				try
+				{
+					mDamageSystem.Clear();
+					mDamageSystem.Process(livingEntityStore, null, Seeds.Master, gt);
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("Update 3 " + ex.Message);
+				}
+				
+				
+				try
+				{
+					mDamageOverTimeSystem.Clear();
+					mDamageOverTimeSystem.Process(livingEntityStore, null, Seeds.Master, gt);
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("Update 4 " + ex.Message);
+				}
+				
+				
+				try
+				{
+					mDataProcessor.Update(gt, Boids.ToArray());
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("Update 4 " + ex.Message);
+				}
+				
 				
 	#endif
 			}
@@ -1526,11 +1557,6 @@ namespace HelloBoids
 			//Boid.Laser_Struct
 			
 				
-			// todo: during Spawn()
-			// todo: generate Droids with some variance for age, size, and speed
-			// todo: create a "cooldown" interval that is based on the droid's size
-				
-				
 			int count = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 
             //for (int i = 0; i < Boids.Count; i++)
@@ -1541,64 +1567,49 @@ namespace HelloBoids
 				bool canFire = mIntervalTimers.IsReady(timerID, "droid_canfire");
             	if (canFire)
            	 	{
-                	Console.WriteLine("CanFire = " + canFire.ToString());
+                	//Console.WriteLine("Do_Droid_Logic() - Droid " + currentBoid.SpanIndex.ToString() + " Can Fire = " + canFire.ToString());
                 	mIntervalTimers.Reset(timerID, "droid_canfire");
             					
 					Boid target = (Boid)FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE);
-					Console.WriteLine("Target found == " + (target != null).ToString());
+					//Console.WriteLine("Do_Droid_Logic() - Droid " + currentBoid.SpanIndex.ToString() + " Has Found Target == " + (target != null).ToString());
 					
-					if (target == null) return; // continue; //NOTE: for parallel.For we use "return" for regular for() loop we use "continue"
+					if (target == null) 
+						return;      // NOTE: for parallel.For we use "return"
+						// continue; // NOTE: for regular for() loop we use "continue"
 					
-					double distanceToTargetSquared = Vector3d.GetDistance3dSquared(currentBoid.Translation, target.Translation);
-					Laser_Struct laser = (Laser_Struct)currentBoid.mMemStore_Laser.Span[0];
-					
-					if (CanHit(target))
+					try
 					{
-						Console.WriteLine("Droid " + currentBoid.SpanIndex.ToString() + " firing on Droid " + target.SpanIndex.ToString());
-						
-						// NOTE: here we assume the Fire() occurs immediately using a lightspeed laser and the damage is instantaneous 
-						//       and does not need any travel time to reach the target
-						object[] damages = CalculateDamage(currentBoid, laser, target); // <-- returns 1 or more Products (eg ImpalingDamage and FireDamage)
-						if (damages != null)
-							for (int j = 0; j < damages.Length; j++)
-							{
-								if (damages[j] is DamageSystem.Damage)
-									mDamageSystem.Add((DamageSystem.Damage)damages[j]);
-								else if (damages[j] is DamageOverTimeSystem.DamageOverTime)
-									mDamageOverTimeSystem.Add ((DamageOverTimeSystem.DamageOverTime)damages[j]);
-								else 
-									throw new Exception("Do_Droid_Logic() - Unexpected Damge type. " + damages[j].GetType().Name);
-							}
+						double distanceToTargetSquared = Vector3d.GetDistance3dSquared(currentBoid.Translation, target.Translation);
+						Laser_Struct laser = (Laser_Struct)currentBoid.mMemStore_Laser.Span[0];
+
+						if (CanHit(target))
+						{
+							currentBoid.ShotsFired++;
+							
+							//Console.WriteLine("Do_Droid_Logic() - Droid " + currentBoid.SpanIndex.ToString() + " firing shot # " + currentBoid.ShotsFired.ToString() + " on Droid " + target.SpanIndex.ToString());
+
+							// NOTE: here we assume the Fire() occurs immediately using a lightspeed laser and the damage is instantaneous 
+							//       and does not need any travel time to reach the target
+							object[] damages = CalculateDamage(currentBoid, laser, target); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
+							if (damages != null)
+								for (int j = 0; j < damages.Length; j++)
+								{
+									if (damages[j] is DamageSystem.Damage)
+										mDamageSystem.Add((DamageSystem.Damage)damages[j]);
+									else if (damages[j] is DamageOverTimeSystem.DamageOverTime)
+										mDamageOverTimeSystem.Add ((DamageOverTimeSystem.DamageOverTime)damages[j]);
+									else 
+										throw new Exception("Do_Droid_Logic() - Unexpected Damge type. " + damages[j].GetType().Name);
+								}
+
+							mIntervalTimers.Reset(timerID, "droid_canfire");
+						}
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine ("Do_Droid_Logic() - " + ex.Message);
 					}
 				}
-				else 
-				{
-					
-					bool isFiring = mIntervalTimers.IsReady(timerID, "droid_isfiring");
-					
-					if (isFiring)
-					{
-						// animation continues
-						
-					}
-					else if (mIntervalTimers.IsReady(timerID, "droid_fireanimationcooldown"))
-					{
-						
-					}
-				}
-				
-			
-				
-				//      fire(i, targetID) 
-				// 			how are these productions added to the struct fireDamage {}   and struct burningDamage { } 
-				//      firingAnimationCooldown
-				// else if alreadyfiring
-				//     wait for complete and cooldown of firingAnimation
-				//     wait for complete of RoF cooldown
-				// 
-				// 
-				
-				
 			});
 	
 			//see Keystone.Game01.Messages.   public class AttackResults since
@@ -1799,7 +1810,7 @@ namespace HelloBoids
 				{
 					// TODO: there is a bug here in CheckIn and Destroy()... we are not managing the entity.Index and entity.SpanIndex properly
 					/*
-					store.CheckIn(Boids[i].mMemStore_LivingEntity);
+
 					Destroy(Boids[i]);
 					numDestroyed++;
 					*/
@@ -2178,7 +2189,7 @@ namespace HelloBoids
             double vY = (rand.NextDouble() - 0.5d) * 2d;
 
             Boid b = new Boid(index, posX, posY, posZ, vX, vY);
-	
+			
 			// Register (nodeID, interval_name)
 			string id = b.Index.ToString();
 	
@@ -2187,6 +2198,19 @@ namespace HelloBoids
 			mIntervalTimers.Register(id, "droid_isfiring", 0.06d);
 	
 	
+			// todo: during Spawn()
+			// todo: generate Droids with some variance for age, size, and speed
+			// todo: create a "cooldown" interval that is based on the droid's size
+				
+			
+			// TODO: Add to Spawn() and Destroy()
+			//
+			// OnEntityAttached(EntityNode e)
+			//       {
+			//			AddProduction(e)
+			//	        AddConsumption(e);
+			//       }
+				
 	
 		    if (this.Octree != null)
             {
@@ -2205,6 +2229,13 @@ namespace HelloBoids
 #endif
 			int lastIndex = this.Boids.Count - 1;
 	
+			// OnEntityDetached(EntityNode e)
+			//       {
+			//			RemoveProduction(e)
+			//	        RemoveConsumption(e);
+			//       }
+				
+
 			// remove from Octree
 			this.Octree.OnEntityNode_Removed(entity);
 			
@@ -2215,7 +2246,7 @@ namespace HelloBoids
 			//       of the Memory<T> store to previousCount - 1;
 			// TODO: we need to release all Memory<T> used by Transform_Struct and Living_Entity structs.
 		#if MEMORY_T
-			this.Boids[entity.Index].Dispose();
+			this.Boids[entity.Index].Dispose(); // 	<-- store.CheckIn(Boids[i].mMemStore_LivingEntity); occurs here correct?
 		#endif
 			this.Boids[entity.Index] = null;
 			this.Boids[entity.Index] = this.Boids[lastIndex];
@@ -2427,7 +2458,9 @@ namespace HelloBoids
     public class Boid : EntityNode
     {
         private const double BOID_WIDTH = 2.0d;
-        
+        public uint ShotsFired = 0;
+		
+		
 	#if	USE_MEMORY_T
 		public Memory<Laser_Struct> mMemStore_Laser; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
 		public int SpanIndexLaser = -1;
@@ -4298,7 +4331,7 @@ bool mIsDisposed;
 
 		// beam specific
 		public int Type;       // type is really just about what types of Damage(s) (ProductID(s)) it results in such as Paralysis, Crushing, Burning, Impaling
-		public float Duration;   // duration in seconds
+		public float Duration;   // duration of the firing animation in seconds.  This probably doesn't need to be here.  It should be reflected in the Cyclic Rate and RoF cooldowns instead.
 
 		public bool EnergyDrill;
 		public bool FTL;
@@ -4308,13 +4341,13 @@ bool mIsDisposed;
 		public float Malfunction_ ; // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
 		//public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
 
-		public float BeamOutput;    // what is the difference between this and kW of power... is it the convsion rate of the input power to the output power?
-		public float CyclicRate;
+		public float BeamOutput;    // kJ - kiloJoules -  what is the difference between this and kW of power... is it the convsion rate of the input power to the output power?
+		public float CyclicRate;    //   Expressed as a cooldown value.  The maximum possible firing rate of the weapon without considering overheating or ammunition capacity. Often, RoF and CyclicRate are the same, but CyclicRate is theoretical maximum given mechanics of the weapon
 		public int Accuracy;
 		public int SnapShot;
-		//			public string Shots;
+		//	public string Shots;
 
-		public double CoolDown_;
+		public float CoolDown_;    // RoF expressed as a cooldown value.  For instance, a RoF = 1/5 means once shot per 5 turns (eg 1 per every 5 seconds == 5 second cooldown) RoF = 1 means one shot per one second = 1 second cooldown.  
 		//			public string RoF;
 
 		public double PowerReqt;
@@ -10767,7 +10800,8 @@ if (mEntityNodesCollection == null) return null;
         private const uint MIN_SIZE = 64;
         private const uint MAX_SIZE = 1024;
         private uint EXPAND_INCREMENT = MIN_SIZE; // expand by this amount when needed.  if 0, it will double the size of Components
-        
+        private uint mRecordCount = 0;  // should equal (Size - mAvailableForCheckOut.Count)
+		
 		// NOTE: there is no System.Collections.Concurrent.ConcurrentList<>
 		private Memory<T> Components;
 		private Stack<int> mAvailableForCheckOut;
@@ -10848,9 +10882,23 @@ if (mEntityNodesCollection == null) return null;
 			Console.WriteLine( "ComponentStore.ctor() - Type == '" + (typeof(T)).ToString() + " Starting size == " + size.ToString());
         }
 
-		
+		/// <summary>
+		/// The maximum number of records this Store can hold before it needs to be expanded.
+		/// </summary>
         public uint Size { get { return (uint)Components.Length; } }
 
+		/// <summary>
+		/// The currrent number of records this Store is holding.  This number
+		/// cannot exceed the 'Size' value.
+		/// </summary>
+		public uint Count { 
+			get 
+			{ 
+				System.Diagnostics.Debug.Assert (mRecordCount == Size - mAvailableForCheckOut.Count);
+				return mRecordCount;
+			}
+		}
+		
         public Span<T> Span { get { return Components.Span; } }
         
         public ReadOnlySpan<T> Copy()
@@ -10899,7 +10947,7 @@ if (mEntityNodesCollection == null) return null;
 						// using stack<int> of available indices
 						if (mAvailableForCheckOut.Count > 0)
 						{
-							
+							mRecordCount++;
 							int i = mAvailableForCheckOut.Pop();
 							try
 							{
@@ -10960,6 +11008,7 @@ if (mEntityNodesCollection == null) return null;
 						// CheckIn(); 
 						
                         mAvailableForCheckOut.Push(i);
+						mRecordCount--;
                         return;
 
                         // todo: Components.Span[i] = default(T);    
@@ -11052,10 +11101,10 @@ if (mEntityNodesCollection == null) return null;
                 Components = new T[STARTING_SIZE];
                 InUse = new bool[STARTING_SIZE];
                 mAvailableForCheckOut = new Stack<int>();
-
+				mRecordCount = 0;
+				
                 for (int i = (int)STARTING_SIZE; i >= 0; i--)
-                    if (!InUse[i])
-                        mAvailableForCheckOut.Push(i);
+	                mAvailableForCheckOut.Push(i);
 
                 return;
             }
@@ -11087,7 +11136,8 @@ if (mEntityNodesCollection == null) return null;
                     tmpStack.Push(i);
 
             mAvailableForCheckOut = tmpStack;
-
+			
+			
             ExpandViews(newSize);
         }
 
@@ -12436,6 +12486,10 @@ if (mEntityNodesCollection == null) return null;
 
             return A | R | G | B;
         }
+		
+		
+		
+		
     }
 
 
@@ -12514,4 +12568,6 @@ if (mEntityNodesCollection == null) return null;
     }
     }
     */
+	
+	
 }

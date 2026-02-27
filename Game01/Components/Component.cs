@@ -65,27 +65,7 @@ namespace Game01.Components
         - Hyperdrive / JumpDrive / StarDrive
         */
 
-    public struct Build_Struct
-	{
-		public string PersistString;
-		
-		
-		public string Serialize()
-		{
-			// javascript object notation
-			Laser_Struct laser = new Laser_Struct();
-			// TODO: test whether this saves all the different types of data we need with our complex structs/class properties
-			string persistedString = System.Text.Json.JsonSerializer.Serialize(laser);
-			
-			return persistedString;
-		}
-		
-		public bool Deserialize(string persistString)
-		{
-			return true;
-		}	
-		
-	}
+   
 
     public struct Component  // aka: "Useable Component"
     {
@@ -100,18 +80,21 @@ namespace Game01.Components
         public float Craftsmanship;
         public bool Repairable; 
 
-        public ExternalStructure Defense; 
-        public InternalStructure Internals; 
-		public Armor Armor;
-
-		public Production[] Production;   // eg. even a painting on a wall can produce +0.2 aesthic bonus to morale or happiness to crew
+        public Production[] Production;   // eg. even a painting on a wall can produce +0.2 aesthic bonus to morale or happiness to crew
 		public Consumption[] Consumption; // eg. all components can consume damage.  
 					      
+        public ExternalStructure Defense; 
+        public InternalStructure Internals; 
+		public Armor Armor;               // This is additional to component DR, specialized defensive material added to the component to increase its protection (e.g., bolted-on steel plates, Kevlar blankets, or composite ceramic armor).
+                                          // See Google AI Overview in Game01.Components.Armor.cs 
+
+
         // stats
         public int Hitpoints;
         public int Damage;
-        public int PD;
-        public int DR;
+        public int DR;                  // Defense Resistance - natural protection provided by the material and structure of the vehicle component itself (e.g., the 1-inch thick steel hull, the aluminum skin of an aircraft, or the glass of a windshield).
+        public int PD;                  // Passive Defense - see Google AI Overview in Game01.Components.Armor.cs Definition: PD acts as a bonus to the vehicle's evasion roll (Active Defense). Component PD is used when a specific part (like a turret, rotor, or sensor array) is targeted rather than the vehicle as a whole.
+
 
         public float Cost;
         public float Weight;
@@ -125,18 +108,14 @@ namespace Game01.Components
 		public float Duration;
 		public bool Looping; // Repeating
 		public float CooldownDuration; 
-		public bool InCoolDown;
+		//public bool InCoolDown;
 		
         public delegate void OnCreate();  // or OnAddedToScene()
         public delegate void OnDestroy(); // or OnRemovedFromScene()
 		public delegate void OnUseStarted();
 		public delegate void OnUseEnded();
 
-		        
-        //  build 
-        public string BuildPersistString;
-        public bool StatsChanged;
-        public bool BuildChanged;
+
 
 
 		public void Use(string entityID)

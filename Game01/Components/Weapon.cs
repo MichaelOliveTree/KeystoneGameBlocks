@@ -28,6 +28,8 @@ namespace Game01.Components
         
     }
 
+
+
     public struct Laser_Struct
 	{
 		// common component properties
@@ -45,30 +47,35 @@ namespace Game01.Components
 		public double Weight;
 		public double SurfaceArea;
 		public double Volume;
-		public int DR;  // todo: if we use complex armor, is DR (damage resistance) used?
+		public int DR;
+		// public int PD;       // See Google AI Overview in Game01.Components.Armor.cs 
 
 		// beam specific
 		public int Type;       // type is really just about what types of Damage(s) (ProductID(s)) it results in such as Paralysis, Crushing, Burning, Impaling
 		public float Duration;   // duration in seconds
 
+				
+		public float BeamOutput;    // what is the difference between this and kW of power... is it the convsion rate of the input power to the output power?
 		public bool EnergyDrill;
 		public bool FTL;
 		public bool Reliable;
 		public bool Compact;
 
-		public float Malfunction_ ; // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
-		//public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
 
-		public float BeamOutput;    // what is the difference between this and kW of power... is it the convsion rate of the input power to the output power?
-		public float CyclicRate;
+		
+
 		public int Accuracy;
 		public int SnapShot;
 		//			public string Shots;
 
-		public double CoolDown_;
+		public float CyclicRate;
+		public double CoolDown_;              // computed directl from CycleRate or RateOfFire
 		//			public string RoF;
 
 		public double PowerReqt;
+		public float Malfunction_ ; // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
+		//public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
+
 		//			
 		//			public string Mount;
 		//			public string Direction;
@@ -89,7 +96,7 @@ namespace Game01.Components
 
 
 		//			public string Range; // string description of range (eg: "very long range")
-		public double MaxRange;
+		public double MaxRange;          // distance in meters
 		//			public double MaxRange2;
 		//			public double VacuumMaxRange;
 		//			public double VacuumMaxRange2;

@@ -1539,7 +1539,6 @@ namespace HelloBoids
 		/// </summary>
 		private void Do_Droid_Logic(int seed, double maxDistance)
 		{
-	
 			ThreadedRandom random = new ThreadedRandom(seed);
 			const double MAX_SEARCH_DISTANCE = 35d;
 	
@@ -1646,10 +1645,9 @@ namespace HelloBoids
 			return result;		
 		}
 		
-		///
+		// 
 		private bool CanHit(EntityNode target)
 		{
-			
 			bool result = false;
 			
 			
@@ -1692,6 +1690,8 @@ namespace HelloBoids
 		/// </summary>
         private object[] CalculateDamage(EntityNode droid, Laser_Struct weaponStruct, EntityNode target)
         {
+			//Console.WriteLine("CalculateDamage() - Created DamageSystem.Damage.");
+			
 			object[] result = new object[2];
 			
 			/*
@@ -1713,7 +1713,7 @@ namespace HelloBoids
 			result[0] = d;
 			
 			
-			Console.WriteLine("CalculateDamage() - Created DamageSystem.Damage.");
+			
 			
 			DamageOverTimeSystem.DamageOverTime dot;
 			dot.Amount = 1;  // weaponStruct.BeamOutput;
@@ -2474,6 +2474,12 @@ namespace HelloBoids
 
 				
 #if USE_MEMORY_T
+			// Component
+			//          InternalStructure
+			//			ExternalStructure  
+			// Weapon
+			// Laser
+		
 			ComponentStore<Laser_Struct> store = EntryClass.mCStoreCol.CheckOut<Laser_Struct>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
             int checkOutIndex = -1;
             mMemStore_Laser = store.CheckOut(out checkOutIndex);
@@ -2481,7 +2487,7 @@ namespace HelloBoids
             
 			this.AddUserStruct(typeof(Laser_Struct).Name, mMemStore_Laser);
 				
-				
+			
 			// initialize the memory store
 			mMemStore_Laser.Span[0].TL = 1;
 			mMemStore_Laser.Span[0].Quality_ = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
@@ -2540,7 +2546,7 @@ namespace HelloBoids
 //			public double VacuumMaxRange;
 //			public double VacuumMaxRange2;
 
-
+				
             // todo do we need destructor for Repository.CheckIn mMemstore?
 
 #endif
@@ -4244,13 +4250,7 @@ bool mIsDisposed;
     }
 
 				
-		
-	public struct Living_Entity
-	{
-			
-		public long CreationDateTime;   		
-	}
-	
+
 	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
 	public struct LivingEntity
 	{
@@ -4277,96 +4277,388 @@ bool mIsDisposed;
 		// material quality
 	public enum QUALITY_
 	{
-		Cheap,
+		Cheap = 0,
 		BelowAverage,
 		Average,
-			
 		Fine,
 		VeryFine				
 	}
 		
-	public struct Build_Struct
+	
+	// See KeystoneGameBlocks/Game01/Builders
+	public interface IBuilder
+    {
+       public string BuildPersistString {get;}
+        public bool StatsChanged {get;}
+        public bool BuildChanged {get;}
+
+        public void Update();
+
+        public string ToString ();
+        public IBuilder FromString(string persistString);
+    }
+
+	
+	public struct Build_Laser : IBuilder
 	{
-		public string PersistString;
+        // build specific LASER properties
 		
+
+        // struct for component properties and stats
+        Component component; 
+
+        // struct for basic weapons properties
+        Weapon weapon;
+
+        // struct for laser specific weapon properties
+        Laser_Struct laser;
+
+
+#region IBuilder implementation
+        public void Update()
+        {
+            
+        }
+
+		public string BuildPersistString {get;}
+        public bool StatsChanged {get;}
+        public bool BuildChanged {get;}
+
 		
-		public string Serialize()
-		{
-			// javascript object notation
-			Laser_Struct laser = new Laser_Struct();
-			// TODO: test t
-			string persistedString = System.Text.Json.JsonSerializer.Serialize(laser);
+        public override string ToString()
+        {
+            // NOTE: we only need to write out the build parameters and from that we can
+            //       reconstitute the full entity
+
 			
-			return persistedString;
-		}
-		
-		public bool Deserialize(string persistString)
-		{
-			return true;
-		}
-		
+			// 1 - Memory<T> represents how the data is STORED in memory, in structs from which we can
+			//     store in contiguous memory
+			// 2 - So, a Laser will be made up of 3 "structs" like Component, Weapon and Laser for storing the data
+			//    and these structs will co-exist in our UserData object keyed by their typename
+			//    The Defense and InternalStructure too can be keyed this way and assigned later... with ArmorLayers being
+			//    somewhat special case because there are currently no maximum allowable limits
+			    
 			
+            string persistString = null;
+
+			// TODO: next follows a series of 
+			
+						
+            // JSon == javascript object notation
+			persistString = System.Text.Json.JsonSerializer.Serialize(this);
+			Console.WriteLine("Build_Laser.ToString() - " + persistString);
+            return persistString;
+		}
+
+        public IBuilder FromString (string persistString)
+        {
+            if (string.IsNullOrEmpty(persistString))
+			{
+				Laser_Struct laserStruct;
+				//laserStruct.
+					
+			}
+			
+            // NOTE: we only need the build parameters and from that we can
+            //       create the full entity
+            Build_Laser laser = System.Text.Json.JsonSerializer.Deserialize<Build_Laser>(persistString);
+			
+			
+			return laser;
+        }
 		
+#endregion
 	}
 	
-	// In \\KeystoneGameBlocks\\ see \\game01\\Components\\Weapon
-	public struct Laser_Struct
-	{
-		// common component properties
+	
+
+	
+	public struct Armor
+    {
+        public const int MAX_ARMOR_LAYERS = 5;
+        public const int NUM_ARMOR_FACES = 6; //4 = front, back, left, right.  6 adds top, back.
+
+        public ArmorFace[] Faces;
+    }
+    
+    
+    public struct ArmorFace
+    {
+		[Flags]
+		public enum SURFACE_ATTRBITUES : byte
+		{
+			None = 0,                // 0
+    		RAP = 1 << 0,            // 1
+    		Electrified = 1 << 1,    // 2
+    		ThermalCoating = 1 << 2, // 4
+    		RadShielding = 1 << 3,   // 8
+			ReflectiveCoating = 1 << 4, // 16
+    		All = RAP | Electrified | ThermalCoating | RadShielding | ReflectiveCoating
+		}
+		
+        //public bool RAP;  // reactive armor plate
+        //public bool Electrified;
+        //public bool ThermalCoating;
+        //public bool RadShielding;
+        //public string ReflectiveCoating;  // todo: what types are there? see gvd // todo:  need enums or perhaps a coefficient value instead AND THE GUI can interpet this coefficient into a string if desired
+		public SURFACE_ATTRBITUES SurfaceAttributes;
+				
+		public bool RAP 
+		{
+			get {return (SurfaceAttributes & SURFACE_ATTRBITUES.RAP) == SURFACE_ATTRBITUES.RAP;}
+			set 
+			{
+				if (value)
+                	SurfaceAttributes |= SURFACE_ATTRBITUES.RAP;
+                else
+                    SurfaceAttributes &= ~SURFACE_ATTRBITUES.RAP;
+			}
+		}
+		
+		public bool Electrified 
+		{
+			get {return (SurfaceAttributes & SURFACE_ATTRBITUES.Electrified) == SURFACE_ATTRBITUES.Electrified;}
+			set 
+			{
+				if (value)
+                	SurfaceAttributes |= SURFACE_ATTRBITUES.Electrified;
+                else
+                    SurfaceAttributes &= ~SURFACE_ATTRBITUES.Electrified;
+			}
+		}
+		
+		public bool ThermalCoating 
+		{
+			get {return (SurfaceAttributes & SURFACE_ATTRBITUES.ThermalCoating) == SURFACE_ATTRBITUES.ThermalCoating;}
+			set 
+			{
+				if (value)
+                	SurfaceAttributes |= SURFACE_ATTRBITUES.ThermalCoating;
+                else
+                    SurfaceAttributes &= ~SURFACE_ATTRBITUES.ThermalCoating;
+			}
+		}
+		
+		public bool RadShielding 
+		{
+			get {return (SurfaceAttributes & SURFACE_ATTRBITUES.RadShielding) == SURFACE_ATTRBITUES.RadShielding;}
+			set 
+			{
+				if (value)
+                	SurfaceAttributes |= SURFACE_ATTRBITUES.RadShielding;
+                else
+                    SurfaceAttributes &= ~SURFACE_ATTRBITUES.RadShielding;
+			}
+		}
+		
+		public bool ReflectiveCoating 
+		{
+			get {return (SurfaceAttributes & SURFACE_ATTRBITUES.ReflectiveCoating) == SURFACE_ATTRBITUES.ReflectiveCoating;}
+			set 
+			{
+				if (value)
+                	SurfaceAttributes |= SURFACE_ATTRBITUES.ReflectiveCoating;
+                else
+                    SurfaceAttributes &= ~SURFACE_ATTRBITUES.ReflectiveCoating;
+			}
+		}
+		
+		
+		                    // Armor, PD and DR is redundand with "Defense"
+		                    // This is additional to component DR, specialized defensive material added to the component to increase its protection (e.g., bolted-on steel plates, Kevlar blankets, or composite ceramic armor).
+                                          // See Google AI Overview in Game01.Components.Armor.cs 
+		public int DR;                  // Defense Resistance - natural protection provided by the material and structure of the vehicle component itself (e.g., the 1-inch thick steel hull, the aluminum skin of an aircraft, or the glass of a windshield).
+        public int PD;                  // Passive Defense - see Google AI Overview in Game01.Components.Armor.cs Definition: PD acts as a bonus to the vehicle's evasion roll (Active Defense). Component PD is used when a specific part (like a turret, rotor, or sensor array) is targeted rather than the vehicle as a whole.
+ 
+        public float SurfaceArea {get;}
+        public float Weight {get;}
+        public float Cost {get;}
+    }
+    
+    public struct ArmorLayer
+    {
+        public string Material;   // material type e.g metal // todo; need enums
+        public string Quality;    // material quality e.g. "cheap"  // todo:  need enums or perhaps a coefficient value instead AND THE GUI can interpet this coefficient into a string if desired
+        public int DR;
+        public float Weight;
+        public float Cost;   
+    }
+	
+	public struct ExternalArmor
+    {
+        public Armor[] Armor;   // can be init with 5 or 6 sides, with each side having arbitrary number of layers with NO MINIMUM either... so one or more sides can be completely UN-ARMORED
+        public int Defense;     // Passive Defense is a type of defense that requires no active trying to defeat an attack against it
+    }
+    
+    public struct InternalStructure
+    {
+		[Flags]
+		public enum STRUCTURE_ATTRIBUTES : byte
+		{
+			None = 0,                // 0
+    		Robotic = 1 << 0,            // 1
+    		Biomechanical = 1 << 1,    // 2
+    		Responsive = 1 << 2, // 4
+    		LivingMetal = 1 << 3,   // 8
+    		All = Robotic | Biomechanical | Responsive | LivingMetal
+		}
+		
+		public STRUCTURE_ATTRIBUTES StructureAttributes;
+        public int MaterialType; // wood, metal, composite
+        public float Strength;  // frame strength
+        		
+		public bool Robotic 
+		{
+			get {return (StructureAttributes & STRUCTURE_ATTRIBUTES.Robotic) == STRUCTURE_ATTRIBUTES.Robotic;}
+			set 
+			{
+				if (value)
+                	StructureAttributes |= STRUCTURE_ATTRIBUTES.Robotic;
+                else
+                    StructureAttributes &= ~STRUCTURE_ATTRIBUTES.Robotic;
+			}
+		}
+		
+		public bool Biomechanical 
+		{
+			get {return (StructureAttributes & STRUCTURE_ATTRIBUTES.Biomechanical) == STRUCTURE_ATTRIBUTES.Biomechanical;}
+			set 
+			{
+				if (value)
+                	StructureAttributes |= STRUCTURE_ATTRIBUTES.Biomechanical;
+                else
+                    StructureAttributes &= ~STRUCTURE_ATTRIBUTES.Biomechanical;
+			}
+		}
+		
+		public bool Responsive 
+		{
+			get {return (StructureAttributes & STRUCTURE_ATTRIBUTES.Responsive) == STRUCTURE_ATTRIBUTES.Responsive;}
+			set 
+			{
+				if (value)
+                	StructureAttributes |= STRUCTURE_ATTRIBUTES.Responsive;
+                else
+                    StructureAttributes &= ~STRUCTURE_ATTRIBUTES.Responsive;
+			}
+		}
+		
+		public bool LivingMetal 
+		{
+			get {return (StructureAttributes & STRUCTURE_ATTRIBUTES.LivingMetal) == STRUCTURE_ATTRIBUTES.LivingMetal;}
+			set 
+			{
+				if (value)
+                	StructureAttributes |= STRUCTURE_ATTRIBUTES.LivingMetal;
+                else
+                    StructureAttributes &= ~STRUCTURE_ATTRIBUTES.LivingMetal;
+			}
+		}
+		
+        public byte SlopeLeft; // note: slope uses constants to represent 0, 30 or 60
+        public byte SlopeRight;
+        public byte SlopeFront;
+        public byte SlopeBack;
+        
+        // todo: is this correct place to have streamlining?  It would have to be set individually for each subassembly?
+        public string StreamLining; // todo:  need enums or perhaps a coefficient value instead AND THE GUI can interpet this coefficient into a string if desired
+        // NOTE: hitpoints I think is fine for inanimate objects,
+        //       but not good for living things. 
+        //       https://www.youtube.com/watch?v=sMWMB9bjFGo
+        public int HitPoints; 
+        public int CurrentHP; // HitPoints - Damage == CurrentHP
+    }
+	
+	
+		
+		// NOTE: Production and Consumption belong in Entity, not in Component. 
+        //public Production[] Production;   // eg. even a painting on a wall can produce +0.2 aesthic bonus to morale or happiness to crew
+		//public Consumption[] Consumption; // eg. all components can consume damage.  
+	public struct Component  // aka: "Useable Component"
+    {
+        public int Interfaces; // 32 bit flags for the various interfaces (Build and Runtime) used by this component
+        public string EntityID; // Guid.NewGuid().ToString() results in a 36 character string.
+              
 		public int TL;
 
 		public float Quality_;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
 		//public string Quality; // todo: this needs to be a coefficient of 0.0 to 1.0
+				
+        public float MaterialQuality; // TODO: i think Quality_ above should be deleted and MaterialQuality kept... along with Craftsmenship which involves how it's put together
+        public float Craftsmanship;
+        public bool Ruggedized;
+		public bool Repairable; 
+		
+	
+		public int NumOperatorsRequired; // number of Human (as opposed to software/AI) Operators Required (if 0 then RequiresOperator {get { return NumOperatorsRequired > 0;}}
 
+					      
+		// 'Defense' is Armor (Armor Faces with Armor Layers and DR and PD)
+        public ExternalArmor Defense; 
+        public InternalStructure Internals; 	
+		
+        // stats
+        public int Hitpoints;
+        public int CurrentHP; // HitPoints - Damage == CurrentHP;
+        
+        public float Cost;
+        public float Weight;
+        public float Volume;
+        public float SurfaceArea;
 
-		public bool Ruggedized;
+        // runtime
+		public string[] OperatorIDs;
+        public bool InUse;
+		public float StartTime;
+		public float Duration;
+		public bool Looping; // Repeating
+		public float CooldownDuration; 
+		
+		
+        public delegate void OnCreate();  // or OnAddedToScene()
+        public delegate void OnDestroy(); // or OnRemovedFromScene()
+		public delegate void OnUseStarted();
+		public delegate void OnUseEnded();
 
-		// common component stats 
-		public int HitPoints; // from LivingEntity
-		public double Cost;
-		public double Weight;
-		public double SurfaceArea;
-		public double Volume;
-		public int DR;  // todo: if we use complex armor, is DR (damage resistance) used?
-
-		// beam specific
-		public int Type;       // type is really just about what types of Damage(s) (ProductID(s)) it results in such as Paralysis, Crushing, Burning, Impaling
-		public float Duration;   // duration of the firing animation in seconds.  This probably doesn't need to be here.  It should be reflected in the Cyclic Rate and RoF cooldowns instead.
-
-		public bool EnergyDrill;
-		public bool FTL;
-		public bool Reliable;
-		public bool Compact;
-
+		public void Use(string entityID)
+		{
+ 		}
+	}
+	
+   // Laser:Weapon:Component
+	
+	
+	// In \\KeystoneGameBlocks\\ see \\game01\\Components\\Weapon
+	public struct Weapon 
+    {
+        // kinetic energy type weapons build parameters 
+        public float Bore;
+        public int BarrelLength;
+                
+        // stats
+        public int RoF;
+        
+        public float Range;
+        public float Accuracy;
+		public int SnapShot;
+        //public float Malfunction; // 0.0 - 1.0f coefficient for tendancy to malfunction. MaterialQuality and Craftsmanship have impact
+        
+		//	public string Shots;
 		public float Malfunction_ ; // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
 		//public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
 
-		public float BeamOutput;    // kJ - kiloJoules -  what is the difference between this and kW of power... is it the convsion rate of the input power to the output power?
-		public float CyclicRate;    //   Expressed as a cooldown value.  The maximum possible firing rate of the weapon without considering overheating or ammunition capacity. Often, RoF and CyclicRate are the same, but CyclicRate is theoretical maximum given mechanics of the weapon
-		public int Accuracy;
-		public int SnapShot;
-		//	public string Shots;
-
+		
 		public float CoolDown_;    // RoF expressed as a cooldown value.  For instance, a RoF = 1/5 means once shot per 5 turns (eg 1 per every 5 seconds == 5 second cooldown) RoF = 1 means one shot per one second = 1 second cooldown.  
 		//			public string RoF;
 
-		public double PowerReqt;
-		//			
-		//			public string Mount;
-		//			public string Direction;
-
-		// TODO: these are like "internal" items and can be used if another power source is no longer connected
-		//			public string PowerCellType;  // TOOD: Need an ENUM
-		//			public int PowerCellQuantity;
-		//			public double PowerCellWeight;
-
-		// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
-		// https://gamedev.stackexchange.com/questions/148961/how-to-design-a-damage-formula-in-an-rpg-which-keeps-weapons-with-different-atta
-		public DAMAGE_TYPE TypeDamage;     // TOOD: Need an ENUM
+		public DAMAGE_TYPE DamageType;
+        public int Damage; // amount of damage it can inflict
+        public int HalfDamage;
+		
 		//public string Damage;         // this is dice of damage, but often contains a multiplier like (100) afterwards.  We don't need the multiplier since we just compute a min/max damage range or maybe we compute a single damage that then gets modified based on the target evasive maneuvers and such
 		public int AverageDamage;       
 		//			public double KEDamage;
-		//			public double HalfDamage; 
+		//			public double HalfDamage;  // the range at which the amount of damage the weapon can do is at least halved.
 		//			public double VacuumHalfDamage;
 
 
@@ -4375,6 +4667,47 @@ bool mIsDisposed;
 		//			public double MaxRange2;
 		//			public double VacuumMaxRange;
 		//			public double VacuumMaxRange2;
+		
+		//			
+		//			public string Mount;
+		//			public string Direction;
+		
+        // runtime flags
+        public bool IsFiring;
+        public bool IsReloading;
+        public bool IsUnJamming; // represents fix of minor malfunction... does not require a "repair"
+        public bool IsPowered;
+        public bool IsHealthy;
+        
+        // nested weapon.  
+        //public Weapon SecondaryWeapon;
+    }
+	
+	public struct Laser_Struct
+	{
+		// beam specific
+		public int Type;       // type is really just about what types of Damage(s) (ProductID(s)) it results in such as Paralysis, Crushing, Burning, Impaling
+		public float Duration;   // duration of the firing animation in seconds.  This probably doesn't need to be here.  It should be reflected in the Cyclic Rate and RoF cooldowns instead.
+
+		public bool EnergyDrill;
+		public bool FTL;
+		public bool Reliable;
+		public bool Compact;
+		
+		public float BeamOutput;    // kJ - kiloJoules -  what is the difference between this and kW of power... is it the convsion rate of the input power to the output power?
+		public float CyclicRate;    //   Expressed as a cooldown value.  The maximum possible firing rate of the weapon without considering overheating or ammunition capacity. Often, RoF and CyclicRate are the same, but CyclicRate is theoretical maximum given mechanics of the weapon
+		
+		public double PowerReqt;
+
+
+		// TODO: these are like "internal" items and can be used if another power source is no longer connected
+		//			public string PowerCellType;  // TOOD: Need an ENUM
+		//			public int PowerCellQuantity;
+		//			public double PowerCellWeight;
+
+		// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
+		// https://gamedev.stackexchange.com/questions/148961/how-to-design-a-damage-formula-in-an-rpg-which-keeps-weapons-with-different-atta
+
 	}
 		
 	

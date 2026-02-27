@@ -6,7 +6,7 @@ public namespace Game01.Builders
 
         public string BuildPersistString {get;}
         public bool StatsChanged {get;}
-        public bool BuildChanged {get;};
+        public bool BuildChanged {get;}
 
 
         public void Update();

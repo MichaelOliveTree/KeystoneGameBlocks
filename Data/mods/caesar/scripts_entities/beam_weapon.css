@@ -34,14 +34,32 @@ public class BeamWeapon : BaseScript
 {
 	public static void Initialize(string scriptID)
 	{
+		// todo: this Initialize() needs to override a base class and then be 
+		//       able to merge custom properties from the base class into the derived
+		//       For instance,  component.css ->  weapon.css -> laser.css
+		//       NOTE: we do this already for properties of the various Nodes that are inherited.
+
+		// TODO: below is an example of how to retreive the custom properties from the base class
+		//       and add them to the custom properties specified here in this derived class.
+				
+		Settings.PropertySpec[] tmp = EntityAPI.GetCustomProperties(scriptID, false);
+        Settings.PropertySpec[] properties = new Settings.PropertySpec[8 + tmp.Length];
+        tmp.CopyTo(properties, 8);
+
+
+
 		string category = "Misc"; //"public properties";
+		
+
+
 		// create the custom properties	
 		Settings.PropertySpec[] properties = new Settings.PropertySpec[8];
+		
 		// name, type, category, default value
 		// name, type, category, description, default value, editor, converter
 		properties[0] = new PropertySpec("description", typeof(string).Name, category,(object)"beam weapon");
 		// type
-		// subtype // type and subtype determines the type of damage.  game00.Rules.Combat() should accept weapon stats and return us damage for which to create Production from. (eg heat, piercing, etc)
+		// subtype // type and subtype determines the type of damage.  game01.Rules.Combat() should accept weapon stats and return us damage for which to create Production from. (eg heat, piercing, etc)
 		//category = "private variables";
 		properties[1] = new PropertySpec("breaker", typeof(bool).Name, category, true);
 		                                  
@@ -77,6 +95,9 @@ public class BeamWeapon : BaseScript
 		EntityAPI.AddRule (scriptID, "description", new SimpleRule(1, Rule_Description));				
 	}
 	
+
+
+
 	public static void InitializeEntity(string entityID)
 	{
 		//EntityAPI.SetEntityFlag(entityID, (uint)UserConstants.AutoGenerateFootprint, true);

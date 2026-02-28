@@ -1779,6 +1779,11 @@ namespace HelloBoids
 			
         private void DoLifeCycle(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
         {
+			
+			
+			ComponentStore<LivingEntity> testLEComp = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
+			Console.WriteLine("DoLifeCycle() - Stores are the same == " + (store == testLEComp).ToString());
+			
 			// TODO: until both paths use DoLifeCycle(), this will throw off deterministism for Memory<T> path
     		return;
     
@@ -2451,7 +2456,17 @@ namespace HelloBoids
     }
 
 
-
+	/*
+	ref struct ComponentLaserStruct
+	{
+		public ComponentStruct[] Components;
+		public WeaponStruct[] Weapons;
+		public LaserStruct[] Lasers;
+		public Armor[] Armor;
+		//public ComponentLaserStruct[] Records;
+	}
+	*/
+	
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // BEGIN BOIDS
     //https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
@@ -2476,7 +2491,7 @@ namespace HelloBoids
 #if USE_MEMORY_T
 			// Component
 			//          InternalStructure
-			//			ExternalStructure  
+			//			Defenses  
 			// Weapon
 			// Laser
 		
@@ -2485,10 +2500,91 @@ namespace HelloBoids
             mMemStore_Laser = store.CheckOut(out checkOutIndex);
             SpanIndexLaser = checkOutIndex;
             
+			//this.AddUserStruct<Laser_Struct>(typeof(Laser_Struct).GetType(), mMemStore_Laser);
 			this.AddUserStruct(typeof(Laser_Struct).Name, mMemStore_Laser);
 				
-			
-			// initialize the memory store
+			// TODO: the CustomProperties should be mostly for GUI... the structs is where the values
+			//       for that underlying GUI is STORED.  So there's just a couple of questions
+			//       1 - do we use multiple structs or do we use one struct with all possible options except perhaps Armor options
+			//          - if we use multiple structs, the indices will all be different in the different Memory<T> records.  
+			//       Also, this will always happen anyway when iterating that records representing most Weapons will NOT be firing anyways... 
+			//      VERY GOOD ARTICLE ON Span<T> below.  
+			//	https://nishanc.medium.com/an-introduction-to-writing-high-performance-c-using-span-t-struct-b859862a84e4
+				
+			// WE KNOW what the FOREIGN KEY WOULD BE for say Component.Index, Component.ArmorIndex, Component.WeaponIndex, Component.LaserIndex
+			//                                               each Armor, Weapon, Laser, etc, will have a reference to the Component.Index which
+			//                                               will yield Entity.Index if necessary.  
+			// SO NOW THE QUESTION IS, we need a way to grab these memoryStores perhaps in the Processors WITHOUT having to pass them in
+			// at all!!! Let each Processor know which ones to grab I think.
+			// 
+			// Component has indices to all the different structs for this Script's component 
+			// componentStruct.EntityIndex
+			// componentStruct.WeaponIndex;
+			// componentStruct.LaserIndex;
+			// componentStruct.ArmorIndex;
+				
+			// weaponStruct.ComponentIndex;
+			// laserStruct.WeaponIndex;  (maybe weaponStruct is just expanded to include all options to simplify things?)
+			// armorStruct.ComponentIndex;
+
+			// userData...   and we need to wire up the CustomProperties (PropertySpec[]) to these
+			// ComponentStore structs.
+			// 
+			// This has to be done via Game01.dll via something like passing in the SCRIPT NAME and perhaps
+			// the and from that the script can handle any parsing perhaps..
+			// Hmm... the particular Script would have to be instanced first in order to be able to call something like
+			// thisScript.Parse(persistString) BUT THIS IS TOTALLY OK BECAUSE WE ALREADY DO THIS IN
+			// Entity.private void RestoreCustomPropertyValuesFromPersistString()   where we ONLY
+			// attempt to restore the CustomProperties AFTER the script has been fully loaded.  
+			// So there are no problems here.  Just that each script (potentially with the help of a base class perhaps
+			// where our Json persistString is seperated into different strings via a special delimiter value from the one
+			// used to delimit different property values within the same struct
+			// 
+			// where it would create the Structs, parse and assign their property values, 
+			// add them to the UserData or a DataStore that can be serialized/deserialized, and wire
+			// them up to the PropertySpec[]
+				
+			// 	
+				
+			// if ()
+			// 
+				
+			/*
+				-- To String
+				using System;
+				using System.Text;
+
+				// Example with a byte array (UTF-8 encoding for "Hello")
+				byte[] buffer = { 72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100 };
+				ReadOnlySpan<byte> span = new ReadOnlySpan<byte>(buffer);
+
+				// Slice the span
+				ReadOnlySpan<byte> slice = span.Slice(0, 5); // Corresponds to "Hello"
+
+				// Convert the slice to a string using the correct encoding
+				string result = Encoding.UTF8.GetString(slice);
+
+				Console.WriteLine(result); // Output: Hello
+
+
+				-- To Int
+				using System;
+				using System.Runtime.InteropServices;
+
+				byte[] buffer = new byte[] { 25, 0, 0, 0, 100, 101, 102, 103 };
+				ReadOnlySpan<byte> slice = buffer.AsSpan().Slice(0, 4);
+
+				// Reinterpret the bytes as a ReadOnlySpan<int>
+				// This assumes the bytes are already in the correct endianness for the current system.
+				// If not, you need to use BinaryPrimitives.ReverseEndianness to correct it.
+				int result = MemoryMarshal.Read<int>(slice); 
+
+				Console.WriteLine(result);
+				*/
+				
+
+				
+			// TEMP HACK - this would normally be done in the relevant scripit - initialize the memory store vars from the serialized
 			mMemStore_Laser.Span[0].TL = 1;
 			mMemStore_Laser.Span[0].Quality_ = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
 			//public string Quality; // todo: this needs to be a coefficient of 0.0 to 1.0
@@ -2546,8 +2642,6 @@ namespace HelloBoids
 //			public double VacuumMaxRange;
 //			public double VacuumMaxRange2;
 
-				
-            // todo do we need destructor for Repository.CheckIn mMemstore?
 
 #endif
 	
@@ -3079,6 +3173,12 @@ return (0,0);
         protected BoundingBox _box;
         protected OctreeOctant _octant;
 		protected Dictionary<string, object> mUserStructs;
+		
+		
+		public void AddUserStruct<T> (T type, object memStore)
+		{
+			AddUserStruct (type.GetType().Name, memStore);
+		}
 		
 		public void AddUserStruct(string typename, object memStore)
 		{

@@ -328,7 +328,10 @@ namespace Keystone.Entities
         /// This value is assigned via the EntityEditPlugin General tab.  mHost.Entity_GetUserTypeIDsToString() is used
         /// to populate the combobox with string versions of the enum Game01.Enums.COMPONENT_TYPE
         /// </summary>
-        /// <remarks>I don't know about this since it means to have a distinct userTypeID, every component needs its own script.  I should probably just use a customproperty to hold this value instead.  In fact the game00.Rules.BuildWeapon() can probably be used to modify this custom property value</remarks>
+        /// <remarks>I don't know about this since it means to have a distinct userTypeID, every component needs its own script.  
+        /// I should probably just use a customproperty to hold this value instead.  In fact the game01.Builders.BuildWeapon() 
+        /// can probably be used to modify this custom property value
+        /// </remarks>
         public uint UserTypeID
         {
             // Enum assign from game01.dll.Enums.COMPONENT_TYPE
@@ -637,7 +640,6 @@ namespace Keystone.Entities
                             mPersistedCustomPropertyValues = null;
                             RestoreCustomPropertyValuesFromPersistString();
                             return;
-
                         }
                         for (int i = 0; i < customProperties.Length; i++)
                         {

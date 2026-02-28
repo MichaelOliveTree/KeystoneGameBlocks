@@ -10,7 +10,8 @@ using Antlr4.StringTemplate.Misc;
 
 namespace KeyScript
 {
-    public class BaseScript
+    // Feb.28.2026 - made abstract class. This shouldn't break anything, but we shall see
+    public abstract class BaseScript
     {
         protected static IScriptingHost mHost;
 
@@ -84,6 +85,8 @@ namespace KeyScript
         }
         
         // TODO: this function shouldn't be here.  It should perhaps be part of VisualFXAPI.???
+        // todo: ideally, there'd be a way to enqueue the drawing of this healthbar so that we can draw them all at once
+        //       for all Entities (NPCs) that need one.
     	public static void DrawHealthBar (string contextID, string entityID, Vector3d cameraSpacePosition, Vector3d[] cameraSpaceBoundingBoxVertices, float barWidth, float barHeight)
 		{
 			

@@ -36,7 +36,8 @@ namespace Keystone.Entities
         protected Animation.Animation[] mAnimations;
         protected Behavior.Behavior mBehaviorRoot;
         protected KeyCommon.Traversal.BehaviorContext mBehaviorContext; // holds state vars related to traversing the behavior tree. Currently not used anywhere. Seems viewpoint behavviors are just using mBlackboardData but... hmm..
-             
+
+        protected Dictionary<string, object> mUserStructs; // See HelloBoids.cs for help with finishing this implementation     
         // todo: do we need a reference to GameObject or Character? I don't want there to be a dependancy on Game01.dll or KeyScript or even the Exe so it might need to just be a generic "object"
         protected KeyCommon.Data.UserData mBlackboardData; // todo: allow exe to add an object from game01.dll.  can be stored with key named "npc" and then cast in the script to (Game01.GameObjects.Crew)npc; This data then is stored in a database unlike the mCustomPropertyValues
                                                        // todo: this probably means the Plugins need to be able to grab this object too.
@@ -358,6 +359,56 @@ namespace Keystone.Entities
             }
         }
 
+        
+		
+		// See HelloBoids.cs for help with finishing this implementation     
+		public void AddUserStruct(object memStore)
+		{
+			string genericTypeName = memStore.GetType().FullName;
+			// our Memory<T>'s will look as follows:
+			// 'System.Memory`1[[HelloBoids.Laser_Struct, nkj43iat.exe, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]]'
+			
+			// if we want to parse out just the first string
+			int start = genericTypeName.IndexOf("[[") + 2;
+			int end = genericTypeName.IndexOf(",");
+											  
+		    genericTypeName = genericTypeName.Substring(start, end - start);
+			
+			// For Memory<T> just use the above, the below is  NOT what we want
+        	// Remove the generic arity part (e.g., "`1")
+        	//genericTypeName = genericTypeName.Substring(0, genericTypeName.IndexOf('`'));
+			
+			AddUserStruct (genericTypeName, memStore);
+		}
+		
+		public void AddUserStruct(string typename, object memStore)
+		{
+			if (mUserStructs == null) mUserStructs = new Dictionary<string, object>();
+			
+			//Console.WriteLine ("EntityNode.AddUserStruct() - Adding User Struct '" + typename + "'");
+			mUserStructs.Add(typename, memStore);
+		}
+		
+		public object GetUserStruct (Type t)
+		{
+			string typename = t.FullName;
+			
+			return GetUserStruct( typename);
+		}
+		
+		public object GetUserStruct(string typename)
+		{
+			//Console.WriteLine ("EntityNode.GetUserStruct '" + typename + "'");
+			if (mUserStructs == null) return null;
+			
+			object result;
+			if (mUserStructs.TryGetValue(typename, out result))
+				return result;
+				
+			return null;
+		}
+        
+
         // TODO: changing the underlying Script must clear and re-init the mCustomPropertyValues collection
         public Settings.PropertySpec[] GetCustomProperties(bool specOnly)
         {
@@ -401,6 +452,25 @@ namespace Keystone.Entities
 
         public object GetCustomPropertyValue(string customPropertyName)
         {
+            ////////////////////////////////////////////////////////
+            // March.2.2026 - MichaelOliveTree - using Memory<T> and ComponentStores to hold structs for Component data
+            //               requires the below:
+            // Using structs like Component and Weapon to store the values of those aspects of a Laser for example
+            // requires we call Script.GetCustomPropertyValue (customPropetyName)
+            // The script will know which interface to grab the "values" from in the store.Span[0].PROPERTY
+            // NOTE: some customPropertyNames may not be related to the Component's at all, such as descriptions and name and such
+            //       which are not needed for high performance computation so those can be stored in NON ComponentStore.cs variables
+            //       within the UserData object.
+            // NOTE: For bool valid = SetCustomPropertyValues(customPropertyName, value)   <-- VALIDATION CAN OCCUR HERE and there'd
+            //       be no need for mScript.RulesValidate() 
+ //           if (mScriptIsInitialized)
+ //               return mScript.GetCustomPropertyValue (customPropertyName);
+ //           else 
+ //               return null;
+//          //////////////////////////////////////////////////////
+
+
+            // TODO: Uncomment the above and comment out all of the below
             if (mCustomPropertyValues == null)
             {
                 if (!string.IsNullOrEmpty(mPersistedCustomPropertyValues))

@@ -15,6 +15,12 @@
 
 
 
+using System.Collections;
+using System.ComponentModel;
+
+//using System.Collections.Generic; //used by UITypeEditor
+
+
 using System.Runtime.CompilerServices; // needed for using "[MethodImpl(MethodImplOptions.AggressiveInlining)]"
 using System.Diagnostics;
 using System; 
@@ -977,7 +983,6 @@ namespace HelloBoids
                 Octree = new OctreeOctant(0, 0, box, parent);
             }
 
-
 #if USE_MEMORY_T
 
             // add data processors
@@ -1006,7 +1011,6 @@ namespace HelloBoids
 			Console.WriteLine("BoidSimulation.ctor() - Preparing to Spawn " + numBoids + " with SEED == " + this.Seeds.Master.ToString());
 
 			
-
 			//NOTE: List<> which stores our Boids is not threadsafe and so for .Add() we must prefill it with 
 			// null items so we can use direct assignment (eg Boids[i] = b;  rather than Boids.Add(b); when spawning them
 			// NOTE: either of the below two lines of code will work to fill the list to the desired amount with nulls
@@ -1303,7 +1307,7 @@ namespace HelloBoids
 
 				// TEST MEMORY<T> (Data Oriented Technique)
 				// ====================
-		ComponentStore<LivingEntity> livingEntityStore = null;
+				ComponentStore<LivingEntity> livingEntityStore = null;
 				
 				try
 				{
@@ -1546,14 +1550,11 @@ namespace HelloBoids
 	
 			// todo: we could pass in an array of store to our Processor functions... rather than just one.
 			//       but it would have to be an array of object[] like parameters and we'd have to cast them
+			// OR, our various processors can just grab the Stores that are needed.  There's no need really to 
+			// grab the stores outside of the processor functions only to just pass them there...  
 	
-			// todo: we need to be able to access all of these from just the single Droid EntityNode
-			//       this means they must exist in a UserData object perhaps that we can grab them from?
 	
-	
-			//Transform.Transform_Struct
-			//Transform.Living_Entity
-			//Boid.Laser_Struct
+			
 			
 				
 			int count = Boids.Count;
@@ -1561,6 +1562,10 @@ namespace HelloBoids
             //for (int i = 0; i < Boids.Count; i++)
             {
 				Boid currentBoid = Boids[i];
+				
+				Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component));
+				Memory<Weapon> wep = (Memory<Weapon>) currentBoid.GetUserStruct(typeof(Weapon));
+				
 				
 				string timerID = currentBoid.SpanIndex.ToString();
 				bool canFire = mIntervalTimers.IsReady(timerID, "droid_canfire");
@@ -1589,7 +1594,7 @@ namespace HelloBoids
 
 							// NOTE: here we assume the Fire() occurs immediately using a lightspeed laser and the damage is instantaneous 
 							//       and does not need any travel time to reach the target
-							object[] damages = CalculateDamage(currentBoid, laser, target); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
+							object[] damages = CalculateDamage(currentBoid, wep, target); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
 							if (damages != null)
 								for (int j = 0; j < damages.Length; j++)
 								{
@@ -1640,7 +1645,7 @@ namespace HelloBoids
 				return found[0];
 			else 
 			{
-				Console.WriteLine("FindNearestTarget found count == " + found.Count.ToString());
+				//Console.WriteLine("FindNearestTarget found count == " + found.Count.ToString());
 			}
 			return result;		
 		}
@@ -1688,7 +1693,7 @@ namespace HelloBoids
 		/// The resulting damage types and amounts (and duration for damage that can be applied overtime)
 		/// that occur on this successful hit.
 		/// </summary>
-        private object[] CalculateDamage(EntityNode droid, Laser_Struct weaponStruct, EntityNode target)
+        private object[] CalculateDamage(EntityNode droid, Memory<Weapon> weaponStruct, EntityNode target)
         {
 			//Console.WriteLine("CalculateDamage() - Created DamageSystem.Damage.");
 			
@@ -2187,7 +2192,6 @@ namespace HelloBoids
 		{
 			double posX = rand.NextDouble() * width;
             double posY = rand.NextDouble() * height;
-            
             double posZ= rand.NextDouble() * depth;
             
             double vX = (rand.NextDouble() - 0.5d) * 2d;
@@ -2195,27 +2199,96 @@ namespace HelloBoids
 
             Boid b = new Boid(index, posX, posY, posZ, vX, vY);
 			
-			// Register (nodeID, interval_name)
 			string id = b.Index.ToString();
 	
 			mIntervalTimers.Register(id, "droid_spawn", 0.14d);
 			mIntervalTimers.Register(id, "droid_canfire", 0.04d);
 			mIntervalTimers.Register(id, "droid_isfiring", 0.06d);
 	
-	
-			// todo: during Spawn()
+
 			// todo: generate Droids with some variance for age, size, and speed
 			// todo: create a "cooldown" interval that is based on the droid's size
-				
-			
-			// TODO: Add to Spawn() and Destroy()
+							
+			// TODO: Add to Spawn()
 			//
 			// OnEntityAttached(EntityNode e)
 			//       {
 			//			AddProduction(e)
 			//	        AddConsumption(e);
 			//       }
-				
+			
+	
+			// NOTE: the following calls to GetUserStruct() returns the typically ONE record (but more potentially for ArmorLayers)
+			//       that is stored within the EntityNode's.  Unlike calls to EntryClass.mColStore.CheckOut(Component);
+			Memory<Component> component = (Memory<Component>)b.GetUserStruct("HelloBoids.Component");
+			Memory<Weapon> weapon = (Memory<Weapon>)b.GetUserStruct("HelloBoids.Weapon");
+			Memory<Laser_Struct> laser = (Memory<Laser_Struct>)b.GetUserStruct("HelloBoids.Laser_Struct");
+	
+			//Memory<Component> test = (Memory<Component>)b.GetUserStruct(typeof(Component));
+			//Console.WriteLine (test.Equals(component).ToString());
+
+	
+	/*
+	// TEMP HACK - this would normally be done in the relevant scripit - initialize the memory store vars from the serialized
+			component.Span[0].TL = 1;
+			component.Span[0].Quality_ = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
+			//public string Quality; // todo: this needs to be a coefficient of 0.0 to 1.0
+			component.Span[0].Ruggedized = true;
+			component.Span[0].HitPoints = 100;
+			component.Span[0].DR = 20;  // todo: if we use complex armor, is DR (damage resistance) used?
+			component.Span[0].Cost = 10d;
+			component.Span[0].Weight = 2.5d;
+			component.Span[0].SurfaceArea = 1d;
+			component.Span[0].Volume = 0.2d;
+			
+			// beam specific
+			laser.Span[0].Type = 1;     
+			laser.Span[0].Duration = 0.25f;   // duration in seconds
+			
+			laser.Span[0].EnergyDrill = false;
+			laser.Span[0].FTL = true;
+			laser.Span[0].Reliable = true;
+			laser.Span[0].Compact = true;
+			
+			weapon.Span[0].Malfunction_ = 0.2f; // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
+			//public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
+									
+			weapon.Span[0].BeamOutput = 10f; // kW
+			weapon.Span[0].CyclicRate = 1;
+			weapon.Span[0].Accuracy = 10;
+			weapon.Span[0].SnapShot = 2;
+//			public string Shots;
+			
+			weapon.Span[0].CoolDown_ = 0.3f;
+//			public string RoF;
+			
+			weapon.Span[0].PowerReqt = 0.0f;
+//			
+//			public string Mount;
+//			public string Direction;
+
+			// TODO: these are like "internal" items and can be used if another power source is no longer connected
+//			public string PowerCellType;  // TOOD: Need an ENUM
+//			public int PowerCellQuantity;
+//			public double PowerCellWeight;
+			
+			// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
+			weapon.Span[0].TypeDamage = DAMAGE_TYPE.Burning;     // TOOD: Need an ENUM
+			//public string Damage;         // this is dice of damage, but often contains a multiplier like (100) afterwards.  We don't need the multiplier since we just compute a min/max damage range or maybe we compute a single damage that then gets modified based on the target evasive maneuvers and such
+			weapon.Span[0].AverageDamage = 40;       
+//			public double KEDamage;
+//			public double HalfDamage; 
+//			public double VacuumHalfDamage;
+
+			
+//			public string Range; // string description of range (eg: "very long range")
+			weapon.Span[0].MaxRange = 10;
+//			public double MaxRange2;
+//			public double VacuumMaxRange;
+//			public double VacuumMaxRange2;
+    
+   */
+		
 	
 		    if (this.Octree != null)
             {
@@ -2234,6 +2307,7 @@ namespace HelloBoids
 #endif
 			int lastIndex = this.Boids.Count - 1;
 	
+			// TODO:
 			// OnEntityDetached(EntityNode e)
 			//       {
 			//			RemoveProduction(e)
@@ -2477,7 +2551,14 @@ namespace HelloBoids
 		
 		
 	#if	USE_MEMORY_T
+		// TODO: these Memory<T> should be stored in base.UserStructs
+		public Memory<Component> mMemStore_Component; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
+		public Memory<Weapon> mMemStore_Weapon; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
 		public Memory<Laser_Struct> mMemStore_Laser; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
+		public Memory<ArmorLayer> mMemStore_ArmorLayers; 
+		
+		public int SpanIndexComponent = -1;
+		public int SpanIndexWeapon = -1;
 		public int SpanIndexLaser = -1;
 		
 	
@@ -2486,22 +2567,100 @@ namespace HelloBoids
         public Boid(int index, double x, double y, double z,  double xV, double yV)
             : base(index, x, y, z, xV, yV)
         {
-
 				
 #if USE_MEMORY_T
+			OnInitializeEntity();
+				
+#endif
+	
+            Vector3d v;
+            v.x = xV;
+            v.y = yV;
+            v.z = 0.0d;
+            Velocity = v;
+
+			// bounding box in World Space which is probably not what we want for KGB Entity but only for KGB EntityNode (which is derived from SceneNode and used for hierarchical bbox structure)
+            _box = new BoundingBox(Translation,  BOID_WIDTH);
+        }
+		
+		private void OnInitializeEntity()
+		{
 			// Component
 			//          InternalStructure
 			//			Defenses  
 			// Weapon
 			// Laser
 		
-			ComponentStore<Laser_Struct> store = EntryClass.mCStoreCol.CheckOut<Laser_Struct>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
+			// assignment can be done via User Interface just using a propertyName and TypeName from a PropertySpec and does not need to know any game specific info including the MODs various types of UserStructs or how to process them
+			// -------------------------------
+			// Entity.SetCustomPropertyValue
+			// Entity.GetCustomPropertyValue
+	
+			// assignment can be done via the scripts themselves since they are aware of the properties of their MOD using just the single records Memory<T>
+			// -------------------------------
+			// object = (CastHere>Entity.GetUserStruct(T type)
+			// object.Span[0].PropertyName = 1234;
+			// or return object.Span[0].PropertyName;
+			
+			// assignment can be done via our DataProcessors using the FULL Memory<T> 
+			// or object = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+			// -------------------------------
+			// for (int i = 0; i < object.RecordCount; i++
+			// {
+			//     string name = object.Span[i].PropertyName 
+			// }
+			
+	
+			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
+			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
             int checkOutIndex = -1;
-            mMemStore_Laser = store.CheckOut(out checkOutIndex);
+			// NOTE: this second call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
+            mMemStore_Component = storeComp.CheckOut(out checkOutIndex);
+			this.AddUserStruct(mMemStore_Component);
+            SpanIndexComponent = checkOutIndex;
+			mMemStore_Component.Span[0].Cost = 1234;
+				
+			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
+			ComponentStore<Weapon> storeWeapon = EntryClass.mCStoreCol.CheckOut<Weapon>(EntryClass.NUM_ENTRIES);
+            checkOutIndex = -1;
+			// NOTE: this call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
+            mMemStore_Weapon = storeWeapon.CheckOut(out checkOutIndex);
+			this.AddUserStruct(mMemStore_Weapon);
+            SpanIndexWeapon = checkOutIndex;
+				
+			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
+			ComponentStore<Laser_Struct> storeLasers = EntryClass.mCStoreCol.CheckOut<Laser_Struct>(EntryClass.NUM_ENTRIES); 
+            checkOutIndex = -1;
+			// NOTE: this call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
+            mMemStore_Laser = storeLasers.CheckOut(out checkOutIndex);
+			this.AddUserStruct(mMemStore_Laser);
             SpanIndexLaser = checkOutIndex;
-            
-			//this.AddUserStruct<Laser_Struct>(typeof(Laser_Struct).GetType(), mMemStore_Laser);
-			this.AddUserStruct(typeof(Laser_Struct).Name, mMemStore_Laser);
+            			
+			
+			// TODO: this may require an array of checkOutIndices based on how many layers as determined from 
+			//       component.ArmorLayersCount
+			ComponentStore<ArmorLayer> storeArmorLayers = EntryClass.mCStoreCol.CheckOut<ArmorLayer>(EntryClass.NUM_ENTRIES); 
+            checkOutIndex = -1;
+            mMemStore_ArmorLayers = storeArmorLayers.CheckOut(out checkOutIndex);
+            // SpanIndexArmorLayers = checkOutIndex;
+			
+					
+					
+				
+			PropertyBag bag = new PropertyBag();
+			bag.SetValue += OnSetLaserStructValue;
+			bag.GetValue += OnGetLaserStructValue;
+				
+			// TODO: the problem here is, only a GUI can trigger the events for SetValue and GetValue...  
+			//       and that is fine since it does represent editing say the Laser build properties 
+			//       and then being able to grab them all from bag.Properties if we need to.
+			PropertySpec spec = new PropertySpec("entityIndex", typeof(int).Name, "indices", "this is the span index", (object)0, (string)null, (string)null);
+			bag.Properties.Add(spec);
+			
+			PropertySpecEventArgs e = new PropertySpecEventArgs(spec, 9999);
+			bag.OnSetValue (e);
+				
+			
 				
 			// TODO: the CustomProperties should be mostly for GUI... the structs is where the values
 			//       for that underlying GUI is STORED.  So there's just a couple of questions
@@ -2530,21 +2689,7 @@ namespace HelloBoids
 			// userData...   and we need to wire up the CustomProperties (PropertySpec[]) to these
 			// ComponentStore structs.
 			// 
-			// This has to be done via Game01.dll via something like passing in the SCRIPT NAME and perhaps
-			// the and from that the script can handle any parsing perhaps..
-			// Hmm... the particular Script would have to be instanced first in order to be able to call something like
-			// thisScript.Parse(persistString) BUT THIS IS TOTALLY OK BECAUSE WE ALREADY DO THIS IN
-			// Entity.private void RestoreCustomPropertyValuesFromPersistString()   where we ONLY
-			// attempt to restore the CustomProperties AFTER the script has been fully loaded.  
-			// So there are no problems here.  Just that each script (potentially with the help of a base class perhaps
-			// where our Json persistString is seperated into different strings via a special delimiter value from the one
-			// used to delimit different property values within the same struct
-			// 
-			// where it would create the Structs, parse and assign their property values, 
-			// add them to the UserData or a DataStore that can be serialized/deserialized, and wire
-			// them up to the PropertySpec[]
-				
-			// 	
+			
 				
 			// if ()
 			// 
@@ -2581,80 +2726,64 @@ namespace HelloBoids
 
 				Console.WriteLine(result);
 				*/
-				
+		
+			
+			
+			
+		}
 
-				
-			// TEMP HACK - this would normally be done in the relevant scripit - initialize the memory store vars from the serialized
-			mMemStore_Laser.Span[0].TL = 1;
-			mMemStore_Laser.Span[0].Quality_ = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
-			//public string Quality; // todo: this needs to be a coefficient of 0.0 to 1.0
-			mMemStore_Laser.Span[0].Ruggedized = true;
-			mMemStore_Laser.Span[0].HitPoints = 100;
-			mMemStore_Laser.Span[0].DR = 20;  // todo: if we use complex armor, is DR (damage resistance) used?
-			mMemStore_Laser.Span[0].Cost = 10d;
-			mMemStore_Laser.Span[0].Weight = 2.5d;
-			mMemStore_Laser.Span[0].SurfaceArea = 1d;
-			mMemStore_Laser.Span[0].Volume = 0.2d;
+		// public delegate void PropertySpecEventHandler(object sender, PropertySpecEventArgs e);
+		public void OnGetLaserStructValue(object sender, PropertySpecEventArgs e)
+		{
+			Console.WriteLine("OnGetLaserStructValue " + e.Value.ToString());
 			
-			// beam specific
-			mMemStore_Laser.Span[0].Type = 1;     
-			mMemStore_Laser.Span[0].Duration = 0.25f;   // duration in seconds
+			switch (e.Property.Name)
+			{
+				case "entityIndex":
+					Console.WriteLine ("Getter() - entityIndex currently set to " + e.Value.ToString());
+					break;
+				default:
+					break;
+			}
 			
-			mMemStore_Laser.Span[0].EnergyDrill = false;
-			mMemStore_Laser.Span[0].FTL = true;
-			mMemStore_Laser.Span[0].Reliable = true;
-			mMemStore_Laser.Span[0].Compact = true;
-			
-			mMemStore_Laser.Span[0].Malfunction_ = 0.2f; // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
-			//public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
-									
-			mMemStore_Laser.Span[0].BeamOutput = 10f; // kW
-			mMemStore_Laser.Span[0].CyclicRate = 1;
-			mMemStore_Laser.Span[0].Accuracy = 10;
-			mMemStore_Laser.Span[0].SnapShot = 2;
-//			public string Shots;
-			
-			mMemStore_Laser.Span[0].CoolDown_ = 0.3f;
-//			public string RoF;
-			
-			mMemStore_Laser.Span[0].PowerReqt = 0.0f;
-//			
-//			public string Mount;
-//			public string Direction;
+			// Have the property bag raise an event to get the current value
+			// of the property.
 
-			// TODO: these are like "internal" items and can be used if another power source is no longer connected
-//			public string PowerCellType;  // TOOD: Need an ENUM
-//			public int PowerCellQuantity;
-//			public double PowerCellWeight;
+			//PropertySpecEventArgs e = new PropertySpecEventArgs(item, null);
+			//bag.OnGetValue(e);
+			//return e.Value;
+		}
+		
+		public void OnSetLaserStructValue(object sender, PropertySpecEventArgs e)
+		{
+			Console.WriteLine("OnSetLaserStructValue " + e.Value.ToString());
 			
-			// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
-			mMemStore_Laser.Span[0].TypeDamage = DAMAGE_TYPE.Burning;     // TOOD: Need an ENUM
-			//public string Damage;         // this is dice of damage, but often contains a multiplier like (100) afterwards.  We don't need the multiplier since we just compute a min/max damage range or maybe we compute a single damage that then gets modified based on the target evasive maneuvers and such
-			mMemStore_Laser.Span[0].AverageDamage = 40;       
-//			public double KEDamage;
-//			public double HalfDamage; 
-//			public double VacuumHalfDamage;
+			switch (e.Property.Name)
+			{
+				case "entityIndex":
+					Console.WriteLine ("Setter() - entityIndex changing too " + e.Value.ToString());
+					break;
+				default:
+					break;
+			}
+			// Have the property bag raise an event to set the current value
+			// of the property.
 
+			//PropertySpecEventArgs e = new PropertySpecEventArgs(item, value);
+			//bag.OnSetValue(e);
+		}
+		
+		private void OnSetLaserStructValue(PropertySpecEventArgs e)
+		{
 			
-//			public string Range; // string description of range (eg: "very long range")
-			mMemStore_Laser.Span[0].MaxRange = 10;
-//			public double MaxRange2;
-//			public double VacuumMaxRange;
-//			public double VacuumMaxRange2;
-
-
-#endif
+		}
+		
+		private void OnGetLaserStructValue(PropertySpecEventArgs e)
+		{
+			
+		}
 	
-            Vector3d v;
-            v.x = xV;
-            v.y = yV;
-            v.z = 0.0d;
-            Velocity = v;
-
-			// bounding box in World Space which is probably not what we want for KGB Entity but only for KGB EntityNode (which is derived from SceneNode and used for hierarchical bbox structure)
-            _box = new BoundingBox(Translation,  BOID_WIDTH);
-        }
-
+		
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static double GetDistance(Boid b1, Boid b2)
         {
@@ -3175,21 +3304,43 @@ return (0,0);
 		protected Dictionary<string, object> mUserStructs;
 		
 		
-		public void AddUserStruct<T> (T type, object memStore)
+		public void AddUserStruct(object memStore)
 		{
-			AddUserStruct (type.GetType().Name, memStore);
+			string genericTypeName = memStore.GetType().FullName;
+			// our Memory<T>'s will look as follows:
+			// 'System.Memory`1[[HelloBoids.Laser_Struct, nkj43iat.exe, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]]'
+			
+			// if we want to parse out just the first string
+			int start = genericTypeName.IndexOf("[[") + 2;
+			int end = genericTypeName.IndexOf(",");
+											  
+		    genericTypeName = genericTypeName.Substring(start, end - start);
+			
+			// For Memory<T> just use the above, the below is  NOT what we want
+        	// Remove the generic arity part (e.g., "`1")
+        	//genericTypeName = genericTypeName.Substring(0, genericTypeName.IndexOf('`'));
+			
+			AddUserStruct (genericTypeName, memStore);
 		}
 		
 		public void AddUserStruct(string typename, object memStore)
 		{
 			if (mUserStructs == null) mUserStructs = new Dictionary<string, object>();
 			
+			//Console.WriteLine ("EntityNode.AddUserStruct() - Adding User Struct '" + typename + "'");
 			mUserStructs.Add(typename, memStore);
+		}
+		
+		public object GetUserStruct (Type t)
+		{
+			string typename = t.FullName;
 			
+			return GetUserStruct( typename);
 		}
 		
 		public object GetUserStruct(string typename)
 		{
+			//Console.WriteLine ("EntityNode.GetUserStruct '" + typename + "'");
 			if (mUserStructs == null) return null;
 			
 			object result;
@@ -4350,24 +4501,6 @@ bool mIsDisposed;
     }
 
 				
-
-	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
-	public struct LivingEntity
-	{
-		public long CreationDateTime;
-		public long Age;            // technically, this probably doesnt need to be stored... we only need the CreationDate?  // assign using Utils.GetAge() and find Age via 'age = Utils.GetAge(entity.CreationDate);'
-		public double MaxAge;
-		public int Hitpoints;
-
-		//public double
-
-		public double GetAge(double currentTime)
-		{
-			return currentTime - CreationDateTime;
-		}
-	}
-		
-
 	public enum DAMAGE_TYPE
 	{
 		Impaling,
@@ -4388,7 +4521,9 @@ bool mIsDisposed;
 	// See KeystoneGameBlocks/Game01/Builders
 	public interface IBuilder
     {
-       public string BuildPersistString {get;}
+		public object[] Components {get; set;}
+		
+        public string BuildPersistString {get;}
         public bool StatsChanged {get;}
         public bool BuildChanged {get;}
 
@@ -4402,22 +4537,39 @@ bool mIsDisposed;
 	public struct Build_Laser : IBuilder
 	{
         // build specific LASER properties
+		private string COMPONENT_DELIMETER = "|";
+		public object[] Components {get; set;}
 		
+		
+		public Build_Laser() // parameterless constructors for structs first became available in c# 10
+		{
+			// struct for component properties and stats
+			Components = new object[3];
+			
+			int componentIndex = 1;
+			Component component = ((ComponentStore<Component>)EntryClass.mCStoreCol.CheckOut<Component>(0)).Span[componentIndex];
+			Components[0] = component;
+						
+			// struct for basic weapons properties
+			int weaponIndex = 0;
+			Weapon weapon = ((ComponentStore<Weapon>)EntryClass.mCStoreCol.CheckOut<Weapon>(0)).Span[weaponIndex];
+			Components[1] = component;
+			
+			// struct for laser specific weapon properties
+			int laserIndex = 2;
+			Laser_Struct laser = ((ComponentStore<Laser_Struct>)EntryClass.mCStoreCol.CheckOut<Laser_Struct>(0)).Span[laserIndex];
+			Components[2] = laser;		
+		}
+		
+		public Build_Laser(string persistString)
+		{
+			Components = FromString(persistString).Components;
+		}
 
-        // struct for component properties and stats
-        Component component; 
-
-        // struct for basic weapons properties
-        Weapon weapon;
-
-        // struct for laser specific weapon properties
-        Laser_Struct laser;
-
-
+		
 #region IBuilder implementation
         public void Update()
         {
-            
         }
 
 		public string BuildPersistString {get;}
@@ -4430,40 +4582,46 @@ bool mIsDisposed;
             // NOTE: we only need to write out the build parameters and from that we can
             //       reconstitute the full entity
 
-			
 			// 1 - Memory<T> represents how the data is STORED in memory, in structs from which we can
 			//     store in contiguous memory
 			// 2 - So, a Laser will be made up of 3 "structs" like Component, Weapon and Laser for storing the data
 			//    and these structs will co-exist in our UserData object keyed by their typename
 			//    The Defense and InternalStructure too can be keyed this way and assigned later... with ArmorLayers being
 			//    somewhat special case because there are currently no maximum allowable limits
-			    
-			
             string persistString = null;
 
-			// TODO: next follows a series of 
-			
-						
+			// TODO: next follows a series of parts that join together to create the full persist string
+			string componentPart = Components[0].ToString();
+			string weaponPart = Components[1].ToString();
+			string laserPart = Components[2].ToString();
+			 
             // JSon == javascript object notation
 			persistString = System.Text.Json.JsonSerializer.Serialize(this);
 			Console.WriteLine("Build_Laser.ToString() - " + persistString);
             return persistString;
 		}
 
+		
         public IBuilder FromString (string persistString)
         {
             if (string.IsNullOrEmpty(persistString))
 			{
-				Laser_Struct laserStruct;
-				//laserStruct.
-					
+				string[] parts = persistString.Split(COMPONENT_DELIMETER);
+				System.Diagnostics.Debug.Assert (parts.Length == 3);
+				
+				Component componentStruct = System.Text.Json.JsonSerializer.Deserialize<Component>(parts[0]);
+				Weapon weaponStruct = System.Text.Json.JsonSerializer.Deserialize<Weapon>(parts[1]);
+				Laser_Struct laserStruct = System.Text.Json.JsonSerializer.Deserialize<Laser_Struct>(parts[2]);
+				
+				// todo: all of the above need to be checked in to the EntryClass.mColStore?
+									
 			}
+			
 			
             // NOTE: we only need the build parameters and from that we can
             //       create the full entity
             Build_Laser laser = System.Text.Json.JsonSerializer.Deserialize<Build_Laser>(persistString);
-			
-			
+							
 			return laser;
         }
 		
@@ -4472,15 +4630,47 @@ bool mIsDisposed;
 	
 	
 
+	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
+	public struct LivingEntity
+	{
+		public long CreationDateTime;
+		public long Age;            // technically, this probably doesnt need to be stored... we only need the CreationDate?  // assign using Utils.GetAge() and find Age via 'age = Utils.GetAge(entity.CreationDate);'
+		public double MaxAge;
+		public int Hitpoints; // CurrentHP
+
+		//public double
+
+		public double GetAge(double currentTime)
+		{
+			return currentTime - CreationDateTime;
+		}
+	}
+		
+	
 	
 	public struct Armor
     {
         public const int MAX_ARMOR_LAYERS = 5;
         public const int NUM_ARMOR_FACES = 6; //4 = front, back, left, right.  6 adds top, back.
 
+		public Armor(uint numFaces)
+		{
+			if (numFaces != NUM_ARMOR_FACES) throw new ArgumentOutOfRangeException();
+			
+			mSlopes = new byte[numFaces];
+			Faces = new ArmorFace[numFaces];
+		}
+		
+		private byte[] mSlopes;
         public ArmorFace[] Faces;
+		public byte[] Slopes 
+		{
+			get 
+			{
+				return mSlopes;
+			}
+		}
     }
-    
     
     public struct ArmorFace
     {
@@ -4492,7 +4682,7 @@ bool mIsDisposed;
     		Electrified = 1 << 1,    // 2
     		ThermalCoating = 1 << 2, // 4
     		RadShielding = 1 << 3,   // 8
-			ReflectiveCoating = 1 << 4, // 16
+			ReflectiveCoating = 1 << 4, // 16 // todo: there are multiple types of ReflectiveCoating right? 
     		All = RAP | Electrified | ThermalCoating | RadShielding | ReflectiveCoating
 		}
 		
@@ -4502,7 +4692,19 @@ bool mIsDisposed;
         //public bool RadShielding;
         //public string ReflectiveCoating;  // todo: what types are there? see gvd // todo:  need enums or perhaps a coefficient value instead AND THE GUI can interpet this coefficient into a string if desired
 		public SURFACE_ATTRBITUES SurfaceAttributes;
+		
 				
+		                    // Armor, PD and DR is redundant with "Defense"
+		                    // This is additional to component DR, specialized defensive material added to the component to increase its protection (e.g., bolted-on steel plates, Kevlar blankets, or composite ceramic armor).
+                                          // See Google AI Overview in Game01.Components.Armor.cs 
+		public int DR;                  // Defense Resistance - natural protection provided by the material and structure of the vehicle component itself (e.g., the 1-inch thick steel hull, the aluminum skin of an aircraft, or the glass of a windshield).
+        public int PD;                  // Passive Defense - see Google AI Overview in Game01.Components.Armor.cs Definition: PD acts as a bonus to the vehicle's evasion roll (Active Defense). Component PD is used when a specific part (like a turret, rotor, or sensor array) is targeted rather than the vehicle as a whole.
+ 
+        public float SurfaceArea {get;}
+        public float Weight {get;}
+        public float Cost {get;}
+		
+		
 		public bool RAP 
 		{
 			get {return (SurfaceAttributes & SURFACE_ATTRBITUES.RAP) == SURFACE_ATTRBITUES.RAP;}
@@ -4562,17 +4764,6 @@ bool mIsDisposed;
                     SurfaceAttributes &= ~SURFACE_ATTRBITUES.ReflectiveCoating;
 			}
 		}
-		
-		
-		                    // Armor, PD and DR is redundand with "Defense"
-		                    // This is additional to component DR, specialized defensive material added to the component to increase its protection (e.g., bolted-on steel plates, Kevlar blankets, or composite ceramic armor).
-                                          // See Google AI Overview in Game01.Components.Armor.cs 
-		public int DR;                  // Defense Resistance - natural protection provided by the material and structure of the vehicle component itself (e.g., the 1-inch thick steel hull, the aluminum skin of an aircraft, or the glass of a windshield).
-        public int PD;                  // Passive Defense - see Google AI Overview in Game01.Components.Armor.cs Definition: PD acts as a bonus to the vehicle's evasion roll (Active Defense). Component PD is used when a specific part (like a turret, rotor, or sensor array) is targeted rather than the vehicle as a whole.
- 
-        public float SurfaceArea {get;}
-        public float Weight {get;}
-        public float Cost {get;}
     }
     
     public struct ArmorLayer
@@ -4606,7 +4797,21 @@ bool mIsDisposed;
 		public STRUCTURE_ATTRIBUTES StructureAttributes;
         public int MaterialType; // wood, metal, composite
         public float Strength;  // frame strength
-        		
+        			
+        public byte SlopeLeft; // note: slope uses constants to represent 0, 30 or 60
+        public byte SlopeRight;
+        public byte SlopeFront;
+        public byte SlopeBack;
+        
+        // todo: is this correct place to have streamlining?  It would have to be set individually for each subassembly?
+        public string StreamLining; // todo:  need enums or perhaps a coefficient value instead AND THE GUI can interpet this coefficient into a string if desired
+        // NOTE: hitpoints I think is fine for inanimate objects,
+        //       but not good for living things. 
+        //       https://www.youtube.com/watch?v=sMWMB9bjFGo
+        public int HitPoints; 
+        public int CurrentHP; // HitPoints - Damage == CurrentHP
+		
+		
 		public bool Robotic 
 		{
 			get {return (StructureAttributes & STRUCTURE_ATTRIBUTES.Robotic) == STRUCTURE_ATTRIBUTES.Robotic;}
@@ -4654,19 +4859,7 @@ bool mIsDisposed;
                     StructureAttributes &= ~STRUCTURE_ATTRIBUTES.LivingMetal;
 			}
 		}
-		
-        public byte SlopeLeft; // note: slope uses constants to represent 0, 30 or 60
-        public byte SlopeRight;
-        public byte SlopeFront;
-        public byte SlopeBack;
-        
-        // todo: is this correct place to have streamlining?  It would have to be set individually for each subassembly?
-        public string StreamLining; // todo:  need enums or perhaps a coefficient value instead AND THE GUI can interpet this coefficient into a string if desired
-        // NOTE: hitpoints I think is fine for inanimate objects,
-        //       but not good for living things. 
-        //       https://www.youtube.com/watch?v=sMWMB9bjFGo
-        public int HitPoints; 
-        public int CurrentHP; // HitPoints - Damage == CurrentHP
+
     }
 	
 	
@@ -4677,8 +4870,13 @@ bool mIsDisposed;
 	public struct Component  // aka: "Useable Component"
     {
         public int Interfaces; // 32 bit flags for the various interfaces (Build and Runtime) used by this component
-        public string EntityID; // Guid.NewGuid().ToString() results in a 36 character string.
-              
+        
+		
+		public int EntityID; // Guid.NewGuid().ToString() results in a 36 character string.
+        public int[] ComponentIndices; // all the different component indices used by this Component. For example, a Laser Component would use both WeaponIndex and LaserIndex
+		public string[] ComponentTypenames;
+		
+			
 		public int TL;
 
 		public float Quality_;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
@@ -4689,11 +4887,11 @@ bool mIsDisposed;
         public bool Ruggedized;
 		public bool Repairable; 
 		
-	
 		public int NumOperatorsRequired; // number of Human (as opposed to software/AI) Operators Required (if 0 then RequiresOperator {get { return NumOperatorsRequired > 0;}}
-
-					      
+			      
 		// 'Defense' is Armor (Armor Faces with Armor Layers and DR and PD)
+		// TODO: i think these simply need to be part of the Component 
+		// https://www.google.com/search?q=memory%3CT%3E+and+span%3CT%3E+from+a+struct+with+nested+structs&rlz=1C1GCPF_enUS1162US1162&oq=memory%3CT%3E+and+span%3CT%3E+from+a+struct+with+nested+structs&gs_lcrp=EgZjaHJvbWUyBggAEEUYOdIBCTExMDEzajBqMagCALACAA&sourceid=chrome&ie=UTF-8
         public ExternalArmor Defense; 
         public InternalStructure Internals; 	
 		
@@ -4731,6 +4929,8 @@ bool mIsDisposed;
 	// In \\KeystoneGameBlocks\\ see \\game01\\Components\\Weapon
 	public struct Weapon 
     {
+		public int ComponentIndex; // from this we can get the EntityIndex
+		
         // kinetic energy type weapons build parameters 
         public float Bore;
         public int BarrelLength;
@@ -4785,6 +4985,9 @@ bool mIsDisposed;
 	
 	public struct Laser_Struct
 	{
+		public int WeaponIndex;
+		
+		
 		// beam specific
 		public int Type;       // type is really just about what types of Damage(s) (ProductID(s)) it results in such as Paralysis, Crushing, Burning, Impaling
 		public float Duration;   // duration of the firing animation in seconds.  This probably doesn't need to be here.  It should be reflected in the Cyclic Rate and RoF cooldowns instead.
@@ -11352,6 +11555,10 @@ if (mEntityNodesCollection == null) return null;
         // Initialize_Entity() will then call CheckOut(typeof(Weapon)) and CheckOut(typeOf(EnergyWeapon))
         // to get direct memory access to the Memory<T> where variables associated with those interfaces
         // will get stored.
+		/// <summary>
+		/// This CheckOut() call currently retreives only a single record from the Components Memory<T> 
+		/// and returns it as a new Memory<T> that points to that single record
+		/// </summary>
         public Memory<T> CheckOut(out int index) // aka: MemoryPool<T>.Rent() 
         {
 			
@@ -13002,5 +13209,1184 @@ if (mEntityNodesCollection == null) return null;
     }
     */
 	
+	/********************************************************************
+ *
+ *  PropertyBag.cs
+ *  --------------
+ *  Copyright (C) 2002  Tony Allowatt
+ *  Last Update: 12/14/2002
+ * 
+ *  THE SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS", WITHOUT WARRANTY
+ *  OF ANY KIND, EXPRESS OR IMPLIED. IN NO EVENT SHALL THE AUTHOR BE
+ *  LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM,
+ *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OF THIS
+ *  SOFTWARE.
+ * 
+ *  Public types defined in this file:
+ *  ----------------------------------
+ *  namespace Flobbster.Windows.Forms
+ *     class PropertySpec
+ *     class PropertySpecEventArgs
+ *     delegate PropertySpecEventHandler
+ *     class PropertyBag
+ *        class PropertyBag.PropertySpecCollection
+ *     class PropertyTable
+ *
+ ********************************************************************/
+	/// <summary>
+	/// Represents a collection of custom properties that can be selected into a
+	/// PropertyGrid to provide functionality beyond that of the simple reflection
+	/// normally used to query an object's properties.
+	/// </summary>
+	public class PropertyBag : ICustomTypeDescriptor
+	{
+
+        protected string defaultProperty;
+        protected PropertySpecCollection mSpecs; // TODO: this whole thing can likely be replaced by List<PropertySpec>
+
+		#region private PropertySpecDescriptor class definition
+		private class PropertySpecDescriptor : PropertyDescriptor
+		{
+			private PropertyBag bag;
+			private PropertySpec item;
+
+			public PropertySpecDescriptor(PropertySpec item, PropertyBag bag, string name, Attribute[] attrs) :
+				base(name, attrs)
+			{
+				this.bag = bag;
+				this.item = item;
+			}
+
+			public override Type ComponentType
+			{
+				get { return item.GetType(); }
+			}
+
+			public override bool IsReadOnly
+			{
+				get { return (Attributes.Matches(ReadOnlyAttribute.Yes)); }
+			}
+
+            public override Type PropertyType
+            {
+
+                get
+                {
+                    try
+                    {
+                        return Type.GetType(item.TypeName);
+                    }
+
+                    catch
+                    {
+                        Trace.WriteLine("Type '" + item.TypeName + "' unsupported." );
+                        throw new ArgumentNullException("Type '" + item.TypeName + "' unsupported.");
+                    }
+                }
+            }
+
+			public override bool CanResetValue(object component)
+			{
+				if(item.DefaultValue == null)
+					return false;
+				else
+					return !this.GetValue(component).Equals(item.DefaultValue);
+			}
+
+			public override object GetValue(object component)
+			{
+				// Have the property bag raise an event to get the current value
+				// of the property.
+
+				PropertySpecEventArgs e = new PropertySpecEventArgs(item, null);
+				bag.OnGetValue(e);
+				return e.Value;
+			}
+
+			public override void ResetValue(object component)
+			{
+				SetValue(component, item.DefaultValue);
+			}
+
+			public override void SetValue(object component, object value)
+			{
+				// Have the property bag raise an event to set the current value
+				// of the property.
+
+				PropertySpecEventArgs e = new PropertySpecEventArgs(item, value);
+				bag.OnSetValue(e);
+			}
+
+			public override bool ShouldSerializeValue(object component)
+			{
+				object val = this.GetValue(component);
+
+				if(item.DefaultValue == null || val == null)
+					return false;
+				else
+					return !val.Equals(item.DefaultValue);
+			}
+		}
+		#endregion // end private PropertySpecDescriptor nested class
+
+
+		/// <summary>
+		/// Initializes a new instance of the PropertyBag class.
+		/// </summary>
+		public PropertyBag()
+		{
+			defaultProperty = null;
+			mSpecs = new PropertySpecCollection();
+		}
+
+		/// <summary>
+		/// Gets or sets the name of the default property in the collection.
+		/// </summary>
+		public string DefaultProperty
+		{
+			get { return defaultProperty; }
+			set { defaultProperty = value; }
+		}
+
+		/// <summary>
+		/// Gets the collection of properties contained within this PropertyBag.
+		/// </summary>
+		public PropertySpecCollection Properties
+		{
+			get { return mSpecs; }
+		}
+
+		/// <summary>
+		/// Occurs when a PropertyGrid requests the value of a property.
+		/// </summary>
+		public event PropertySpecEventHandler GetValue;
+
+		/// <summary>
+		/// Occurs when the user changes the value of a property in a PropertyGrid.
+		/// </summary>
+		public event PropertySpecEventHandler SetValue;
+
+		/// <summary>
+		/// Raises the GetValue event.
+		/// </summary>
+		/// <param name="e">A PropertySpecEventArgs that contains the event data.</param>
+		public virtual void OnGetValue(PropertySpecEventArgs e)
+		{
+			// Feb.28.2026 - made public from protected - MichaelOliveTree
+			if(GetValue != null)
+				GetValue(this, e);
+		}
+
+		/// <summary>
+		/// Raises the SetValue event.
+		/// </summary>
+		/// <param name="e">A PropertySpecEventArgs that contains the event data.</param>
+		public virtual void OnSetValue(PropertySpecEventArgs e)
+		{
+			// Feb.28.2026 - made public from protected - MichaelOliveTree
+			if(SetValue != null)
+				SetValue(this, e);
+		}
+
+		#region ICustomTypeDescriptor explicit interface definitions
+		// Most of the functions required by the ICustomTypeDescriptor are
+		// merely pssed on to the default TypeDescriptor for this type,
+		// which will do something appropriate.  The exceptions are noted
+		// below.
+		AttributeCollection ICustomTypeDescriptor.GetAttributes()
+		{
+			return TypeDescriptor.GetAttributes(this, true);
+		}
+
+		string ICustomTypeDescriptor.GetClassName()
+		{
+			return TypeDescriptor.GetClassName(this, true);
+		}
+
+		string ICustomTypeDescriptor.GetComponentName()
+		{
+			return TypeDescriptor.GetComponentName(this, true);
+		}
+
+		TypeConverter ICustomTypeDescriptor.GetConverter()
+		{
+			return TypeDescriptor.GetConverter(this, true);
+		}
+
+		EventDescriptor ICustomTypeDescriptor.GetDefaultEvent()
+		{
+			return TypeDescriptor.GetDefaultEvent(this, true);
+		}
+
+		PropertyDescriptor ICustomTypeDescriptor.GetDefaultProperty()
+		{
+			// This function searches the property list for the property
+			// with the same name as the DefaultProperty specified, and
+			// returns a property descriptor for it.  If no property is
+			// found that matches DefaultProperty, a null reference is
+			// returned instead.
+
+			PropertySpec propertySpec = null;
+			if(defaultProperty != null)
+			{
+				int index = mSpecs.IndexOf(defaultProperty);
+				propertySpec = mSpecs[index];
+			}
+
+			if(propertySpec != null)
+				return new PropertySpecDescriptor(propertySpec, this, propertySpec.DisplayName , null);
+			else
+				return null;
+		}
+
+		object ICustomTypeDescriptor.GetEditor(Type editorBaseType)
+		{
+			return TypeDescriptor.GetEditor(this, editorBaseType, true);
+		}
+
+		EventDescriptorCollection ICustomTypeDescriptor.GetEvents()
+		{
+			return TypeDescriptor.GetEvents(this, true);
+		}
+
+		EventDescriptorCollection ICustomTypeDescriptor.GetEvents(Attribute[] attributes)
+		{
+			return TypeDescriptor.GetEvents(this, attributes, true);
+		}
+
+		PropertyDescriptorCollection ICustomTypeDescriptor.GetProperties()
+		{
+			return ((ICustomTypeDescriptor)this).GetProperties(new Attribute[0]);
+		}
+
+		PropertyDescriptorCollection ICustomTypeDescriptor.GetProperties(Attribute[] attributes)
+		{
+			// Rather than passing this function on to the default TypeDescriptor,
+			// which would return the actual properties of PropertyBag, I construct
+			// a list here that contains property descriptors for the elements of the
+			// Properties list in the bag.
+
+			ArrayList props = new ArrayList();
+
+			foreach(PropertySpec property in mSpecs)
+			{
+				ArrayList attrs = new ArrayList();
+
+				// If a category, description, editor, or type converter are specified
+				// in the PropertySpec, create attributes to define that relationship.
+				if(property.Category != null)
+					attrs.Add(new CategoryAttribute(property.Category));
+
+				if(property.Description != null)
+					attrs.Add(new DescriptionAttribute(property.Description));
+
+				//if(property.EditorTypeName != null)
+				//	attrs.Add(new EditorAttribute(property.EditorTypeName, typeof(UITypeEditor)));
+
+				if(property.ConverterTypeName != null)
+					attrs.Add(new TypeConverterAttribute(property.ConverterTypeName));
+
+				// dec.24.2013 - Hypno - using System.Attributes in this way is unnecessary
+				// Additionally, append the custom attributes associated with the
+				// PropertySpec, if any.
+				//if(property.Attributes != null)
+				//	attrs.AddRange(property.Attributes);
+
+				Attribute[] attrArray = (Attribute[])attrs.ToArray(typeof(Attribute));
+
+				// Create a new property descriptor for the property item, and add
+				// it to the list.
+				PropertySpecDescriptor pd = new PropertySpecDescriptor(property,
+					this, property.DisplayName, attrArray);
+				props.Add(pd);
+			}
+
+			// Convert the list of PropertyDescriptors to a collection that the
+			// ICustomTypeDescriptor can use, and return it.
+			PropertyDescriptor[] propArray = (PropertyDescriptor[])props.ToArray(
+				typeof(PropertyDescriptor));
+			return new PropertyDescriptorCollection(propArray);
+		}
+
+		object ICustomTypeDescriptor.GetPropertyOwner(PropertyDescriptor pd)
+		{
+			return this;
+		}
+		#endregion
+		
+		#region PropertySpecCollection class definition
+		/// <summary>
+		/// Encapsulates a collection of PropertySpec objects.
+		/// </summary>
+		[Serializable]
+		public class PropertySpecCollection : IList
+		{
+			private List<PropertySpec> _innerArray;
+			
+			/// <summary>
+			/// Initializes a new instance of the PropertySpecCollection class.
+			/// </summary>
+			public PropertySpecCollection()
+			{
+				_innerArray = new List<PropertySpec>();
+			}
+
+			/// <summary>
+			/// Gets the number of elements in the PropertySpecCollection.
+			/// </summary>
+			/// <value>
+			/// The number of elements contained in the PropertySpecCollection.
+			/// </value>
+			public int Count
+			{
+				get { return _innerArray.Count; }
+			}
+
+			/// <summary>
+			/// Gets a value indicating whether the PropertySpecCollection has a fixed size.
+			/// </summary>
+			/// <value>
+			/// true if the PropertySpecCollection has a fixed size; otherwise, false.
+			/// </value>
+			public bool IsFixedSize
+			{
+				get { return false; }
+			}
+			
+			/// <summary>
+			/// Gets a value indicating whether the PropertySpecCollection is read-only.
+			/// </summary>
+			public bool IsReadOnly
+			{
+				get { return false; }
+			}
+
+			/// <summary>
+			/// Gets a value indicating whether access to the collection is synchronized (thread-safe).
+			/// </summary>
+			/// <value>
+			/// true if access to the PropertySpecCollection is synchronized (thread-safe); otherwise, false.
+			/// </value>
+			public bool IsSynchronized
+			{
+				get { return false; }
+			}
+
+			/// <summary>
+			/// Gets an object that can be used to synchronize access to the collection.
+			/// </summary>
+			/// <value>
+			/// An object that can be used to synchronize access to the collection.
+			/// </value>
+			object ICollection.SyncRoot
+			{
+				get { return null; }
+			}
+
+			/// <summary>
+			/// Gets or sets the element at the specified index.
+			/// In C#, this property is the indexer for the PropertySpecCollection class.
+			/// </summary>
+			/// <param name="index">The zero-based index of the element to get or set.</param>
+			/// <value>
+			/// The element at the specified index.
+			/// </value>
+			public PropertySpec this[int index]
+			{
+				get { return _innerArray[index]; }
+				set { _innerArray[index] = value; }
+			}
+
+            ///// <summary>
+            ///// Gets or sets the element at the specified index.
+            ///// In C#, this property is the indexer for the PropertySpecCollection class.
+            ///// </summary>
+            ///// <param name="key">The hash key of the element to get or set.</param>
+            ///// <value>
+            ///// The element at the specified index.
+            ///// </value>
+            //public PropertySpec this[string key]
+            //{
+            //    get { return _innerArray[key]; }
+            //    set 
+            //    { 
+            //        int index = IndexOf (key)
+            //        _innerArray[key] = value; 
+            //    }
+            //}
+
+			/// <summary>
+			/// Adds a PropertySpec to the end of the PropertySpecCollection.
+			/// </summary>
+			/// <param name="value">The PropertySpec to be added to the end of the PropertySpecCollection.</param>
+			/// <returns>The PropertySpecCollection index at which the value has been added.</returns>
+			public int Add(PropertySpec value)
+			{
+				_innerArray.Add(value);
+                return _innerArray.Count - 1;
+			}
+
+			/// <summary>
+			/// Adds the elements of an array of PropertySpec objects to the end of the PropertySpecCollection.
+			/// </summary>
+			/// <param name="array">The PropertySpec array whose elements should be added to the end of the
+			/// PropertySpecCollection.</param>
+			public void AddRange(PropertySpec[] array)
+			{
+				_innerArray.AddRange(array);
+			}
+
+			/// <summary>
+			/// Removes all elements from the PropertySpecCollection.
+			/// </summary>
+			public void Clear()
+			{
+				_innerArray.Clear();
+			}
+
+			/// <summary>
+			/// Determines whether a PropertySpec is in the PropertySpecCollection.
+			/// </summary>
+			/// <param name="item">The PropertySpec to locate in the PropertySpecCollection. The element to locate
+			/// can be a null reference (Nothing in Visual Basic).</param>
+			/// <returns>true if item is found in the PropertySpecCollection; otherwise, false.</returns>
+			public bool Contains(PropertySpec item)
+			{
+				return _innerArray.Contains(item);
+			}
+
+			/// <summary>
+			/// Determines whether a PropertySpec with the specified name is in the PropertySpecCollection.
+			/// </summary>
+			/// <param name="name">The name of the PropertySpec to locate in the PropertySpecCollection.</param>
+			/// <returns>true if item is found in the PropertySpecCollection; otherwise, false.</returns>
+			public bool Contains(string name)
+			{
+				foreach(PropertySpec spec in _innerArray)
+					if(spec.Name == name)
+						return true;
+
+				return false;
+			}
+
+			/// <summary>
+			/// Copies the entire PropertySpecCollection to a compatible one-dimensional Array, starting at the
+			/// beginning of the target array.
+			/// </summary>
+			/// <param name="array">The one-dimensional Array that is the destination of the elements copied
+			/// from PropertySpecCollection. The Array must have zero-based indexing.</param>
+			public void CopyTo(PropertySpec[] array)
+			{
+				_innerArray.CopyTo(array);
+			}
+
+			/// <summary>
+			/// Copies the PropertySpecCollection or a portion of it to a one-dimensional array.
+			/// </summary>
+			/// <param name="array">The one-dimensional Array that is the destination of the elements copied
+			/// from the collection.</param>
+			/// <param name="index">The zero-based index in array at which copying begins.</param>
+			public void CopyTo(PropertySpec[] array, int index)
+			{
+				_innerArray.CopyTo(array, index);
+			}
+
+			/// <summary>
+			/// Returns an enumerator that can iterate through the PropertySpecCollection.
+			/// </summary>
+			/// <returns>An IEnumerator for the entire PropertySpecCollection.</returns>
+			public IEnumerator GetEnumerator()
+			{
+				return _innerArray.GetEnumerator();
+			}
+
+			/// <summary>
+			/// Searches for the specified PropertySpec and returns the zero-based index of the first
+			/// occurrence within the entire PropertySpecCollection.
+			/// </summary>
+			/// <param name="value">The PropertySpec to locate in the PropertySpecCollection.</param>
+			/// <returns>The zero-based index of the first occurrence of value within the entire PropertySpecCollection,
+			/// if found; otherwise, -1.</returns>
+			public int IndexOf(PropertySpec value)
+			{
+				return _innerArray.IndexOf(value);
+			}
+
+			/// <summary>
+			/// Searches for the PropertySpec with the specified name and returns the zero-based index of
+			/// the first occurrence within the entire PropertySpecCollection.
+			/// </summary>
+			/// <param name="name">The name of the PropertySpec to locate in the PropertySpecCollection.</param>
+			/// <returns>The zero-based index of the first occurrence of value within the entire PropertySpecCollection,
+			/// if found; otherwise, -1.</returns>
+			public int IndexOf(string name)
+			{
+				int i = 0;
+
+				foreach(PropertySpec spec in _innerArray)
+				{
+					if(spec.Name == name)
+						return i;
+
+					i++;
+				}
+
+				return -1;
+			}
+
+			/// <summary>
+			/// Inserts a PropertySpec object into the PropertySpecCollection at the specified index.
+			/// </summary>
+			/// <param name="index">The zero-based index at which value should be inserted.</param>
+			/// <param name="value">The PropertySpec to insert.</param>
+			public void Insert(int index, PropertySpec value)
+			{
+				_innerArray.Insert(index, value);
+			}
+
+			/// <summary>
+			/// Removes the first occurrence of a specific object from the PropertySpecCollection.
+			/// </summary>
+			/// <param name="obj">The PropertySpec to remove from the PropertySpecCollection.</param>
+			public void Remove(PropertySpec obj)
+			{
+				_innerArray.Remove(obj);
+			}
+
+			/// <summary>
+			/// Removes the property with the specified name from the PropertySpecCollection.
+			/// </summary>
+			/// <param name="name">The name of the PropertySpec to remove from the PropertySpecCollection.</param>
+			public void Remove(string name)
+			{
+				int index = IndexOf(name);
+				RemoveAt(index);
+			}
+
+			/// <summary>
+			/// Removes the object at the specified index of the PropertySpecCollection.
+			/// </summary>
+			/// <param name="index">The zero-based index of the element to remove.</param>
+			public void RemoveAt(int index)
+			{
+				_innerArray.RemoveAt(index);
+			}
+
+			/// <summary>
+			/// Copies the elements of the PropertySpecCollection to a new PropertySpec array.
+			/// </summary>
+			/// <returns>A PropertySpec array containing copies of the elements of the PropertySpecCollection.</returns>
+			public PropertySpec[] ToArray()
+			{
+				return _innerArray.ToArray();
+			}
+
+			#region Explicit interface implementations for ICollection and IList
+			/// <summary>
+			/// This member supports the .NET Framework infrastructure and is not intended to be used directly from your code.
+			/// </summary>
+			void ICollection.CopyTo(Array array, int index)
+			{
+				CopyTo((PropertySpec[])array, index);
+			}
+
+			/// <summary>
+			/// This member supports the .NET Framework infrastructure and is not intended to be used directly from your code.
+			/// </summary>
+			int IList.Add(object value)
+			{
+				return Add((PropertySpec)value);
+			}
+
+			/// <summary>
+			/// This member supports the .NET Framework infrastructure and is not intended to be used directly from your code.
+			/// </summary>
+			bool IList.Contains(object obj)
+			{
+				return Contains((PropertySpec)obj);
+			}
+
+			/// <summary>
+			/// This member supports the .NET Framework infrastructure and is not intended to be used directly from your code.
+			/// </summary>
+			object IList.this[int index]
+			{
+				get
+				{
+					return ((PropertySpecCollection)this)[index];
+				}
+				set
+				{
+					((PropertySpecCollection)this)[index] = (PropertySpec)value;
+				}
+			}
+
+			/// <summary>
+			/// This member supports the .NET Framework infrastructure and is not intended to be used directly from your code.
+			/// </summary>
+			int IList.IndexOf(object obj)
+			{
+				return IndexOf((PropertySpec)obj);
+			}
+
+			/// <summary>
+			/// This member supports the .NET Framework infrastructure and is not intended to be used directly from your code.
+			/// </summary>
+			void IList.Insert(int index, object value)
+			{
+				Insert(index, (PropertySpec)value);
+			}
+
+			/// <summary>
+			/// This member supports the .NET Framework infrastructure and is not intended to be used directly from your code.
+			/// </summary>
+			void IList.Remove(object value)
+			{
+				Remove((PropertySpec)value);
+			}
+			#endregion
+		}
+		#endregion
+
+	}
 	
+	/********************************************************************
+ *
+ *  PropertyBag.cs
+ *  --------------
+ *  Copyright (C) 2002  Tony Allowatt
+ *  Last Update: 12/14/2002
+ * 
+ *  THE SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS", WITHOUT WARRANTY
+ *  OF ANY KIND, EXPRESS OR IMPLIED. IN NO EVENT SHALL THE AUTHOR BE
+ *  LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM,
+ *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OF THIS
+ *  SOFTWARE.
+ * 
+ *  Public types defined in this file:
+ *  ----------------------------------
+ *  namespace Flobbster.Windows.Forms
+ *     class PropertySpec
+ *     class PropertySpecEventArgs
+ *     delegate PropertySpecEventHandler
+ *     class PropertyBag
+ *        class PropertyBag.PropertySpecCollection
+ *     class PropertyTable
+ *
+ ********************************************************************/
+	/// <summary>
+    /// Provides data for the GetValue and SetValue events of the PropertyBag class.
+    /// </summary>
+    public class PropertySpecEventArgs : EventArgs
+    {
+        private PropertySpec property;
+        private object val;
+
+        /// <summary>
+        /// Initializes a new instance of the PropertySpecEventArgs class.
+        /// </summary>
+        /// <param name="property">The PropertySpec that represents the property whose
+        /// value is being requested or set.</param>
+        /// <param name="val">The current value of the property.</param>
+        public PropertySpecEventArgs(PropertySpec property, object val)
+        {
+            this.property = property;
+            this.val = val;
+        }
+
+        /// <summary>
+        /// Gets the PropertySpec that represents the property whose value is being
+        /// requested or set.
+        /// </summary>
+        public PropertySpec Property
+        {
+            get { return property; }
+        }
+
+        /// <summary>
+        /// Gets or sets the current value of the property.
+        /// </summary>
+        public object Value
+        {
+            get { return val; }
+            set { val = value; }
+        }
+    }
+	
+    /// <summary>
+    /// Represents the method that will handle the GetValue and SetValue events of the
+    /// PropertyBag class.
+    /// </summary>
+    public delegate void PropertySpecEventHandler(object sender, PropertySpecEventArgs e);
+    
+    /// <summary>
+    /// Represents a single property in a PropertySpec.
+    /// </summary>
+    public class PropertySpec
+    {
+        private PropertyFlags mAttributeFlags;
+        private string category; // public vars, private vars, game properties, build properties
+        private object defaultValue;
+        private string description;
+        private string editor; // eg Texture browser, Material
+        private string name;
+        private string type; // the "type" does store the AssemblyQualifiedName
+        //private string assemblyQualifiedName;
+        private string typeConverter;
+        private string displayName;
+
+        
+        /// <summary>
+        /// Initializes a new instance of the PropertySpec class.
+        /// </summary>
+        /// <param name="name">The name of the property displayed in the property grid.</param>
+        /// <param name="type">The fully qualified name of the type of the property.</param>
+        /// <param name="category">The category under which the property is displayed in the
+        /// property grid.</param>
+        /// <param name="description">A string that is displayed in the help area of the
+        /// property grid.</param>
+        /// <param name="defaultValue">The default value of the property, or null if there is
+        /// no default value.</param>
+        /// <param name="editor">The fully qualified name of the type of the editor for this
+        /// property.  This type must derive from UITypeEditor.</param>
+        /// <param name="typeConverter">The fully qualified name of the type of the type
+        /// converter for this property.  This type must derive from TypeConverter.</param>
+        public PropertySpec(string name, string type, string category, string description, object defaultValue,
+            string editor, string typeConverter)
+        {
+        	
+            this.name = name;
+            this.displayName = name;
+            this.type = type;
+            this.category = category;
+            if (string.IsNullOrEmpty (description) == false)
+	            this.description = description;
+    
+            this.defaultValue = defaultValue;
+
+            if (string.IsNullOrEmpty (editor) == false)
+	            this.editor = editor;
+            
+            if (string.IsNullOrEmpty (typeConverter) == false)
+            	this.typeConverter = typeConverter;
+        
+            // default attribute flags
+            IsSerializable = true;
+            IsReadOnly = false;
+            IsBrowsable = true; 
+        }
+        
+        /// <summary>
+        /// Initializes a new instance of the PropertySpec class.
+        /// </summary>
+        /// <param name="name">The name of the property displayed in the property grid.</param>
+        /// <param name="type">The fully qualified name of the type of the property.</param>
+        /// <param name="category">The category under which the property is displayed in the
+        /// property grid.</param>
+        /// <param name="description">A string that is displayed in the help area of the
+        /// property grid.</param>
+        /// <param name="defaultValue">The default value of the property, or null if there is
+        /// no default value.</param>
+        public PropertySpec(string name, string type, string category, string description, object defaultValue)
+        	:
+            this(name, type, category, description, defaultValue, "", "")
+        {
+
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the PropertySpec class.
+        /// </summary>
+        public PropertySpec() 
+            : 
+            this("", "", null, null, null) 
+        { }
+
+        /// <summary>
+        /// Initializes a new instance of the PropertySpec class.
+        /// </summary>
+        /// <param name="name">The name of the property displayed in the property grid.</param>
+        /// <param name="type">The fully qualified name of the type of the property.</param>
+        public PropertySpec(string name, string type) 
+            : 
+            this(name, type, null, null, null) 
+        { }
+
+        /// <summary>
+        /// Initializes a new instance of the PropertySpec class.
+        /// </summary>
+        /// <param name="name">The name of the property displayed in the property grid.</param>
+        /// <param name="type">A Type that represents the type of the property.</param>
+        public PropertySpec(string name, Type type)
+            :
+            this(name, type.AssemblyQualifiedName, null, null, null) 
+        { }
+
+        /// <summary>
+        /// Initializes a new instance of the PropertySpec class.
+        /// </summary>
+        /// <param name="name">The name of the property displayed in the property grid.</param>
+        /// <param name="type">The fully qualified name of the type of the property.</param>
+        /// <param name="category">The category under which the property is displayed in the
+        /// property grid.</param>
+        public PropertySpec(string name, string type, string category) 
+            : 
+            this(name, type, category, null, null) 
+        { }
+
+        /// <summary>
+        /// Initializes a new instance of the PropertySpec class.
+        /// </summary>
+        /// <param name="name">The name of the property displayed in the property grid.</param>
+        /// <param name="type">A Type that represents the type of the property.</param>
+        /// <param name="category"></param>
+        public PropertySpec(string name, Type type, string category)
+            :
+            this(name, type.AssemblyQualifiedName, category, null, null) 
+        { }
+
+        /// <summary>
+        /// Initializes a new instance of the PropertySpec class.
+        /// </summary>
+        /// <param name="name">The name of the property displayed in the property grid.</param>
+        /// <param name="type">The fully qualified name of the type of the property.</param>
+        /// <param name="category">The category under which the property is displayed in the
+        /// property grid.</param>
+        /// <param name="description">A string that is displayed in the help area of the
+        /// property grid.</param>
+        public PropertySpec(string name, string type, string category, string description)
+            :
+            this(name, type, category, description, null) 
+        { }
+
+        /// <summary>
+        /// Initializes a new instance of the PropertySpec class.
+        /// </summary>
+        /// <param name="name">The name of the property displayed in the property grid.</param>
+        /// <param name="type">A Type that represents the type of the property.</param>
+        /// <param name="category">The category under which the property is displayed in the
+        /// property grid.</param>
+        /// <param name="description">A string that is displayed in the help area of the
+        /// property grid.</param>
+        public PropertySpec(string name, Type type, string category, string description)
+            :
+            this(name, type.AssemblyQualifiedName, category, description, null) 
+        { }
+        
+        /// <summary>
+        /// Initializes a new instance of the PropertySpec class.
+        /// </summary>
+        /// <param name="name">The name of the property displayed in the property grid.</param>
+        /// <param name="type">The fully qualified name of the type of the property.</param>
+        /// <param name="defaultValue">The default value of the property, or null if there is
+        /// no default value.</param>
+        public PropertySpec(string name, string type, object defaultValue)
+            :
+            this(name, type, null, null, defaultValue) 
+        { }
+        
+        public PropertySpec(string name, string type, string category, object defaultValue)
+            :
+            this(name, type, category, null, defaultValue)
+        { }
+
+        public PropertySpec(string name, Type type, string category, object defaultValue)
+            :
+            this(name, type.AssemblyQualifiedName, category, null, defaultValue) 
+        { }
+
+
+        /// <summary>
+        /// Initializes a new instance of the PropertySpec class.
+        /// </summary>
+        /// <param name="name">The name of the property displayed in the property grid.</param>
+        /// <param name="type">A Type that represents the type of the property.</param>
+        /// <param name="category">The category under which the property is displayed in the
+        /// property grid.</param>
+        /// <param name="description">A string that is displayed in the help area of the
+        /// property grid.</param>
+        /// <param name="defaultValue">The default value of the property, or null if there is
+        /// no default value.</param>
+        public PropertySpec(string name, Type type, string category, string description, object defaultValue)
+            :
+            this(name, type.AssemblyQualifiedName, category, description, defaultValue) 
+        { }
+
+        public PropertySpec(string name, Type type, string category, object defaultValue, Type typeConverter)
+            :
+            this(name, type.AssemblyQualifiedName, category, null, defaultValue) 
+        { }
+
+        /// <summary>
+        /// Initializes a new instance of the PropertySpec class.
+        /// </summary>
+        /// <param name="name">The name of the property displayed in the property grid.</param>
+        /// <param name="type">A Type that represents the type of the property.</param>
+        /// <param name="category">The category under which the property is displayed in the
+        /// property grid.</param>
+        /// <param name="description">A string that is displayed in the help area of the
+        /// property grid.</param>
+        /// <param name="defaultValue">The default value of the property, or null if there is
+        /// no default value.</param>
+        /// <param name="editor">The fully qualified name of the type of the editor for this
+        /// property.  This type must derive from UITypeEditor.</param>
+        /// <param name="typeConverter">The fully qualified name of the type of the type
+        /// converter for this property.  This type must derive from TypeConverter.</param>
+        public PropertySpec(string name, Type type, string category, string description, object defaultValue,
+            string editor, string typeConverter)
+            :
+            this(name, type.AssemblyQualifiedName, category, description, defaultValue, editor, typeConverter) 
+        { }
+
+        /// <summary>
+        /// Initializes a new instance of the PropertySpec class.
+        /// </summary>
+        /// <param name="name">The name of the property displayed in the property grid.</param>
+        /// <param name="type">The fully qualified name of the type of the property.</param>
+        /// <param name="category">The category under which the property is displayed in the
+        /// property grid.</param>
+        /// <param name="description">A string that is displayed in the help area of the
+        /// property grid.</param>
+        /// <param name="defaultValue">The default value of the property, or null if there is
+        /// no default value.</param>
+        /// <param name="editor">The Type that represents the type of the editor for this
+        /// property.  This type must derive from UITypeEditor.</param>
+        /// <param name="typeConverter">The fully qualified name of the type of the type
+        /// converter for this property.  This type must derive from TypeConverter.</param>
+        public PropertySpec(string name, string type, string category, string description, object defaultValue,
+            Type editor, string typeConverter)
+            :
+            this(name, type, category, description, defaultValue, editor.AssemblyQualifiedName,
+            typeConverter) 
+        { }
+
+        /// <summary>
+        /// Initializes a new instance of the PropertySpec class.
+        /// </summary>
+        /// <param name="name">The name of the property displayed in the property grid.</param>
+        /// <param name="type">A Type that represents the type of the property.</param>
+        /// <param name="category">The category under which the property is displayed in the
+        /// property grid.</param>
+        /// <param name="description">A string that is displayed in the help area of the
+        /// property grid.</param>
+        /// <param name="defaultValue">The default value of the property, or null if there is
+        /// no default value.</param>
+        /// <param name="editor">The Type that represents the type of the editor for this
+        /// property.  This type must derive from UITypeEditor.</param>
+        /// <param name="typeConverter">The fully qualified name of the type of the type
+        /// converter for this property.  This type must derive from TypeConverter.</param>
+        public PropertySpec(string name, Type type, string category, string description, object defaultValue,
+            Type editor, string typeConverter)
+            :
+            this(name, type.AssemblyQualifiedName, category, description, defaultValue,
+            editor.AssemblyQualifiedName, typeConverter) 
+        { }
+
+        /// <summary>
+        /// Initializes a new instance of the PropertySpec class.
+        /// </summary>
+        /// <param name="name">The name of the property displayed in the property grid.</param>
+        /// <param name="type">The fully qualified name of the type of the property.</param>
+        /// <param name="category">The category under which the property is displayed in the
+        /// property grid.</param>
+        /// <param name="description">A string that is displayed in the help area of the
+        /// property grid.</param>
+        /// <param name="defaultValue">The default value of the property, or null if there is
+        /// no default value.</param>
+        /// <param name="editor">The fully qualified name of the type of the editor for this
+        /// property.  This type must derive from UITypeEditor.</param>
+        /// <param name="typeConverter">The Type that represents the type of the type
+        /// converter for this property.  This type must derive from TypeConverter.</param>
+        public PropertySpec(string name, string type, string category, string description, object defaultValue,
+            string editor, Type typeConverter)
+            :
+            this(name, type, category, description, defaultValue, editor, typeConverter.AssemblyQualifiedName) 
+        { }
+
+        /// <summary>
+        /// Initializes a new instance of the PropertySpec class.
+        /// </summary>
+        /// <param name="name">The name of the property displayed in the property grid.</param>
+        /// <param name="type">A Type that represents the type of the property.</param>
+        /// <param name="category">The category under which the property is displayed in the
+        /// property grid.</param>
+        /// <param name="description">A string that is displayed in the help area of the
+        /// property grid.</param>
+        /// <param name="defaultValue">The default value of the property, or null if there is
+        /// no default value.</param>
+        /// <param name="editor">The fully qualified name of the type of the editor for this
+        /// property.  This type must derive from UITypeEditor.</param>
+        /// <param name="typeConverter">The Type that represents the type of the type
+        /// converter for this property.  This type must derive from TypeConverter.</param>
+        public PropertySpec(string name, Type type, string category, string description, object defaultValue,
+            string editor, Type typeConverter)
+            :
+            this(name, type.AssemblyQualifiedName, category, description, defaultValue, editor,
+            typeConverter.AssemblyQualifiedName)
+        { }
+
+        /// <summary>
+        /// Initializes a new instance of the PropertySpec class.
+        /// </summary>
+        /// <param name="name">The name of the property displayed in the property grid.</param>
+        /// <param name="type">The fully qualified name of the type of the property.</param>
+        /// <param name="category">The category under which the property is displayed in the
+        /// property grid.</param>
+        /// <param name="description">A string that is displayed in the help area of the
+        /// property grid.</param>
+        /// <param name="defaultValue">The default value of the property, or null if there is
+        /// no default value.</param>
+        /// <param name="editor">The Type that represents the type of the editor for this
+        /// property.  This type must derive from UITypeEditor.</param>
+        /// <param name="typeConverter">The Type that represents the type of the type
+        /// converter for this property.  This type must derive from TypeConverter.</param>
+        public PropertySpec(string name, string type, string category, string description, object defaultValue,
+            Type editor, Type typeConverter)
+            :
+            this(name, type, category, description, defaultValue, editor.AssemblyQualifiedName,
+            typeConverter.AssemblyQualifiedName) 
+        { }
+
+        /// <summary>
+        /// Initializes a new instance of the PropertySpec class.
+        /// </summary>
+        /// <param name="name">The name of the property displayed in the property grid.</param>
+        /// <param name="type">A Type that represents the type of the property.</param>
+        /// <param name="category">The category under which the property is displayed in the
+        /// property grid.</param>
+        /// <param name="description">A string that is displayed in the help area of the
+        /// property grid.</param>
+        /// <param name="defaultValue">The default value of the property, or null if there is
+        /// no default value.</param>
+        /// <param name="editor">The Type that represents the type of the editor for this
+        /// property.  This type must derive from UITypeEditor.</param>
+        /// <param name="typeConverter">The Type that represents the type of the type
+        /// converter for this property.  This type must derive from TypeConverter.</param>
+        public PropertySpec(string name, Type type, string category, string description, object defaultValue,
+            Type editor, Type typeConverter)
+            :
+            this(name, type.AssemblyQualifiedName, category, description, defaultValue,
+            editor.AssemblyQualifiedName, typeConverter.AssemblyQualifiedName) 
+        { }
+
+
+            [Flags]
+        enum PropertyFlags : uint
+        {
+        	None = 0,
+        	ReadOnly = 1 << 0,
+        	Serializable =1 << 1,
+        	Browsable = 1 << 2
+        }
+        
+		// bit 0 = readonly
+		// bit 1 = serializable
+		// bit 2 = browsable
+        public bool IsReadOnly 
+        {
+        	get{ return (mAttributeFlags & PropertyFlags.ReadOnly) != 0;}
+        	set 
+        	{
+        		if (value)
+        			mAttributeFlags |= PropertyFlags.ReadOnly;
+        		else
+	        		mAttributeFlags &= ~PropertyFlags.ReadOnly;
+        	}
+        }
+        
+        public bool IsSerializable
+        {
+        	get{ return (mAttributeFlags & PropertyFlags.Serializable) != 0;}
+        	set 
+        	{
+        		if (value)
+        			mAttributeFlags |= PropertyFlags.Serializable;
+        		else
+	        		mAttributeFlags &= ~PropertyFlags.Serializable;
+        	}
+        }
+                
+        public bool IsBrowsable 
+        {
+        	get{ return (mAttributeFlags & PropertyFlags.Browsable) != 0;}
+        	set 
+        	{
+        		if (value)
+        			mAttributeFlags |= PropertyFlags.Browsable;
+        		else
+	        		mAttributeFlags &= ~PropertyFlags.Browsable;
+        	}
+        }
+        
+        public string DisplayName
+        {
+            get { return (string.IsNullOrEmpty(displayName) ? name : displayName); }
+            set { displayName = value; }
+        }
+        /// <summary>
+        /// Gets or sets the category name of this property.
+        /// </summary>
+        public string Category
+        {
+            get { return category; }
+            set { category = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets the fully qualified name of the type converter
+        /// type for this property.
+        /// </summary>
+        public string ConverterTypeName
+        {
+            get { return typeConverter; }
+            set { typeConverter = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets the default value of this property.
+        /// </summary>
+        public object DefaultValue
+        {
+            get { return defaultValue; }
+            set { defaultValue = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets the help text description of this property.
+        /// </summary>
+        public string Description
+        {
+            get { return description; }
+            set { description = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets the fully qualified name of the editor type for
+        /// this property.
+        /// </summary>
+        public string EditorTypeName
+        {
+            get { return editor; }
+            set { editor = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets the name of this property.
+        /// </summary>
+        public string Name
+        {
+            get { return name; }
+            set { name = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets the fully qualfied name of the type of this
+        /// property.
+        /// </summary>
+        public string TypeName
+        {
+            get { return type; }
+            set { type = value; }
+        }
+    }
 }

@@ -1553,8 +1553,31 @@ namespace HelloBoids
 			// OR, our various processors can just grab the Stores that are needed.  There's no need really to 
 			// grab the stores outside of the processor functions only to just pass them there...  
 	
-	
-			
+
+			// ordinance Rules
+			// ROE example:
+			//		- retreat if possible
+			//      - never fire first except during wartime
+			//		- diplomacy first unless state of war
+			//      - never fire on disabled ships or otherwise  non-threats
+			//		- pre-emptive policy
+			//		- disable priority
+			//			- shields
+			//			- weapons
+			//			- engines
+			//		- proportiality / proportional response
+			//		- nuclear weapons only to deter opposing nuclear threat only (some ships may have a mission of always staying hidden and running silent and nuclear deterences in case of an attack on homeworld and homeworld is destroyed, the retaliatory strike option will still exist to carry out its mission
+			//		- 
+			// NOTE: Really, the below loop is mostly for COMBAT logic only.  
+			// 
+				
+			// "lastAction"
+			// "canPerformAction"
+			// "numOutstandingActions"
+			// "lastTarget"
+			//	  "lastTargetStatus" // eg active, disabled, 
+			// "lastContactList"
+			// 
 			
 				
 			int count = Boids.Count;

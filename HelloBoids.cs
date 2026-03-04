@@ -1577,8 +1577,7 @@ namespace HelloBoids
 			// "lastTarget"
 			//	  "lastTargetStatus" // eg active, disabled, 
 			// "lastContactList"
-			// 
-			
+					
 				
 			int count = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 
@@ -1588,7 +1587,7 @@ namespace HelloBoids
 				
 				Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component));
 				Memory<Weapon> wep = (Memory<Weapon>) currentBoid.GetUserStruct(typeof(Weapon));
-				
+				Memory<Laser_Struct> laser = (Memory<Laser_Struct>)currentBoid.GetUserStruct(typeof(Laser_Struct)); //  Laser_Struct laser = (Laser_Struct)currentBoid.mMemStore_Laser.Span[0];
 				
 				string timerID = currentBoid.SpanIndex.ToString();
 				bool canFire = mIntervalTimers.IsReady(timerID, "droid_canfire");
@@ -1607,8 +1606,7 @@ namespace HelloBoids
 					try
 					{
 						double distanceToTargetSquared = Vector3d.GetDistance3dSquared(currentBoid.Translation, target.Translation);
-						Laser_Struct laser = (Laser_Struct)currentBoid.mMemStore_Laser.Span[0];
-
+						
 						if (CanHit(target))
 						{
 							currentBoid.ShotsFired++;

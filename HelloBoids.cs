@@ -1554,6 +1554,7 @@ namespace HelloBoids
 			// grab the stores outside of the processor functions only to just pass them there...  
 	
 
+			// todo: the ai captain needs a "mission" or "objectives" for each mission
 			// ordinance Rules
 			// ROE example:
 			//		- retreat if possible
@@ -1589,33 +1590,48 @@ namespace HelloBoids
 				Memory<Weapon> wep = (Memory<Weapon>) currentBoid.GetUserStruct(typeof(Weapon));
 				Memory<Laser_Struct> laser = (Memory<Laser_Struct>)currentBoid.GetUserStruct(typeof(Laser_Struct)); //  Laser_Struct laser = (Laser_Struct)currentBoid.mMemStore_Laser.Span[0];
 				
+				
+				// can TACTICAL STATION perform ANY actions right now?
+				//  - station is not available/powered/healthy/has operator or AI conroller/etc
+				//  - are we in a state of COMBAT?
+				//		- direct orders?
+				//      - any Contacts in list marked as FOE + HOSTILE as opposed to just FOE (note: stale contacts are still treated as available in case of need to persue)
+				//      	- FOE + WITHDRAWING may be ignored for example if ROE says we don't persue in this circumstance including disabled ships and unarmed ships like freighters
+				//    
+				//	- we already have reached maximum number of ongoing actions for this station as well as Operator's skill level?
+				
+				
 				string timerID = currentBoid.SpanIndex.ToString();
 				bool canFire = mIntervalTimers.IsReady(timerID, "droid_canfire");
             	if (canFire)
            	 	{
                 	//Console.WriteLine("Do_Droid_Logic() - Droid " + currentBoid.SpanIndex.ToString() + " Can Fire = " + canFire.ToString());
                 	mIntervalTimers.Reset(timerID, "droid_canfire");
-            					
-					Boid target = (Boid)FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE);
+            			
+					List<Boid> targets = null;
+					List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE);
+					if (tmp != null)
+						targets = tmp.OfType<Boid>().ToList();
 					//Console.WriteLine("Do_Droid_Logic() - Droid " + currentBoid.SpanIndex.ToString() + " Has Found Target == " + (target != null).ToString());
 					
-					if (target == null) 
+					if (targets == null || targets.Count == 0) 
 						return;      // NOTE: for parallel.For we use "return"
 						// continue; // NOTE: for regular for() loop we use "continue"
 					
 					try
 					{
-						double distanceToTargetSquared = Vector3d.GetDistance3dSquared(currentBoid.Translation, target.Translation);
+						Boid currentTarget = targets[0];
+						double distanceToTargetSquared = Vector3d.GetDistance3dSquared(currentBoid.Translation, currentTarget.Translation);
 						
-						if (CanHit(target))
+						if (CanHit(currentTarget))
 						{
 							currentBoid.ShotsFired++;
 							
 							//Console.WriteLine("Do_Droid_Logic() - Droid " + currentBoid.SpanIndex.ToString() + " firing shot # " + currentBoid.ShotsFired.ToString() + " on Droid " + target.SpanIndex.ToString());
 
 							// NOTE: here we assume the Fire() occurs immediately using a lightspeed laser and the damage is instantaneous 
-							//       and does not need any travel time to reach the target
-							object[] damages = CalculateDamage(currentBoid, wep, target); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
+							//       and does not need any travel time to reach the currentTarget
+							object[] damages = CalculateDamage(currentBoid, wep, currentTarget); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
 							if (damages != null)
 								for (int j = 0; j < damages.Length; j++)
 								{
@@ -1645,10 +1661,8 @@ namespace HelloBoids
 		/// This is the target that the operator (either crew member or computer) of a Targeting Crew Station
 		/// will be attempting to fire upon.  
 		/// </summary>
-		private EntityNode FindNearestTarget (EntityNode source, double maxDistance)
+		private List<EntityNode> FindNearestTarget (EntityNode source, double maxDistance)
 		{
-			EntityNode result = null;
-			
 			BoundingBox searchArea = new BoundingBox (source.SpatialNode.BoundingBox.Center, maxDistance * 0.5d);
 			double maxDistanceSquared = maxDistance * maxDistance;
 			
@@ -1662,50 +1676,92 @@ namespace HelloBoids
 			List<EntityNode> found  = this.Octree.Query(source, true, searchArea, match);
 			if (found == null) return null;
 			
-			if (found.Count == 1)
-				return found[0];
-			else 
-			{
-				//Console.WriteLine("FindNearestTarget found count == " + found.Count.ToString());
-			}
-			return result;		
+			//Console.WriteLine("FindNearestTarget found count == " + found.Count.ToString());
+			return found;		
 		}
 		
-		// 
+		
+		private double[] GenerateWeaponFitnessScores(EntityNode ship, EntityNode target)
+		{
+			// the different structs used for a "Laser" component 
+			Memory<Component> component = (Memory<Component>)ship.GetUserStruct("HelloBoids.Component");
+			Memory<Weapon> wep = (Memory<Weapon>)ship.GetUserStruct("HelloBoids.Weapon");
+			Memory<Laser_Struct> laser = (Memory<Laser_Struct>)ship.GetUserStruct("HelloBoids.Laser_Struct");
+			
+			// todo: we need just all the weapons from this particular ship.  
+			// ComponetStore<Weapon> would contain ALL for ALL ships
+			ComponentStore<Weapon> allWeapons = (ComponentStore<Weapon>)EntryClass.mCStoreCol.CheckOut<Weapon>(0);
+			
+			// return just the ones for this ship... maybe add a new function and not just GetView()
+			// Memory<Weapon> allWeaponsForThisShip = allWeapons.GetView(ship.SpanIndex); 
+				
+			uint numRules = 3;
+			uint numWeapons = 1;
+			double[] scores =  new double[numWeapons];
+			double[] weights = new double[numRules];
+				
+			weights[0] = 2;
+			weights[1] = 5;
+			weights[2] = 0;
+			
+			for (int i = 0; i < numWeapons; i++)
+			{
+				if (wep.Span[0].CoolDown_ == 0)  // if coolDown != 0 then the fitness score should just be 0?
+				{
+					scores[i] = 0;
+				}
+				else
+				{
+					scores[i] = (wep.Span[0].Damage * weights[0]) * (laser.Span[0].PowerReqt * weights[1]);
+				}
+			}
+			
+			return scores;
+		}
+		
+		// NOTE: This only applies for FTL weapons... "CanHit()" must be different for Missiles, Kinetic Energy Weapons and Particle Weapons that are slower than light
 		private bool CanHit(EntityNode target)
 		{
 			bool result = false;
 			
 			
-        // todo: for tactical station, the logic for determining hit+damage should rely on the crew station.css script and not the operator.  Instead, we just grab bonuses or minuses from the operator crew member.
-        //  - time to get a lock
-        //  - bonus for time 
-        //  - bonus for damage
-        //  and remember, it's the tactical station that keeps track of all the weapons available and the targets (including friendlies)
-        // time for turret to rotate towards target
+			// todo: for tactical station, the logic for determining hit+damage should rely on the crew station.css script and not the operator.  Instead, we just grab bonuses or minuses from the operator crew member.
+			//  - time to get a lock
+			//  - bonus for time 
+			//  - bonus for damage
+			//  and remember, it's the tactical station that keeps track of all the weapons available and the targets (including friendlies)
+			
+			
+			// is the weapon available? does it need to aim at target? has it been doing so already? time for turret to rotate towards target
 
 
-        // todo: the ai captain needs a "mission" or "objectives" for each mission
+			
+
+			
+			// target last acquisition - previous aquisition makes it easier to re-aquire
+			
+			// sensorLockOfTargetTimeElapsed (aka durationOfSensorAquistion) // how much time has this  target been tracked by sensors already
+			
+			// operator skill
 			
 			
-			// evasive
+			// operator Health
 			
 			
+			// target distance			
+
+			
+			// target evasive
+			
+			
+			// target deployed counter measures within X time (time * fallOff aka call it 'attenuation')
+					
+
+						
 			// stealth
 			
 			
 			
-			// counter measures
-			
-			
-			
-			// sensorLockElapsed // how much time has this  target been tracked by sensors already
-			
-			
-			
-			// distance
-			
-						
 			result = true;
 			return result;
 		}
@@ -1751,45 +1807,14 @@ namespace HelloBoids
 			// target Armor
 			
 			
-			
-			
-			
-			// target Evasive?
-			
-			
-			
-			
+
 			
 			// target distance
 			
 			
 			
-			
-			// target last acquisition
-			
-			
-			
-			
-			
-			// operator skill
-			
-			
-			
-			
-			
-			// operator Health
-			
-			
-			
-			
-			
-			
 			// weapon %power of maxpower being used vs weapon output
-			
-			
-			
-			
-			
+
 			
 			// weapon Hitpoints
 			
@@ -1808,7 +1833,7 @@ namespace HelloBoids
 			
 			
 			ComponentStore<LivingEntity> testLEComp = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
-			Console.WriteLine("DoLifeCycle() - Stores are the same == " + (store == testLEComp).ToString());
+			//Console.WriteLine("DoLifeCycle() - Stores are the same == " + (store == testLEComp).ToString());
 			
 			// TODO: until both paths use DoLifeCycle(), this will throw off deterministism for Memory<T> path
     		return;
@@ -2604,13 +2629,11 @@ namespace HelloBoids
             _box = new BoundingBox(Translation,  BOID_WIDTH);
         }
 		
+		
+	#region ShouldBeInEntityScript_NotHERE_ButCantRunScriptsFromWebCSharpCompiler
 		private void OnInitializeEntity()
 		{
-			// Component
-			//          InternalStructure
-			//			Defenses  
-			// Weapon
-			// Laser
+			
 		
 			// assignment can be done via User Interface just using a propertyName and TypeName from a PropertySpec and does not need to know any game specific info including the MODs various types of UserStructs or how to process them
 			// -------------------------------
@@ -2697,20 +2720,7 @@ namespace HelloBoids
 			// SO NOW THE QUESTION IS, we need a way to grab these memoryStores perhaps in the Processors WITHOUT having to pass them in
 			// at all!!! Let each Processor know which ones to grab I think.
 			// 
-			// Component has indices to all the different structs for this Script's component 
-			// componentStruct.EntityIndex
-			// componentStruct.WeaponIndex;
-			// componentStruct.LaserIndex;
-			// componentStruct.ArmorIndex;
-				
-			// weaponStruct.ComponentIndex;
-			// laserStruct.WeaponIndex;  (maybe weaponStruct is just expanded to include all options to simplify things?)
-			// armorStruct.ComponentIndex;
 
-			// userData...   and we need to wire up the CustomProperties (PropertySpec[]) to these
-			// ComponentStore structs.
-			// 
-			
 				
 			// if ()
 			// 
@@ -2756,12 +2766,13 @@ namespace HelloBoids
 		// public delegate void PropertySpecEventHandler(object sender, PropertySpecEventArgs e);
 		public void OnGetLaserStructValue(object sender, PropertySpecEventArgs e)
 		{
-			Console.WriteLine("OnGetLaserStructValue " + e.Value.ToString());
+			//Console.WriteLine("OnGetLaserStructValue " + e.Value.ToString());
 			
+			// TODO: this MUST _GET_ the values from the relevant Script's struct  eg wep = (Weapon)GetUserStruct(type);
 			switch (e.Property.Name)
 			{
 				case "entityIndex":
-					Console.WriteLine ("Getter() - entityIndex currently set to " + e.Value.ToString());
+					//Console.WriteLine ("Getter() - entityIndex currently set to " + e.Value.ToString());
 					break;
 				default:
 					break;
@@ -2777,12 +2788,13 @@ namespace HelloBoids
 		
 		public void OnSetLaserStructValue(object sender, PropertySpecEventArgs e)
 		{
-			Console.WriteLine("OnSetLaserStructValue " + e.Value.ToString());
+			//Console.WriteLine("OnSetLaserStructValue " + e.Value.ToString());
 			
+			// TODO: this MUST _SET_ the values TO the relevant Script's struct  eg wep = (Weapon)GetUserStruct(type);
 			switch (e.Property.Name)
 			{
 				case "entityIndex":
-					Console.WriteLine ("Setter() - entityIndex changing too " + e.Value.ToString());
+					//Console.WriteLine ("Setter() - entityIndex changing too " + e.Value.ToString());
 					break;
 				default:
 					break;
@@ -2803,7 +2815,8 @@ namespace HelloBoids
 		{
 			
 		}
-	
+	#endregion // ShouldBeInEntityScript_NotHERE_ButCantRunScriptsFromWebCSharpCompiler
+		
 		
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static double GetDistance(Boid b1, Boid b2)

@@ -1538,6 +1538,15 @@ namespace HelloBoids
 
 #if USE_MEMORY_T
 	
+		public struct StationAction
+		{
+			public static int NextID;
+			public int ID;
+			public long TimeStarted;
+			public int Duration;
+				
+		}
+		
 		/// <summary>
 		/// Seed would typically be Seeds.Local_Droid_Logic + mCurrentFrame;
 		/// </summary>
@@ -1554,6 +1563,7 @@ namespace HelloBoids
 			// grab the stores outside of the processor functions only to just pass them there...  
 	
 
+			// POLICIES AND RULES 
 			// todo: the ai captain needs a "mission" or "objectives" for each mission
 			// ordinance Rules
 			// ROE example:
@@ -1572,12 +1582,18 @@ namespace HelloBoids
 			// NOTE: Really, the below loop is mostly for COMBAT logic only.  
 			// 
 				
+
+	
 			// "lastAction"
-			// "canPerformAction"
 			// "numOutstandingActions"
-			// "lastTarget"
-			//	  "lastTargetStatus" // eg active, disabled, 
-			// "lastContactList"
+			// "maxOutstandingActions"   // based on operator's max ability to handle so many simultaneously, tacticalstation TL, tacticalStation damage, and ability to perform that many actions in the first place (eg having enough weapons to use )
+			// "canPerformAction"
+			
+			// last "TargetList"
+			// 	"lastTarget"
+			//		  "lastTargetStatus" 
+			// last "ContactList"
+			 
 					
 				
 			int count = Boids.Count;
@@ -1590,8 +1606,14 @@ namespace HelloBoids
 				Memory<Weapon> wep = (Memory<Weapon>) currentBoid.GetUserStruct(typeof(Weapon));
 				Memory<Laser_Struct> laser = (Memory<Laser_Struct>)currentBoid.GetUserStruct(typeof(Laser_Struct)); //  Laser_Struct laser = (Laser_Struct)currentBoid.mMemStore_Laser.Span[0];
 				
+				// NOTE: The EXE will render Sensor Contact info as necessary.
+				//       The client EXE will have access to those types and the UI elements using them and can update
+				//       those relevant UI elements as necessary
+				
 				
 				// can TACTICAL STATION perform ANY actions right now?
+				
+				
 				//  - station is not available/powered/healthy/has operator or AI conroller/etc
 				//  - are we in a state of COMBAT?
 				//		- direct orders?
@@ -1693,10 +1715,11 @@ namespace HelloBoids
 			ComponentStore<Weapon> allWeapons = (ComponentStore<Weapon>)EntryClass.mCStoreCol.CheckOut<Weapon>(0);
 			
 			// return just the ones for this ship... maybe add a new function and not just GetView()
-			// Memory<Weapon> allWeaponsForThisShip = allWeapons.GetView(ship.SpanIndex); 
-				
+			Memory<Weapon> allWeaponsForThisShip = null; // allWeapons.GetView(ship.SpanIndex); 
+
+			
 			uint numRules = 3;
-			uint numWeapons = 1;
+			uint numWeapons = (uint)allWeaponsForThisShip.Span.Length;
 			double[] scores =  new double[numWeapons];
 			double[] weights = new double[numRules];
 				
@@ -1706,13 +1729,15 @@ namespace HelloBoids
 			
 			for (int i = 0; i < numWeapons; i++)
 			{
-				if (wep.Span[0].CoolDown_ == 0)  // if coolDown != 0 then the fitness score should just be 0?
+				// todo:  is the weapon available? does it need to aim at target? has it been doing so already? time for turret to rotate towards target
+
+				if (allWeaponsForThisShip.Span[0].CoolDown_ == 0)  // if coolDown != 0 then the fitness score should just be 0?
 				{
 					scores[i] = 0;
 				}
 				else
 				{
-					scores[i] = (wep.Span[0].Damage * weights[0]) * (laser.Span[0].PowerReqt * weights[1]);
+					scores[i] = (allWeaponsForThisShip.Span[0].Damage * weights[0]) * (laser.Span[0].PowerReqt * weights[1]);
 				}
 			}
 			
@@ -1731,12 +1756,9 @@ namespace HelloBoids
 			//  - bonus for damage
 			//  and remember, it's the tactical station that keeps track of all the weapons available and the targets (including friendlies)
 			
-			
-			// is the weapon available? does it need to aim at target? has it been doing so already? time for turret to rotate towards target
 
-
-			
-
+					
+			// stealth
 			
 			// target last acquisition - previous aquisition makes it easier to re-aquire
 			
@@ -1756,11 +1778,6 @@ namespace HelloBoids
 			
 			// target deployed counter measures within X time (time * fallOff aka call it 'attenuation')
 					
-
-						
-			// stealth
-			
-			
 			
 			result = true;
 			return result;
@@ -1831,7 +1848,6 @@ namespace HelloBoids
         private void DoLifeCycle(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
         {
 			
-			
 			ComponentStore<LivingEntity> testLEComp = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
 			//Console.WriteLine("DoLifeCycle() - Stores are the same == " + (store == testLEComp).ToString());
 			
@@ -1873,8 +1889,6 @@ namespace HelloBoids
 				}
 			}
          
-           
-	
 			// spawn new ones up to max spawn number per frame
 			double width = (double)parameters[0];
 			double height = (double)parameters[1];
@@ -1900,6 +1914,7 @@ namespace HelloBoids
 				() => DoParallelTest(store, size/2, size)
 			);
 		*/
+		
 		private void DoParallelTest(ComponentStore<Transform.Transform_Struct> store, int start, int end)
 		{
 			int l = store.Span.Length;;
@@ -1910,8 +1925,6 @@ namespace HelloBoids
 		
         private void DoFlocking(ComponentStore<Transform.Transform_Struct> store, object[] parameters, int seed, GameTime gt)
         {
-		
-			
 			double elapsedSeconds = gt.ElapsedSeconds;
 			OctreeOctant root = this.Octree;
 			int length = store.Span.Length;
@@ -2576,16 +2589,6 @@ namespace HelloBoids
     }
 
 
-	/*
-	ref struct ComponentLaserStruct
-	{
-		public ComponentStruct[] Components;
-		public WeaponStruct[] Weapons;
-		public LaserStruct[] Lasers;
-		public Armor[] Armor;
-		//public ComponentLaserStruct[] Records;
-	}
-	*/
 	
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // BEGIN BOIDS
@@ -5017,10 +5020,21 @@ bool mIsDisposed;
         //public Weapon SecondaryWeapon;
     }
 	
+	/*
+	ref struct ComponentLaserStruct
+	{
+		public ComponentStruct[] Components;
+		public WeaponStruct[] Weapons;
+		public LaserStruct[] Lasers;
+		public Armor[] Armor;
+		//public ComponentLaserStruct[] Records;
+	}
+	*/
+	
+	
 	public struct Laser_Struct
 	{
 		public int WeaponIndex;
-		
 		
 		// beam specific
 		public int Type;       // type is really just about what types of Damage(s) (ProductID(s)) it results in such as Paralysis, Crushing, Burning, Impaling
@@ -5048,7 +5062,130 @@ bool mIsDisposed;
 	}
 		
 	
+	/// <summary>
+	/// A SensorContact is a PRODUCT that is produced by a Sensor upon receiving
+	/// and detectinig an emission of the same PRODUCT of that Sensor.
+	/// eg. a Product.OpticalEmission received by a binocular set of "Eyes" sensors
+	/// will result in the "production" of a SensorContact of that Entity that emitted the
+	/// Product.OpticalEmission and in turn that SensorContact will be consumed by the TacticalStation
+	/// or Droid
+	/// </summary>
+	public struct SensorContact // NOTE: our Droids have one optical sensor... a single binocular system comprised of two eyes
+	{
+		// see game "Highfleet" for it's exterior ship component placement interface
+		public enum FOF
+		{
+			Friend = 0,
+			Foe = 1 << 0, 
+			Unknown = 1 << 2
+		}
+		
+		public enum TYPE
+		{
+			Unknown,
+			Asteroid,
+			Debris,
+			Mine,
+			Missile,
+			Fighter,
+			Bomber,
+			Frigate,
+			Transport,
+			Destroyer,
+			Corvette,
+			Carrier,
+			Satellite,
+			OrbitalPlatform,
+			GroundRadar	
+		}
+		
+		public enum SIZE
+		{
+			VerySmall = 0,
+			Small,
+			Medium,
+			Large,
+			VeryLarge,
+			Huge,
+			Enormous
+		}
+		
+		const int HistoryLength = 1;
+		public long TimeAcquired;
+		public int AcquisitionStatus;   // New, UpToDate, AcquisitionLost,  contact if HistoryLength > 1 but this ContactStatus == AcquisitionLost
+		public Target.STATUS ContactStatus;
+		public int Index;
+		public int ContactIndex;    // EntityIndex
+		public Vector3d Position;
+		public Vector3d Velocity;
+		public double Distance;     // range to target
+		public float Heading;       // NOTE: Bearing is the direction to fly to get somewhere specific see Google AI Overview notes below
+		
+		/* Target Bearing is the angular direction from your current position to a target (often relative to North or your bow),
+		while Target Heading is the direction the target itself is moving or pointing. Bearings tell you where to look, whereas headings indicate the target's trajectory. 
+		
+		Key Differences:
+		Bearing (Direction to Target): The angle from your position to the target, often measured in degrees from True North (True Bearing) or clockwise from your bow (Relative Bearing).
+		Heading (Direction of Travel): The direction your vessel, aircraft, or the target is facing.
+		Context: In navigation, a bearing helps locate an object (e.g., "bearing 090" is East), while a heading is your current course (e.g., "heading 180" is South). 
+
+		Application Example:
+		If you are facing North (Heading) and a target is to your right, the relative bearing is 
+		(East). If you turn East to follow it, your new heading is, but the bearing to the target changes as you close the distance. 
+		*/
 	
+		
+		public TYPE Type;
+		public FOF FoF;
+		public SIZE Size;
+		
+		public string Name; // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
+		public string RegistryNumber;
+		
+		public int[] SensorsIndices;   // the sensorIDs that have all acquired this target
+		public string[] SensorsTypes;  // the types of Sensors corresponding to the SensorsIndices
+	}
+	
+	
+	public struct Target
+	{
+		[Flags]
+		public enum STATUS : int
+		{
+			Unknown = 0,           // a good tactical officer will flag a status of Unknown if not sure why it appears Disabled, rather than report it as Disabled when it could be playing possum waiting to draw your ship in
+			Withdrawing = 1 << 0,
+			Disabled    = 1 << 1,
+			EnginesDisabled = 1 << 2,
+			WeaponsDisabled = 1 << 3,
+			ShieldsDisabled = 1 << 4,
+			Active          = 1 << 5,
+			NonCombatant     = 1 << 6,           // eg civilian, medical
+			CombatIneffective     = 1 << 7,      // eg out of ammunition and/or power
+			Neutral           = 1 << 8,
+			Suspect           = 1 << 9,         // TODO: some of these need to move to FOF
+			Hostile         = 1 << 10,
+			Derelict        = 1 << 11
+		}
+		
+		public enum CREWSTATUS
+		{
+			Unknown,
+			Alive,
+			Dead,
+			LightlyDepleted,
+			ModeratelyDepleted,
+			HeavilyDepleted
+		}
+		
+		public int EntityIndex;
+		public int[] WeaponsAssigned;
+		public int[] TargetedBy;      // other Ships/Vehciles/Entities, ground radars, factions, etc that are targeting this Target
+		public STATUS Status;
+		public CREWSTATUS CrewStatus;
+		public int Hitpoints;         // max hitpoints of target... should a Sensor be able to know this exact number?  It's really just a game thing and maybe we should just use visual observations of condition of ship instead
+		public int CurrentHitPoints;  // used to determine % damage of Target
+	}
+
 	
     public interface IEntitySystem
     {

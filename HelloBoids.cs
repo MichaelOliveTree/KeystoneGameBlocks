@@ -192,6 +192,7 @@ namespace HelloBoids
 		private static uint OctreeSplitThreshold = 8;
 		
 	
+		public static HelloBoids.UserDataStore mCStoreUserData;
         public static HelloBoids.ComponentStoreCollection mCStoreCol;
         public static BoidSimulation bSim;
 		
@@ -435,7 +436,10 @@ namespace HelloBoids
 			
 			
 			mGameLoopLock = new object();
-           	mCStoreCol = new HelloBoids.ComponentStoreCollection();
+           	
+			mCStoreCol = new HelloBoids.ComponentStoreCollection();
+			mCStoreUserData = new HelloBoids.UserDataStore();
+			
            	bSim = new BoidSimulation((int)NUM_ENTRIES, WIDTH, HEIGHT, DEPTH, useOctree);
 			
             CodeProfiler.StartLoop();
@@ -1538,13 +1542,52 @@ namespace HelloBoids
 
 #if USE_MEMORY_T
 	
-		public struct StationAction
+		public struct StationState
 		{
+			public struct StationAction
+			{
+				public long TimeStarted;     // time this action started
+				public int Duration;         // time to complete this action
+				public int ActionID;         // eg Fire at Target, Lay Mines, Deploy Counter-measures
+			}
+			
+			
 			public static int NextID;
-			public int ID;
-			public long TimeStarted;
-			public int Duration;
+			public int Index;            // index of ComponentStore<Components> where this TacticalStation's general Component struct is stored
+			
+			// NOTE: The "GetLastAction() is simply the Action at index == 0
+			
+			// Queue is First In First Out
+			public System.Collections.Generic.Queue<StationAction> Actions;
+			
+			
+			public int HistoryCount; 
+			public int NumActions;
+			public int MaxActions;        // based on operator's max ability to handle so many simultaneously, tacticalstation TL, tacticalStation damage, and ability to perform that many actions in the first place (eg having enough weapons to use )
+			
+			public System.Collections.Generic.Dictionary<int, List<SensorContact>> ContactsHistory;
+			public SensorContact[] Contacts;
+			public Target[] Targets;
+			
+			public void AddContact(SensorContact c)
+			{
 				
+			}
+			
+			public void RemoveContact()
+			{
+				
+			}
+			
+			public void ClearContacts()
+			{
+				
+			}
+			
+			public void AddTarget(Target t)
+			{
+				
+			}
 		}
 		
 		/// <summary>
@@ -1555,7 +1598,8 @@ namespace HelloBoids
 			ThreadedRandom random = new ThreadedRandom(seed);
 			const double MAX_SEARCH_DISTANCE = 35d;
 	
-			// ComponentStore<Transform.Living_Entity> store, object[] parameters, int seed, GameTime gt
+			// DataProcessor normally excepts following arguments
+			// 	- ComponentStore<Transform.Living_Entity> store, object[] parameters, int seed, GameTime gt
 	
 			// todo: we could pass in an array of store to our Processor functions... rather than just one.
 			//       but it would have to be an array of object[] like parameters and we'd have to cast them
@@ -1583,25 +1627,261 @@ namespace HelloBoids
 			// 
 				
 
-	
-			// "lastAction"
-			// "numOutstandingActions"
-			// "maxOutstandingActions"   // based on operator's max ability to handle so many simultaneously, tacticalstation TL, tacticalStation damage, and ability to perform that many actions in the first place (eg having enough weapons to use )
-			// "canPerformAction"
+             // movement of crew (steering)
+             //   linear acceleration / decelaration
+             //   newtonian ship movement
+             //   movement of ships via Steering 
+             //
+             // physics Update
+             //   N-Body
+             // laser bolts
+             // missiles
+
+             // particle Systems
+             // motion fields
+             // 
+
+             // collisions (BoundingBox.Min, BoundingBox.Max, and Sphere.Center and Sphere.Radius need to be in a Memory<T> struct)
+             //
+
+             // Animations 
+             //   - interpolation Animations
+             //   - spritesheets
+             // 
+             // 
+             // game specific
+             //    - power drain
+             //    - fuel drain
+             //    - OnFire
+             //    - InRadiation
+             //    - UnderWater/InVaccuum
+             //
+             //    - applying accumulated damage
+             //    -   ""         "" damage
+             //    -   ""         "" bufs
+             //    -   ""         "" debufs
+             // 
+             //    - sensor scan (lambda)
+
+             //    - planetary scan
+             //    - AreaOfInterest 
+             //    // - storing data on interior Walls for fast iteration of mouse picking
+             //    // walls and floors and ceilings.  <-- This is mostly for when our view is such that
+             //    // we cannot first determine the closest edge and use that to find any wall on that edge
+             //    // For instance, imagine a camera that is more like a FPS view or a bullet or laser hits a Walls
+
+             //    - storing data on interior Walls and Floors and Ceilings "damage"
+
+
+		// http://www.gamasutra.com/view/news/198377/Video_Valves_system_for_creating_AIdriven_dynamic_dialog.php   <- now on Youtube @ https://www.youtube.com/watch?v=tAbBID3N64A
+		// http://www.valvesoftware.com/publications/2012/GDC2012_Ruskin_Elan_DynamicDialog.pdf
+		// NOTE: in Valve's Zombie game, for the npc voice logic, they share
+		//       all of this knowledge in a single knowledge base rather than allowing
+		//       each to have it's own in a fragmented way and it makes running through
+		//       them sequentially to find voice responses that match a search much faster and easier.
+		//       Valve's Left 4 Dead voice logic is very much a flat database but generated by flattening
+		//		 a scenegraph style directed acyclic graph (DAG))	
+		
+			/* 
+			https://stackoverflow.com/questions/31879609/flattening-a-graph
+			https://deephaven.io/core/docs/conceptual/dag/
+			https://github.com/madelson/Traverse
+			//	http://www.gamasutra.com/blogs/GuyHasson/20120706/173705/Story_Design_Tips_Better_NPC_Interaction_Part_II.php
+		//  -> Flattening a DAG ->   https://medium.com/@chipzt/directed-acyclic-graphs-dags-8d479ed14967
+		
+			"Flattening" a Directed Acyclic Graph (DAG) in C# is typically achieved using a topological sort algorithm. 
+			This process results in a linear ordering of all nodes such that for every directed edge from node A to 
+			node B, A appears before B in the list. This linear sequence is the "flattened" representation of the DAG, 
+			often used for task scheduling and dependency resolution. 
+			Implementation Concepts in C#
+			To flatten a DAG in C#, you would generally follow these steps:
+			Represent the DAG: Define a class for the nodes and a way to store the edges (e.g., an adjacency list or a 
+			dictionary where keys are nodes and values are lists of their children).
+			Implement Topological Sort: Use an algorithm like Kahn's algorithm or a depth-first search (DFS) based 
+			approach to generate a topological ordering.
+
+			Iterate and Collect: The result of the topological sort is your flattened list of nodes. 
+
+			Example C# Code Snippet (Conceptual)
+			A common approach for topological sort uses DFS: 
+
+		public class Node<T>
+		{
+			public T Value { get; set; }
+			public List<Node<T>> Dependencies { get; set; } = new List<Node<T>>();
+		}
+
+		public static List<Node<T>> TopologicalSort<T>(List<Node<T>> nodes)
+		{
+			var sortedList = new List<Node<T>>();
+			var visited = new HashSet<Node<T>>();
+			var recursionStack = new HashSet<Node<T>>();
+
+			foreach (var node in nodes)
+			{
+				if (!visited.Contains(node))
+				{
+					SortUtil(node, visited, recursionStack, sortedList);
+				}
+			}
+			// Result needs to be reversed if using DFS post-order traversal
+			sortedList.Reverse(); 
+			return sortedList;
+		}
+
+		private static void SortUtil<T>(Node<T> node, HashSet<Node<T>> visited, HashSet<Node<T>> recursionStack, List<Node<T>> sortedList)
+		{
+			visited.Add(node);
+			recursionStack.Add(node); // Used for cycle detection (crucial for DAG validation)
+
+			foreach (var dependency in node.Dependencies)
+			{
+				if (!visited.Contains(dependency))
+				{
+					SortUtil(dependency, visited, recursionStack, sortedList);
+				}
+				else if (recursionStack.Contains(dependency))
+				{
+					// Cycle detected - the graph is NOT a DAG and cannot be flattened this way
+					throw new Exception("Graph contains a cycle!"); 
+				}
+			}
+
+			recursionStack.Remove(node);
+			sortedList.Add(node);
+		}
+
+		Note: A true "flattening" into a simple linear list is only possible if the graph is, in fact, a DAG (meaning it has no cycles). 
+		If a cycle is present, the process cannot terminate in a finite order, and an exception should be thrown. 
+
+		For a complete, working example or to use a library that handles graph operations, you might explore graph libraries for C# or
+		refer to examples on platforms like Stack Overflow.  https://stackoverflow.com/questions/31879609/flattening-a-graph
+		*/
 			
-			// last "TargetList"
-			// 	"lastTarget"
-			//		  "lastTargetStatus" 
-			// last "ContactList"
-			 
-					
-				
+			
+			
+		//	- The trick is how the KEY for each flattened path is created and then used when building the query string!!!		
+		//	http://www.gamasutra.com/blogs/GuyHasson/20120706/173705/Story_Design_Tips_Better_NPC_Interaction_Part_II.php
+		//  -> Flattening a DAG ->   https://medium.com/@chipzt/directed-acyclic-graphs-dags-8d479ed14967
+			
+		//			- sort rules alphabetically.  Why?
+		//				- well this way when running the comparisons of the QUERIES against the CONDITIONS of each rule,
+		//			as we iterate through each QUERY "key" we don't have to re-start an iteration at the beginning of every CONDITION "key" 
+		//			because we know they are in same alphabetical order as the QUERIES collection.  For instance:
+		//			QUERY: A:100, B:50, C:true, F:false
+		//			RULE1:
+		//          	CONDITIONS: A:<=500 && A: >=0 
+		//              CONDITIONS: C:<=True && >=True
+		//				- in the above, we start to iterate through the 4 query tuples and for each naivly we iterate each CONDITION
+		//                but instead, when we find a matching condition, we don't need to start over.  We can resume because we know that
+		//                the CONDITIONS are sorted the same way so when testing QUERY part B, we can resume iteration of CONDITION and next
+		//				  CONDITION will be C: so we know B doesn't exist (else the iteration cursor would have been moved back to beginning).		
+		//
+		//          TODO: currently our normal propertybag stores it's data as DefaultValue and does not actually hook back to a
+		//			      collection of objects.  It should actually store to same object store so that the data can also be read
+		//                directly through the object store and not through the entity.  Recall that originally, the point of using the PropertySpec's
+		//                was to get propertybag GUI rendering for free via propertygrid control.
+		//
+		//			- hash buckets for different regions and/or other basic buckets similarly to what we do when we cull
+		//			- store pointers to the value we want to compare rather than have to query that game data
+		//			- sort by decreasing # of criteria (as we do with TileMap auto-tile rules)
+		//			- represent every comparision as a >= x >= b  
+		//				eg.   return (10 >= ptrCharacterXHitpoints && ptrCharacterXHitpoints >= 100);    
+		//
+		//		 So in a way, what we want there is a Blackboard class that can
+		//       manage all that for us, and then when we first initialize a behavior
+		//       on an Entity, it will grab a blackboard blob from the allocator and
+		//       assign it to the Enity.Knowledge
+		//       - and since the dialogue tree structure is essentially a flattened DAG (like a scenegraph)
+		//		 which seems to take on a Rules Engine like functionality because it becomes serial
+		//       test and not a branching test.
+		//       - thus, each "record" has an owner and can be referenced and read/written to
+		//       from the UserDataStore.  There is a question of whether this data should remain in 
+		//       DB form.. perhaps cached for recent access.  Well, i think it must be cached or else
+		//       way too slow for the type of use we do.  Do we CheckIn/CheckOut data blobs?  We could do some
+		//       really fast computations I think and threaded, on an in memory "blackboard" where each blackboard 
+		//       can be defined and hold all of same record types (eg all stars, all worlds, all npcs) so that
+		//       manipulation of their data is... well... its all very functional style and not OO.
+		//		 - THE CACHE COHERENCY BECOMES EXCELLENT.
+		//		   - perhaps each derived blackboard itself becomes a data manipulator that knows how to read/write it's data
+		//	       and then the sqlite or whatever storage occurs as generic using array of field definitions
+		//			- Being able to define custom blackboards is nice because we now have fixed size fields
+		//
+		//		 - is the UserDataStore a global like Pager and Repository?
+		//		- maybe each Blackboard gets instantiated EXE side and so we get StarData : UserData 
+		//      that gets used for all stars and which we can write custom data manipulation against
+		//		- we could even read/write to it like we do with Packets... and perhaps even use unsafe code for even greater performance
+		// (See E:\dev\_projects\_XNA\Mercury Particle Engine\ProjectMercury.WindowsEmitters\Emitter.cs.Update() method)
+		// but one thing it does which i think defeats the purpose somewhat perhaps is it creates a fixed pointer to the particle array rather than allocating it as pointer from start.  having to "fix" it seems like enough overhead to nullify any performance advantages
+		
+		//  - Production productID and Consumers can be stored here as well.  Do we still want to use scripts for these entities? or
+		//    would scripts assigned to each data store type be more efficient?
+		//  - for economic simulation this could be very fast
+		//	- AI simulation may be more needed case for a single player 1.0 game release
+		//		- blackboard data can store Area_Of_Interest data generated from other pre- calculations 
+		//  - for NPC simulation this can be very fast too when running out behavior tree against this data
+		//    and eventually we probably stop simulating Entity AI in Entity.Update() and move it to an Update() 
+		//    of simulation that will iterate through npcs by iterating through the blackboard data (limiting iterating 
+		//    to X count that fit into an alotted timeslice using threading as available and as needed)
+		
+		//		- IN OTHER WORDS, by iterating through the array of UserData to perform entity updates, can we properly update
+		//    these variables with appropriate functions and have the update reflected in the Entity itself?  For example, lets say
+		//    we have 50 entities that are doing wander steering behavior... can we run a singular script that operates on blackboard user data
+		//    to update all 50 of those entities?  rather than 50 calls to entity.update() and 50 script calls.
+		//          - if the scripts each entity uses can be one of the ways we sort entities when updating their data, then we can easily
+		//          update all entities using a particular script.... similar to how we do renders of sorted entities
+		//			- if our scene update() loop added entities to be updated in sorted buckets... but for now this is jsut brainstorming idea, since it could slow us down
+		//  Feb.6.2026 -> Regarding the above question which is Data-Oriented processing model, YES WE CAN.  This is what i have been in fact implementing for last few months
+		//                
+		//
+		
+		// TODO: google cache coherency as it relates to flat databases 
+		//			- and .net c#
+		// TODO: isn't BehaviorContext.Knowledge already associated with Entity?  And shouldn't this data replace Entity CustomProperties? and Rename var from Knowledge to Entity.CustomData
+                                   //       and is now stored in sqlite where our scene representation which uses xml is seperate from the entity custom data which is db stored.  Our EntityAPI for
+                                   //       getting custom data can now also use methods with type safety.  Further we no longer have to care about custom data being serialized to xml and perhaps this
+                                   //       speeds up our ability to save scene when we are editing maps as well as saving game state
+        							// TODO: however, will this type of CustomProperties now no longer be easily editable in a PropertyGrid and if not, is that ok?
+        							//      we're using custom html interfaces now anyway right?
+        							//      we must start with _just_ custom properties for now but actually just RenderingContext 
+        							// TODO: also what about shaders?  right now those use custom properties for shader params/vars and should not be stored in a db!
+        							// TODO: actually volume, surfacearea,cost,weight for all celestial bodes is already being used as custom properties!
+        							//       So question is, how do we connect those to a datastore?
+        							//		 - well just as we use GetProperties() SetProperties() where a single reader/writer of xml store is operating
+        							//       we can do same for UserData.   We can convert to GetProperties and SetProperties() and we can also
+        							//       use other methods of iterating thru the list of custom data. For now, let's just focus on Viewpoint for Chase
+        					
+		// is there a way to track the data for an individual Entity via an Index into array of records and to have this record
+		// index maintained during lifetime? indices can be checked in / checked out
+
+		// locally, we dont really need to use entityID as part of a record key either, locally we can use just an Index
+		// and perhaps a lookup value... but i think in short term, we should continue to focus on just Viewpoint and Chase cam
+		// and if that goes well, Stars and see about how it works with LoadTVResource() and restoring DB via a LoadCustomData()
+        			
+
+			ComponentStore<LivingEntity> testLEComp = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
+			// MicroExpressionEvaluator is a neat little library!  Very fast and Very compact and easy to use with web compilers like DotNetFiddle since its just one
+			// completely self contained class with no depenedancies that i can just paste into this single .cs script!
+			// https://github.com/webermania/MicroExpressionEvaluator
+			string logicalExpression = "false != true";
+			
+			bool result = MicroEx.Evaluate(logicalExpression);
+			Console.WriteLine ("Do_Droid_Logic() - MicroEx.Evaluate() - '" + logicalExpression + "' " + result.ToString());
+			
+			
+			
+			
+			
+			
 			int count = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 
             //for (int i = 0; i < Boids.Count; i++)
             {
 				Boid currentBoid = Boids[i];
 				
+				// these will be stored in "object[]" and thus boxed
+				StationState stationState  = (StationState)currentBoid.BlackBoardData.GetObject("tactical_state");
+					
 				Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component));
 				Memory<Weapon> wep = (Memory<Weapon>) currentBoid.GetUserStruct(typeof(Weapon));
 				Memory<Laser_Struct> laser = (Memory<Laser_Struct>)currentBoid.GetUserStruct(typeof(Laser_Struct)); //  Laser_Struct laser = (Laser_Struct)currentBoid.mMemStore_Laser.Span[0];
@@ -1609,20 +1889,23 @@ namespace HelloBoids
 				// NOTE: The EXE will render Sensor Contact info as necessary.
 				//       The client EXE will have access to those types and the UI elements using them and can update
 				//       those relevant UI elements as necessary
-				
-				
-				// can TACTICAL STATION perform ANY actions right now?
-				
-				
+								
+				// can this Droids TACTICAL STATION perform ANY actions right now?
+								
 				//  - station is not available/powered/healthy/has operator or AI conroller/etc
 				//  - are we in a state of COMBAT?
 				//		- direct orders?
-				//      - any Contacts in list marked as FOE + HOSTILE as opposed to just FOE (note: stale contacts are still treated as available in case of need to persue)
-				//      	- FOE + WITHDRAWING may be ignored for example if ROE says we don't persue in this circumstance including disabled ships and unarmed ships like freighters
+				//      - any Contacts in list marked as FOF.Foe + FOF.Hostile as opposed to just FOF.Foe (note: stale contacts are still treated as available in case of need to persue)
+				//      	- FOF.Withdrawing may be ignored for example if ROE says we don't persue in this circumstance including disabled ships and unarmed ships like freighters
 				//    
 				//	- we already have reached maximum number of ongoing actions for this station as well as Operator's skill level?
 				
 				
+				logicalExpression = wep.Span[0].AverageDamage.ToString() + " < " + testLEComp.Span[currentBoid.SpanIndexLE].Hitpoints.ToString();
+				bool result = MicroEx.Evaluate(logicalExpression);
+				//Console.WriteLine ("Do_Droid_Logic() - MicroEx.Evaluate() - '" + logicalExpression + "' " + result.ToString());
+					
+					
 				string timerID = currentBoid.SpanIndex.ToString();
 				bool canFire = mIntervalTimers.IsReady(timerID, "droid_canfire");
             	if (canFire)
@@ -1631,7 +1914,7 @@ namespace HelloBoids
                 	mIntervalTimers.Reset(timerID, "droid_canfire");
             			
 					List<Boid> targets = null;
-					List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE);
+					List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE); // TODO: Hopefully this FindNearestTarget() can be optimized.... spatial searches even with Octree is slow.
 					if (tmp != null)
 						targets = tmp.OfType<Boid>().ToList();
 					//Console.WriteLine("Do_Droid_Logic() - Droid " + currentBoid.SpanIndex.ToString() + " Has Found Target == " + (target != null).ToString());
@@ -1675,7 +1958,7 @@ namespace HelloBoids
 				}
 			});
 	
-			//see Keystone.Game01.Messages.   public class AttackResults since
+			// see Keystone.Game01.Messages.   public class AttackResults since
 			// we need results going over the network
 		}
 		
@@ -1693,7 +1976,6 @@ namespace HelloBoids
                 if (Vector3d.GetDistance3dSquared(neighbor.Translation, current.Translation) <= maxDistanceSquared) return true;
                 return false;
             };
-			
 			
 			List<EntityNode> found  = this.Octree.Query(source, true, searchArea, match);
 			if (found == null) return null;
@@ -2266,6 +2548,10 @@ namespace HelloBoids
 	
 
 			// todo: generate Droids with some variance for age, size, and speed
+			ComponentStore<LivingEntity> testLEComp = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
+			testLEComp.Span[b.SpanIndexLE].Age = 1;
+			testLEComp.Span[b.SpanIndexLE].Hitpoints = 20;
+	
 			// todo: create a "cooldown" interval that is based on the droid's size
 							
 			// TODO: Add to Spawn()
@@ -2277,6 +2563,22 @@ namespace HelloBoids
 			//       }
 			
 	
+			// add the required StationState for our tactical station's state to the droid.BlackBoardData which is required by Do_Droid_Logic()
+			StationState stationState;
+			stationState.Index = b.Index;
+						
+			stationState.HistoryCount = 1;
+			
+			stationState.MaxActions = 2;
+			stationState.NumActions = 0;
+			stationState.Actions = null;
+			stationState.Contacts = null;
+			stationState.ContactsHistory = null;
+			stationState.Targets = null;
+			
+			b.BlackBoardData.SetObject("tactical_state", stationState);
+	
+	
 			// NOTE: the following calls to GetUserStruct() returns the typically ONE record (but more potentially for ArmorLayers)
 			//       that is stored within the EntityNode's.  Unlike calls to EntryClass.mColStore.CheckOut(Component);
 			Memory<Component> component = (Memory<Component>)b.GetUserStruct("HelloBoids.Component");
@@ -2287,9 +2589,9 @@ namespace HelloBoids
 			//Console.WriteLine (test.Equals(component).ToString());
 
 	
-	/*
+	
 	// TEMP HACK - this would normally be done in the relevant scripit - initialize the memory store vars from the serialized
-			component.Span[0].TL = 1;
+/*			component.Span[0].TL = 1;
 			component.Span[0].Quality_ = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
 			//public string Quality; // todo: this needs to be a coefficient of 0.0 to 1.0
 			component.Span[0].Ruggedized = true;
@@ -2299,7 +2601,7 @@ namespace HelloBoids
 			component.Span[0].Weight = 2.5d;
 			component.Span[0].SurfaceArea = 1d;
 			component.Span[0].Volume = 0.2d;
-			
+*/
 			// beam specific
 			laser.Span[0].Type = 1;     
 			laser.Span[0].Duration = 0.25f;   // duration in seconds
@@ -2312,8 +2614,8 @@ namespace HelloBoids
 			weapon.Span[0].Malfunction_ = 0.2f; // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
 			//public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
 									
-			weapon.Span[0].BeamOutput = 10f; // kW
-			weapon.Span[0].CyclicRate = 1;
+			laser.Span[0].BeamOutput = 10f; // kW
+			laser.Span[0].CyclicRate = 1;
 			weapon.Span[0].Accuracy = 10;
 			weapon.Span[0].SnapShot = 2;
 //			public string Shots;
@@ -2321,7 +2623,7 @@ namespace HelloBoids
 			weapon.Span[0].CoolDown_ = 0.3f;
 //			public string RoF;
 			
-			weapon.Span[0].PowerReqt = 0.0f;
+//			weapon.Span[0].PowerReqt = 0.0f;
 //			
 //			public string Mount;
 //			public string Direction;
@@ -2332,10 +2634,10 @@ namespace HelloBoids
 //			public double PowerCellWeight;
 			
 			// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
-			weapon.Span[0].TypeDamage = DAMAGE_TYPE.Burning;     // TOOD: Need an ENUM
+//			weapon.Span[0].TypeDamage = DAMAGE_TYPE.Burning;     // TOOD: Need an ENUM
 			//public string Damage;         // this is dice of damage, but often contains a multiplier like (100) afterwards.  We don't need the multiplier since we just compute a min/max damage range or maybe we compute a single damage that then gets modified based on the target evasive maneuvers and such
-			weapon.Span[0].AverageDamage = 40;       
-//			public double KEDamage;
+			weapon.Span[0].AverageDamage = 3;       
+//			public double KEDamage = 3.0d;
 //			public double HalfDamage; 
 //			public double VacuumHalfDamage;
 
@@ -2346,7 +2648,7 @@ namespace HelloBoids
 //			public double VacuumMaxRange;
 //			public double VacuumMaxRange2;
     
-   */
+   
 		
 	
 		    if (this.Octree != null)
@@ -3339,6 +3641,17 @@ return (0,0);
         protected BoundingBox _box;
         protected OctreeOctant _octant;
 		protected Dictionary<string, object> mUserStructs;
+		protected UserData mUserData;
+		
+		
+        public EntityNode(int index, double x, double y, double z, double xV, double yV) 
+			: base (x, y, z, xV, yV)
+        {
+            mIndex = index;
+				
+			mUserData = EntryClass.mCStoreUserData.CheckOut(index.ToString());
+				
+        }
 		
 		
 		public void AddUserStruct(object memStore)
@@ -3359,6 +3672,8 @@ return (0,0);
 			
 			AddUserStruct (genericTypeName, memStore);
 		}
+		
+		public UserData BlackBoardData { get {return mUserData;} set {mUserData = value;} }
 		
 		public void AddUserStruct(string typename, object memStore)
 		{
@@ -3392,16 +3707,6 @@ return (0,0);
             get { return _box; }
         }
 
-        public EntityNode(string guid)
-        {
-            mID = guid;
-        }
-
-        public EntityNode(int index, double x, double y, double z, double xV, double yV) 
-			: base (x, y, z, xV, yV)
-        {
-            mIndex = index;
-        }
 
         public OctreeOctant SpatialNode
         {
@@ -3411,6 +3716,23 @@ return (0,0);
         }
 
         public int Index { get { return mIndex; } set {mIndex = value;}}
+		
+		
+	#region
+		public override void DisposeManagedResources()
+        {
+           if (!mIsDisposed)
+           {
+			   base.Dispose();
+			   
+			   // todo: verify this.Index should not be this.ID (a string) in KGB Entity.cs since
+			   //       maintaining the "Index" within a ComponentStore<> will be needlessly complicated
+			   EntryClass.mCStoreUserData.CheckIn(this.Index.ToString(), mUserData);
+			   mIsDisposed = true;
+		   }   
+        }
+	#endregion
+		
     }
 
 
@@ -4455,13 +4777,13 @@ return (0,0);
 
         #region Disposable members
 #if USE_MEMORY_T
-bool mIsDisposed;
-        public void Dispose()
+		protected bool mIsDisposed;
+        public virtual void Dispose()
         {
             DisposeManagedResources();
 		}
 
-        public void DisposeManagedResources()
+        public virtual void DisposeManagedResources()
         {
            if (!mIsDisposed)
            {
@@ -5254,11 +5576,11 @@ bool mIsDisposed;
 
         public int MaxEntityCount { get; set; }
 
-
-        protected EntitySystemBase(string id) : base(id)
-        {
-        }
-
+		protected EntitySystemBase(string guid) : base(guid.GetHashCode(), 0, 0, 0, 0, 0)
+		{
+			
+		}
+		
         public virtual void Update(double elapsedSeconds, IEntitySystem.EntitySystemUpdateContext context)
         {
             // select from mUpdateHandlers based on context... its essentially like update LOD where the
@@ -11146,7 +11468,8 @@ if (mEntityNodesCollection == null) return null;
 
 
 
-
+	////////////////////////////////////////////////////////////////////////////////////////////////
+    // DATA PROCESSORS, USER DATA STORE and COMPONENT STORES 
 #if USE_MEMORY_T
     public class DataProcessorsStore
     {
@@ -11448,60 +11771,502 @@ if (mEntityNodesCollection == null) return null;
              // IEntitySystems.Update()
 
 
-             // movement of crew (steering)
-             //   linear acceleration / decelaration
-             //   newtonian ship movement
-             //   movement of ships via Steering 
-             //
-             // physics Update
-             //   N-Body
-             // laser bolts
-             // missiles
-
-             // particle Systems
-             // motion fields
-             // 
-
-             // collisions (BoundingBox.Min, BoundingBox.Max, and Sphere.Center and Sphere.Radius need to be in a Memory<T> struct)
-             //
-
-             // Animations 
-             //   - interpolation Animations
-             //   - spritesheets
-             // 
-             // 
-             // game specific
-             //    - power drain
-             //    - fuel drain
-             //    - OnFire
-             //    - InRadiation
-             //    - UnderWater/InVaccuum
-             //
-             //    - applying accumulated damage
-             //    -   ""         "" damage
-             //    -   ""         "" bufs
-             //    -   ""         "" debufs
-             // 
-             //    - sensor scan (lambda)
-
-             //    - planetary scan
-             //    - AreaOfInterest 
-             //    // - storing data on interior Walls for fast iteration of mouse picking
-             //    // walls and floors and ceilings.  <-- This is mostly for when our view is such that
-             //    // we cannot first determine the closest edge and use that to find any wall on that edge
-             //    // For instance, imagine a camera that is more like a FPS view or a bullet or laser hits a Walls
-
-             //    - storing data on interior Walls and Floors and Ceilings "damage"
-
-
-
-
          } */
     }
 
 #endif
 
+	// http://www.gamasutra.com/view/news/38977/InDepth_Behavior_Tree_Entrails.php
+	// An agent's blackboard aggregates all agent specific game world knowledge. 
+	// It's the only data immediate action functions are allowed to access to keep
+	// cache misses at bay. A blackboard data structure might just be a C struct with
+	// fields like used by Halo 2 or a key-value dictionary. It's favorable if the
+	// blackboard can be stored as a data blob that's easily kept or streamed into 
+	// local memory/cache.
+	// ---
+	// WWG Notes - August.20.2025: see KeyCommon.Data.BinaryBlob.cs
+	// ---
+	// https://social.technet.microsoft.com/wiki/contents/articles/13461.blackboard-design-pattern-a-practical-example-radar-defense-system.aspx
+	// Blackboard is a design pattern that also requires it be threadsafe.	Blackboard
+	// is great for sharing knowledge.
+	// http://www.codeproject.com/Articles/451326/Type-safe-blackboard-property-bag
+	public class UserData 
+	{
+		
+		// http://www.gamasutra.com/view/news/198377/Video_Valves_system_for_creating_AIdriven_dynamic_dialog.php
+		// http://www.valvesoftware.com/publications/2012/GDC2012_Ruskin_Elan_DynamicDialog.pdf
+		// NOTE: in Valve's Zombie game, for the npc voice logic, they share
+		//       all of this knowledge in a single knowledge base rather than allowing
+		//       each to have it's own in a fragmented way and it makes running through
+		//       them sequentially to find voice responses that match a search much faster and easier.
+		//       Valve's Left 4 Dead voice logic is very much a flat database but generated by flattening
+		//		 a scenegraph style directed acyclic graph (DAG))	
+		//		 - The trick is how the KEY for each flattened path is created and then used when building the query string!!!		
+		//		http://www.gamasutra.com/blogs/GuyHasson/20120706/173705/Story_Design_Tips_Better_NPC_Interaction_Part_II.php
+		//			- sort rules alphabetically.  Why?
+		//				- well this way when running the comparisons of the QUERIES against the CONDITIONS of each rule,
+		//			as we iterate through each QUERY "key" we don't have to re-start an iteration at the beginning of every CONDITION "key" 
+		//			because we know they are in same alphabetical order as the QUERIES collection.  For instance:
+		//			QUERY: A:100, B:50, C:true, F:false
+		//			RULE1:
+		//          	CONDITIONS: A:<=500 && A: >=0 
+		//              CONDITIONS: C:<=True && >=True
+		//				- in the above, we start to iterate through the 4 query tuples and for each naivly we iterate each CONDITION
+		//                but instead, when we find a matching condition, we don't need to start over.  We can resume because we know that
+		//                the CONDITIONS are sorted the same way so when testing QUERY part B, we can resume iteration of CONDITION and next
+		//				  CONDITION will be C: so we know B doesn't exist (else the iteration cursor would have been moved back to beginning).		
+		//
+		//          TODO: currently our normal propertybag stores it's data as DefaultValue and does not actually hook back to a
+		//			      collection of objects.  It should actually store to same object store so that the data can also be read
+		//                directly through the object store and not through the entity.  Recall that originally, the point of using the PropertySpec's
+		//                was to get propertybag GUI rendering for free via propertygrid control.
+		//
+		//			- hash buckets for different regions and/or other basic buckets similarly to what we do when we cull
+		//			- store pointers to the value we want to compare rather than have to query that game data
+		//			- sort by decreasing # of criteria (as we do with TileMap auto-tile rules)
+		//			- represent every comparision as a >= x >= b  
+		//				eg.   return (10 >= ptrCharacterXHitpoints && ptrCharacterXHitpoints >= 100);    
+		//
+		//		So in a way, what we want there is a Blackboard class that can
+		//       manage all that for us, and then when we first initialize a behavior
+		//       on an Entity, it will grab a blackboard blob from the allocator and
+		//       assign it to the Enity.Knowledge
+		//       - and since the dialogue tree structure is essentially a flattened DAG (like a scenegraph)
+		//		 which seems to take on a Rules Engine like functionality because it becomes serial
+		//       test and not a branching test.
+		//       -thus, each "record" has an owner and can be referenced and read/written to
+		//       from the UserDataStore.  There is a question of whether this data should remain in 
+		//       DB form.. perhaps cached for recent access.  Well, i think it must be cached or else
+		//       way too slow for the type of use we do.  Do we CheckIn/CheckOut data blobs?  We could do some
+		//       really fast computations I think and threaded, on an in memory "blackboard" where each blackboard 
+		//       can be defined and hold all of same record types (eg all stars, all worlds, all npcs) so that
+		//       manipulation of their data is... well... its all very functional style and not OO.
+		//		 - THE CACHE COHERENCY BECOMES EXCELLENT.
+		//		   - perhaps each derived blackboard itself becomes a data manipulator that knows how to read/write it's data
+		//	       and then the sqlite or whatever storage occurs as generic using array of field definitions
+		//			- Being able to define custom blackboards is nice because we now have fixed size fields
+		//
+		//		 - is the UserDataStore a global like Pager and Repository?
+		//		- maybe each Blackboard gets instantiated EXE side and so we get StarData : UserData 
+		//      that gets used for all stars and which we can write custom data manipulation against
+		//		- we could even read/write to it like we do with Packets... and perhaps even use unsafe code for even greater performance
+		// (See E:\dev\_projects\_XNA\Mercury Particle Engine\ProjectMercury.WindowsEmitters\Emitter.cs.Update() method)
+		// but one thing it does which i think defeats the purpose somewhat perhaps is it creates a fixed pointer to the particle array rather than allocating it as pointer from start.  having to "fix" it seems like enough overhead to nullify any performance advantages
+		
+		//  - Production productID and Consumers can be stored here as well.  Do we still want to use scripts for these entities? or
+		//    would scripts assigned to each data store type be more efficient?
+		//  - for economic simulation this could be very fast
+		//	- AI simulation may be more needed case for a single player 1.0 game release
+		//		- blackboard data can store Area_Of_Interest data generated from other pre- calculations 
+		//  - for NPC simulation this can be very fast too when running out behavior tree against this data
+		//    and eventually we probably stop simulating Entity AI in Entity.Update() and move it to an Update() 
+		//    of simulation that will iterate through npcs by iterating through the blackboard data (limiting iterating 
+		//    to X count that fit into an alotted timeslice using threading as available and as needed)
+		
+		//		- IN OTHER WORDS, by iterating through the array of UserData to perform entity updates, can we properly update
+		//    these variables with appropriate functions and have the update reflected in the Entity itself?  For example, lets say
+		//    we have 50 entities that are doing wander steering behavior... can we run a singular script that operates on blackboard user data
+		//    to update all 50 of those entities?  rather than 50 calls to entity.update() and 50 script calls.
+		//          - if the scripts each entity uses can be one of the ways we sort entities when updating their data, then we can easily
+		//          update all entities using a particular script.... similar to how we do renders of sorted entities
+		//			- if our scene update() loop added entities to be updated in sorted buckets... but for now this is jsut brainstorming idea, since it could slow us down
+		//
+		
+		// TODO: google cache coherency as it relates to flat databases 
+		//			- and .net c#
+		// TODO: isn't BehaviorContext.Knowledge already associated with Entity?  And shouldn't this data replace Entity CustomProperties? and Rename var from Knowledge to Entity.CustomData
+                                   //       and is now stored in sqlite where our scene representation which uses xml is seperate from the entity custom data which is db stored.  Our EntityAPI for
+                                   //       getting custom data can now also use methods with type safety.  Further we no longer have to care about custom data being serialized to xml and perhaps this
+                                   //       speeds up our ability to save scene when we are editing maps as well as saving game state
+        							// TODO: however, will this type of CustomProperties now no longer be easily editable in a PropertyGrid and if not, is that ok?
+        							//      we're using custom html interfaces now anyway right?
+        							//      we must start with _just_ custom properties for now but actually just RenderingContext 
+        							// TODO: also what about shaders?  right now those use custom properties for shader params/vars and should not be stored in a db!
+        							// TODO: actually volume, surfacearea,cost,weight for all celestial bodes is already being used as custom properties!
+        							//       So question is, how do we connect those to a datastore?
+        							//		 - well just as we use GetProperties() SetProperties() where a single reader/writer of xml store is operating
+        							//       we can do same for UserData.   We can convert to GetProperties and SetProperties() and we can also
+        							//       use other methods of iterating thru the list of custom data. For now, let's just focus on Viewpoint for Chase
+        					
+		// is there a way to track the data for an individual Entity via an Index into array of records and to have this record
+		// index maintained during lifetime? indices can be checked in / checked out
 
+		// locally, we dont really need to use entityID as part of a record key either, locally we can use just an Index
+		// and perhaps a lookup value... but i think in short term, we should continue to focus on just Viewpoint and Chase cam
+		// and if that goes well, Stars and see about how it works with LoadTVResource() and restoring DB via a LoadCustomData()
+        							
+		bool Initialized = false;      // first run? if knowledge is not initialized, then we should select initialization node first
+                                       // TODO: is it useful to store these by type?  so bools, timestamps, vector3d, strings, ints, etc?
+                                       //	System.Collections.Hashtable BehaviorState;
+                                       //	System.Collections.Hashtable AxisState;
+                                       //	System.Collections.Hashtable TimeStamps;  // when a target was seen, when received damage, when ally died, 
+                                       // Stimulii <-- not sure... is this like timestamps where we learn if we've just consumed explosive damage from an explosive producer?
+
+
+        // TODO: I could/should just use a Template here!
+        // TODO: if everything was an object and I just used the "GetInteger()" for example, as helper method to do a cast for me since i know the type represented by each key value
+        //       then perhaps i could jsut avoid all of these dictionaries? perhaps at least, have dictionaries that are now key'ed into buckets
+        //       by entityID and/or by regionID and then entityID.	The point is though
+        //       by storing them in a Dictionary as object, I can query the value by maintaining a reference to that object in a Rule
+        //       so that when running these rules, i dont have to perform the lookup in the collection for the value.  I just have to do a cast.	
+        //private int ID; // ID should (but not required) to be unique amongst all Entities and combined with an iterator count, can be used for deterministic random seeds.
+        // https://www.gamedeveloper.com/programming/a-primer-on-repeatable-random-numbers
+        //private int mCounter; // every traversal of the behavior tree increments this value by 1 and potentially every decision made during traversal where a Random number is needed, can increment this counter.	
+		private Dictionary <string, object> Objects;
+		private Dictionary<string, object[]> ObjectsArray;
+		private Dictionary <string, string> Strings;
+        private Dictionary <string, string[]> StringArray;
+		private Dictionary <string, bool> Bools;
+		private Dictionary <string, int> Integers;
+		private Dictionary <string, float> Floats;
+		private Dictionary <string, double> Doubles;
+		//private Dictionary <string, System.Drawing.Point> Points;
+		private Dictionary <string, Vector3d> Vectors;
+		private Dictionary <string, Vector3d[]> Vector3dArrays;
+		private Dictionary <string, Quaternion> Quaternions;
+		//private Dictionary <string, Color> Colors;
+
+        // https://github.com/wuyuntao/BehaveAsSakura/tree/master
+        // TODO: if we enforced all fields first, then we could do a fixed layout
+        //       but if that's the case, we might as well just use struct{}
+        //       However, also it could be better if the key for all of these
+        //       is tied to the Entity so that we have key = entity.ID + ":" + name
+        //       and this way we can use a single set of Dictionaries (or in the future, arrays)
+        //       to store everything.  The problem is with arrays, we could use a lookup for the entity ID
+        //       to find the index for the record, then use sub-index for the specific field
+        // TODO: Collections field could be used perhaps to store nested Data?
+        private Dictionary <string, UserData> Collections;
+
+        /// <summary>
+        /// UseData.ctor() uses the access modifier "internal" because an instance
+        /// must be obtained via GameAPI which will result in a call to 
+        /// UserDataStore.CheckOut() which will provide an index.
+        /// Our Viewpoint BehaviorTree is one exception currently that calls 
+        /// UserDataStore.CheckOut() that does not originate from a script call 
+        /// to GameAPI.
+        /// </summary>
+        internal UserData()
+        {
+        }
+
+		internal UserData Clone ()
+		{
+			UserData copy = new UserData ();
+
+            // TODO: a single array of object would consume less memory
+            //       and cloning it would not require we maintain the code whenever we add
+            //       a new generic Dictionary type.
+            // 
+            //  and then why not then use "custom properties" or something?
+            //  our PropertyTable is a type of blackboard too... but its main
+            //  feature is that it allows for use with a propertyGrid
+            //  We could maybe streamline it... but it uses just flat array instead of
+            //  dictionary.  
+            //  Also, even our "custom properties" could use same array as our regular properties
+            //  only we could add them to a category of "custom" properties instead
+            //  so that when serializing we can skip them
+
+            // our IEntityAPI can still use special accessors for get/set so that caller in script
+            // does not have to specify a category, but actually i dont think thats necessary.  they are
+            // only keyed by property name, not name and category.
+            // 
+            // Also, we can still do database storage easily using a DataObject wrapper around our Properties.
+            // or well maybe scrach that, since our normal properties are linked to intrinsic property fields 
+            // in those Entities like _translation and _scale and _orientation, but our Behavior nodes can still
+            // access those as blackboard knowledge...
+
+            // so i think our 'UserData' interface should merge with "CustomProperties" in the short term 
+            // and be cloneable.  at the least instead of spec.DefaultValue, we should be using actual
+            // UserData[key]  to store the value.
+            throw new NotImplementedException();
+            return null;
+		}
+
+        // TODO: our "Entity.BlackboardData" will contain an array of objects that each script
+        //       for that Entity will assign and therefore know how to cast each array element.
+        //       So we can have bbData = new object[2];
+        //       bbData[0] = new ComponentStore<EnergyWeapon>();
+        //       bbData[1] = new UserData;  // <-- this is the AI data which can be a struct also and which the Entity's script will know what is assigned to this index
+        public object[] GetObjectArray(string name)
+        {
+            return ObjectsArray[name];
+        }
+        
+        public void SetObject(string name, object[] value)
+        {
+            if (ObjectsArray == null)
+                ObjectsArray = new Dictionary<string, object[]>();
+
+            if (ObjectsArray.ContainsKey(name))
+                ObjectsArray[name] = value;
+            else
+                ObjectsArray.Add(name, value);
+        }
+        
+        public object GetObject(string name)
+        {
+            return Objects[name];
+        }
+        
+        public void SetObject(string name, object value)
+        {
+            if (Objects == null)
+                Objects = new Dictionary<string, object>();
+
+            if (Objects.ContainsKey(name))
+                Objects[name] = value;
+            else
+                Objects.Add(name, value);
+        }
+
+        public string GetString (string name)
+		{
+			return Strings[name];
+		}
+		public void SetString (string name, string value)
+		{
+			if (Strings == null)
+					Strings = new Dictionary<string, string> ();
+			
+			if (Strings.ContainsKey(name))
+				Strings [name] = value;
+			else   				
+				Strings.Add (name, value);
+		}
+
+        public string[] GetStringArray(string name)
+        {
+            return StringArray[name];
+        }
+
+        public void SetStringArray(string name, string[] value)
+        {
+            if (StringArray == null) StringArray = new Dictionary<string, string[]>();
+            StringArray[name] = value;
+        }
+
+		public bool GetBool (string name)
+		{
+			return Bools[name];
+		}
+		public void SetBool (string name, bool value)
+		{
+			if (Bools == null)
+					Bools = new Dictionary<string, bool> ();
+			
+			if (Bools.ContainsKey(name))
+				Bools [name] = value;
+			else   				
+				Bools.Add (name, value);
+		}
+		
+		public int GetInteger (string name)
+		{
+			return Integers[name];
+		}
+		public void SetInteger (string name, int value)
+		{
+			if (Integers == null)
+				Integers = new Dictionary<string, int> ();
+			
+			if (Integers.ContainsKey(name))
+				Integers [name] = value;
+			else   				
+				Integers.Add (name, value);
+		}
+		
+		public double GetDouble (string name)
+		{
+			return Doubles[name];
+		}
+		public void SetDouble (string name, double value)
+		{
+			if (Doubles == null)
+					Doubles = new Dictionary<string, double> ();
+			
+			if (Doubles.ContainsKey(name))
+				Doubles [name] = value;
+			else
+				Doubles.Add (name, value);
+		}
+		
+		public float GetFloat (string name)
+		{
+			return Floats[name];
+		}
+		public void SetFloat (string name, float value)
+		{
+			if (Floats == null)
+					Floats = new Dictionary<string, float> ();
+			
+			if (Floats.ContainsKey(name))
+				Floats [name] = value;
+			else
+				Floats.Add (name, value);
+		}
+		  
+		/*
+		public System.Drawing.Point GetPoint (string name)
+		{
+			return Points [name];
+		}
+		public void SetPoint (string name, System.Drawing.Point value)
+		{
+			if (Points == null)
+				Points = new Dictionary<string, System.Drawing.Point> ();
+				
+			if (Points.ContainsKey(name))
+				Points [name] = value;
+			else
+				Points.Add (name, value);
+
+		}
+		*/
+		
+		public Vector3d GetVector (string name)
+		{
+			return Vectors [name];
+		}
+		public void SetVector (string name, Vector3d value)
+		{
+			if (Vectors == null)
+				Vectors = new Dictionary<string, Vector3d> ();
+				
+			if (Vectors.ContainsKey(name))
+				Vectors [name] = value;
+			else
+				Vectors.Add (name, value);
+		}
+
+		public Vector3d[] GetVector3dArray (string name)
+		{
+			return Vector3dArrays [name];
+		}
+		public void SetVector3dArray (string name, Vector3d[] value)
+		{
+			if (Vector3dArrays == null)
+				Vector3dArrays = new Dictionary<string, Vector3d[]> ();
+				
+			if (Vector3dArrays.ContainsKey(name))
+				Vector3dArrays [name] = value;
+			else
+				Vector3dArrays.Add (name, value);
+		}
+		
+		
+		public Quaternion GetQuaternion (string name)
+		{
+			return Quaternions [name];
+		}
+		public void SetQuaternion (string name, Quaternion value)
+		{
+			if (Quaternions == null)
+				Quaternions = new Dictionary<string, Quaternion> ();
+				
+			if (Quaternions.ContainsKey(name))
+				Quaternions [name] = value;
+			else
+				Quaternions.Add (name, value);
+		}
+		
+		
+		
+	#region Disposable members
+		bool mIsDisposed;
+        public void Dispose()
+        {
+            DisposeManagedResources();
+		}
+
+        public void DisposeManagedResources()
+        {
+           if (!mIsDisposed)
+           {
+                
+				//Console.WriteLine ("UserData.cs.DisposeManagedResources() - ...");
+
+			   mIsDisposed = true;
+		   }
+        }
+
+        #endregion
+	
+	
+	}	
+	
+	/// <summary>
+	/// Stores ALL UserData objects for all loaded Entities.  
+	/// This is necessary so that our DataProcessors can grab the appropriate
+	/// parameters required for a DataProcessor delegate, for all Entities/Components
+	/// that are being processed.
+	/// </summary>
+	public class UserDataStore : IDisposable
+	{
+		private System.Collections.Concurrent.ConcurrentDictionary<string, UserData> mUserDataCollection; // Dictionary<string, UserData> mUserDataCollection;
+		
+		public UserDataStore()
+		{
+		    //mUserDataCollection = new Dictionary<string, UserData>();
+			mUserDataCollection = new System.Collections.Concurrent.ConcurrentDictionary<string, UserData>();
+			
+		}
+		
+		// TODO: currently Entity.BlackBoardData is being assigned externally to entityID
+		//       which is just fine, but now we need to grab it from KeyCommon.Data.UserDataStore.CheckOut(entityID);
+		// TODO: We also need to make sure when an Entity is detached from the Scene, CheckIn(entity.ID, entity.BlackBoardData) is called.
+		// August.18.2025 - WWG -  this change is being made because we need to be able to pass all BlackBoardData for all Entities 
+		//                         so that rules processors for Memory<T> will have access to that BlackBoardData which can contain
+		//                         parameters required by the various rules processors in order to adequately process the data for each Entity 
+		//                         given the current rule being ran.
+		public UserData CheckOut(string entityID)
+		{
+		    bool success = mUserDataCollection.ContainsKey(entityID);		    
+		    if (success) throw new Exception ("UserDataStore.ctor() - Dictionary Key '" + entityID + "' Already Exists.");
+		    
+		    UserData data = new UserData();
+		    
+		    mUserDataCollection.TryAdd(entityID, data);
+		    return data;
+		}
+		
+		public void CheckIn (string entityID, UserData data)
+		{
+		    if (string.IsNullOrEmpty(entityID) || data == null) throw new ArgumentOutOfRangeException();
+		    
+		    UserData value;
+		    bool success = mUserDataCollection.TryGetValue(entityID, out value);
+		    
+		    if (value != data) throw new ArgumentOutOfRangeException();
+		    
+		    bool tryResult = mUserDataCollection.TryRemove(entityID, out data);
+			if (!tryResult) throw new ArgumentOutOfRangeException("UserDataStore.CheckIn() - Key " + entityID + "' does not exist.");
+		    data.Dispose();
+		}
+		
+		#region Disposable members
+		protected bool mIsDisposed;
+        public void Dispose()
+        {
+            DisposeManagedResources();
+		}
+
+        public void DisposeManagedResources()
+        {
+           if (!mIsDisposed)
+           {
+                // TODO: Iterate through and dispose all contained UserData in collectiopns
+			   throw new NotImplementedException("UserStore.Dispose() - ");
+			   
+				//Console.WriteLine ("UserData.cs.DisposeManagedResources() - ...");
+
+			   mIsDisposed = true;
+		   }
+        }
+
+        #endregion
+			
+	}
+	
 
     /// <summary>
     /// ComponentStoreCollection allows for the CheckIn() and CheckOut() of 
@@ -14560,4 +15325,279 @@ if (mEntityNodesCollection == null) return null;
             set { type = value; }
         }
     }
+	
+	
+	
+	// https://github.com/webermania/MicroExpressionEvaluator
+	// Apache 2.0 license  // todo: include
+	public static class MicroEx
+    {
+        public static StringComparison StringComparison { get; set; } = StringComparison.Ordinal;
+
+        /// <summary>
+        /// interprets and evaluates logic expressions represented as string
+        /// </summary>
+        /// <param name="expression">Input expression such as "(\"text123\" == \"text123\") && (7 <= 8)"</param>
+        /// <returns>returns evaluation success as bool or throws Exception with clear a Error message
+        public static bool Evaluate(string expression)
+        {
+            return string.IsNullOrWhiteSpace(expression)
+                ? throw new Exception("Invalid input! Empty expression.")
+                : SimplifyAndSolveExpression(expression);
+        }
+
+        private static bool ContainsAnyOperators(string expr)
+        {
+            return new[] { "||", "&&", "!=", "==", "<=", ">=", "<", ">" }.Any(expr.Contains);
+        }
+
+        /// <summary>
+        ///     Solves nested groups from the ((((inside)))) out
+        /// </summary>
+        private static bool SimplifyAndSolveExpression(string expr)
+        {
+            bool containsOpenBracket = expr.Contains('(');
+            bool containsCloseBracket = expr.Contains(')');
+
+            if (containsOpenBracket && !containsCloseBracket)
+            {
+                throw new Exception($"Invalid input:'{expr}'! ) expected.");
+            }
+
+            if (!containsOpenBracket && containsCloseBracket)
+            {
+                throw new Exception($"Invalid input:'{expr}'! ( expected.");
+            }
+
+            if (containsOpenBracket)
+            {
+                string[] potentialGroups = expr.Split(new string[] { "(" }, StringSplitOptions.RemoveEmptyEntries);
+
+                foreach (string potentialGroupX in potentialGroups)
+                {
+                    if (potentialGroupX.StartsWith(")") && potentialGroupX.Length > 1)
+                    {
+                        throw new Exception($"Invalid input:'{potentialGroupX}'! ( expected.");
+                    }
+
+                    if (potentialGroupX.StartsWith(")"))
+                    {
+                        throw new Exception("Invalid input! Group has no value ().");
+                    }
+
+                    int nextOpenBracket = potentialGroupX.IndexOf('(');
+                    int nextCloseBracket = potentialGroupX.IndexOf(')');
+
+                    if (nextCloseBracket == -1 || (nextOpenBracket != -1 && nextOpenBracket < nextCloseBracket))
+                    {
+                        continue;
+                    }
+
+                    // found a (group) that has (no (deeper nested) group)
+                    string subExpr = potentialGroupX.Substring(0, nextCloseBracket);
+                    bool subResult = SplitAndValidateLogicalOperators(subExpr);
+
+                    string simplifiedExpr = expr.Replace($"({subExpr})", subResult.ToString().ToLower());
+                    return SimplifyAndSolveExpression(simplifiedExpr);
+                }
+            }
+
+            return SplitAndValidateLogicalOperators(expr);
+        }
+
+        /// <summary>
+        ///     Fast and simple way to split into only two pieces
+        /// </summary>
+        /// <param name="source">string to be split</param>
+        /// <param name="separator">what to split by</param>
+        /// <returns>string array of result(s)</returns>
+        private static string[] SplitOnce(string source, string separator)
+        {
+            if (string.IsNullOrEmpty(source))
+            {
+                return Array.Empty<string>();
+            }
+
+            if (string.IsNullOrEmpty(separator))
+            {
+                return new string[] { source.Trim() };
+            }
+
+            int position = source.IndexOf(separator, StringComparison.Ordinal);
+            if (position == -1)
+            {
+                return new string[] { source.Trim() };
+            }
+
+            string before = source.Substring(0, position);
+            string after = source.Substring(position + separator.Length);
+
+            return new string[] { before.Trim(), after.Trim() };
+        }
+
+        /// <summary>
+        ///     Splits the problem respecting the correct operator precedence.
+        ///     (Testsed against C# implementation.)
+        /// </summary>
+        private static bool SplitAndValidateLogicalOperators(string expr)
+        {
+            // ||
+            string[] op1 = SplitOnce(expr, "||");
+            if (op1.Length > 1)
+            {
+                return op1.Any(SimplifyAndSolveExpression);
+            }
+
+            // &&
+            string[] op2 = SplitOnce(expr, "&&");
+            if (op2.Length > 1)
+            {
+                return op2.All(SimplifyAndSolveExpression);
+            }
+
+            // !=
+            string[] op3 = SplitOnce(expr, "!=");
+            if (op3.Length > 1)
+            {
+                bool part1GoesDeeper = ContainsAnyOperators(op3[0]);
+                bool part2GoesDeeper = ContainsAnyOperators(op3[1]);
+
+                if (part1GoesDeeper || part2GoesDeeper)
+                {
+                    bool resultPart1 = part1GoesDeeper ? SimplifyAndSolveExpression(op3[0]) : ValidateBool(op3[0]);
+                    bool resultPart2 = part2GoesDeeper ? SimplifyAndSolveExpression(op3[1]) : ValidateBool(op3[1]);
+
+                    return resultPart1 != resultPart2;
+                }
+
+                return !ValidateEquality(op3[0], op3[1]);
+            }
+
+            // ==
+            string[] op4 = SplitOnce(expr, "==");
+            if (op4.Length > 1)
+            {
+                bool part1GoesDeeper = ContainsAnyOperators(op4[0]);
+                bool part2GoesDeeper = ContainsAnyOperators(op4[1]);
+
+                if (part1GoesDeeper || part2GoesDeeper)
+                {
+                    bool resultPart1 = part1GoesDeeper ? SimplifyAndSolveExpression(op4[0]) : ValidateBool(op4[0]);
+                    bool resultPart2 = part2GoesDeeper ? SimplifyAndSolveExpression(op4[1]) : ValidateBool(op4[1]);
+
+                    return resultPart1 == resultPart2;
+                }
+
+                return ValidateEquality(op4[0], op4[1]);
+            }
+
+            // >=
+            string[] op5 = SplitOnce(expr, ">=");
+            if (op5.Length > 1)
+            {
+                bool part1GoesDeeper = ContainsAnyOperators(op5[0]);
+                bool part2GoesDeeper = ContainsAnyOperators(op5[1]);
+
+                return part1GoesDeeper || part2GoesDeeper
+                    ? throw new Exception(
+                        $"Invalid input:'{expr}'! Operator '>=' cannot be applied to operands of type 'bool' and 'object'.")
+                    : Convert.ToDecimal(op5[0]) >= Convert.ToDecimal(op5[1]);
+            }
+
+            // <=
+            string[] op6 = SplitOnce(expr, "<=");
+            if (op6.Length > 1)
+            {
+                bool part1GoesDeeper = ContainsAnyOperators(op6[0]);
+                bool part2GoesDeeper = ContainsAnyOperators(op6[1]);
+
+                return part1GoesDeeper || part2GoesDeeper
+                    ? throw new Exception(
+                        $"Invalid input:'{expr}'! Operator '<=' cannot be applied to operands of type 'bool' and 'unknown object'.")
+                    : Convert.ToDecimal(op6[0]) <= Convert.ToDecimal(op6[1]);
+            }
+
+            // >
+            string[] op7 = SplitOnce(expr, ">");
+            if (op7.Length > 1)
+            {
+                bool part1GoesDeeper = ContainsAnyOperators(op7[0]);
+                bool part2GoesDeeper = ContainsAnyOperators(op7[1]);
+
+                return part1GoesDeeper || part2GoesDeeper
+                    ? throw new Exception(
+                        $"Invalid input:'{expr}'! Operator '>' cannot be applied to operands of type 'bool' and 'unknown object'.")
+                    : Convert.ToDecimal(op7[0]) > Convert.ToDecimal(op7[1]);
+            }
+
+            // <
+            string[] op8 = SplitOnce(expr, "<");
+            if (op8.Length > 1)
+            {
+                bool part1GoesDeeper = ContainsAnyOperators(op8[0]);
+                bool part2GoesDeeper = ContainsAnyOperators(op8[1]);
+
+                return part1GoesDeeper || part2GoesDeeper
+                    ? throw new Exception(
+                        $"Invalid input:'{expr}'! Operator '<' cannot be applied to operands of type 'bool' and 'unknown object'.")
+                    : Convert.ToDecimal(op8[0]) < Convert.ToDecimal(op8[1]);
+            }
+
+            return ValidateBool(expr);
+        }
+
+        private static bool ValidateBool(string val)
+        {
+            if (string.IsNullOrEmpty(val))
+            {
+                throw new ArgumentException("Input string is null or empty.");
+            }
+
+            val = val.Trim();
+
+            if (val.Length == 0)
+            {
+                throw new ArgumentException("Input string is only whitespace.");
+            }
+
+            if (val[0] == '!')
+            {
+                return !ValidateBool(val.Substring(1));
+            }
+
+            // Using StringComparison.OrdinalIgnoreCase for case-insensitive comparison
+            return val.Equals("true", StringComparison.OrdinalIgnoreCase) || (val.Equals("false", StringComparison.OrdinalIgnoreCase)
+                    ? false
+                    : throw new ArgumentException($"String '{val}' was not recognized as a valid Boolean."));
+        }
+
+        private static bool ValidateEquality(string val1, string val2)
+        {
+            val1 = val1.Trim();
+            val2 = val2.Trim();
+
+            bool val1HasStringFlag = val1.StartsWith("\"") && val1.EndsWith("\"");
+            bool val2HasStringFlag = val2.StartsWith("\"") && val2.EndsWith("\"");
+
+            if (val1HasStringFlag != val2HasStringFlag)
+            {
+                throw new Exception(
+                    $"Invalid input i1:'{val1}' i2:'{val1}'! Operator cannot be applied to operands of type 'string' and 'unknown object'.");
+            }
+
+            if (val1HasStringFlag)
+            {
+                return val1.Equals(val2, StringComparison);
+            }
+
+            bool val1IsDec = decimal.TryParse(val1, out decimal val1Dec);
+            bool val2IsDec = decimal.TryParse(val2, out decimal val2Dec);
+
+            return val1IsDec != val2IsDec
+                ? throw new Exception(
+                    $"Invalid input i1:'{val1}' i2:'{val1}'! Operator cannot be applied to operands of type 'decimal' and 'unknown object'.")
+                : val1IsDec ? val1Dec == val2Dec : ValidateBool(val1) == ValidateBool(val2);
+        }
+    }
 }
+

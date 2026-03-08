@@ -1610,19 +1610,9 @@ namespace HelloBoids
 			// POLICIES AND RULES 
 			// todo: the ai captain needs a "mission" or "objectives" for each mission
 			// ordinance Rules
-			// ROE example:
-			//		- retreat if possible
-			//      - never fire first except during wartime
-			//		- diplomacy first unless state of war
-			//      - never fire on disabled ships or otherwise  non-threats
-			//		- pre-emptive policy
-			//		- disable priority
-			//			- shields
-			//			- weapons
-			//			- engines
-			//		- proportiality / proportional response
-			//		- nuclear weapons only to deter opposing nuclear threat only (some ships may have a mission of always staying hidden and running silent and nuclear deterences in case of an attack on homeworld and homeworld is destroyed, the retaliatory strike option will still exist to carry out its mission
-			//		- 
+			// ROE example: see HelloConditions.cs
+
+			//		
 			// NOTE: Really, the below loop is mostly for COMBAT logic only.  
 			// 
 				
@@ -1879,9 +1869,17 @@ namespace HelloBoids
             {
 				Boid currentBoid = Boids[i];
 				
-				// these will be stored in "object[]" and thus boxed
+				// these will be stored in UserData's local "object[]" and thus boxed
 				StationState stationState  = (StationState)currentBoid.BlackBoardData.GetObject("tactical_state");
-					
+				if (stationSate.Actions == null || stationState.Actions.Count == 0)	
+                {
+
+                    int count = stationState.Actions.Count;
+
+
+                }
+
+
 				Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component));
 				Memory<Weapon> wep = (Memory<Weapon>) currentBoid.GetUserStruct(typeof(Weapon));
 				Memory<Laser_Struct> laser = (Memory<Laser_Struct>)currentBoid.GetUserStruct(typeof(Laser_Struct)); //  Laser_Struct laser = (Laser_Struct)currentBoid.mMemStore_Laser.Span[0];
@@ -1893,12 +1891,14 @@ namespace HelloBoids
 				// can this Droids TACTICAL STATION perform ANY actions right now?
 								
 				//  - station is not available/powered/healthy/has operator or AI conroller/etc
-				//  - are we in a state of COMBAT?
+				//	- we already have reached maximum number of ongoing actions for this station as well as Operator's skill level?
+				
+                
+                //  - are we in a state of COMBAT?
 				//		- direct orders?
 				//      - any Contacts in list marked as FOF.Foe + FOF.Hostile as opposed to just FOF.Foe (note: stale contacts are still treated as available in case of need to persue)
 				//      	- FOF.Withdrawing may be ignored for example if ROE says we don't persue in this circumstance including disabled ships and unarmed ships like freighters
 				//    
-				//	- we already have reached maximum number of ongoing actions for this station as well as Operator's skill level?
 				
 				
 				logicalExpression = wep.Span[0].AverageDamage.ToString() + " < " + testLEComp.Span[currentBoid.SpanIndexLE].Hitpoints.ToString();

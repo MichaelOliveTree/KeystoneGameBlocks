@@ -993,6 +993,10 @@ namespace HelloBoids
             DataProcessorsStore.Processor<LivingEntity> lifeCycleBehavior = DoLifeCycle;
             mDataProcessor.Add("LIFECYCLE", lifeCycleBehavior);
 
+			
+			DataProcessorsStore.Processor<Transform.Transform_Struct> opticalSensorsDetect = ProcessOpticalSensors;
+            mDataProcessor.Add("OPTICAL_SENSING", opticalSensorsDetect);	
+			
             DataProcessorsStore.Processor<Transform.Transform_Struct> flockingBehavior = DoFlocking;
             mDataProcessor.Add("FLOCKING", flockingBehavior);
 	
@@ -1360,7 +1364,7 @@ namespace HelloBoids
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine("Update 4 " + ex.Message);
+					Console.WriteLine("Update 5 " + ex.Message);
 				}
 				
 				
@@ -1590,17 +1594,189 @@ namespace HelloBoids
 			}
 		}
 		
+		
+		
+        private System.Collections.Concurrent.ConcurrentDictionary<int, List<int>> mNeighbors = new System.Collections.Concurrent.ConcurrentDictionary<int, List<int>>();
+
+		///<summary>
+		/// The Droid's Eyes are treated as Optical Sensors and are processed to find the adjacent Droids to each other Droids based on their sight distance.
+		/// This means that each Droid will find all Droids that are within it's "optical range."
+        /// This will be the initial set of "neighbors" that a Droid is influenced by before the finer
+        /// influences of seperation, alignment and cohesion rules.
+		/// Incidentally, moving this processing out into a seperated dedicated processor results in a significant boost in FPS compared to when it was
+		/// apart of DoFlocking().  We moved it out seperately because we need the adjacency info for doing Combat logic such as which Droid a particular
+		/// Droid can "see" and thus target with a laser.  
+		///</summary>
+        private void ProcessOpticalSensors(ComponentStore<Transform.Transform_Struct> store, object[] parameters, int seed, GameTime gt)
+        {
+            mNeighbors.Clear();
+			int length = store.Span.Length;
+			
+            OctreeOctant root = this.Octree;
+
+			//Console.WriteLine("parameters count == " + parameters.Length.ToString());
+			// NOTE: these values derived from passed in parameters
+			double separationDistance = (double)parameters[0];
+			double alignmentDistance = (double)parameters[1];
+			double cohesionDistance = (double)parameters[2];
+			
+			// more parameters
+			double separationFactor = (double)parameters[3];
+            double alignmentFactor = (double)parameters[4];
+            double cohesionFactor = (double)parameters[5];
+			double turnFactor = (double)parameters[6]; // For boundary avoidance
+			double maxSpeed = (double)parameters[7];
+            
+            //Console.WriteLine("ProcessOpticalSensors() - parameters count OK");
+            
+            double seperatationDistanceSquare = separationDistance * separationDistance;
+            double alignmentDistanceSquared = alignmentDistance * alignmentDistance;
+            double cohesionDistanceSquared = cohesionDistance * cohesionDistance;
+		   
+            double largestDistance = System.Math.Max(this.SeparationDistance, this.AlignmentDistance);
+            largestDistance = System.Math.Max(largestDistance, this.CohesionDistance);
+            double largestDistanceSquared = largestDistance * largestDistance;
+			double searchRadius = largestDistance * 0.5d;
+			
+			
+            System.Threading.Tasks.Parallel.For(0, length, i =>
+			//for (int i = 0; i < memSpan.Length; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
+            {
+				// NOTE: inside of the Parallel.For(), Span<T> cannot be passed in
+				//      because the code inside the Paralle.For() is treated as a Lambda
+				Span<Transform.Transform_Struct> memSpan = store.Span;
+				EntityNode currentBoid = Boids[(int)i];
+				
+				mNeighbors.TryAdd(currentBoid.SpanIndex, new List<int>(4));
+				
+		#if SPATIAL_SEARCH == false
+
+			   if (i > Boids.Count - 1)
+				   Console.WriteLine("ProcessOpticalScanners() - Out of range i == " + i.ToString() + " but count == " + Boids.Count.ToString());
+
+				mNeighbors[currentBoid.SpanIndex] = GetNeighbors(Boids[i], largestDistance, largestDistanceSquared);
+		#endif
+				
+			
+		#if SPATIAL_SEARCH
+				Stack<OctreeOctant> stack = new Stack<OctreeOctant>(32);
+            	
+				
+				// INLINING of "GetNeighbors" in order to avoid have to load the memSpan onto the stack for each iteration
+				
+				// Vector3d currentBoidTranslation = memSpan[i].Translation;
+								
+				// WARNING:  The first line that uses currentBoid.Translation is 100x SLOWER than the version using CLASSES (eg for "Classes" version comment out #define USE_MEMORY_T
+				//           The second line that uses memSpan[i].Translation is 100x FASTER than the version using CLASSES (WHAT ON EARTH?
+				//           I believe it is because the cache evicts the span<T> data and has to re-load it every iteration (eg memSpan.Length)
+				// UPDATE:   Above is likely wrong.  One problem is memSpan[i].Translation was always 0,0,0 and so the search box was often
+				//           never intersecting with the box of the currentB's spatial node SpatialNode.BoundingBox
+
+				//       BoundingBox searchArea = new BoundingBox(currentBoid.Translation, radius);
+				//       System.Console.WriteLine("Translation CLASS = " + currentBoid.Translation.ToString());
+				//BoundingBox searchArea = new BoundingBox(Boids[i].Translation, radius);
+				using (EntryClass.CodeProfiler.HookUp("GetNeighbors"))
+				{
+					BoundingBox searchArea;
+					//using (EntryClass.CodeProfiler.HookUp("GetSearchArea"))
+                    	searchArea = new BoundingBox(memSpan[(int)i].Translation, searchRadius);
+					//BoundingBox searchArea = new BoundingBox(currentBoidTranslation, radius);
+			//		System.Console.WriteLine("Translation MEMORY<T> = " + memSpan[i].Translation.ToString());
+                    
+                    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+                    // INLINED VERSION OF "ITERATIVE DEPTH-FIRST" TRAVERSAL OF OCTREE TO FIND NEIGHBORING BOIDS OF THE CURRENT ONE
+					// NOTE: We use this inline version that uses a stack<> to avoid recursion because having to load the span<T> onto
+					//       the stack for every function call that needs it, slows this "flocking" update code BIG TIME (eg by ~100x slower)
+	
+                    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+                    stack.Clear();
+					stack.Push(root); 
+					
+					while (stack.Count > 0)
+                    {
+						OctreeOctant currentOctant = stack.Pop();
+						if (currentOctant.BoundingBox.Intersects(searchArea))
+						{
+							// TODO: the following call to currentOcant.EntityNodes needs to be thread safe... the EntityNodes assigned can move within this ProcessOpticalScanners()  method
+							EntityNode[] ents = currentOctant.EntityNodes;
+							if (ents != null)
+							{
+								for (int j = 0; j < ents.Length; j++)
+								{
+									EntityNode potentialNeighbor = ents[j];
+
+									if (currentOctant.MaxRadius * 2d <= largestDistance)
+									{
+							 			mNeighbors[currentBoid.SpanIndex].Add(potentialNeighbor.SpanIndex);
+                         			}   
+                         			else
+									{   
+										// if (currentOctant.EntityNodes[j].SpanIndex == currentBoid.SpanIndex) continue; 
+										//using (EntryClass.CodeProfiler.HookUp("IntersectsSearchArea"))
+										if (!potentialNeighbor.BoundingBox.Intersects(searchArea)) 
+											continue;
+								
+										double distanceToNeighboringBoidSquared;
+										// TODO: if i stored the SpanIndex in the Octree instead of the EntityNode perhaps that would help?
+										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
+											distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[potentialNeighbor.SpanIndex].Translation, memSpan[(int)i].Translation);
+											//distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[potentialNeighbor.SpanIndex].Translation, currentBoidTranslation);
+
+										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
+										//   distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(currentOctant.EntityNodes[j].Translation, currentBoid.Translation);
+
+										//System.Diagnostics.Debug.WriteLine("Calculated distanceSquared to neighboring boid = " + distanceToNeighboringBoidSquared.ToString());
+										if (distanceToNeighboringBoidSquared <= largestDistanceSquared)
+
+											mNeighbors[currentBoid.SpanIndex].Add(potentialNeighbor.SpanIndex);
+     								}       
+             					}  // end for ents[]        
+							}
+						
+							OctreeOctant[] childOctants = currentOctant.Children;
+							if (childOctants != null)
+							{
+								//Console.WriteLine("ProcessOpticalScanners() - CLength == " + childOctants.Length.ToString());
+								for (int j = 0; j < childOctants.Length; j++)
+								{
+									// NOTE: Each OctreeOctant's BoundingBox needs to be in World Space.
+									bool intersects = false;
+									//using (EntryClass.CodeProfiler.HookUp("IntersectsSearchArea"))
+									{
+										if (childOctants[j] == null)
+											continue;
+
+										intersects = childOctants[j].BoundingBox.Intersects(searchArea);
+									}
+									if (intersects)
+									{
+										stack.Push(childOctants[j]);
+									}
+									//Console.WriteLine("ProcessOpticalScanners() - Stack count == " + stack.Count.ToString());
+								} // end for childOctants[]
+
+								//Console.WriteLine("ProcessOpticalScanners() - Stack count == " + stack.Count.ToString());
+							}
+						} // end if currentOctant intersects searchArea test
+					} // end While loop
+				} // end Using (GetNeighbors)
+		#endif // SPATIAL_SEARCH
+			});
+        
+			//Console.WriteLine("ProcessOpticalSensors() - COMPLETE ");
+        }
+		
 		/// <summary>
 		/// Seed would typically be Seeds.Local_Droid_Logic + mCurrentFrame;
 		/// </summary>
 		private void Do_Droid_Logic(int seed, double maxDistance)
 		{
+			//Console.WriteLine("Do_Droid_Logic() - BEGIN ");
+			
 			ThreadedRandom random = new ThreadedRandom(seed);
 			const double MAX_SEARCH_DISTANCE = 35d;
 	
-			// DataProcessor normally excepts following arguments
-			// 	- ComponentStore<Transform.Living_Entity> store, object[] parameters, int seed, GameTime gt
-	
+
 			// todo: we could pass in an array of store to our Processor functions... rather than just one.
 			//       but it would have to be an array of object[] like parameters and we'd have to cast them
 			// OR, our various processors can just grab the Stores that are needed.  There's no need really to 
@@ -1854,13 +2030,8 @@ namespace HelloBoids
 			// completely self contained class with no depenedancies that i can just paste into this single .cs script!
 			// https://github.com/webermania/MicroExpressionEvaluator
 			string logicalExpression = "false != true";
-			
-			bool result = MicroEx.Evaluate(logicalExpression);
-			Console.WriteLine ("Do_Droid_Logic() - MicroEx.Evaluate() - '" + logicalExpression + "' " + result.ToString());
-			
-			
-			
-			
+			//bool result = MicroEx.Evaluate(logicalExpression);
+			//Console.WriteLine ("Do_Droid_Logic() - MicroEx.Evaluate() - '" + logicalExpression + "' " + result.ToString());
 			
 			
 			int count = Boids.Count;
@@ -1869,17 +2040,22 @@ namespace HelloBoids
             {
 				Boid currentBoid = Boids[i];
 				
+				List<int> neighbors = mNeighbors[currentBoid.SpanIndex];
+				
 				// these will be stored in UserData's local "object[]" and thus boxed
+				// TODO: the BlackBoardData is not threadsafe
 				StationState stationState  = (StationState)currentBoid.BlackBoardData.GetObject("tactical_state");
-				if (stationSate.Actions == null || stationState.Actions.Count == 0)	
+				if (stationState.Actions != null)	
                 {
-
                     int count = stationState.Actions.Count;
-
 
                 }
 
 
+                // 
+                
+                
+            
 				Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component));
 				Memory<Weapon> wep = (Memory<Weapon>) currentBoid.GetUserStruct(typeof(Weapon));
 				Memory<Laser_Struct> laser = (Memory<Laser_Struct>)currentBoid.GetUserStruct(typeof(Laser_Struct)); //  Laser_Struct laser = (Laser_Struct)currentBoid.mMemStore_Laser.Span[0];
@@ -1887,9 +2063,11 @@ namespace HelloBoids
 				// NOTE: The EXE will render Sensor Contact info as necessary.
 				//       The client EXE will have access to those types and the UI elements using them and can update
 				//       those relevant UI elements as necessary
-								
+				
+				
 				// can this Droids TACTICAL STATION perform ANY actions right now?
-								
+				
+				
 				//  - station is not available/powered/healthy/has operator or AI conroller/etc
 				//	- we already have reached maximum number of ongoing actions for this station as well as Operator's skill level?
 				
@@ -2203,14 +2381,12 @@ namespace HelloBoids
 			int a = l * start * end;
 			Console.WriteLine(a.ToString());
 		}
-		
-		
+
         private void DoFlocking(ComponentStore<Transform.Transform_Struct> store, object[] parameters, int seed, GameTime gt)
         {
 			double elapsedSeconds = gt.ElapsedSeconds;
-			OctreeOctant root = this.Octree;
 			int length = store.Span.Length;
-		
+
 			//Console.WriteLine ("Span and Store Size Agree == " + (store.Span.Length == store.Size).ToString());
 			
             //using (EntryClass.CodeProfiler.HookUp("AssignSpan"))
@@ -2234,20 +2410,11 @@ namespace HelloBoids
             double cohesionFactor = (double)parameters[5];
 			double turnFactor = (double)parameters[6]; // For boundary avoidance
 			double maxSpeed = (double)parameters[7];
-            
-            //Console.WriteLine("parameters count OK");
-            
+			
             double seperatationDistanceSquare = separationDistance * separationDistance;
             double alignmentDistanceSquared = alignmentDistance * alignmentDistance;
             double cohesionDistanceSquared = cohesionDistance * cohesionDistance;
-		   
-            double largestDistance = System.Math.Max(this.SeparationDistance, this.AlignmentDistance);
-            largestDistance = System.Math.Max(largestDistance, this.CohesionDistance);
-            double largestDistanceSquared = largestDistance * largestDistance;
-			double searchRadius = largestDistance * 0.5d;
 
-			
-			
 			
 			System.Threading.Tasks.Parallel.For(0, length, i =>
 			//for (int i = 0; i < memSpan.Length; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
@@ -2255,130 +2422,13 @@ namespace HelloBoids
 				// NOTE: inside of the Parallel.For(), Span<T> cannot be passed in
 				//      because the code inside the Paralle.For() is treated as a Lambda
 				Span<Transform.Transform_Struct> memSpan = store.Span;
-				List<int> neighbors = new List<int>(8);
-		#if SPATIAL_SEARCH == false
-
-			   if (i > Boids.Count - 1)
-				   Console.WriteLine("Out of range i == " + i.ToString() + " but count == " + Boids.Count.ToString());
-
-				neighbors = GetNeighbors(Boids[i], largestDistance, largestDistanceSquared);
-		#endif
-				
-			
-		#if SPATIAL_SEARCH
-				Stack<OctreeOctant> stack = new Stack<OctreeOctant>(32);
-            	
-				
-				// INLINING of "GetNeighbors" in order to avoid have to load the memSpan onto the stack for each iteration
 				EntityNode currentBoid = Boids[(int)i];
-				// Vector3d currentBoidTranslation = memSpan[i].Translation;
-								
-				// WARNING:  The first line that uses currentBoid.Translation is 100x SLOWER than the version using CLASSES (eg for "Classes" version comment out #define USE_MEMORY_T
-				//           The second line that uses memSpan[i].Translation is 100x FASTER than the version using CLASSES (WHAT ON EARTH?
-				//           I believe it is because the cache evicts the span<T> data and has to re-load it every iteration (eg memSpan.Length)
-				// UPDATE:   Above is likely wrong.  One problem is memSpan[i].Translation was always 0,0,0 and so the search box was often
-				//           never intersecting with the box of the currentB's spatial node SpatialNode.BoundingBox
-
-				//       BoundingBox searchArea = new BoundingBox(currentBoid.Translation, radius);
-				//       System.Console.WriteLine("Translation CLASS = " + currentBoid.Translation.ToString());
-				//BoundingBox searchArea = new BoundingBox(Boids[i].Translation, radius);
-				using (EntryClass.CodeProfiler.HookUp("GetNeighbors"))
-				{
-					BoundingBox searchArea;
-					//using (EntryClass.CodeProfiler.HookUp("GetSearchArea"))
-                    	searchArea = new BoundingBox(memSpan[(int)i].Translation, searchRadius);
-					//BoundingBox searchArea = new BoundingBox(currentBoidTranslation, radius);
-			//		System.Console.WriteLine("Translation MEMORY<T> = " + memSpan[i].Translation.ToString());
-                    
-                    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-                    // INLINED VERSION OF "ITERATIVE DEPTH-FIRST" TRAVERSAL OF OCTREE TO FIND NEIGHBORING BOIDS OF THE CURRENT ONE
-					// NOTE: We use this inline version that uses a stack<> to avoid recursion because having to load the span<T> onto
-					//       the stack for every function call that needs it, slows this "flocking" update code BIG TIME (eg by ~100x slower)
-	
-                    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-                    neighbors.Clear();
-                    stack.Clear();
-											
-					stack.Push(root); 
-
-					while (stack.Count > 0)
-                    {
-						OctreeOctant currentOctant = stack.Pop();
-						if (currentOctant.BoundingBox.Intersects(searchArea))
-						{
-							// TODO: the following call to currentOcant.EntityNodes needs to be thread safe... the EntityNodes assigned can move within this DoFlocking()  method
-							EntityNode[] ents = currentOctant.EntityNodes;
-							if (ents != null)
-							{
-							   // if (ents.Length > 230)
-									//Console.WriteLine("Entity Node Count == " + ents.Length.ToString());
-
-								for (int j = 0; j < ents.Length; j++)
-								{
-									EntityNode potentialNeighbor = ents[j];
-
-									if (currentOctant.MaxRadius * 2d <= largestDistance)
-									{
-							 			neighbors.Add(potentialNeighbor.SpanIndex);
-                         			}   
-                         			else
-									{   
-										// if (currentOctant.EntityNodes[j].SpanIndex == currentBoid.SpanIndex) continue; 
-										//using (EntryClass.CodeProfiler.HookUp("IntersectsSearchArea"))
-										if (!potentialNeighbor.BoundingBox.Intersects(searchArea)) 
-											continue;
-								
-										double distanceToNeighboringBoidSquared;
-										// TODO: if i stored the SpanIndex in the Octree instead of the EntityNode perhaps that would help?
-										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
-											distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[potentialNeighbor.SpanIndex].Translation, memSpan[(int)i].Translation);
-											//distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[potentialNeighbor.SpanIndex].Translation, currentBoidTranslation);
-
-										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
-										//   distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(currentOctant.EntityNodes[j].Translation, currentBoid.Translation);
-
-										//System.Diagnostics.Debug.WriteLine("Calculated distanceSquared to neighboring boid = " + distanceToNeighboringBoidSquared.ToString());
-										if (distanceToNeighboringBoidSquared <= largestDistanceSquared)
-
-											neighbors.Add(potentialNeighbor.SpanIndex);
-     								}       
-             					}  // end for ents[]        
-							}
-
-							OctreeOctant[] childOctants = currentOctant.Children;
-							if (childOctants != null)
-							{
-								//Console.WriteLine("CLength == " + childOctants.Length.ToString());
-								for (int j = 0; j < childOctants.Length; j++)
-								{
-									// NOTE: Each OctreeOctant's BoundingBox needs to be in World Space.
-									bool intersects = false;
-									//using (EntryClass.CodeProfiler.HookUp("IntersectsSearchArea"))
-									{
-										if (childOctants[j] == null)
-											continue;
-
-										intersects = childOctants[j].BoundingBox.Intersects(searchArea);
-									}
-									if (intersects)
-									{
-										stack.Push(childOctants[j]);
-									}
-									//Console.WriteLine("DoFlocking() - #940 - Stack count == " + stack.Count.ToString());
-								} // end for childOctants[]
-
-								//Console.WriteLine("DoFlocking() - #943 - Stack count == " + stack.Count.ToString());
-							}
-						} // end if currentOctant intersects searchArea test
-					} // end While loop
-				} // end Using (GetNeighbors)
-		#endif // SPATIAL_SEARCH
+				List<int>neighbors;
+				bool r = mNeighbors.TryGetValue(currentBoid.SpanIndex, out neighbors); 
 				
-                int nCount = 0;
+				if (neighbors == null || neighbors.Count == 0) return;
+                int nCount = neighbors.Count;
 				
-                if (neighbors != null)
-                    nCount = neighbors.Count;
-
 				// DEBUG TEST
 				for (int z = 0; z < nCount; z++)
 					if (neighbors[z] > length  - 1)
@@ -2499,8 +2549,6 @@ namespace HelloBoids
 					memSpan[(int)i].Translation += memSpan[(int)i].Velocity;
                 } // end profiler FlockingRules
 
-
-				
 				
 				//Console.WriteLine($"DoFlocking() - OnEntityNode_Moved()");
 		#if SPATIAL_MOVE_UPDATES // this define needs to remain FALSE because currently Octree is NOT THREAD SAFE
@@ -2782,7 +2830,7 @@ namespace HelloBoids
 			//neighbors = Boid.FindNeighbors(store, numBoids, largestDistance, currentIndex, findNeighborsFunc);
 			try 
 			{
-				neighbors = Boid.FindNeighbors(this.Boids, largestDistanceSquared, currentBoid.Index, ff);
+				neighbors = Boid.FindNeighbors(this.Boids, largestDistanceSquared, currentBoid.SpanIndex, ff);
 			}
 			catch (Exception ex)
 			{
@@ -2790,7 +2838,7 @@ namespace HelloBoids
 			}
 #else
 #if USE_MEMORY_T == false
-            List<Boid> found = Boid.FindNeighbors(this.Boids, largestDistance, currentBoid.Index, ff);
+            List<Boid> found = Boid.FindNeighbors(this.Boids, largestDistance, currentBoid.SpanIndex, ff);
 
             if (found == null || found.Count == 0) return null;
             neighbors = new List<int>(found.Count);
@@ -11564,6 +11612,11 @@ if (mEntityNodesCollection == null) return null;
 				// note: we could probably check it's GetType() instead... but not necessary for now
 				switch (key)
 				{
+					case "OPTICAL_SENSING":
+						Processor<Transform.Transform_Struct> opticalSensing = (Processor<Transform.Transform_Struct>)func;
+                        ComponentStore<Transform.Transform_Struct> storeForOptical = mComponentStoreCollection.CheckOut<Transform.Transform_Struct>(0);
+  		                opticalSensing.Invoke(storeForOptical, args, seed, gt);
+						break;
 					case "FLOCKING":
 						Processor<Transform.Transform_Struct> flocking = (Processor<Transform.Transform_Struct>)func;
                         ComponentStore<Transform.Transform_Struct> store0 = mComponentStoreCollection.CheckOut<Transform.Transform_Struct>(0);
@@ -11615,6 +11668,17 @@ if (mEntityNodesCollection == null) return null;
 				    result[1] = EntryClass.WIDTH;
 				    result[2] =
 				    EntryClass.DEPTH;
+                    break;
+				case "OPTICAL_SENSING":
+					result = new object[8];
+					result[0] = EntryClass.SEPERATION_DISTANCE;
+					result[1] = EntryClass.ALIGNMENT_DISTANCE;
+					result[2] = EntryClass.COHESION_DISTANCE;
+					result[3] = EntryClass.SEPARATION_FACTOR;
+					result[4] = EntryClass.ALIGNMENT_FACTOR;
+					result[5] = EntryClass.COHESION_FACTOR;
+					result[6] = EntryClass.TURN_FACTOR; // For boundary avoidance
+					result[7] = EntryClass.MAX_SPEED;
                     break;
                 case "FLOCKING":
 					result = new object[8];
@@ -11913,7 +11977,7 @@ if (mEntityNodesCollection == null) return null;
         // https://www.gamedeveloper.com/programming/a-primer-on-repeatable-random-numbers
         //private int mCounter; // every traversal of the behavior tree increments this value by 1 and potentially every decision made during traversal where a Random number is needed, can increment this counter.	
 		private Dictionary <string, object> Objects;
-		private Dictionary<string, object[]> ObjectsArray;
+		private System.Collections.Concurrent.ConcurrentDictionary<string, object[]> ObjectsArray;
 		private Dictionary <string, string> Strings;
         private Dictionary <string, string[]> StringArray;
 		private Dictionary <string, bool> Bools;
@@ -11995,12 +12059,12 @@ if (mEntityNodesCollection == null) return null;
         public void SetObject(string name, object[] value)
         {
             if (ObjectsArray == null)
-                ObjectsArray = new Dictionary<string, object[]>();
+                ObjectsArray = new System.Collections.Concurrent.ConcurrentDictionary<string, object[]>();
 
             if (ObjectsArray.ContainsKey(name))
                 ObjectsArray[name] = value;
             else
-                ObjectsArray.Add(name, value);
+                ObjectsArray.TryAdd(name, value);
         }
         
         public object GetObject(string name)
@@ -12023,10 +12087,11 @@ if (mEntityNodesCollection == null) return null;
 		{
 			return Strings[name];
 		}
+		
 		public void SetString (string name, string value)
 		{
 			if (Strings == null)
-					Strings = new Dictionary<string, string> ();
+					Strings = new Dictionary<string, string>();
 			
 			if (Strings.ContainsKey(name))
 				Strings [name] = value;
@@ -12049,6 +12114,7 @@ if (mEntityNodesCollection == null) return null;
 		{
 			return Bools[name];
 		}
+		
 		public void SetBool (string name, bool value)
 		{
 			if (Bools == null)
@@ -12064,6 +12130,7 @@ if (mEntityNodesCollection == null) return null;
 		{
 			return Integers[name];
 		}
+		
 		public void SetInteger (string name, int value)
 		{
 			if (Integers == null)
@@ -12079,6 +12146,7 @@ if (mEntityNodesCollection == null) return null;
 		{
 			return Doubles[name];
 		}
+		
 		public void SetDouble (string name, double value)
 		{
 			if (Doubles == null)
@@ -12094,6 +12162,7 @@ if (mEntityNodesCollection == null) return null;
 		{
 			return Floats[name];
 		}
+		
 		public void SetFloat (string name, float value)
 		{
 			if (Floats == null)
@@ -12127,6 +12196,7 @@ if (mEntityNodesCollection == null) return null;
 		{
 			return Vectors [name];
 		}
+		
 		public void SetVector (string name, Vector3d value)
 		{
 			if (Vectors == null)
@@ -12142,6 +12212,7 @@ if (mEntityNodesCollection == null) return null;
 		{
 			return Vector3dArrays [name];
 		}
+		
 		public void SetVector3dArray (string name, Vector3d[] value)
 		{
 			if (Vector3dArrays == null)
@@ -12158,6 +12229,7 @@ if (mEntityNodesCollection == null) return null;
 		{
 			return Quaternions [name];
 		}
+		
 		public void SetQuaternion (string name, Quaternion value)
 		{
 			if (Quaternions == null)
@@ -12188,7 +12260,6 @@ if (mEntityNodesCollection == null) return null;
 			   mIsDisposed = true;
 		   }
         }
-
         #endregion
 	
 	

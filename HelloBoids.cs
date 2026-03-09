@@ -1545,55 +1545,6 @@ namespace HelloBoids
         } 
 
 #if USE_MEMORY_T
-	
-		public struct StationState
-		{
-			public struct StationAction
-			{
-				public long TimeStarted;     // time this action started
-				public int Duration;         // time to complete this action
-				public int ActionID;         // eg Fire at Target, Lay Mines, Deploy Counter-measures
-			}
-			
-			
-			public static int NextID;
-			public int Index;            // index of ComponentStore<Components> where this TacticalStation's general Component struct is stored
-			
-			// NOTE: The "GetLastAction() is simply the Action at index == 0
-			
-			// Queue is First In First Out
-			public System.Collections.Generic.Queue<StationAction> Actions;
-			
-			
-			public int HistoryCount; 
-			public int NumActions;
-			public int MaxActions;        // based on operator's max ability to handle so many simultaneously, tacticalstation TL, tacticalStation damage, and ability to perform that many actions in the first place (eg having enough weapons to use )
-			
-			public System.Collections.Generic.Dictionary<int, List<SensorContact>> ContactsHistory;
-			public SensorContact[] Contacts;
-			public Target[] Targets;
-			
-			public void AddContact(SensorContact c)
-			{
-				
-			}
-			
-			public void RemoveContact()
-			{
-				
-			}
-			
-			public void ClearContacts()
-			{
-				
-			}
-			
-			public void AddTarget(Target t)
-			{
-				
-			}
-		}
-		
 		
 		
         private System.Collections.Concurrent.ConcurrentDictionary<int, List<int>> mNeighbors = new System.Collections.Concurrent.ConcurrentDictionary<int, List<int>>();
@@ -4865,7 +4816,7 @@ return (0,0);
     // LibNoise
     // IEntitySystem proc gen
 
-
+	// NOTE: game specific structs and enums may only need to exist in Game01.dll or any future GameNN.dll
     public struct NFT_Address // Locator 
     {
         public string NestedGUIDs;
@@ -4899,6 +4850,426 @@ return (0,0);
         // public Entity_Taxonomy Taxonomy;     // ProcGen_ItemType enum can be loaded from a modder's file 
     }
 
+	
+	
+	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
+	public struct LivingEntity
+	{
+		public long CreationDateTime;
+		public long Age;            // technically, this probably doesnt need to be stored... we only need the CreationDate?  // assign using Utils.GetAge() and find Age via 'age = Utils.GetAge(entity.CreationDate);'
+		public double MaxAge;
+		public int Hitpoints; // CurrentHP
+		
+		public Membership[] Memberships;
+		public Skill[] Skills;
+		
+		//public double
+
+		public double GetAge(double currentTime)
+		{
+			return currentTime - CreationDateTime;
+		}
+	}
+		
+	
+	
+	public enum ActionType : int
+	{
+		Target,
+		FireAt,
+		Ram,
+		DeployCounterMeasure,
+		DeployMine,
+		DeployProbe
+	}
+
+
+#region Game01.GameObjects
+	public class UnitedEarthCode
+	{
+
+		// SpecialOrder1 (as in SpecialDirective)
+
+
+	}
+
+	public struct CrewMemberServiceRecord
+	{
+
+
+	}
+
+	// Directives
+	// Treaties
+	// RulesOfEngagement
+	// Orders
+	// Objectives
+	// OrdianceUsePolicy
+	// EnergyAllocationPolicy
+	
+	
+	// combat specific assessmemnts
+	// ----
+	// Readyness, CapacityToAct;
+	// CapabilityAssessment;
+	// OutcomeAssessment;
+	public class ExecutiveDirectives
+	{
+		// Keystone.Simulation.Missions.Mission
+		// Keystone.Simulaton.Missions.MissionData
+		// Keystone.Simulation.Missions.Objective
+
+	//	public Mission Mission;
+	//	public Orders Orders;
+
+		// Game01.GameObjects.ExecutiveDirectives.RulesOfEngagement
+		public struct RulesOfEngagement
+		{
+			public bool FireOnFreighters; // usually always false
+			public bool RetreatRatherThanFightIfPossible;
+				//      - never fire first except during wartime
+				//		- diplomacy first unless state of war
+				//      - never fire on disabled ships or otherwise  non-threats
+				//		- pre-emptive policy
+				//		- disable priority
+				//			- shields
+				//			- weapons
+				//			- engines
+				//		- proportiality / proportional response
+				//		- nuclear weapons only to deter opposing nuclear threat only (some ships may have a mission of always staying hidden and running silent and nuclear deterences in case of an attack on homeworld and homeworld is destroyed, the retaliatory strike option will still exist to carry out its mission
+				//		- 
+
+
+		}
+	}
+
+
+	
+	public struct Membership
+	{
+		int OrganizationID;  // will lead to organizationType, Name, Description, etc.
+		long JoinDate;
+		long LeaveDate;
+
+		public long GenerateJoinDate (int age)
+		{
+			// based on the age of the character, compute a "join date" that seems believable
+			// and is consistant also with the age of the Organization or Faction.
+
+			return 0;
+		}
+
+		public bool HasMembership(string organizationID, int organizationType)
+		{
+			return false;
+		}
+	}
+
+	public enum Skills
+	{
+		HelmOperations,
+		TacticalOperations,
+		Piloting,
+		Targeting,
+		Engineering,
+		Command,
+		SensorOperations
+	}
+
+	public enum StrengthAndWeaknesses
+	{
+		PanicsUnderPressure,
+		GreatUnderPressure
+	}
+
+		/// <summary>
+		/// These can overlap Skills, Stats, Armor DR and such because they can give bonuses (positive or negative)
+		/// to all of these things.
+		/// </summary>
+	public enum ModificationType
+	{
+		Morale,
+		Command
+	}
+
+	public struct Modification
+	{
+		ModificationType Type;
+		int Level;
+
+	}
+
+	public enum ModificationEffect
+	{
+		Individual,
+		List,
+		Party,
+		Area,
+		Region,
+		Faction
+	}
+
+	// TODO: an Operator that has for example a targeting skill, (see struct LivingEntity)
+	//       will "PRODUCE" a bonus for that crew station every update.  It does not require
+	//       an "Update()" function within a script, it only needs the type of PRODUCTION defined
+	//       and registered via the Scripting API.  
+	public struct Skill
+	{
+		Modification[] Mods;
+		int Level;
+
+
+	}
+
+	public struct StationState
+	{
+		public struct StationAction
+		{
+			public long TimeStarted;     // time this action started
+			public int Duration;         // time to complete this action
+			public int ActionID;         // eg Fire at Target, Lay Mines, Deploy Counter-measures
+
+		}
+
+		public static int NextID;
+		public int Index;            // index of ComponentStore<Components> where this TacticalStation's general Component struct is stored
+
+		// NOTE: The "GetLastAction() is simply the Action at index == 0
+
+		// Queue is First In First Out
+		public System.Collections.Generic.Queue<StationAction> Actions;
+		public int HistoryCount; 
+		public int NumActions;
+		public int MaxActions;        // based on operator's max ability to handle so many simultaneously, tacticalstation TL, tacticalStation damage, and ability to perform that many actions in the first place (eg having enough weapons to use )
+
+		public System.Collections.Generic.Dictionary<int, List<SensorContact>> ContactsHistory;
+		public SensorContact[] Contacts;
+		public Target[] Targets;
+
+
+		public void AddContact(SensorContact c)
+		{
+
+		}
+
+		public void RemoveContact()
+		{
+
+		}
+
+		public void ClearContacts()
+		{
+
+		}
+
+		public void AddTarget(Target t)
+		{
+
+		}
+	}
+		
+	
+	
+	/// <summary>
+	/// A SensorContact is a PRODUCT that is produced by a Sensor upon receiving
+	/// and detectinig an emission of the same PRODUCT of that Sensor.
+	/// eg. a Product.OpticalEmission received by a binocular set of "Eyes" sensors
+	/// will result in the "production" of a SensorContact of that Entity that emitted the
+	/// Product.OpticalEmission and in turn that SensorContact will be consumed by the TacticalStation
+	/// or Droid
+	/// </summary>
+	public struct SensorContact // NOTE: our Droids have one optical sensor... a single binocular system comprised of two eyes
+	{
+		// see game "Highfleet" for it's exterior ship component placement interface
+		public enum FoF // Friend or Foe
+		{
+			Friend = 0,
+			Foe = 1 << 0, 
+			Unknown = 1 << 2
+		}
+		
+		public enum TYPE
+		{
+			Unknown,
+			Asteroid,
+			Debris,
+			Mine,
+			Missile,
+			Fighter,
+			Bomber,
+			Frigate,
+			Transport,
+			Destroyer,
+			Corvette,
+			Carrier,
+			Satellite,
+			OrbitalPlatform,
+			GroundRadar	
+		}
+		
+		public enum SIZE
+		{
+			VerySmall = 0,
+			Small,
+			Medium,
+			Large,
+			VeryLarge,
+			Huge,
+			Enormous
+		}
+		
+		const int HistoryLength = 1;
+		public long TimeAcquired;
+		public int AcquisitionStatus;   // New, UpToDate, AcquisitionLost,  contact if HistoryLength > 1 but this ContactStatus == AcquisitionLost
+		public Target.STATUS ContactStatus;
+		public int Index;
+		public int ContactIndex;    // EntityIndex
+		public Vector3d Position;
+		public Vector3d Velocity;
+		public double Distance;     // range to target
+		public float Heading;       // NOTE: Bearing is the direction to fly to get somewhere specific see Google AI Overview notes below
+		
+		/* Target Bearing is the angular direction from your current position to a target (often relative to North or your bow),
+		while Target Heading is the direction the target itself is moving or pointing. Bearings tell you where to look, whereas headings indicate the target's trajectory. 
+		
+		Key Differences:
+		Bearing (Direction to Target): The angle from your position to the target, often measured in degrees from True North (True Bearing) or clockwise from your bow (Relative Bearing).
+		Heading (Direction of Travel): The direction your vessel, aircraft, or the target is facing.
+		Context: In navigation, a bearing helps locate an object (e.g., "bearing 090" is East), while a heading is your current course (e.g., "heading 180" is South). 
+
+		Application Example:
+		If you are facing North (Heading) and a target is to your right, the relative bearing is 
+		(East). If you turn East to follow it, your new heading is, but the bearing to the target changes as you close the distance. 
+		*/
+	
+		public TYPE Type;
+		public FoF FriendOrFoe;
+		public SIZE Size;
+		
+		public string Name; // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
+		public string RegistryNumber;
+		
+		public int[] SensorsIndices;   // the sensorIDs that have all acquired this target
+		public string[] SensorsTypes;  // the types of Sensors corresponding to the SensorsIndices
+	}
+	
+	
+	public struct Target
+	{
+		[Flags]
+		public enum STATUS : int
+		{
+			Unknown = 0,           // a good tactical officer will flag a status of Unknown if not sure why it appears Disabled, rather than report it as Disabled when it could be playing possum waiting to draw your ship in
+			Withdrawing = 1 << 0,
+			Disabled    = 1 << 1,
+			EnginesDisabled = 1 << 2,
+			WeaponsDisabled = 1 << 3,
+			ShieldsDisabled = 1 << 4,
+			Active          = 1 << 5,
+			NonCombatant     = 1 << 6,           // eg civilian, medical
+			CombatIneffective     = 1 << 7,      // eg out of ammunition and/or power
+			Neutral           = 1 << 8,
+			Suspect           = 1 << 9,         // TODO: some of these need to move to FOF
+			Hostile         = 1 << 10,
+			Derelict        = 1 << 11
+		}
+		
+		public enum CREWSTATUS
+		{
+			Unknown,
+			Alive,
+			Dead,
+			LightlyDepleted,
+			ModeratelyDepleted,
+			HeavilyDepleted
+		}
+		
+		public int EntityIndex;
+		public int[] WeaponsAssigned;
+		public int[] TargetedBy;      // other Ships/Vehciles/Entities, ground radars, factions, etc that are targeting this Target
+		public STATUS Status;
+		public CREWSTATUS CrewStatus;
+		public int Hitpoints;         // max hitpoints of target... should a Sensor be able to know this exact number?  It's really just a game thing and maybe we should just use visual observations of condition of ship instead
+		public int CurrentHitPoints;  // used to determine % damage of Target
+	}
+
+	
+	
+	
+	
+	
+	public class Query
+	{
+		// should NOT need to be concurrent, correct?
+		Dictionary<string, object> mKVPs = new Dictionary<string, object>();
+
+
+		public void Add(string name, object value)
+		{
+			if (mKVPs == null) mKVPs = new Dictionary<string, object>();
+
+			mKVPs.Add (name, value);
+		}
+	}
+
+
+	/// <summary>
+	/// Rules should be sorted from highest number of Conditions to lowest so that we always test against highest number first so we can potentially early-exit
+	/// <summary>
+	public class Rule
+	{
+		public string Concept;
+		public string Description;
+		public Condition[] Conditions;
+		//public Response Response;
+		//public Remember Remember;
+		//public Trigger Trigger;
+
+		public void Add(Condition c)
+		{
+			// following is using Keystone namespace but actually is in KeyStandardLibrary
+			// Keystone.Extensions.ArrayExtensions.	
+		}
+
+		public void Remove (Condition c)
+		{
+
+		}
+	}
+							
+	public class Condition
+	{
+		public string Name;
+		public string Description;
+		public int operandLeft;
+		public int operandRight;
+		public int evalType;
+
+		// geater than
+		public bool Evaluate()
+		{
+			switch (evalType)
+			{
+				case 0:
+					 return operandLeft < operandRight;
+
+				case 1:
+					 return operandLeft > operandRight;
+
+				case 2:
+					return operandLeft == operandRight;
+				default:
+					throw new ArgumentOutOfRangeException("Condition.Evaluate() - Unexpected evalType '" + evalType.ToString() + "'");
+			}
+		}
+	}
+
+
+	
+
+	
+	
+	
     public struct DeltaInfo
     {
         public int ID;
@@ -4924,136 +5295,7 @@ return (0,0);
 		VeryFine				
 	}
 		
-	
-	// See KeystoneGameBlocks/Game01/Builders
-	public interface IBuilder
-    {
-		public object[] Components {get; set;}
-		
-        public string BuildPersistString {get;}
-        public bool StatsChanged {get;}
-        public bool BuildChanged {get;}
 
-        public void Update();
-
-        public string ToString ();
-        public IBuilder FromString(string persistString);
-    }
-
-	
-	public struct Build_Laser : IBuilder
-	{
-        // build specific LASER properties
-		private string COMPONENT_DELIMETER = "|";
-		public object[] Components {get; set;}
-		
-		
-		public Build_Laser() // parameterless constructors for structs first became available in c# 10
-		{
-			// struct for component properties and stats
-			Components = new object[3];
-			
-			int componentIndex = 1;
-			Component component = ((ComponentStore<Component>)EntryClass.mCStoreCol.CheckOut<Component>(0)).Span[componentIndex];
-			Components[0] = component;
-						
-			// struct for basic weapons properties
-			int weaponIndex = 0;
-			Weapon weapon = ((ComponentStore<Weapon>)EntryClass.mCStoreCol.CheckOut<Weapon>(0)).Span[weaponIndex];
-			Components[1] = component;
-			
-			// struct for laser specific weapon properties
-			int laserIndex = 2;
-			Laser_Struct laser = ((ComponentStore<Laser_Struct>)EntryClass.mCStoreCol.CheckOut<Laser_Struct>(0)).Span[laserIndex];
-			Components[2] = laser;		
-		}
-		
-		public Build_Laser(string persistString)
-		{
-			Components = FromString(persistString).Components;
-		}
-
-		
-#region IBuilder implementation
-        public void Update()
-        {
-        }
-
-		public string BuildPersistString {get;}
-        public bool StatsChanged {get;}
-        public bool BuildChanged {get;}
-
-		
-        public override string ToString()
-        {
-            // NOTE: we only need to write out the build parameters and from that we can
-            //       reconstitute the full entity
-
-			// 1 - Memory<T> represents how the data is STORED in memory, in structs from which we can
-			//     store in contiguous memory
-			// 2 - So, a Laser will be made up of 3 "structs" like Component, Weapon and Laser for storing the data
-			//    and these structs will co-exist in our UserData object keyed by their typename
-			//    The Defense and InternalStructure too can be keyed this way and assigned later... with ArmorLayers being
-			//    somewhat special case because there are currently no maximum allowable limits
-            string persistString = null;
-
-			// TODO: next follows a series of parts that join together to create the full persist string
-			string componentPart = Components[0].ToString();
-			string weaponPart = Components[1].ToString();
-			string laserPart = Components[2].ToString();
-			 
-            // JSon == javascript object notation
-			persistString = System.Text.Json.JsonSerializer.Serialize(this);
-			Console.WriteLine("Build_Laser.ToString() - " + persistString);
-            return persistString;
-		}
-
-		
-        public IBuilder FromString (string persistString)
-        {
-            if (string.IsNullOrEmpty(persistString))
-			{
-				string[] parts = persistString.Split(COMPONENT_DELIMETER);
-				System.Diagnostics.Debug.Assert (parts.Length == 3);
-				
-				Component componentStruct = System.Text.Json.JsonSerializer.Deserialize<Component>(parts[0]);
-				Weapon weaponStruct = System.Text.Json.JsonSerializer.Deserialize<Weapon>(parts[1]);
-				Laser_Struct laserStruct = System.Text.Json.JsonSerializer.Deserialize<Laser_Struct>(parts[2]);
-				
-				// todo: all of the above need to be checked in to the EntryClass.mColStore?
-									
-			}
-			
-			
-            // NOTE: we only need the build parameters and from that we can
-            //       create the full entity
-            Build_Laser laser = System.Text.Json.JsonSerializer.Deserialize<Build_Laser>(persistString);
-							
-			return laser;
-        }
-		
-#endregion
-	}
-	
-	
-
-	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
-	public struct LivingEntity
-	{
-		public long CreationDateTime;
-		public long Age;            // technically, this probably doesnt need to be stored... we only need the CreationDate?  // assign using Utils.GetAge() and find Age via 'age = Utils.GetAge(entity.CreationDate);'
-		public double MaxAge;
-		public int Hitpoints; // CurrentHP
-
-		//public double
-
-		public double GetAge(double currentTime)
-		{
-			return currentTime - CreationDateTime;
-		}
-	}
-		
-	
 	
 	public struct Armor
     {
@@ -5430,132 +5672,116 @@ return (0,0);
 		// https://gamedev.stackexchange.com/questions/148961/how-to-design-a-damage-formula-in-an-rpg-which-keeps-weapons-with-different-atta
 
 	}
-		
 	
-	/// <summary>
-	/// A SensorContact is a PRODUCT that is produced by a Sensor upon receiving
-	/// and detectinig an emission of the same PRODUCT of that Sensor.
-	/// eg. a Product.OpticalEmission received by a binocular set of "Eyes" sensors
-	/// will result in the "production" of a SensorContact of that Entity that emitted the
-	/// Product.OpticalEmission and in turn that SensorContact will be consumed by the TacticalStation
-	/// or Droid
-	/// </summary>
-	public struct SensorContact // NOTE: our Droids have one optical sensor... a single binocular system comprised of two eyes
-	{
-		// see game "Highfleet" for it's exterior ship component placement interface
-		public enum FOF
-		{
-			Friend = 0,
-			Foe = 1 << 0, 
-			Unknown = 1 << 2
-		}
+	// See KeystoneGameBlocks/Game01/Builders
+	public interface IBuilder
+    {
+		public object[] Components {get; set;}
 		
-		public enum TYPE
-		{
-			Unknown,
-			Asteroid,
-			Debris,
-			Mine,
-			Missile,
-			Fighter,
-			Bomber,
-			Frigate,
-			Transport,
-			Destroyer,
-			Corvette,
-			Carrier,
-			Satellite,
-			OrbitalPlatform,
-			GroundRadar	
-		}
-		
-		public enum SIZE
-		{
-			VerySmall = 0,
-			Small,
-			Medium,
-			Large,
-			VeryLarge,
-			Huge,
-			Enormous
-		}
-		
-		const int HistoryLength = 1;
-		public long TimeAcquired;
-		public int AcquisitionStatus;   // New, UpToDate, AcquisitionLost,  contact if HistoryLength > 1 but this ContactStatus == AcquisitionLost
-		public Target.STATUS ContactStatus;
-		public int Index;
-		public int ContactIndex;    // EntityIndex
-		public Vector3d Position;
-		public Vector3d Velocity;
-		public double Distance;     // range to target
-		public float Heading;       // NOTE: Bearing is the direction to fly to get somewhere specific see Google AI Overview notes below
-		
-		/* Target Bearing is the angular direction from your current position to a target (often relative to North or your bow),
-		while Target Heading is the direction the target itself is moving or pointing. Bearings tell you where to look, whereas headings indicate the target's trajectory. 
-		
-		Key Differences:
-		Bearing (Direction to Target): The angle from your position to the target, often measured in degrees from True North (True Bearing) or clockwise from your bow (Relative Bearing).
-		Heading (Direction of Travel): The direction your vessel, aircraft, or the target is facing.
-		Context: In navigation, a bearing helps locate an object (e.g., "bearing 090" is East), while a heading is your current course (e.g., "heading 180" is South). 
+        public string BuildPersistString {get;}
+        public bool StatsChanged {get;}
+        public bool BuildChanged {get;}
 
-		Application Example:
-		If you are facing North (Heading) and a target is to your right, the relative bearing is 
-		(East). If you turn East to follow it, your new heading is, but the bearing to the target changes as you close the distance. 
-		*/
-	
-		
-		public TYPE Type;
-		public FOF FoF;
-		public SIZE Size;
-		
-		public string Name; // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
-		public string RegistryNumber;
-		
-		public int[] SensorsIndices;   // the sensorIDs that have all acquired this target
-		public string[] SensorsTypes;  // the types of Sensors corresponding to the SensorsIndices
-	}
-	
-	
-	public struct Target
-	{
-		[Flags]
-		public enum STATUS : int
-		{
-			Unknown = 0,           // a good tactical officer will flag a status of Unknown if not sure why it appears Disabled, rather than report it as Disabled when it could be playing possum waiting to draw your ship in
-			Withdrawing = 1 << 0,
-			Disabled    = 1 << 1,
-			EnginesDisabled = 1 << 2,
-			WeaponsDisabled = 1 << 3,
-			ShieldsDisabled = 1 << 4,
-			Active          = 1 << 5,
-			NonCombatant     = 1 << 6,           // eg civilian, medical
-			CombatIneffective     = 1 << 7,      // eg out of ammunition and/or power
-			Neutral           = 1 << 8,
-			Suspect           = 1 << 9,         // TODO: some of these need to move to FOF
-			Hostile         = 1 << 10,
-			Derelict        = 1 << 11
-		}
-		
-		public enum CREWSTATUS
-		{
-			Unknown,
-			Alive,
-			Dead,
-			LightlyDepleted,
-			ModeratelyDepleted,
-			HeavilyDepleted
-		}
-		
-		public int EntityIndex;
-		public int[] WeaponsAssigned;
-		public int[] TargetedBy;      // other Ships/Vehciles/Entities, ground radars, factions, etc that are targeting this Target
-		public STATUS Status;
-		public CREWSTATUS CrewStatus;
-		public int Hitpoints;         // max hitpoints of target... should a Sensor be able to know this exact number?  It's really just a game thing and maybe we should just use visual observations of condition of ship instead
-		public int CurrentHitPoints;  // used to determine % damage of Target
-	}
+        public void Update();
 
+        public string ToString ();
+        public IBuilder FromString(string persistString);
+    }
+
+	
+	public struct Build_Laser : IBuilder
+	{
+        // build specific LASER properties
+		private string COMPONENT_DELIMETER = "|";
+		public object[] Components {get; set;}
+		
+		
+		public Build_Laser() // parameterless constructors for structs first became available in c# 10
+		{
+			// struct for component properties and stats
+			Components = new object[3];
+			
+			int componentIndex = 1;
+			Component component = ((ComponentStore<Component>)EntryClass.mCStoreCol.CheckOut<Component>(0)).Span[componentIndex];
+			Components[0] = component;
+						
+			// struct for basic weapons properties
+			int weaponIndex = 0;
+			Weapon weapon = ((ComponentStore<Weapon>)EntryClass.mCStoreCol.CheckOut<Weapon>(0)).Span[weaponIndex];
+			Components[1] = component;
+			
+			// struct for laser specific weapon properties
+			int laserIndex = 2;
+			Laser_Struct laser = ((ComponentStore<Laser_Struct>)EntryClass.mCStoreCol.CheckOut<Laser_Struct>(0)).Span[laserIndex];
+			Components[2] = laser;		
+		}
+		
+		public Build_Laser(string persistString)
+		{
+			Components = FromString(persistString).Components;
+		}
+
+		
+#region IBuilder implementation
+        public void Update()
+        {
+        }
+
+		public string BuildPersistString {get;}
+        public bool StatsChanged {get;}
+        public bool BuildChanged {get;}
+
+		
+        public override string ToString()
+        {
+            // NOTE: we only need to write out the build parameters and from that we can
+            //       reconstitute the full entity
+
+			// 1 - Memory<T> represents how the data is STORED in memory, in structs from which we can
+			//     store in contiguous memory
+			// 2 - So, a Laser will be made up of 3 "structs" like Component, Weapon and Laser for storing the data
+			//    and these structs will co-exist in our UserData object keyed by their typename
+			//    The Defense and InternalStructure too can be keyed this way and assigned later... with ArmorLayers being
+			//    somewhat special case because there are currently no maximum allowable limits
+            string persistString = null;
+
+			// TODO: next follows a series of parts that join together to create the full persist string
+			string componentPart = Components[0].ToString();
+			string weaponPart = Components[1].ToString();
+			string laserPart = Components[2].ToString();
+			 
+            // JSon == javascript object notation
+			persistString = System.Text.Json.JsonSerializer.Serialize(this);
+			Console.WriteLine("Build_Laser.ToString() - " + persistString);
+            return persistString;
+		}
+
+		
+        public IBuilder FromString (string persistString)
+        {
+            if (string.IsNullOrEmpty(persistString))
+			{
+				string[] parts = persistString.Split(COMPONENT_DELIMETER);
+				System.Diagnostics.Debug.Assert (parts.Length == 3);
+				
+				Component componentStruct = System.Text.Json.JsonSerializer.Deserialize<Component>(parts[0]);
+				Weapon weaponStruct = System.Text.Json.JsonSerializer.Deserialize<Weapon>(parts[1]);
+				Laser_Struct laserStruct = System.Text.Json.JsonSerializer.Deserialize<Laser_Struct>(parts[2]);
+				
+				// todo: all of the above need to be checked in to the EntryClass.mColStore?
+									
+			}
+			
+			
+            // NOTE: we only need the build parameters and from that we can
+            //       create the full entity
+            Build_Laser laser = System.Text.Json.JsonSerializer.Deserialize<Build_Laser>(persistString);
+							
+			return laser;
+        }
+		
+#endregion
+	}
 	
     public interface IEntitySystem
     {
@@ -7393,7 +7619,6 @@ if (mEntityNodesCollection == null) return null;
                         sb.Append(delimiter);
                 }
                 result = sb.ToString();
-    3
                 return result;
             }
             */
@@ -7502,7 +7727,8 @@ if (mEntityNodesCollection == null) return null;
         //}
 
         //#endregion
-    }
+    } // end class Vector3d
+		
 
     //public class FieldPropertyDescriptor : PropertyDescriptor
     //{
@@ -7668,8 +7894,6 @@ if (mEntityNodesCollection == null) return null;
 
     //    //    return value;
     //    //}
-
-
     //}
 
 

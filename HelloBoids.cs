@@ -14,7 +14,6 @@
 
 
 
-
 using System.Collections;
 using System.ComponentModel;
 
@@ -649,14 +648,6 @@ namespace HelloBoids
         public DataProcessorsStore mDataProcessor;
 #endif
 		
-        public enum PRODUCTS : uint
-        {
-            None = 0,
-            MicrowaveEmission = 1,
-            MicrowaveReflection = 2,
-            MicrowaveDamage = 3
-        }
-
 		// todo: might exist in Game01.Rules.Processors
 		public struct ComponentModificationSystem
 		{
@@ -879,11 +870,13 @@ namespace HelloBoids
 //        public Dictionary<uint, List<string> mProducers;
 //        public Dictionary<uint, List<string> mConsumers;
 
+		private Dictionary<uint, List<Production>> mProduction;
+        private Dictionary<uint, List<Consumption>> mConsumption;
 		
 		// TODO: These will probably just be part of a ComponentStore<> which are
 		//       in turn part of ComponentStoreCollection<>
-        private Dictionary<uint, List<EntityNode>> mProducers;
-        private Dictionary<uint, List<EntityNode>> mConsumers;
+//        private Dictionary<uint, List<EntityNode>> mProducers;
+//        private Dictionary<uint, List<EntityNode>> mConsumers;
         
 		// NOTE: These mUserProduction and mUserConsumption should be perhaps another 
 		//       DataProcessorsStore mDataProcessor;  
@@ -1057,230 +1050,6 @@ namespace HelloBoids
         }
         
 
-        
-#region Consumption and Production
-	
-		public struct Production
-    	{
-			// todo: should i have a frequency or Hz?  Gravitation would be at Physics frequency, but other's should be 1 hz or every 1000 ms
-			// production is not serialized to XML because they are created by the scripts in code
-			public int EntityID;
-			public uint ProductID;
-			public Vector3d Location; // location where this production is occurring (eg. explosion, heat signature, etc)
-			public object Value;  // eg. for thrust this contains double, for radar echos, UnitValue is a Vector3d position
-			public int Amount; // infitie = -1, else number of unit's 
-			// public DistributionType DistributionMode; 
-			// public Func<Production, string, bool> DistributionFilterFunc; // accepts Production and an EntityID and returns true if the test is passed
-			// used when DistributionType is List.  Contains id of entities consuming this product.  
-			// No searches (spatial or otherwise) reqt. "power links" and other "links" are good examples of their use.
-			public string[] DistributionList;  
-			public object SearchPrimitive;   // used with DistributionMode is a spatial search of some kind.
-			
-	//		public float Rate;    // amount of units consumed per second
-
-	//        // confused on some of these vars because where does the machine/entity pass in
-	//        // vars used for the computation, and which exist here?  I think one good argument
-	//        // to keep them here is that a machine that produces/consumes multiple things
-	//        // may have seperate throttle values and efficiency values and even different enable/disable
-	//        // states
-	//        // But why not have some of these custom properties in the Entity then?
-	//        public bool Enabled;
-	//        public float Efficiency; // at same throttle, increased efficiency will produce more
-	//                                 // as the machine wears out between mainteneance efficiency
-	//                                 // will drop.  It is also possible to increase efficiency
-
-	//        public float Throttle;  // value typically 0 -1.0 but can exceed 1.0 with potential risk
-	//                                // of damaging the machine (is Damage a customProperty in Entity?)
-			
-			
-		}
-	
-		public enum PropertyOperation : byte
-		{
-			Replace = 0,
-			Add,        // typically for adding an array element
-			Remove,     // typically for removing an array element
-			Union,      // merge two arrays with no duplicates
-			Increment,  // for numeric propertyspec values to add the propertySpec value to the existing value within the Entity
-			Decrement,
-			Additive_Multiply,
-			Additive_Divide
-		}
-
-    // consumption is more charged with the algorithm for computing how much consumption
-    // of the particular product the Entity will use.  This includes everything from 
-    // consuming damage or gravity to consuming electricity, water or fuel.
-    // It will take into account modifiers such as "stealth" to determine consumption if any. 
-    // For instance, a "microwaves" consumption could result in 0 consumption if the distance between
-    // producer and consumer is too great or there is an applicable "stealth" modifier
-    
-    //  It will also take into account modifiers from the crew operator at a station for example.
-    
-    // TODO: should our Consumption_Delegate return "ConsumptionResult" so that these changes
-    // can be sent to other players over the network?
-    
-    // details information about how much this device will consume.  This is returned
-    // when Consumption delegate is invoked in a script for a particular entity.
-    // todo: maybe we should think of this as ConsumptionResults and host all the changes that need to be applied to the target entities
-    //       so we could include an array of PropertySpec and corresponding nodeIDs
-    public struct Consumption // todo: rename this to ConsumptionResult
-    {
-        // Consumption here is really PRODUCT CONSUMPTION RESULT struct that gets filled so that
-        // other players in the networked game can receive the "results" of 
-        // having consumed a product
-        public int EntityID; // the entity that is consuming a product
-        public int ProducerID; // the producer of the product that is being consumed by entity.ID == EntityID.
-        public uint ProductID;     // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer
-        public object Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
-
-           
-        //public string TargetID; // NOTE: this does mean that an entity performing consumption can change properties of other nodes and not just itself. Typically though, its only for entities within a single ship hierarchy from Exterior to Interior components
-        public PropertyOperation[] Operations;
- //       public Settings.PropertySpec[] Properties; // todo: what about HelmState and TacticalState properties? Well, "tacticalstate" and "helmstate" are properties in the ship.css and they are serializable over the wire.
-        // todo: do we need to be able to send this over the wire with NetBuffer Read and Write?
-        // todo: we should probably need to know whether the property values are meant to replace, increment, or decrement the existing value.  "store" is a good example. If we're multithreaded, we might need to lock each node before we apply changes
-        //       I could include an array of int[] operation; that is same length and specifiy 0=replace, 1=increment and 2= decrement, 3 = add array element, 4 = remove array element
-        // todo: maybe instead of seperate objects like HelmState and NavPoints we just use regular custompropertyspec for each member.  This will make it easier for ConsumptionResult handling without keystone.dll needing to know anything about those custom types.
-        // todo: well first, lets just use PropertySpec with intrinsic types.  
-    }
-		
-		
-       public void RegisterProducer(uint productID, EntityNode entity)
-        {
-            if (mProducers == null) mProducers = new Dictionary<uint, List<EntityNode>>();
-            List<EntityNode> producers;
-            bool exists = mProducers.TryGetValue(productID, out producers);
-            if (!exists)
-                mProducers[productID] = new List<EntityNode>();
-
-            mProducers[productID].Add(entity);
-
-            // todo: ideally this ISimulation implementation should be in the EXE because we need to know the game specific productIDs and what they refer to
-            // todo: how and where is the Hz for each productID defined?  Perhaps its just the job of this Simulation implementation which should be implemented in the EXE, not Keystone.dll
-        }
-
-        public void RegisterConsumer(uint productID, EntityNode entity)
-        {
-            if (mConsumers == null) mConsumers = new Dictionary<uint, List<EntityNode>>();
-            List<EntityNode> consumers;
-            bool exists = mConsumers.TryGetValue(productID, out consumers);
-            if (!exists)
-                mConsumers[productID] = new List<EntityNode>();
-
-            mConsumers[productID].Add(entity);
-
-            // todo: ideally this ISimulation implementation should be in the EXE because we need to know the game specific productIDs and what they refer to
-            // todo: how and where is the Hz for each productID defined?  Perhaps its just the job of this Simulation implementation which should be implemented in the EXE, not Keystone.dll
-        }
-        
-        // TODO: when an Entity is detached from the Scene, it should be removed as a Producer
-        public void UnRegisterProducer(uint productID, EntityNode entity)
-        {
-            mProducers[productID].Remove(entity);
-        }
-
-        // TODO: when an Entity is detached from the Scene, it should be removed as a Consumer
-        public void UnRegisterConsumer(uint productID, EntityNode entity)
-        {
-            mConsumers[productID].Remove(entity);
-        }
-
-
-
-
-        //public KeyCommon.Simulation.Production_Delegate ForceProduction
-        //{
-        //    get { return mForceProduction;}
-        //}
-
-/*
-		public void AssignConsumptionHandler(string productID, Consumption_Delegate consumptionHandler)
-        {
-            if (mUserConsumption == null) mUserConsumption = new Dictionary<uint, Consumption_Delegate>();
-            mUserConsumption.Add(productionTypeFlag, consumptionHandler);
-        }
-
-
-        public void AssignProductionHandler(uint productID, Production_Delegate productionHandler)
-        {
-             // now then, as far as registering, i think that must occur
-            // when the entity is Activated, not here.  The entity itself
-            // can look at it's mProductionTypeFlags and register accordingly. 
-            // But there has to be a point to registering... what is the performance benefit?
-
-            // TODO: but what about production that is per entity?  are we ensuring that production is
-            // running properly based on the specific entity instance this script is attached to?
-
-             if (mUserProduction == null) mUserProduction = new Dictionary<uint, Production_Delegate>();
-             mUserProduction.Add(productID, productionHandler);
-        }
-
-		// TODO: these should be OBSOLETE since these should just be within DataProcessors even
-		//       if we use unique DataProcessors like DataProcessor mUserProduction; and DataProcessor mUserConsumption;
-		//       So during AILogic for instance, if a laser fires, we would produce a FireDamage and BurnDamage struct
-		//       and add those to the ComponentStores for <> affected (eg in range) Consumers of those respective productIDs
-		//       Any particular FireDamage may remain in the list of FireDamage.Records[] if the duration of the fire has not
-		//       expired.  
-		//       Similarly, gravity production of Jupiter would not need to be added to the Gravity.Records every frame 
-		//       
-        public Dictionary<uint, Production_Delegate> UserProduction
-        {
-            get { return mUserProduction; }
-        }
-
-        public Dictionary<uint, Consumption_Delegate> UserConsumption 
-        {
-            get { return mUserConsumption; }
-        }
-
-        //public void AddForceProduction(KeyCommon.Simulation.Production_Delegate productionHandler)
-        //{
-        //    mForceProduction = productionHandler;
-        //}
-*/
-		
-
-        private EntityNode[] GetProducers(uint productID)
-        {
-            if (mProducers == null) return null;
-            List<EntityNode> results;
-            mProducers.TryGetValue(productID, out results);
-
-            if (results == null) return null;
-
-            return results.ToArray();
-        }
-
-        private List<EntityNode> FindConsumers(EntityNode sourceEntity, uint productID)
-        {
-
-            return null;
-        }
-        #endregion
-
-
-        bool mIsDisposed;
-        public void Dispose()
-        {
-            if (!mIsDisposed)
-            {
-                Console.WriteLine("BoidSimulation.~dtor() - Detroying all boids");
-            
-				if (this.Boids != null)
-					for (int i = 0; i < this.Boids.Count; i++)
-					{
-						// todo: do we need to remove from SpatialNode here or should
-						//       the BoidSimulation do that?  I think the Simulation should on notification
-						//       that it's been removed from the Scene which is how we will do it in KeystoneGameBlocks.
-				#if MEMORY_T
-						this.Boids[i].Dispose();
-				#endif
-						this.Boids[i] = null;
-					}
-
-					mIsDisposed = true;
-			}
-        }
 		
         /// <summary>
         /// Update simulation using either Data Oriented Technique or Object Oriented Technique
@@ -1365,9 +1134,7 @@ namespace HelloBoids
 				catch (Exception ex)
 				{
 					Console.WriteLine("Update 5 " + ex.Message);
-				}
-				
-				
+				}				
 	#endif
 			}
 			catch (AggregateException ae)
@@ -1990,8 +1757,18 @@ namespace HelloBoids
             //for (int i = 0; i < Boids.Count; i++)
             {
 				Boid currentBoid = Boids[i];
+				List<int> neighbors = null;
 				
-				List<int> neighbors = mNeighbors[currentBoid.SpanIndex];
+				try
+				{
+					bool success = mNeighbors.TryGetValue(currentBoid.SpanIndex, out neighbors);
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("Do_Droid_Logic() -  key '" + currentBoid.SpanIndex.ToString() + "' does not exist");
+				}
+				
+				
 				
 				// these will be stored in UserData's local "object[]" and thus boxed
 				// TODO: the BlackBoardData is not threadsafe
@@ -2004,8 +1781,7 @@ namespace HelloBoids
 
 
                 // 
-                
-                
+                                
             
 				Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component));
 				Memory<Weapon> wep = (Memory<Weapon>) currentBoid.GetUserStruct(typeof(Weapon));
@@ -2029,15 +1805,23 @@ namespace HelloBoids
 				//      	- FOF.Withdrawing may be ignored for example if ROE says we don't persue in this circumstance including disabled ships and unarmed ships like freighters
 				//    
 				
-				
 				logicalExpression = wep.Span[0].AverageDamage.ToString() + " < " + testLEComp.Span[currentBoid.SpanIndexLE].Hitpoints.ToString();
 				bool result = MicroEx.Evaluate(logicalExpression);
 				//Console.WriteLine ("Do_Droid_Logic() - MicroEx.Evaluate() - '" + logicalExpression + "' " + result.ToString());
 					
-					
 				string timerID = currentBoid.SpanIndex.ToString();
-				bool canFire = mIntervalTimers.IsReady(timerID, "droid_canfire");
-            	if (canFire)
+				bool canFire = false;
+				
+				try
+				{
+					canFire = mIntervalTimers.IsReady(timerID, "droid_canfire");
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("Do_Droid_Logic() - droid_canfire " + currentBoid.SpanIndex.ToString() + " key does not exist");
+				}
+				
+				if (canFire)
            	 	{
                 	//Console.WriteLine("Do_Droid_Logic() - Droid " + currentBoid.SpanIndex.ToString() + " Can Fire = " + canFire.ToString());
                 	mIntervalTimers.Reset(timerID, "droid_canfire");
@@ -2086,7 +1870,7 @@ namespace HelloBoids
 					}
 				}
 			});
-	
+			
 			// see Keystone.Game01.Messages.   public class AttackResults since
 			// we need results going over the network
 		}
@@ -2539,7 +2323,7 @@ namespace HelloBoids
 
             Boid b = new Boid(index, posX, posY, posZ, vX, vY);
 			
-			string id = b.Index.ToString();
+			string id = b.SpanIndex.ToString();
 	
 			mIntervalTimers.Register(id, "droid_spawn", 0.14d);
 			mIntervalTimers.Register(id, "droid_canfire", 0.04d);
@@ -2557,6 +2341,24 @@ namespace HelloBoids
 			//
 			// OnEntityAttached(EntityNode e)
 			//       {
+			Production p;
+			p.EntityIndex = b.SpanIndex;
+			p.ProductID = 	(int)PRODUCTS.TargetingSkillModifier;
+			p.Location = Vector3d.Zero();
+			p.Value = 10;
+			p.Amount = 5;
+			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
+			p.DistributionList = new int[] {b.SpanIndex};
+			p.SearchPrimitive  = null;
+	
+			Consumption c;
+			c.EntityIndex = b.SpanIndex;
+			c.ProducerID = p.EntityIndex;
+			c.ProductID = p.ProductID;
+			c.Amount = 5;
+			c.Operations = null;
+			
+	
 			//			AddProduction(e)
 			//	        AddConsumption(e);
 			//       }
@@ -2564,7 +2366,7 @@ namespace HelloBoids
 	
 			// add the required StationState for our tactical station's state to the droid.BlackBoardData which is required by Do_Droid_Logic()
 			StationState stationState;
-			stationState.Index = b.Index;
+			stationState.Index = b.SpanIndex;
 						
 			stationState.HistoryCount = 1;
 			
@@ -2744,7 +2546,6 @@ namespace HelloBoids
 
             // SPATIAL SEARCH ///////////////////////////////////////////////////////////////////////////////////
 #if SPATIAL_SEARCH
-
             BoundingBox searchArea = new BoundingBox(currentBoid.Translation, largestDistance * 0.5d);
             Func<EntityNode, EntityNode, bool> match = (neighbor, current) =>
             {
@@ -2759,7 +2560,6 @@ namespace HelloBoids
 			Console.WriteLine ("GetNeighbors - Memory<T> Using SpatialQueryLocal()");
             ComponentStore<Transform.Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
             List<EntityNode> found = SpatialQueryLocal(store.Span, currentBoid.SpatialNode, currentBoid.SpanIndex, largestDistanceSquared, true, searchArea);
-
 
 #else
             List<EntityNode> found = this.Octree.Query(currentBoid, true, searchArea, match);
@@ -2887,9 +2687,373 @@ namespace HelloBoids
             return results;
         }
 #endif
-    }
+    
+        
+#region Consumption and Production
+
+		public enum PRODUCT_DISTRIBUTION_TYPE
+		{
+			List = 0,
+			Region
+		}
+		
+		public enum PRODUCTS
+        {
+            None = 0,
+			// Emissions and Signatures
+            MicrowaveEmission,
+            MicrowaveReflection,
+			
+			// Damage Types
+            MicrowaveDamage = 1024,
+					
+			// Modifiers
+			TacticalOperationsSkillModifier = 2048,
+			TargetingSkillModifier
+        }
+		
+		public struct Production
+    	{
+			// todo: should i have a frequency or Hz?  Gravitation would be at Physics frequency, but other's should be 1 hz or every 1000 ms
+			// production is not serialized to XML because they are created by the scripts in code
+			public int EntityIndex;
+			public uint ProductID;
+			public Vector3d Location; // location where this production is occurring (eg. explosion, heat signature, etc)
+			public object Value;  // eg. for thrust this contains double, for radar echos, UnitValue is a Vector3d position
+			public int Amount; // infitie = -1, else number of unit's 
+			public PRODUCT_DISTRIBUTION_TYPE DistributionMode; 
+			// public Func<Production, string, bool> DistributionFilterFunc; // accepts Production and an EntityID and returns true if the test is passed
+			// used when DistributionType is List.  Contains id of entities consuming this product.  
+			// No searches (spatial or otherwise) reqt. "power links" and other "links" are good examples of their use.
+			public int[] DistributionList;  
+			public object SearchPrimitive;   // used with DistributionMode is a spatial search of some kind.
+			
+	//		public float Rate;    // amount of units consumed per second
+
+	//        // confused on some of these vars because where does the machine/entity pass in
+	//        // vars used for the computation, and which exist here?  I think one good argument
+	//        // to keep them here is that a machine that produces/consumes multiple things
+	//        // may have seperate throttle values and efficiency values and even different enable/disable
+	//        // states
+	//        // But why not have some of these custom properties in the Entity then?
+	//        public bool Enabled;
+	//        public float Efficiency; // at same throttle, increased efficiency will produce more
+	//                                 // as the machine wears out between mainteneance efficiency
+	//                                 // will drop.  It is also possible to increase efficiency
+
+	//        public float Throttle;  // value typically 0 -1.0 but can exceed 1.0 with potential risk
+	//                                // of damaging the machine (is Damage a customProperty in Entity?)
+			
+			
+		}
+	
+		public enum PropertyOperation : byte
+		{
+			Replace = 0,
+			Add,        // typically for adding an array element
+			Remove,     // typically for removing an array element
+			Union,      // merge two arrays with no duplicates
+			Increment,  // for numeric propertyspec values to add the propertySpec value to the existing value within the Entity
+			Decrement,
+			Additive_Multiply,
+			Additive_Divide
+		}
+
+		// consumption is more charged with the algorithm for computing how much consumption
+		// of the particular product the Entity will use.  This includes everything from 
+		// consuming damage or gravity to consuming electricity, water or fuel.
+		// It will take into account modifiers such as "stealth" to determine consumption if any. 
+		// For instance, a "microwaves" consumption could result in 0 consumption if the distance between
+		// producer and consumer is too great or there is an applicable "stealth" modifier
+
+		//  It will also take into account modifiers from the crew operator at a station for example.
+
+		// TODO: should our Consumption_Delegate return "ConsumptionResult" so that these changes
+		// can be sent to other players over the network?
+
+		// details information about how much this device will consume.  This is returned
+		// when Consumption delegate is invoked in a script for a particular entity.
+		// todo: maybe we should think of this as ConsumptionResults and host all the changes that need to be applied to the target entities
+		//       so we could include an array of PropertySpec and corresponding nodeIDs
+		public struct Consumption // todo: rename this to ConsumptionResult
+		{
+			// Consumption here is really PRODUCT CONSUMPTION RESULT struct that gets filled so that
+			// other players in the networked game can receive the "results" of 
+			// having consumed a product
+			public int EntityIndex; // the entity that is consuming a product
+			public int ProducerID; // the producer of the product that is being consumed by entity.ID == EntityID.
+			public uint ProductID;     // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer
+			public object Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
+
+			//public string TargetID; // NOTE: this does mean that an entity performing consumption can change properties of other nodes and not just itself. Typically though, its only for entities within a single ship hierarchy from Exterior to Interior components
+			public PropertyOperation[] Operations;
+	 //       public Settings.PropertySpec[] Properties; // todo: what about HelmState and TacticalState properties? Well, "tacticalstate" and "helmstate" are properties in the ship.css and they are serializable over the wire.
+			// todo: do we need to be able to send this over the wire with NetBuffer Read and Write?
+			// todo: we should probably need to know whether the property values are meant to replace, increment, or decrement the existing value.  "store" is a good example. If we're multithreaded, we might need to lock each node before we apply changes
+			//       I could include an array of int[] operation; that is same length and specifiy 0=replace, 1=increment and 2= decrement, 3 = add array element, 4 = remove array element
+			// todo: maybe instead of seperate objects like HelmState and NavPoints we just use regular custompropertyspec for each member.  This will make it easier for ConsumptionResult handling without keystone.dll needing to know anything about those custom types.
+			// todo: well first, lets just use PropertySpec with intrinsic types.  
+		}
+		
+		public void RegisterProduction (EntityNode entity, Production[] production)
+		{
+			if (production != null)
+				for (int i = 0; i < production.Length; i++)
+					 RegisterProduction(entity, production[i]);
+		}
+		
+       	public void RegisterProduction(EntityNode entity, Production p)
+        {
+		    uint productID = p.ProductID;  
+			   
+            if (mProduction == null) mProduction = new Dictionary<uint, List<Production>>();
+            List<Production> production;
+            bool exists = mProduction.TryGetValue(productID, out production);
+            if (!exists)
+                mProduction[productID] = new List<Production>();
+
+            mProduction[productID].Add(p);
+
+            // todo: ideally this ISimulation implementation should be in the EXE because we need to know the game specific productIDs and what they refer to
+            // todo: how and where is the Hz for each productID defined?  Perhaps its just the job of this Simulation implementation which should be implemented in the EXE, not Keystone.dll
+        }
+
+        public void RegisterConsumer(EntityNode entity, Consumption c)
+        {
+			uint productID = c.ProductID;
+			
+            if (mConsumption == null) mConsumption = new Dictionary<uint, List<Consumption>>();
+            List<Consumption> consumption;
+            bool exists = mConsumption.TryGetValue(productID, out consumption);
+            if (!exists)
+                mConsumption[productID] = new List<Consumption>();
+
+            mConsumption[productID].Add(c);
+
+            // todo: ideally this ISimulation implementation should be in the EXE because we need to know the game specific productIDs and what they refer to
+            // todo: how and where is the Hz for each productID defined?  Perhaps its just the job of this Simulation implementation which should be implemented in the EXE, not Keystone.dll
+        }
+        
+		public void UnRegisterProduction(uint productID, EntityNode entity)
+        {
+			int found = -1;
+			for (int i = 0; i < mProduction.Count; i++)
+				if (mProduction[productID][i].EntityIndex == entity.Index)
+				{
+					found = (int)i;
+					break;
+				}
+
+            mProduction[productID].Remove(mProduction[productID][(int)found]);
+        }
+
+        // TODO: when an Entity is detached from the Scene, it should be removed as a Consumer
+        public void UnRegisterConsumption(uint productID, EntityNode entity)
+        {
+			int found = -1;
+			for (int i = 0; i < mConsumption.Count; i++)
+				if (mConsumption[productID][i].EntityIndex == entity.Index)
+				{
+					found = (int)i;
+					break;
+				}
+
+            mConsumption[productID].Remove(mConsumption[productID][(int)found]);
+        }
+
+        // TODO: when an Entity is detached from the Scene, it should be removed as a Producer
+        public void UnRegisterProducer(uint productID, EntityNode entity)
+        {
+            //mProducers[productID].Remove(entity);
+        }
+
+        // TODO: when an Entity is detached from the Scene, it should be removed as a Consumer
+        public void UnRegisterConsumer(uint productID, EntityNode entity)
+        {
+            //mConsumers[productID].Remove(entity);
+        }
 
 
+
+        //public KeyCommon.Simulation.Production_Delegate ForceProduction
+        //{
+        //    get { return mForceProduction;}
+        //}
+
+/*
+		public void AssignConsumptionHandler(string productID, Consumption_Delegate consumptionHandler)
+        {
+            if (mUserConsumption == null) mUserConsumption = new Dictionary<uint, Consumption_Delegate>();
+            mUserConsumption.Add(productionTypeFlag, consumptionHandler);
+        }
+
+
+        public void AssignProductionHandler(uint productID, Production_Delegate productionHandler)
+        {
+             // now then, as far as registering, i think that must occur
+            // when the entity is Activated, not here.  The entity itself
+            // can look at it's mProductionTypeFlags and register accordingly. 
+            // But there has to be a point to registering... what is the performance benefit?
+
+            // TODO: but what about production that is per entity?  are we ensuring that production is
+            // running properly based on the specific entity instance this script is attached to?
+
+             if (mUserProduction == null) mUserProduction = new Dictionary<uint, Production_Delegate>();
+             mUserProduction.Add(productID, productionHandler);
+        }
+
+		// TODO: these should be OBSOLETE since these should just be within DataProcessors even
+		//       if we use unique DataProcessors like DataProcessor mUserProduction; and DataProcessor mUserConsumption;
+		//       So during AILogic for instance, if a laser fires, we would produce a FireDamage and BurnDamage struct
+		//       and add those to the ComponentStores for <> affected (eg in range) Consumers of those respective productIDs
+		//       Any particular FireDamage may remain in the list of FireDamage.Records[] if the duration of the fire has not
+		//       expired.  
+		//       Similarly, gravity production of Jupiter would not need to be added to the Gravity.Records every frame 
+		//       
+        public Dictionary<uint, Production_Delegate> UserProduction
+        {
+            get { return mUserProduction; }
+        }
+
+        public Dictionary<uint, Consumption_Delegate> UserConsumption 
+        {
+            get { return mUserConsumption; }
+        }
+
+        //public void AddForceProduction(KeyCommon.Simulation.Production_Delegate productionHandler)
+        //{
+        //    mForceProduction = productionHandler;
+        //}
+*/
+		
+/*
+        private EntityNode[] GetProducers(uint productID)
+        {
+            if (mProducers == null) return null;
+            List<EntityNode> results;
+            mProducers.TryGetValue(productID, out results);
+
+            if (results == null) return null;
+
+            return results.ToArray();
+        }
+
+        private List<EntityNode> FindConsumers(EntityNode sourceEntity, uint productID)
+        {
+
+            return null;
+        }
+		
+*/
+        private EntityNode GetEntity (int index)
+		{
+			return Boids[index];
+		}
+		
+		private void UpdateProduction(double elapsedSeconds)
+        {
+            uint productID = 8; // 3 == power in UserConstants, 8 == microwaves
+            List<Production> production = mProduction[productID];
+            if (production == null) return;
+            // todo: i need to handle each bucket.  currently we are only updating production for "power"
+
+            // TODO: maybe we only want to produce at a certain frequency, with exception of COLLISION filters?
+            //       and maybe we also want to thread and
+            //       maybe we also want to do only x many per interval
+            //       or put another way, load balance scheduling 
+            
+            // %windir%\microsoft.net\framework\v3.5\msbuild /m /p:Configuration=Release /p:DefineConstants="NET35" /nologo /t:Build 
+
+            // March.10.2026 - Production now always occurs automatically without every needing to call Script.OnUpdate()
+			//                 because ALL Production and Consumption must be REGISTERED by the Scripts.  In the future
+			//                 we can always support dynamic insertion of PRODUCTION during a call to Script.OnUpdate() but
+			//                 this should not be used regularly because we do not want to have to force Script.OnUpdate() to
+			//                 be called everyframe since we've switched to using a DATA ORIENTED PROCESSING MODEL.
+            for (int i = 0; i < production.Length; i++)
+            {
+            
+                //if (producer.Script == null) continue; // should never happen!
+                // TODO: the act of "consumption" should add to the contacts and be sent over the wire.
+                // So there is a distinction between what production/consumption is predicted client side
+                // and what is done server side with results transmitted to clients.
+                // TODO: how do we ensure that some production is only done server side
+                //       if not running in loopback?  The "search" feature especially
+                //       here which could use a lamda, 
+                // 1) Produce User Products
+                // todo: outside this loop, we need to iterate through other types of production and at potentially different Hz
+                
+                  
+                // if production is null, consumers attached to this cannot be updated
+                // and so on their next "tick" they will be starved for the product 
+                if (production == null) continue;
+
+                for (int j = 0; j < production.Count; j++)
+                {
+                    EntityNode sourceEntity = GetEntity(production[j].EntityIndex);
+                    if (sourceEntity == null) continue;
+                    // 2) Determine consumer distrubtion - find all valid consumers that match the terms of this production result
+                    // TODO: FindConsumers is very slow.  I must not run that simulation each period for Zones that are beyond a certain range from player.
+                    // TODO:  Verify that we are in fact running Production for entities in every zone we load.  That is a bug.
+                    List<Consumption> consumers = mConsumption[productID];
+                    if (consumers == null) continue;
+
+                    // System.Diagnostics.Debug.WriteLine("Simulation.UpdateProduction() - " + consumers.Count + " found.");
+                    // 3) Consume - pass the production to the consumption handler
+                    for (int k = 0; k < consumers.Count; k++)
+                    {
+                        // invoke appropriate delegate
+                        Consumption[] consumptionResult = consumers[k].Script.Consumers[production[j].ProductID](consumers[k].ID, production[j], elapsedSeconds);
+                        if (consumptionResult == null) continue;
+
+                        // send a command to change relevant properties based on the consumptionResult.
+                        // todo: question is, how would we do someth`ing like an "Explosion" fx when health == 0 after changes to the property?
+                        // well perhaps our script performs a Rule check when the value is changed and initiates the explosion.
+                        // todo: well i think we can still use SensorContacts, HelmState and NavPoints, but they need to be able to serialize over the wire to go through loopback.
+                        // todo: i think we do want to be able to store for saves purposes some custom gameobject types.
+                        // NOTE: we pass in "operations" to perform so that we have ability to things like increment/decrement/add/remove/etc.    
+                        for (int b = 0; b < consumptionResult.Length; b++)
+                        {
+                            if (consumptionResult[b].Properties == null) continue;
+
+                            //KeyCommon.Messages.Entity_ChangeCustomPropertyValue changeProperties = new KeyCommon.Messages.Entity_ChangeCustomPropertyValue();
+                            //changeProperties.EntityID = (consumptionResult[b].TargetID);
+                            for (int c = 0; c < consumptionResult[b].Properties.Length; c++)
+                            {
+                                //changeProperties.Add(consumptionResult[b].Properties[c], consumptionResult[b].Operations[c]);
+                            }
+                            //AppMain.mNetClient.SendMessage(changeProperties);
+                        }
+                    }
+                }
+            }
+        }
+
+		#endregion
+
+
+        bool mIsDisposed;
+        public void Dispose()
+        {
+            if (!mIsDisposed)
+            {
+                Console.WriteLine("BoidSimulation.~dtor() - Detroying all boids");
+            
+				if (this.Boids != null)
+					for (int i = 0; i < this.Boids.Count; i++)
+					{
+						// todo: do we need to remove from SpatialNode here or should
+						//       the BoidSimulation do that?  I think the Simulation should on notification
+						//       that it's been removed from the Scene which is how we will do it in KeystoneGameBlocks.
+				#if MEMORY_T
+						this.Boids[i].Dispose();
+				#endif
+						this.Boids[i] = null;
+					}
+
+					mIsDisposed = true;
+			}
+        }
+	}
 	
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // BEGIN BOIDS
@@ -5672,7 +5836,9 @@ return (0,0);
 		// https://gamedev.stackexchange.com/questions/148961/how-to-design-a-damage-formula-in-an-rpg-which-keeps-weapons-with-different-atta
 
 	}
-	
+	#endregion // Game01.GameObjects
+
+    #region IBuilder implementation
 	// See KeystoneGameBlocks/Game01/Builders
 	public interface IBuilder
     {
@@ -5722,7 +5888,7 @@ return (0,0);
 		}
 
 		
-#region IBuilder implementation
+
         public void Update()
         {
         }

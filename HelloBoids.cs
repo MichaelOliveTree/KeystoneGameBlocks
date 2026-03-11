@@ -1084,6 +1084,8 @@ namespace HelloBoids
 
 				// TEST MEMORY<T> (Data Oriented Technique)
 				// ====================
+				UpdateProduction(gt);
+		
 				ComponentStore<LivingEntity> livingEntityStore = null;
 				
 				try
@@ -2950,81 +2952,75 @@ namespace HelloBoids
 			return Boids[index];
 		}
 		
-		private void UpdateProduction(double elapsedSeconds)
+		private void UpdateProduction(GameTime gt)
         {
-            uint productID = 8; // 3 == power in UserConstants, 8 == microwaves
+            uint productID = (uint)PRODUCTS.TargetingSkillModifier;
             List<Production> production = mProduction[productID];
             if (production == null) return;
-            // todo: i need to handle each bucket.  currently we are only updating production for "power"
-
-            // TODO: maybe we only want to produce at a certain frequency, with exception of COLLISION filters?
-            //       and maybe we also want to thread and
-            //       maybe we also want to do only x many per interval
-            //       or put another way, load balance scheduling 
-            
-            // %windir%\microsoft.net\framework\v3.5\msbuild /m /p:Configuration=Release /p:DefineConstants="NET35" /nologo /t:Build 
 
             // March.10.2026 - Production now always occurs automatically without every needing to call Script.OnUpdate()
 			//                 because ALL Production and Consumption must be REGISTERED by the Scripts.  In the future
 			//                 we can always support dynamic insertion of PRODUCTION during a call to Script.OnUpdate() but
 			//                 this should not be used regularly because we do not want to have to force Script.OnUpdate() to
 			//                 be called everyframe since we've switched to using a DATA ORIENTED PROCESSING MODEL.
-            for (int i = 0; i < production.Length; i++)
+            for (int i = 0; i < production.Count; i++)
             {
-            
-                //if (producer.Script == null) continue; // should never happen!
-                // TODO: the act of "consumption" should add to the contacts and be sent over the wire.
-                // So there is a distinction between what production/consumption is predicted client side
-                // and what is done server side with results transmitted to clients.
-                // TODO: how do we ensure that some production is only done server side
-                //       if not running in loopback?  The "search" feature especially
-                //       here which could use a lamda, 
-                // 1) Produce User Products
-                // todo: outside this loop, we need to iterate through other types of production and at potentially different Hz
-                
-                  
-                // if production is null, consumers attached to this cannot be updated
-                // and so on their next "tick" they will be starved for the product 
-                if (production == null) continue;
+				EntityNode sourceEntity = GetEntity(production[i].EntityIndex);
+				if (sourceEntity == null) continue;
+				
+				// 2) Determine consumer distrubtion - find all valid consumers that match the terms of this production result
+				// TODO: FindConsumers is very slow.  I must not run that simulation each period for Zones that are beyond a certain range from player.
+				// TODO:  Verify that we are in fact running Production for entities in every zone we load.  That is a bug.
+				List<Consumption> consumers = mConsumption[productID];
+				if (consumers == null) continue;
 
-                for (int j = 0; j < production.Count; j++)
-                {
-                    EntityNode sourceEntity = GetEntity(production[j].EntityIndex);
-                    if (sourceEntity == null) continue;
-                    // 2) Determine consumer distrubtion - find all valid consumers that match the terms of this production result
-                    // TODO: FindConsumers is very slow.  I must not run that simulation each period for Zones that are beyond a certain range from player.
-                    // TODO:  Verify that we are in fact running Production for entities in every zone we load.  That is a bug.
-                    List<Consumption> consumers = mConsumption[productID];
-                    if (consumers == null) continue;
+				// CONSIDER ProcessOpticalSensors()... we are essentially initiating the PRODUCTION
+				// of optical emission by taking all of the optical  producers (each Boid inside Boids[] array)
+				// and then doing a spatial search for all other Droids in range of that emission, we 
+				// create a OPTICAL_SIGNATURE that takes the form of a "contact" item and is transmitted
+				// back to the original emitter Droid's "eye" which  is an optical sensor and currently is stored in
+				// Dictionary<> mNeighbors;
+				
+				
+				// TODO: so for testing purposes here, we simulate the OPERATOR of the DROID as PRODUCING a "PRODUCTS.TargetingSkillModifier"
+				//       that the TacticalStation will CONSUME (but for now the Droid will CONSUME that as well until KeystoneGameBlocks can be developed in full again)
+				// TODO: we need to be able to run a Processor here which may result in multiple Consumption[] items.
+				Consumption[] consumptionResult = new Consumption[consumers.Count];
+				
+				// System.Diagnostics.Debug.WriteLine("Simulation.UpdateProduction() - " + consumers.Count + " found.");
+				// 3) Consume - pass the production to the consumption handler
+				for (int j = 0; j < consumers.Count; j++)
+				{
+					// invoke appropriate delegate processors... passing in the potential Consumers?
+					consumptionResult[j].EntityIndex = consumers[j].EntityIndex; // the entity that is consuming a product
+					consumptionResult[j].ProducerID = production[i].EntityIndex; // the producer of the product that is being consumed by entity.ID == EntityID.
+					consumptionResult[j].ProductID = productID;          // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer.  Actually, I think we've modified this so that "PRODUCTS.HeatSignature" and "Products.HeatDamage" are two seperate products that may or may not both be consumed by any given Consumer.
+					consumptionResult[j].Amount = production[i].Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
 
-                    // System.Diagnostics.Debug.WriteLine("Simulation.UpdateProduction() - " + consumers.Count + " found.");
-                    // 3) Consume - pass the production to the consumption handler
-                    for (int k = 0; k < consumers.Count; k++)
-                    {
-                        // invoke appropriate delegate
-                        Consumption[] consumptionResult = consumers[k].Script.Consumers[production[j].ProductID](consumers[k].ID, production[j], elapsedSeconds);
-                        if (consumptionResult == null) continue;
+					//public string TargetID; // NOTE: this does mean that an entity performing consumption can change properties of other nodes and not just itself. Typically though, its only for entities within a single ship hierarchy from Exterior to Interior components
+					//consumptionResult[j].Operations;
+					//consumptionResult[b].Properties
+					
+					// send a command to change relevant properties based on the consumptionResult.
+					// todo: question is, how would we do someth`ing like an "Explosion" fx when health == 0 after changes to the property?
+					//       Well, a "health" has to be -SOMEVALUE before it is truely destroyed to the point where it is no longer a derelict hull.
+					// well perhaps our script performs a Rule check when the value is changed and initiates the explosion.
+					// todo: well i think we can still use SensorContacts, HelmState and NavPoints, but they need to be able to serialize over the wire to go through loopback.
+					// todo: i think we do want to be able to store for saves purposes some custom gameobject types.
+					// NOTE: we pass in "operations" to perform so that we have ability to things like increment/decrement/add/remove/etc. 
+					for (int b = 0; b < consumptionResult.Length; b++)
+					{
+						if (consumptionResult[b].Properties == null) continue;
 
-                        // send a command to change relevant properties based on the consumptionResult.
-                        // todo: question is, how would we do someth`ing like an "Explosion" fx when health == 0 after changes to the property?
-                        // well perhaps our script performs a Rule check when the value is changed and initiates the explosion.
-                        // todo: well i think we can still use SensorContacts, HelmState and NavPoints, but they need to be able to serialize over the wire to go through loopback.
-                        // todo: i think we do want to be able to store for saves purposes some custom gameobject types.
-                        // NOTE: we pass in "operations" to perform so that we have ability to things like increment/decrement/add/remove/etc.    
-                        for (int b = 0; b < consumptionResult.Length; b++)
-                        {
-                            if (consumptionResult[b].Properties == null) continue;
-
-                            //KeyCommon.Messages.Entity_ChangeCustomPropertyValue changeProperties = new KeyCommon.Messages.Entity_ChangeCustomPropertyValue();
-                            //changeProperties.EntityID = (consumptionResult[b].TargetID);
-                            for (int c = 0; c < consumptionResult[b].Properties.Length; c++)
-                            {
-                                //changeProperties.Add(consumptionResult[b].Properties[c], consumptionResult[b].Operations[c]);
-                            }
-                            //AppMain.mNetClient.SendMessage(changeProperties);
-                        }
-                    }
-                }
+						//KeyCommon.Messages.Entity_ChangeCustomPropertyValue changeProperties = new KeyCommon.Messages.Entity_ChangeCustomPropertyValue();
+						//changeProperties.EntityID = (consumptionResult[b].TargetID);
+						for (int c = 0; c < consumptionResult[b].Properties.Length; c++)
+						{
+							//changeProperties.Add(consumptionResult[b].Properties[c], consumptionResult[b].Operations[c]);
+						}
+						//AppMain.mNetClient.SendMessage(changeProperties);
+					}
+				}
             }
         }
 
@@ -3057,7 +3053,10 @@ namespace HelloBoids
 	
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // BEGIN BOIDS
+	// The Boid class is influenced by the Boid code from the following GitHub repository.  Primarily, the 
+	// seperation, cohesion and alignment functions have been copied.
     //https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
+	// 
     public class Boid : EntityNode
     {
         private const double BOID_WIDTH = 2.0d;
@@ -3157,8 +3156,6 @@ namespace HelloBoids
             // SpanIndexArmorLayers = checkOutIndex;
 			
 					
-					
-				
 			PropertyBag bag = new PropertyBag();
 			bag.SetValue += OnSetLaserStructValue;
 			bag.GetValue += OnGetLaserStructValue;
@@ -3172,7 +3169,6 @@ namespace HelloBoids
 			PropertySpecEventArgs e = new PropertySpecEventArgs(spec, 9999);
 			bag.OnSetValue (e);
 				
-			
 				
 			// TODO: the CustomProperties should be mostly for GUI... the structs is where the values
 			//       for that underlying GUI is STORED.  So there's just a couple of questions
@@ -3226,9 +3222,6 @@ namespace HelloBoids
 				Console.WriteLine(result);
 				*/
 		
-			
-			
-			
 		}
 
 		// public delegate void PropertySpecEventHandler(object sender, PropertySpecEventArgs e);

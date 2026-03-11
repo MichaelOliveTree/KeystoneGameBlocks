@@ -184,8 +184,7 @@ namespace HelloBoids
 		public static double TURN_FACTOR = 0.1d; // For boundary avoidance
 		public static double MAX_SPEED = 5d;
 		
-        
-		
+        		
 		private static bool useOctree = false;
 		private static uint OctreeMaxDepth = 12;         // NOTE: this is ignored if Octree.EnforceMaxDepth == false in which case the splitthreshHold and radius of the entity being added is the main determinant
 		private static uint OctreeSplitThreshold = 8;
@@ -440,6 +439,8 @@ namespace HelloBoids
 			mCStoreUserData = new HelloBoids.UserDataStore();
 			
            	bSim = new BoidSimulation((int)NUM_ENTRIES, WIDTH, HEIGHT, DEPTH, useOctree);
+			
+			
 			
             CodeProfiler.StartLoop();
             Stopwatch sw = Stopwatch.StartNew();
@@ -870,8 +871,13 @@ namespace HelloBoids
 //        public Dictionary<uint, List<string> mProducers;
 //        public Dictionary<uint, List<string> mConsumers;
 
-		private Dictionary<uint, List<Production>> mProduction;
-        private Dictionary<uint, List<Consumption>> mConsumption;
+
+		
+		private System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>> mProduction = new System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>>();
+        private System.Collections.Concurrent.ConcurrentDictionary<uint, List<Consumption>> mConsumption  = new System.Collections.Concurrent.ConcurrentDictionary<uint, List<Consumption>>();
+		
+		
+		
 		
 		// TODO: These will probably just be part of a ComponentStore<> which are
 		//       in turn part of ComponentStoreCollection<>
@@ -1084,8 +1090,17 @@ namespace HelloBoids
 
 				// TEST MEMORY<T> (Data Oriented Technique)
 				// ====================
-				UpdateProduction(gt);
-		
+				
+				try
+				{
+					UpdateProduction(gt);
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("Update - Production " + ex.Message);
+				}
+				
+				
 				ComponentStore<LivingEntity> livingEntityStore = null;
 				
 				try
@@ -2044,7 +2059,6 @@ namespace HelloBoids
 			
         private void DoLifeCycle(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
         {
-			
 			ComponentStore<LivingEntity> testLEComp = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
 			//Console.WriteLine("DoLifeCycle() - Stores are the same == " + (store == testLEComp).ToString());
 			
@@ -2325,13 +2339,44 @@ namespace HelloBoids
 
             Boid b = new Boid(index, posX, posY, posZ, vX, vY);
 			
+			// TODO: i need to ensure that the SpanIndex and Index are consistantly used across Memory<T>
+			//       SpanIndex can change as Memory<T> records are added/removed when Entities are added/removed from the Scene.
+			//       The "index" however in KGB is actually an _id GUID and is a string.
+			//       Here "index" only refers to where this Droid exists within the List<>
 			string id = b.SpanIndex.ToString();
 	
+			// TIMERS
+			////////////////////////
 			mIntervalTimers.Register(id, "droid_spawn", 0.14d);
 			mIntervalTimers.Register(id, "droid_canfire", 0.04d);
 			mIntervalTimers.Register(id, "droid_isfiring", 0.06d);
+			////////////////////////
+			
 	
-
+			// SKILLS
+			////////////////////////
+			Skill v;
+			v.SkillType = SKILLS.Targeting;
+			v.Level = 1;     			// the level of this skill
+			v.Bonuses = null;
+	
+			//v.AddModifier();
+			b.Skills.Add(SKILLS.Targeting, v);
+	
+	
+	
+			SkillModifier m;
+			m.EntityIndex = b.SpanIndex;
+			m.Product = PRODUCTS.TargetingSkillModifier; // modifiers are a type of PRODUCT for instance PRODUCT.MoraleBoost
+			m.Skill = SKILLS.Targeting;      // the skill that will be affected eg Skill.Morale
+			m.Bonus = 1;        // can be negative or positive e.g  +1 Morale
+	
+			b.Skills[SKILLS.Targeting].AddModifier(m);
+			
+				
+	
+			////////////////////////
+			
 			// todo: generate Droids with some variance for age, size, and speed
 			ComponentStore<LivingEntity> testLEComp = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
 			testLEComp.Span[b.SpanIndexLE].Age = 1;
@@ -2343,6 +2388,7 @@ namespace HelloBoids
 			//
 			// OnEntityAttached(EntityNode e)
 			//       {
+			
 			Production p;
 			p.EntityIndex = b.SpanIndex;
 			p.ProductID = 	(int)PRODUCTS.TargetingSkillModifier;
@@ -2360,6 +2406,9 @@ namespace HelloBoids
 			c.Amount = 5;
 			c.Operations = null;
 			
+			RegisterProduction(b, p);
+			RegisterConsumption(b, c);
+	
 	
 			//			AddProduction(e)
 			//	        AddConsumption(e);
@@ -2693,26 +2742,13 @@ namespace HelloBoids
         
 #region Consumption and Production
 
+		
 		public enum PRODUCT_DISTRIBUTION_TYPE
 		{
 			List = 0,
 			Region
 		}
 		
-		public enum PRODUCTS
-        {
-            None = 0,
-			// Emissions and Signatures
-            MicrowaveEmission,
-            MicrowaveReflection,
-			
-			// Damage Types
-            MicrowaveDamage = 1024,
-					
-			// Modifiers
-			TacticalOperationsSkillModifier = 2048,
-			TargetingSkillModifier
-        }
 		
 		public struct Production
     	{
@@ -2721,7 +2757,7 @@ namespace HelloBoids
 			public int EntityIndex;
 			public uint ProductID;
 			public Vector3d Location; // location where this production is occurring (eg. explosion, heat signature, etc)
-			public object Value;  // eg. for thrust this contains double, for radar echos, UnitValue is a Vector3d position
+			public object Value;  // eg. for thrust this contains double, for radar echos, UnitValue is a Vector3d position, for SkillModifiers, it can contain a SkillModifier struct.
 			public int Amount; // infitie = -1, else number of unit's 
 			public PRODUCT_DISTRIBUTION_TYPE DistributionMode; 
 			// public Func<Production, string, bool> DistributionFilterFunc; // accepts Production and an EntityID and returns true if the test is passed
@@ -2796,6 +2832,7 @@ namespace HelloBoids
 			// todo: maybe instead of seperate objects like HelmState and NavPoints we just use regular custompropertyspec for each member.  This will make it easier for ConsumptionResult handling without keystone.dll needing to know anything about those custom types.
 			// todo: well first, lets just use PropertySpec with intrinsic types.  
 		}
+
 		
 		public void RegisterProduction (EntityNode entity, Production[] production)
 		{
@@ -2808,11 +2845,7 @@ namespace HelloBoids
         {
 		    uint productID = p.ProductID;  
 			   
-            if (mProduction == null) mProduction = new Dictionary<uint, List<Production>>();
-            List<Production> production;
-            bool exists = mProduction.TryGetValue(productID, out production);
-            if (!exists)
-                mProduction[productID] = new List<Production>();
+            List<Production> production = mProduction.GetOrAdd(productID, result =>  new List<Production>());
 
             mProduction[productID].Add(p);
 
@@ -2820,17 +2853,13 @@ namespace HelloBoids
             // todo: how and where is the Hz for each productID defined?  Perhaps its just the job of this Simulation implementation which should be implemented in the EXE, not Keystone.dll
         }
 
-        public void RegisterConsumer(EntityNode entity, Consumption c)
+        public void RegisterConsumption(EntityNode entity, Consumption c)
         {
 			uint productID = c.ProductID;
 			
-            if (mConsumption == null) mConsumption = new Dictionary<uint, List<Consumption>>();
-            List<Consumption> consumption;
-            bool exists = mConsumption.TryGetValue(productID, out consumption);
-            if (!exists)
-                mConsumption[productID] = new List<Consumption>();
-
-            mConsumption[productID].Add(c);
+            List<Consumption> consumption = mConsumption.GetOrAdd (productID, result =>  new List<Consumption>());
+			
+			mConsumption[productID].Add(c);
 
             // todo: ideally this ISimulation implementation should be in the EXE because we need to know the game specific productIDs and what they refer to
             // todo: how and where is the Hz for each productID defined?  Perhaps its just the job of this Simulation implementation which should be implemented in the EXE, not Keystone.dll
@@ -2965,7 +2994,7 @@ namespace HelloBoids
 			//                 be called everyframe since we've switched to using a DATA ORIENTED PROCESSING MODEL.
             for (int i = 0; i < production.Count; i++)
             {
-				EntityNode sourceEntity = GetEntity(production[i].EntityIndex);
+				Boid sourceEntity = (Boid)GetEntity(production[i].EntityIndex);
 				if (sourceEntity == null) continue;
 				
 				// 2) Determine consumer distrubtion - find all valid consumers that match the terms of this production result
@@ -2974,6 +3003,46 @@ namespace HelloBoids
 				List<Consumption> consumers = mConsumption[productID];
 				if (consumers == null) continue;
 
+				// PRODUCTS.TargetingSkillModifier is generated by the OPERATOR (yes, for now still just a Skill assigned to each Droid, but eventually within KGB, it will apply to a crew member assigned to a Tactical Crew Station)
+				System.Diagnostics.Debug.Assert (productID == production[i].ProductID);
+				//System.Diagnostics.Debug.Assert (
+				int[] distributionList = production[i].DistributionList;
+				
+				if (distributionList ==  null) continue; // return if using parallel.For
+				
+				// verify all Entities in the distribution list match an Entity in the registered consumers of this productID.
+				// NOTE: Just because a consumer is consuming the same ProductID, does NOT mean it's consuming the production of 
+				//       the current sourceEntity.  Consider a reactor that produces POWER, it may only power weapons and the engines
+				//       and a second Reactor or Auxillary power source provides energy for things like computers, sensors, etc even 
+				//       though it's the same PRODUCT ID.
+				try
+				{
+				if (distributionList.Length > 0)
+				{
+					for (int j = 0; j < distributionList.Length; j++)
+					{
+						bool found = false;
+						for (int k = 0; k < consumers.Count; k++)
+						{
+							if (consumers[k].EntityIndex == distributionList[j])
+							{
+								found = true;
+								
+								Boid consumingEntity = (Boid)GetEntity(consumers[k].EntityIndex);
+								SkillModifier modifier = (SkillModifier)production[i].Value;
+								consumingEntity.Skills[SKILLS.Targeting].AddModifier(modifier);
+								continue;
+							}
+						}
+						if (!found) throw new ArgumentOutOfRangeException("Consumer is not registered.");
+					}
+				}	
+				} 
+				catch (Exception ex)
+				{
+					Console.WriteLine("UpdateProduction() - " + ex.Message);
+				}
+				
 				// CONSIDER ProcessOpticalSensors()... we are essentially initiating the PRODUCTION
 				// of optical emission by taking all of the optical  producers (each Boid inside Boids[] array)
 				// and then doing a spatial search for all other Droids in range of that emission, we 
@@ -3010,14 +3079,14 @@ namespace HelloBoids
 					// NOTE: we pass in "operations" to perform so that we have ability to things like increment/decrement/add/remove/etc. 
 					for (int b = 0; b < consumptionResult.Length; b++)
 					{
-						if (consumptionResult[b].Properties == null) continue;
+						//if (consumptionResult[b].Properties == null) continue;
 
 						//KeyCommon.Messages.Entity_ChangeCustomPropertyValue changeProperties = new KeyCommon.Messages.Entity_ChangeCustomPropertyValue();
 						//changeProperties.EntityID = (consumptionResult[b].TargetID);
-						for (int c = 0; c < consumptionResult[b].Properties.Length; c++)
-						{
+						//for (int c = 0; c < consumptionResult[b].Properties.Length; c++)
+						//{
 							//changeProperties.Add(consumptionResult[b].Properties[c], consumptionResult[b].Operations[c]);
-						}
+						//}
 						//AppMain.mNetClient.SendMessage(changeProperties);
 					}
 				}
@@ -3062,6 +3131,9 @@ namespace HelloBoids
         private const double BOID_WIDTH = 2.0d;
         public uint ShotsFired = 0;
 		
+		public Dictionary<SKILLS, Skill> Skills;
+		
+		
 		
 	#if	USE_MEMORY_T
 		// TODO: these Memory<T> should be stored in base.UserStructs
@@ -3073,8 +3145,6 @@ namespace HelloBoids
 		public int SpanIndexComponent = -1;
 		public int SpanIndexWeapon = -1;
 		public int SpanIndexLaser = -1;
-		
-	
 	#endif		
 		
         public Boid(int index, double x, double y, double z,  double xV, double yV)
@@ -3094,14 +3164,15 @@ namespace HelloBoids
 
 			// bounding box in World Space which is probably not what we want for KGB Entity but only for KGB EntityNode (which is derived from SceneNode and used for hierarchical bbox structure)
             _box = new BoundingBox(Translation,  BOID_WIDTH);
+				
+			Skills = new Dictionary<SKILLS, Skill>();
+				
         }
 		
 		
 	#region ShouldBeInEntityScript_NotHERE_ButCantRunScriptsFromWebCSharpCompiler
 		private void OnInitializeEntity()
 		{
-			
-		
 			// assignment can be done via User Interface just using a propertyName and TypeName from a PropertySpec and does not need to know any game specific info including the MODs various types of UserStructs or how to process them
 			// -------------------------------
 			// Entity.SetCustomPropertyValue
@@ -3155,7 +3226,6 @@ namespace HelloBoids
             mMemStore_ArmorLayers = storeArmorLayers.CheckOut(out checkOutIndex);
             // SpanIndexArmorLayers = checkOutIndex;
 			
-					
 			PropertyBag bag = new PropertyBag();
 			bag.SetValue += OnSetLaserStructValue;
 			bag.GetValue += OnGetLaserStructValue;
@@ -3221,7 +3291,6 @@ namespace HelloBoids
 
 				Console.WriteLine(result);
 				*/
-		
 		}
 
 		// public delegate void PropertySpecEventHandler(object sender, PropertySpecEventArgs e);
@@ -3276,6 +3345,11 @@ namespace HelloBoids
 		{
 			
 		}
+		
+		
+		
+		
+		
 	#endregion // ShouldBeInEntityScript_NotHERE_ButCantRunScriptsFromWebCSharpCompiler
 		
 		
@@ -5008,7 +5082,6 @@ return (0,0);
     }
 
 	
-	
 	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
 	public struct LivingEntity
 	{
@@ -5027,19 +5100,7 @@ return (0,0);
 			return currentTime - CreationDateTime;
 		}
 	}
-		
-	
-	
-	public enum ActionType : int
-	{
-		Target,
-		FireAt,
-		Ram,
-		DeployCounterMeasure,
-		DeployMine,
-		DeployProbe
-	}
-
+			
 
 #region Game01.GameObjects
 	public class UnitedEarthCode
@@ -5122,39 +5183,73 @@ return (0,0);
 		}
 	}
 
-	public enum Skills
+	
+	// similar to Advantages and Disadvantages
+	public enum StrengthAndWeaknesses
+	{
+		PanicsUnderPressure,
+		GreatUnderPressure
+	}
+	
+	public enum ActionType : int
+	{
+		Target,
+		FireAt,
+		Ram,
+		DeployCounterMeasure,
+		DeployMine,
+		DeployProbe
+	}
+
+	public enum PRODUCTS
+    {
+    	None = 0,
+		// Emissions and Signatures
+        MicrowaveEmission,
+        MicrowaveReflection,
+			
+		// Damage Types
+        MicrowaveDamage = 1024,
+			
+		// 
+		CommandBoost = 2048,
+		MoraleBoost,   // like all modifiers, this too can actually be either negative or positive
+			
+		// Skill Modifiers
+		TacticalOperationsSkillModifier = 4096,
+		TargetingSkillModifier,
+		
+		Haggling
+    }
+	
+	public enum SKILLS
 	{
 		HelmOperations,
 		TacticalOperations,
 		Piloting,
 		Targeting,
 		Engineering,
+		SensorOperations,
+		
 		Command,
-		SensorOperations
+		Morale
 	}
 
-	public enum StrengthAndWeaknesses
-	{
-		PanicsUnderPressure,
-		GreatUnderPressure
-	}
+	/// <summary>
+	/// These can overlap Skills, Stats, Armor DR and such because they can give bonuses (positive or negative)
+	/// to all of these things.
+	/// </summary>
+	//public enum ModificationType
+	//{
+	//	Morale,
+	//	Command
+	//}
 
-		/// <summary>
-		/// These can overlap Skills, Stats, Armor DR and such because they can give bonuses (positive or negative)
-		/// to all of these things.
-		/// </summary>
-	public enum ModificationType
-	{
-		Morale,
-		Command
-	}
-
-	public struct Modification
-	{
-		ModificationType Type;
-		int Level;
-
-	}
+	//public struct Modification
+	//{
+	//	ModificationType Type;
+	//	int Level;
+	//}
 
 	public enum ModificationEffect
 	{
@@ -5166,16 +5261,34 @@ return (0,0);
 		Faction
 	}
 
+	public struct SkillModifier
+	{
+		public int EntityIndex;
+		public PRODUCTS Product; // modifiers are a type of PRODUCT for instance PRODUCT.MoraleBoost
+		public SKILLS Skill;      // the skill that will be affected eg Skill.Morale
+		public int Bonus;        // can be negative or positive e.g  +1 Morale
+	}
+	
 	// TODO: an Operator that has for example a targeting skill, (see struct LivingEntity)
 	//       will "PRODUCE" a bonus for that crew station every update.  It does not require
 	//       an "Update()" function within a script, it only needs the type of PRODUCTION defined
 	//       and registered via the Scripting API.  
 	public struct Skill
 	{
-		Modification[] Mods;
-		int Level;
-
-
+		public SKILLS SkillType;
+		public int Level;     			// the level of this skill
+		public SkillModifier[] Bonuses;
+		
+		
+		public void AddModifier(SkillModifier modifier)
+		{
+			
+		}
+		
+		public void AddBonus (SkillModifier bonus)
+		{
+			
+		}
 	}
 
 	public struct StationState
@@ -5185,7 +5298,6 @@ return (0,0);
 			public long TimeStarted;     // time this action started
 			public int Duration;         // time to complete this action
 			public int ActionID;         // eg Fire at Target, Lay Mines, Deploy Counter-measures
-
 		}
 
 		public static int NextID;
@@ -5206,22 +5318,18 @@ return (0,0);
 
 		public void AddContact(SensorContact c)
 		{
-
 		}
 
 		public void RemoveContact()
 		{
-
 		}
 
 		public void ClearContacts()
 		{
-
 		}
 
 		public void AddTarget(Target t)
 		{
-
 		}
 	}
 		

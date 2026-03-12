@@ -650,26 +650,56 @@ namespace HelloBoids
 #endif
 		
 		// todo: might exist in Game01.Rules.Processors
-		public struct ComponentModificationSystem
+		public struct SkillModificationSystem
 		{
-			public void AddRecord()
+			public struct Damage
 			{
+				public int EntityIndex;
+				public int Amount;
 			}
 			
-			public void RemoveRecord()
+			List<Consumption> mRecords;
+			List<HealthSystem.DamageResult> mDamageResults;
+			
+			public SkillModificationSystem()
 			{
+				mRecords = new List<Consumption>();
+				mDamageResults = new List<HealthSystem.DamageResult>();
 			}
 			
-			
-			public void Process()
+			public void Add (Consumption d)
 			{
-				
-				
+				mRecords.Add (d);
+				//Console.WriteLine ("DamageSystem.Add() - Record count == " + mRecords.Count.ToString());
 			}
 			
-			public void Produce()
+			public void Clear()
 			{
+				mRecords.Clear();
+				mDamageResults.Clear();
+			}
+					
+			public void Process(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
+			{
+				if (store == null) return;
+				Span<LivingEntity> memSpan = store.Span;
 				
+				if (mRecords != null)
+				{
+					mDamageResults.Clear();
+					
+					for (int i = 0; i < mRecords.Count; i++)
+					{
+						int amount = mRecords[i].Amount;
+						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = mRecords[i].EntityIndex, Amount = amount});
+						
+						// todo: remove damage that has been processed....
+						
+					}
+				
+					// use the same LivingEntityStore as the one passed in, for applying health changes to the Droid
+					BoidSimulation.mHealthSystem.Process(store, new object[] {mDamageResults}, seed, gt);
+				}
 			}
 		}
 		
@@ -868,55 +898,8 @@ namespace HelloBoids
             // FormMainBase.SendNetMessage(msg)
 		}
 		
-//        public Dictionary<uint, List<string> mProducers;
-//        public Dictionary<uint, List<string> mConsumers;
-
-
-		
 		private System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>> mProduction = new System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>>();
         private System.Collections.Concurrent.ConcurrentDictionary<uint, List<Consumption>> mConsumption  = new System.Collections.Concurrent.ConcurrentDictionary<uint, List<Consumption>>();
-		
-		
-		
-		
-		// TODO: These will probably just be part of a ComponentStore<> which are
-		//       in turn part of ComponentStoreCollection<>
-//        private Dictionary<uint, List<EntityNode>> mProducers;
-//        private Dictionary<uint, List<EntityNode>> mConsumers;
-        
-		// NOTE: These mUserProduction and mUserConsumption should be perhaps another 
-		//       DataProcessorsStore mDataProcessor;  
-		//       eg. DataProcessorStore mUserProduction;
-		//       eg. DataProcessorStore mUserConsumption;
-		//       
- //       private KeyCommon.Simulation.Production_Delegate
-//        private Dictionary<uint, Production_Delegate> mUserProduction;
-//        private Dictionary<uint, Consumption_Delegate> mUserConsumption;
-
-		/// <summary>
-        /// // TODO: this delegate has to be modified to look like our DataProcessors as in 
-        /// // KeyCommon.Processors -> public delegate void Processor<T>(ComponentStore<T> store, object parameters, int seed, GameTime gt);
-        /// // because we are using a Data Oriented processing model that will accept all of the entities that will produce a particular productIDs.
-        /// </summary>
-        /// <param name="entityID"></param>
-        /// <param name="production"></param>
-        /// <param name="elapsedSeconds"></param>
-        /// <returns>Consumption Result array so that they can be sent to other players</returns>
-//        public delegate Consumption[] Consumption_Delegate(string entityID, Production production, double elapsedSeconds);
-//        public delegate void Processor<T>(ComponentStore<T> store, object parameters, int seed, GameTime gt);
-		
-        /// // TODO: this delegate has to be modified to look like our DataProcessors as in 
-        /// // KeyCommon.Processors -> public delegate void Processor<T>(ComponentStore<T> store, object parameters, int seed, GameTime gt);
-        /// // because we are using a Data Oriented processing model that will accept all of the entities that will produce a particular productIDs.
-        /// TODO: we have a bit more thinking to do here because we know that for some components, we want to produce multiple things like
-        /// MicrowaveEmission and MicrowaveDamage.    I think to do this, the Entity via its script will just register seperatelyh for BOTH types of production
-		/// (OR, Scene.OnEntityAttached() may get the available ProductIDs (with Production_Struct for those types of products)
-		/// from the Entity.Script (if it's loaded?) and register them itself so the script
-		///  doesnt need to remember to do this, nor does it need to unregister the ProductIDs
-        /// and then the handlers will determine how much emission and damage is produced by this particular component.
-//        public delegate Production[] Production_Delegate(string entityID, double elapsedSeconds);
-//		public delegate void Processor<T>(ComponentStore<T> store, object parameters, int seed, GameTime gt);
-		
 		
 
         public List<Boid> Boids { get; set; }
@@ -944,7 +927,7 @@ namespace HelloBoids
 		public static DamageSystem mDamageSystem = new DamageSystem();
 		public static DamageOverTimeSystem mDamageOverTimeSystem = new DamageOverTimeSystem();
 		public static HealthSystem mHealthSystem = new HealthSystem();
-		
+		public static SkillModificationSystem mSkillModificationSystem = new SkillModificationSystem();
 		
 		
         public BoidSimulation(int numBoids, double width, double height, double depth, bool useOctree = false)
@@ -2358,23 +2341,14 @@ namespace HelloBoids
 			Skill v;
 			v.SkillType = SKILLS.Targeting;
 			v.Level = 1;     			// the level of this skill
-			v.Bonuses = null;
-	
-			//v.AddModifier();
+			v.Modifiers = null;
+		
+			// add the modifier(s) to this skill.  Recall that modifiers behave just like any other type of PRODUCTION and must be registered as PRODUCTION 
+			// at the appropriate time (eg On USE of the Skill, or on EQUIP of an Item, etc.)
+			v.AddModifier(b.SpanIndex, PRODUCTS.TargetingSkillModifier, 1);
+			// add the skill to the DROID as if it was being added to an OPERATOR for a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
 			b.Skills.Add(SKILLS.Targeting, v);
-	
-	
-	
-			SkillModifier m;
-			m.EntityIndex = b.SpanIndex;
-			m.Product = PRODUCTS.TargetingSkillModifier; // modifiers are a type of PRODUCT for instance PRODUCT.MoraleBoost
-			m.Skill = SKILLS.Targeting;      // the skill that will be affected eg Skill.Morale
-			m.Bonus = 1;        // can be negative or positive e.g  +1 Morale
-	
-			b.Skills[SKILLS.Targeting].AddModifier(m);
-			
 				
-	
 			////////////////////////
 			
 			// todo: generate Droids with some variance for age, size, and speed
@@ -2389,21 +2363,26 @@ namespace HelloBoids
 			// OnEntityAttached(EntityNode e)
 			//       {
 			
+			// each Droid can Produce a TargetingSkillModifier as if it had an "OPERATOR"
 			Production p;
+			p.EntityArrayIndex = b.Index;
 			p.EntityIndex = b.SpanIndex;
-			p.ProductID = 	(int)PRODUCTS.TargetingSkillModifier;
+			p.ProductID = 	(uint)v.Modifiers[0].Product;
 			p.Location = Vector3d.Zero();
-			p.Value = 10;
-			p.Amount = 5;
+			p.Value = v.Modifiers[0];
+			p.Amount = v.Modifiers[0].Bonus; // this will use the 
 			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
 			p.DistributionList = new int[] {b.SpanIndex};
 			p.SearchPrimitive  = null;
 	
+			// each Droid can Consume a TargetingSkillModifier as if it had a TACTICAL CREW STATION
 			Consumption c;
+			c.EntityArrayIndex = b.Index;
 			c.EntityIndex = b.SpanIndex;
-			c.ProducerID = p.EntityIndex;
+			c.ProducerID = p.EntityIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
 			c.ProductID = p.ProductID;
-			c.Amount = 5;
+			c.Value =  null;
+			c.Amount = 1;
 			c.Operations = null;
 			
 			RegisterProduction(b, p);
@@ -2741,98 +2720,6 @@ namespace HelloBoids
     
         
 #region Consumption and Production
-
-		
-		public enum PRODUCT_DISTRIBUTION_TYPE
-		{
-			List = 0,
-			Region
-		}
-		
-		
-		public struct Production
-    	{
-			// todo: should i have a frequency or Hz?  Gravitation would be at Physics frequency, but other's should be 1 hz or every 1000 ms
-			// production is not serialized to XML because they are created by the scripts in code
-			public int EntityIndex;
-			public uint ProductID;
-			public Vector3d Location; // location where this production is occurring (eg. explosion, heat signature, etc)
-			public object Value;  // eg. for thrust this contains double, for radar echos, UnitValue is a Vector3d position, for SkillModifiers, it can contain a SkillModifier struct.
-			public int Amount; // infitie = -1, else number of unit's 
-			public PRODUCT_DISTRIBUTION_TYPE DistributionMode; 
-			// public Func<Production, string, bool> DistributionFilterFunc; // accepts Production and an EntityID and returns true if the test is passed
-			// used when DistributionType is List.  Contains id of entities consuming this product.  
-			// No searches (spatial or otherwise) reqt. "power links" and other "links" are good examples of their use.
-			public int[] DistributionList;  
-			public object SearchPrimitive;   // used with DistributionMode is a spatial search of some kind.
-			
-	//		public float Rate;    // amount of units consumed per second
-
-	//        // confused on some of these vars because where does the machine/entity pass in
-	//        // vars used for the computation, and which exist here?  I think one good argument
-	//        // to keep them here is that a machine that produces/consumes multiple things
-	//        // may have seperate throttle values and efficiency values and even different enable/disable
-	//        // states
-	//        // But why not have some of these custom properties in the Entity then?
-	//        public bool Enabled;
-	//        public float Efficiency; // at same throttle, increased efficiency will produce more
-	//                                 // as the machine wears out between mainteneance efficiency
-	//                                 // will drop.  It is also possible to increase efficiency
-
-	//        public float Throttle;  // value typically 0 -1.0 but can exceed 1.0 with potential risk
-	//                                // of damaging the machine (is Damage a customProperty in Entity?)
-			
-			
-		}
-	
-		public enum PropertyOperation : byte
-		{
-			Replace = 0,
-			Add,        // typically for adding an array element
-			Remove,     // typically for removing an array element
-			Union,      // merge two arrays with no duplicates
-			Increment,  // for numeric propertyspec values to add the propertySpec value to the existing value within the Entity
-			Decrement,
-			Additive_Multiply,
-			Additive_Divide
-		}
-
-		// consumption is more charged with the algorithm for computing how much consumption
-		// of the particular product the Entity will use.  This includes everything from 
-		// consuming damage or gravity to consuming electricity, water or fuel.
-		// It will take into account modifiers such as "stealth" to determine consumption if any. 
-		// For instance, a "microwaves" consumption could result in 0 consumption if the distance between
-		// producer and consumer is too great or there is an applicable "stealth" modifier
-
-		//  It will also take into account modifiers from the crew operator at a station for example.
-
-		// TODO: should our Consumption_Delegate return "ConsumptionResult" so that these changes
-		// can be sent to other players over the network?
-
-		// details information about how much this device will consume.  This is returned
-		// when Consumption delegate is invoked in a script for a particular entity.
-		// todo: maybe we should think of this as ConsumptionResults and host all the changes that need to be applied to the target entities
-		//       so we could include an array of PropertySpec and corresponding nodeIDs
-		public struct Consumption // todo: rename this to ConsumptionResult
-		{
-			// Consumption here is really PRODUCT CONSUMPTION RESULT struct that gets filled so that
-			// other players in the networked game can receive the "results" of 
-			// having consumed a product
-			public int EntityIndex; // the entity that is consuming a product
-			public int ProducerID; // the producer of the product that is being consumed by entity.ID == EntityID.
-			public uint ProductID;     // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer
-			public object Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
-
-			//public string TargetID; // NOTE: this does mean that an entity performing consumption can change properties of other nodes and not just itself. Typically though, its only for entities within a single ship hierarchy from Exterior to Interior components
-			public PropertyOperation[] Operations;
-	 //       public Settings.PropertySpec[] Properties; // todo: what about HelmState and TacticalState properties? Well, "tacticalstate" and "helmstate" are properties in the ship.css and they are serializable over the wire.
-			// todo: do we need to be able to send this over the wire with NetBuffer Read and Write?
-			// todo: we should probably need to know whether the property values are meant to replace, increment, or decrement the existing value.  "store" is a good example. If we're multithreaded, we might need to lock each node before we apply changes
-			//       I could include an array of int[] operation; that is same length and specifiy 0=replace, 1=increment and 2= decrement, 3 = add array element, 4 = remove array element
-			// todo: maybe instead of seperate objects like HelmState and NavPoints we just use regular custompropertyspec for each member.  This will make it easier for ConsumptionResult handling without keystone.dll needing to know anything about those custom types.
-			// todo: well first, lets just use PropertySpec with intrinsic types.  
-		}
-
 		
 		public void RegisterProduction (EntityNode entity, Production[] production)
 		{
@@ -2840,27 +2727,42 @@ namespace HelloBoids
 				for (int i = 0; i < production.Length; i++)
 					 RegisterProduction(entity, production[i]);
 		}
-		
-       	public void RegisterProduction(EntityNode entity, Production p)
+
+		private static System.Threading.SemaphoreSlim mProductionSemaphore = new System.Threading.SemaphoreSlim(1);
+		private static System.Threading.SemaphoreSlim mConsumptionSemaphore = new System.Threading.SemaphoreSlim(1);
+       	
+		public void RegisterProduction(EntityNode entity, Production p)
         {
-		    uint productID = p.ProductID;  
-			   
-            List<Production> production = mProduction.GetOrAdd(productID, result =>  new List<Production>());
-
-            mProduction[productID].Add(p);
-
+		    try
+			{
+				mProductionSemaphore.Wait(-1);
+				uint productID = p.ProductID; 
+				//Console.WriteLine ("RegisterProduction()  - productID == " + productID.ToString());
+	            List<Production> production = mProduction.GetOrAdd(productID, (key) =>  new List<Production>());
+            	mProduction[productID].Add(p);
+			}
+			finally
+			{
+				mProductionSemaphore.Release();
+			}
             // todo: ideally this ISimulation implementation should be in the EXE because we need to know the game specific productIDs and what they refer to
             // todo: how and where is the Hz for each productID defined?  Perhaps its just the job of this Simulation implementation which should be implemented in the EXE, not Keystone.dll
         }
 
         public void RegisterConsumption(EntityNode entity, Consumption c)
         {
-			uint productID = c.ProductID;
-			
-            List<Consumption> consumption = mConsumption.GetOrAdd (productID, result =>  new List<Consumption>());
-			
-			mConsumption[productID].Add(c);
-
+			try
+			{
+				mConsumptionSemaphore.Wait(-1);
+				uint productID = c.ProductID;
+				//Console.WriteLine ("RegisterConsumption()  - productID == " + productID.ToString());
+            	List<Consumption> consumption = mConsumption.GetOrAdd (productID, (key) =>  new List<Consumption>());
+				mConsumption[productID].Add(c);
+			}
+			finally
+			{
+				mConsumptionSemaphore.Release();
+			}
             // todo: ideally this ISimulation implementation should be in the EXE because we need to know the game specific productIDs and what they refer to
             // todo: how and where is the Hz for each productID defined?  Perhaps its just the job of this Simulation implementation which should be implemented in the EXE, not Keystone.dll
         }
@@ -2983,9 +2885,12 @@ namespace HelloBoids
 		
 		private void UpdateProduction(GameTime gt)
         {
+			// TODO: This is extraordinarily slow.... 
+			
             uint productID = (uint)PRODUCTS.TargetingSkillModifier;
-            List<Production> production = mProduction[productID];
-            if (production == null) return;
+			List<Production> production = mProduction[productID];
+
+			if (production == null) return;
 
             // March.10.2026 - Production now always occurs automatically without every needing to call Script.OnUpdate()
 			//                 because ALL Production and Consumption must be REGISTERED by the Scripts.  In the future
@@ -2994,9 +2899,6 @@ namespace HelloBoids
 			//                 be called everyframe since we've switched to using a DATA ORIENTED PROCESSING MODEL.
             for (int i = 0; i < production.Count; i++)
             {
-				Boid sourceEntity = (Boid)GetEntity(production[i].EntityIndex);
-				if (sourceEntity == null) continue;
-				
 				// 2) Determine consumer distrubtion - find all valid consumers that match the terms of this production result
 				// TODO: FindConsumers is very slow.  I must not run that simulation each period for Zones that are beyond a certain range from player.
 				// TODO:  Verify that we are in fact running Production for entities in every zone we load.  That is a bug.
@@ -3004,10 +2906,7 @@ namespace HelloBoids
 				if (consumers == null) continue;
 
 				// PRODUCTS.TargetingSkillModifier is generated by the OPERATOR (yes, for now still just a Skill assigned to each Droid, but eventually within KGB, it will apply to a crew member assigned to a Tactical Crew Station)
-				System.Diagnostics.Debug.Assert (productID == production[i].ProductID);
-				//System.Diagnostics.Debug.Assert (
 				int[] distributionList = production[i].DistributionList;
-				
 				if (distributionList ==  null) continue; // return if using parallel.For
 				
 				// verify all Entities in the distribution list match an Entity in the registered consumers of this productID.
@@ -3024,13 +2923,31 @@ namespace HelloBoids
 						bool found = false;
 						for (int k = 0; k < consumers.Count; k++)
 						{
+							// NOTE: BEWARE  of using confusing mix of EntityIndex (Span[] index, and EntityArrayIndex which is Boids[] index)
+							//       In KGB this shouldn't be a problem since we wont have them both, but for this test harnass we do
 							if (consumers[k].EntityIndex == distributionList[j])
 							{
 								found = true;
 								
-								Boid consumingEntity = (Boid)GetEntity(consumers[k].EntityIndex);
-								SkillModifier modifier = (SkillModifier)production[i].Value;
-								consumingEntity.Skills[SKILLS.Targeting].AddModifier(modifier);
+								try
+								{
+									SkillModifier modifier = (SkillModifier)production[i].Value;
+									
+									Consumption[] consumptionResult = new Consumption[distributionList.Length];
+									consumptionResult[j].EntityIndex = consumers[j].EntityIndex; // the entity that is consuming a product
+									consumptionResult[j].ProducerID = production[i].EntityIndex; // the producer of the product that is being consumed by entity.ID == EntityID.
+									consumptionResult[j].ProductID = productID;          // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer.  Actually, I think we've modified this so that "PRODUCTS.HeatSignature" and "Products.HeatDamage" are two seperate products that may or may not both be consumed by any given Consumer.
+									consumptionResult[j].Value = modifier;
+									consumptionResult[j].Amount = modifier.Bonus; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
+
+									
+									mSkillModificationSystem.Add (consumptionResult[j]);
+								}
+								catch (Exception ex)
+								{
+									Console.WriteLine("......");
+								}
+								// the Modifier PRODUCTS.TargetingSkillModifier must be applied to the SKILLS.Targeting of the DROID's 'Crew Station'
 								continue;
 							}
 						}
@@ -3051,6 +2968,7 @@ namespace HelloBoids
 				// Dictionary<> mNeighbors;
 				
 				
+				/*
 				// TODO: so for testing purposes here, we simulate the OPERATOR of the DROID as PRODUCING a "PRODUCTS.TargetingSkillModifier"
 				//       that the TacticalStation will CONSUME (but for now the Droid will CONSUME that as well until KeystoneGameBlocks can be developed in full again)
 				// TODO: we need to be able to run a Processor here which may result in multiple Consumption[] items.
@@ -3064,6 +2982,7 @@ namespace HelloBoids
 					consumptionResult[j].EntityIndex = consumers[j].EntityIndex; // the entity that is consuming a product
 					consumptionResult[j].ProducerID = production[i].EntityIndex; // the producer of the product that is being consumed by entity.ID == EntityID.
 					consumptionResult[j].ProductID = productID;          // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer.  Actually, I think we've modified this so that "PRODUCTS.HeatSignature" and "Products.HeatDamage" are two seperate products that may or may not both be consumed by any given Consumer.
+					consumptionResult[j].Value = 
 					consumptionResult[j].Amount = production[i].Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
 
 					//public string TargetID; // NOTE: this does mean that an entity performing consumption can change properties of other nodes and not just itself. Typically though, its only for entities within a single ship hierarchy from Exterior to Interior components
@@ -3090,6 +3009,7 @@ namespace HelloBoids
 						//AppMain.mNetClient.SendMessage(changeProperties);
 					}
 				}
+				*/
             }
         }
 
@@ -5082,6 +5002,9 @@ return (0,0);
     }
 
 	
+	
+	
+	
 	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
 	public struct LivingEntity
 	{
@@ -5184,56 +5107,149 @@ return (0,0);
 	}
 
 	
-	// similar to Advantages and Disadvantages
-	public enum StrengthAndWeaknesses
-	{
-		PanicsUnderPressure,
-		GreatUnderPressure
-	}
-	
-	public enum ActionType : int
-	{
-		Target,
-		FireAt,
-		Ram,
-		DeployCounterMeasure,
-		DeployMine,
-		DeployProbe
-	}
+		// similar to Advantages and Disadvantages
+		public enum StrengthAndWeaknesses
+		{
+			PanicsUnderPressure,
+			GreatUnderPressure
+		}
 
-	public enum PRODUCTS
-    {
-    	None = 0,
-		// Emissions and Signatures
-        MicrowaveEmission,
-        MicrowaveReflection,
-			
-		// Damage Types
-        MicrowaveDamage = 1024,
-			
-		// 
-		CommandBoost = 2048,
-		MoraleBoost,   // like all modifiers, this too can actually be either negative or positive
-			
-		// Skill Modifiers
-		TacticalOperationsSkillModifier = 4096,
-		TargetingSkillModifier,
+		public enum ActionType : int
+		{
+			Target,
+			FireAt,
+			Ram,
+			DeployCounterMeasure,
+			DeployMine,
+			DeployProbe
+		}
+
+		public enum PRODUCTS
+		{
+			None = 0,
+			// Emissions and Signatures
+			MicrowaveEmission,
+			MicrowaveReflection,
+
+			// Damage Types
+			MicrowaveDamage = 1024,
+
+			// 
+			CommandBoost = 2048,
+			MoraleBoost,   // like all modifiers, this too can actually be either negative or positive
+
+			// Skill Modifiers
+			TacticalOperationsSkillModifier = 4096,
+			TargetingSkillModifier,
+
+			Haggling
+		}
+
+		public enum SKILLS
+		{
+			HelmOperations,
+			TacticalOperations,
+			Piloting,
+			Targeting,
+			Engineering,
+			SensorOperations,
+
+			Command,
+			Morale
+		}
+
+		public enum PRODUCT_DISTRIBUTION_TYPE
+		{
+			List = 0,
+			Region
+		}
 		
-		Haggling
-    }
+		public struct Production
+    	{
+			// todo: should i have a frequency or Hz?  Gravitation would be at Physics frequency, but other's should be 1 hz or every 1000 ms
+			// production is not serialized to XML because they are created by the scripts in code
+			public int EntityArrayIndex;
+			public int EntityIndex;  
+			public uint ProductID;
+			public Vector3d Location; // location where this production is occurring (eg. explosion, heat signature, etc)
+			public object Value;  // eg. for thrust this contains double, for radar echos, UnitValue is a Vector3d position, for SkillModifiers, it can contain a SkillModifier struct.
+			public int Amount; // infitie = -1, else number of unit's 
+			public PRODUCT_DISTRIBUTION_TYPE DistributionMode; 
+			// public Func<Production, string, bool> DistributionFilterFunc; // accepts Production and an EntityID and returns true if the test is passed
+			// used when DistributionType is List.  Contains id of entities consuming this product.  
+			// No searches (spatial or otherwise) reqt. "power links" and other "links" are good examples of their use.
+			public int[] DistributionList;  
+			public object SearchPrimitive;   // used with DistributionMode is a spatial search of some kind.
+			
+	//		public float Rate;    // amount of units consumed per second
+
+	//        // confused on some of these vars because where does the machine/entity pass in
+	//        // vars used for the computation, and which exist here?  I think one good argument
+	//        // to keep them here is that a machine that produces/consumes multiple things
+	//        // may have seperate throttle values and efficiency values and even different enable/disable
+	//        // states
+	//        // But why not have some of these custom properties in the Entity then?
+	//        public bool Enabled;
+	//        public float Efficiency; // at same throttle, increased efficiency will produce more
+	//                                 // as the machine wears out between mainteneance efficiency
+	//                                 // will drop.  It is also possible to increase efficiency
+
+	//        public float Throttle;  // value typically 0 -1.0 but can exceed 1.0 with potential risk
+	//                                // of damaging the machine (is Damage a customProperty in Entity?)
+			
+			
+		}
 	
-	public enum SKILLS
-	{
-		HelmOperations,
-		TacticalOperations,
-		Piloting,
-		Targeting,
-		Engineering,
-		SensorOperations,
-		
-		Command,
-		Morale
-	}
+		public enum PropertyOperation : byte
+		{
+			Replace = 0,
+			Add,        // typically for adding an array element
+			Remove,     // typically for removing an array element
+			Union,      // merge two arrays with no duplicates
+			Increment,  // for numeric propertyspec values to add the propertySpec value to the existing value within the Entity
+			Decrement,
+			Additive_Multiply,
+			Additive_Divide
+		}
+
+		// consumption is more charged with the algorithm for computing how much consumption
+		// of the particular product the Entity will use.  This includes everything from 
+		// consuming damage or gravity to consuming electricity, water or fuel.
+		// It will take into account modifiers such as "stealth" to determine consumption if any. 
+		// For instance, a "microwaves" consumption could result in 0 consumption if the distance between
+		// producer and consumer is too great or there is an applicable "stealth" modifier
+
+		//  It will also take into account modifiers from the crew operator at a station for example.
+
+		// TODO: should our Consumption_Delegate return "ConsumptionResult" so that these changes
+		// can be sent to other players over the network?
+
+		// details information about how much this device will consume.  This is returned
+		// when Consumption delegate is invoked in a script for a particular entity.
+		// todo: maybe we should think of this as ConsumptionResults and host all the changes that need to be applied to the target entities
+		//       so we could include an array of PropertySpec and corresponding nodeIDs
+		public struct Consumption // todo: rename this to ConsumptionResult
+		{
+			// Consumption here is really PRODUCT CONSUMPTION RESULT struct that gets filled so that
+			// other players in the networked game can receive the "results" of 
+			// having consumed a product
+			public int EntityArrayIndex;
+			public int EntityIndex; // the entity that is consuming a product
+			public int ProducerID; // the producer of the product that is being consumed by entity.ID == EntityID.
+			public uint ProductID;     // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer
+			public object Value;
+			public int Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
+
+			//public string TargetID; // NOTE: this does mean that an entity performing consumption can change properties of other nodes and not just itself. Typically though, its only for entities within a single ship hierarchy from Exterior to Interior components
+			public PropertyOperation[] Operations;
+	 //       public Settings.PropertySpec[] Properties; // todo: what about HelmState and TacticalState properties? Well, "tacticalstate" and "helmstate" are properties in the ship.css and they are serializable over the wire.
+			// todo: do we need to be able to send this over the wire with NetBuffer Read and Write?
+			// todo: we should probably need to know whether the property values are meant to replace, increment, or decrement the existing value.  "store" is a good example. If we're multithreaded, we might need to lock each node before we apply changes
+			//       I could include an array of int[] operation; that is same length and specifiy 0=replace, 1=increment and 2= decrement, 3 = add array element, 4 = remove array element
+			// todo: maybe instead of seperate objects like HelmState and NavPoints we just use regular custompropertyspec for each member.  This will make it easier for ConsumptionResult handling without keystone.dll needing to know anything about those custom types.
+			// todo: well first, lets just use PropertySpec with intrinsic types.  
+		}
+
 
 	/// <summary>
 	/// These can overlap Skills, Stats, Armor DR and such because they can give bonuses (positive or negative)
@@ -5262,11 +5278,11 @@ return (0,0);
 	}
 
 	public struct SkillModifier
-	{
-		public int EntityIndex;
-		public PRODUCTS Product; // modifiers are a type of PRODUCT for instance PRODUCT.MoraleBoost
-		public SKILLS Skill;      // the skill that will be affected eg Skill.Morale
-		public int Bonus;        // can be negative or positive e.g  +1 Morale
+	{ 
+		public int EntityIndex;    
+		public PRODUCTS Product;  // modifiers are a type of PRODUCT for instance PRODUCT.MoraleBoost
+		public SKILLS SkillToTarget;      // the skill that will be affected eg Skill.Morale
+		public int Bonus;         // can be negative or positive e.g  +1 Morale
 	}
 	
 	// TODO: an Operator that has for example a targeting skill, (see struct LivingEntity)
@@ -5277,17 +5293,35 @@ return (0,0);
 	{
 		public SKILLS SkillType;
 		public int Level;     			// the level of this skill
-		public SkillModifier[] Bonuses;
+		public SkillModifier[] Modifiers;
 		
+		public void AddModifier(int entityIndex, PRODUCTS product, int bonus)
+		{
+			SkillModifier m;
+			m.EntityIndex = entityIndex;
+			m.SkillToTarget = SkillType;
+			m.Product = product;
+			m.Bonus = bonus;
+			
+			AddModifier(m);
+		}
 		
 		public void AddModifier(SkillModifier modifier)
 		{
+			int length = 0;
 			
-		}
-		
-		public void AddBonus (SkillModifier bonus)
-		{
+			if (Modifiers == null)
+				Modifiers = new SkillModifier[1];
+			else
+			{
+				length = Modifiers.Length;
+				SkillModifier[] tmp = Modifiers;
+				Modifiers.CopyTo(tmp, 0);
+				
+				Modifiers = new SkillModifier[length];
+			}
 			
+			Modifiers[length] = modifier;
 		}
 	}
 

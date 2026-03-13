@@ -658,8 +658,7 @@ namespace HelloBoids
 				public SKILLS SkillType;
 				public int Amount;
 			}
-			
-			
+						
 			public void Apply(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
 			{
 				// NOTE: the store used here must refer to the actual memStore the Droid uses
@@ -677,18 +676,23 @@ namespace HelloBoids
 				{
 					for (int i = 0; i < records.Count; i++)
 					{
-						LivingEntity e = (LivingEntity)memSpan[records[i].TargetIndex]; // todo: this should be the target  to which the Modification should be applied
+						LivingEntity e = (LivingEntity)memSpan[records[i].TargetIndex]; // todo: this should be the target to which the Modification should be applied
 						// = records[i].Amount;
 						
 						SKILLS s = records[i].SkillType;
 						//e.Skills[s].AddExternalModifier(records[i].Amount);
 						
 						
-						// todo: we need to be able to clear ALL external Bonuses
-						//       right? 
 						
-						//e.Skills[(int)m.SkillToTarget].Bonuses += m.Bonus;
+						// e.Skills[(int)m.SkillToTarget].Bonuses += m.Bonus;
 						
+					 	// so lets say we have a TargetingSkillModifier every frame so long as an Operator
+						// is using the "Droid/aka TacticalCrewStation."  Or does it get added just 
+						// ONCE until after the Tactical Crew Station is "USED" by the operator and only when
+						// "UN-USED" does the bonuses get cleared.  
+						
+						// This would entail adding the PRODUCTION but NOT Registering() it.
+						// 
 						
 						
 					}
@@ -700,12 +704,6 @@ namespace HelloBoids
 		// todo: might exist in Game01.Rules.Processors
 		public struct SkillModificationSystem
 		{
-			public struct Damage
-			{
-				public int EntityIndex;
-				public int Amount;
-			}
-			
 			List<Consumption> mRecords;
 			List<SkillSystem.ModificationResult> mSkillModResults;
 			
@@ -732,6 +730,8 @@ namespace HelloBoids
 				if (store == null) return;
 				Span<LivingEntity> memSpan = store.Span;
 				
+				Clear();
+				
 				if (mRecords != null)
 				{
 					mSkillModResults.Clear();
@@ -739,10 +739,7 @@ namespace HelloBoids
 					for (int i = 0; i < mRecords.Count; i++)
 					{
 						int amount = mRecords[i].Amount;
-						mSkillModResults.Add (new SkillSystem.ModificationResult() {EntityIndex = mRecords[i].EntityIndex, TargetIndex = mRecords[i].TargetIndex, Amount = amount});
-						
-						// todo: remove damage that has been processed....
-						
+						mSkillModResults.Add (new SkillSystem.ModificationResult() {EntityIndex = mRecords[i].EntityIndex, TargetIndex = mRecords[i].TargetIndex, Amount = amount});						
 					}
 				
 					// use the same LivingEntityStore as the one passed in, for applying Skill changes to the Droid
@@ -794,19 +791,31 @@ namespace HelloBoids
 				public int Amount;
 			}
 			
-			List<Damage> mRecords;
+			System.Collections.Concurrent.ConcurrentQueue<Damage> mRecords;
+			
+			//List<Damage> mRecords;
 			List<HealthSystem.DamageResult> mDamageResults;
 			
 			public DamageSystem()
 			{
-				mRecords = new List<Damage>();
+				mRecords = new System.Collections.Concurrent.ConcurrentQueue<Damage>();
+				//mRecords = new List<Damage>();
 				mDamageResults = new List<HealthSystem.DamageResult>();
 			}
 			
 			public void Add (Damage d)
 			{
-				mRecords.Add (d);
+				try
+				{
+					mRecords.Enqueue(d);
+					
+					//mRecords.Add (d);
 				//Console.WriteLine ("DamageSystem.Add() - Record count == " + mRecords.Count.ToString());
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("DamageSystem.Add() - Record Count == " + mRecords.Count.ToString());
+				}
 			}
 			
 			public void Clear()
@@ -820,19 +829,28 @@ namespace HelloBoids
 				if (store == null) return;
 				Span<LivingEntity> memSpan = store.Span;
 				
+				Clear();
+				
 				if (mRecords != null)
 				{
 					mDamageResults.Clear();
 					
+					while (mRecords.Count > 0)
+					{
+						Damage d;
+						bool result = mRecords.TryDequeue(out d);
+						
+						int amount = d.Amount;
+						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = d.EntityIndex, Amount = amount});
+						
+					}
+					/*
 					for (int i = 0; i < mRecords.Count; i++)
 					{
 						int amount = mRecords[i].Amount;
 						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = mRecords[i].EntityIndex, Amount = amount});
-						
-						// todo: remove damage that has been processed....
-						
 					}
-				
+					*/
 					// use the same LivingEntityStore as the one passed in, for applying health changes to the Droid
 					BoidSimulation.mHealthSystem.Apply(store, new object[] {mDamageResults}, seed, gt);
 				}
@@ -843,9 +861,6 @@ namespace HelloBoids
 		// we need results going over the network
 		public struct DamageOverTimeSystem
 		{
-			public int Amount;
-			public float Duration;  // a time in seconds? or number of rounds along with a ROUND_LENGTH?
-			
 			public struct DamageOverTime
 			{
 				public int EntityIndex;
@@ -853,20 +868,35 @@ namespace HelloBoids
 				public float Duration;
 			}
 			
-			List<DamageOverTime> mRecords;
+			System.Collections.Concurrent.ConcurrentQueue<DamageOverTime> mRecords;
+			//List<DamageOverTime> mRecords;
 			List<HealthSystem.DamageResult> mDamageResults;
 			
 			
 			public DamageOverTimeSystem()
 			{
-				mRecords = new List<DamageOverTime>();
+				mRecords = new System.Collections.Concurrent.ConcurrentQueue<DamageOverTime>();
+				//mRecords = new List<DamageOverTime>();
 				mDamageResults = new List<HealthSystem.DamageResult>();
 			}
 			
 			public void Add (DamageOverTime d)
 			{
-				if (mRecords == null) mRecords = new List<DamageOverTime>();
-				mRecords.Add (d);
+				try
+				{
+					mRecords.Enqueue(d);
+					
+					// TODO: mRecords.Add() is not threadsafe!
+					//       This is resulting in errors when adding to the List 
+					
+					//if (mRecords == null) mRecords = new List<DamageOverTime>();
+					//mRecords.Add (d);
+					//Console.WriteLine ("DamageSystem.Add() - Record count == " + mRecords.Count.ToString());
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("DamageOverTimeSystem.Add() - Record Count == " + mRecords.Count.ToString() + " " + ex.Message);
+				}
 			}
 					
 			public void Clear()
@@ -884,19 +914,28 @@ namespace HelloBoids
 				if (store == null) return;
 				Span<LivingEntity> memSpan = store.Span;
 				
+				Clear();
+				
 				if (mRecords != null)
 				{
 					mDamageResults.Clear();
-					for (int i = 0; i < mRecords.Count; i++)
+					
+					while (mRecords.Count > 0)
+					{
+						DamageOverTime d;
+						bool result = mRecords.TryDequeue(out d);
+						
+						int amount = d.Amount;
+						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = d.EntityIndex, Amount = amount});
+					}
+					
+					/* for (int i = 0; i < mRecords.Count; i++)
 					{
 						int amount = mRecords[i].Amount; // TODO: * gt.ElapsedSeconds;
 						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = mRecords[i].EntityIndex, Amount = amount});
-						
-						// todo: remove damages that have expired
-						
-						
 					}
-
+					*/
+					
 					// use the same LivingEntityStore as the one passed in, for applying health changes to the Droid
 					BoidSimulation.mHealthSystem.Apply(store, new object[]{ mDamageResults }, seed, gt);
 				}
@@ -917,7 +956,6 @@ namespace HelloBoids
 				double separationDistance = EntryClass.SEPERATION_DISTANCE;
 				double alignmentDistance = EntryClass.ALIGNMENT_DISTANCE;
 				double cohesionDistance = EntryClass.COHESION_DISTANCE;
-				
 			});
 			*/
 			
@@ -941,7 +979,6 @@ namespace HelloBoids
             //  grab that Memory<Laser_Struct> out of a UserData object.
 
 
-
             // NOTE: in KeystoneGameBlocks we would then potentially send the result to the clients if this is processing on the server
             // FormMainBase.SendNetMessage(msg)
 		}
@@ -949,7 +986,6 @@ namespace HelloBoids
 		private System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>> mProduction = new System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>>();
         private System.Collections.Concurrent.ConcurrentDictionary<uint, List<Consumption>> mConsumption  = new System.Collections.Concurrent.ConcurrentDictionary<uint, List<Consumption>>();
 		
-
         public List<Boid> Boids { get; set; }
         public Seeds Seeds { get; set; }
 						 
@@ -1087,7 +1123,6 @@ namespace HelloBoids
             Dispose();
         }
         
-
 		
         /// <summary>
         /// Update simulation using either Data Oriented Technique or Object Oriented Technique
@@ -1097,7 +1132,6 @@ namespace HelloBoids
 			double elapsedSeconds = gt.ElapsedSeconds; 
             mIntervalTimers.Update(elapsedSeconds);
 
-			
 			try
 			{
 				// TODO: I should probably just add a setting for whether we are doing CLASSES or MEMORYT so that
@@ -1132,8 +1166,7 @@ namespace HelloBoids
 					Console.WriteLine("Update() - UpdateProduction() " + ex.Message);
 				}
 				
-			
-				
+
 				try
 				{
 					Do_Droid_Logic (Seeds.Master, elapsedSeconds);
@@ -1149,7 +1182,6 @@ namespace HelloBoids
 				//  modifications before damage?  I think this is probably the way to
 				try
 				{
-					mSkillModificationSystem.Clear();
 					mSkillModificationSystem.Process(livingEntityStore, null, Seeds.Master, gt);
 				}
 				catch (Exception ex)
@@ -1160,7 +1192,6 @@ namespace HelloBoids
 				
 				try
 				{
-					mDamageSystem.Clear();
 					mDamageSystem.Process(livingEntityStore, null, Seeds.Master, gt);
 				}
 				catch (Exception ex)
@@ -1171,7 +1202,6 @@ namespace HelloBoids
 				
 				try
 				{
-					mDamageOverTimeSystem.Clear();
 					mDamageOverTimeSystem.Process(livingEntityStore, null, Seeds.Master, gt);
 				}
 				catch (Exception ex)
@@ -1593,7 +1623,8 @@ namespace HelloBoids
              //    - OnFire
              //    - InRadiation
              //    - UnderWater/InVaccuum
-             //
+             //    - targetingSkill
+			 //    - TacticalStationOperationsSkill
              //    - applying accumulated damage
              //    -   ""         "" damage
              //    -   ""         "" bufs
@@ -1805,7 +1836,6 @@ namespace HelloBoids
 			//bool result = MicroEx.Evaluate(logicalExpression);
 			//Console.WriteLine ("Do_Droid_Logic() - MicroEx.Evaluate() - '" + logicalExpression + "' " + result.ToString());
 			
-			
 			int count = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 
             //for (int i = 0; i < Boids.Count; i++)
@@ -1819,10 +1849,8 @@ namespace HelloBoids
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine("Do_Droid_Logic() -  key '" + currentBoid.SpanIndex.ToString() + "' does not exist");
+					Console.WriteLine("Do_Droid_Logic() -  key '" + currentBoid.SpanIndex.ToString() + "' does not exist. " + ex.Message);
 				}
-				
-				
 				
 				// these will be stored in UserData's local "object[]" and thus boxed
 				// TODO: the BlackBoardData is not threadsafe
@@ -1831,11 +1859,11 @@ namespace HelloBoids
                 {
                     int count = stationState.Actions.Count;
 
+					
+					
                 }
 
-
                 // 
-                                
             
 				Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component));
 				Memory<Weapon> wep = (Memory<Weapon>) currentBoid.GetUserStruct(typeof(Weapon));
@@ -1857,7 +1885,6 @@ namespace HelloBoids
 				//		- direct orders?
 				//      - any Contacts in list marked as FOF.Foe + FOF.Hostile as opposed to just FOF.Foe (note: stale contacts are still treated as available in case of need to persue)
 				//      	- FOF.Withdrawing may be ignored for example if ROE says we don't persue in this circumstance including disabled ships and unarmed ships like freighters
-				//    
 				
 				logicalExpression = wep.Span[0].AverageDamage.ToString() + " < " + testLEComp.Span[currentBoid.SpanIndexLE].Hitpoints.ToString();
 				bool result = MicroEx.Evaluate(logicalExpression);
@@ -1877,14 +1904,14 @@ namespace HelloBoids
 				
 				if (canFire)
            	 	{
-                	//Console.WriteLine("Do_Droid_Logic() - Droid " + currentBoid.SpanIndex.ToString() + " Can Fire = " + canFire.ToString());
+                	// Console.WriteLine("Do_Droid_Logic() - Droid " + currentBoid.SpanIndex.ToString() + " Can Fire = " + canFire.ToString());
                 	mIntervalTimers.Reset(timerID, "droid_canfire");
             			
 					List<Boid> targets = null;
 					List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE); // TODO: Hopefully this FindNearestTarget() can be optimized.... spatial searches even with Octree is slow.
 					if (tmp != null)
 						targets = tmp.OfType<Boid>().ToList();
-					//Console.WriteLine("Do_Droid_Logic() - Droid " + currentBoid.SpanIndex.ToString() + " Has Found Target == " + (target != null).ToString());
+					// Console.WriteLine("Do_Droid_Logic() - Droid " + currentBoid.SpanIndex.ToString() + " Has Found Target == " + (target != null).ToString());
 					
 					if (targets == null || targets.Count == 0) 
 						return;      // NOTE: for parallel.For we use "return"
@@ -1903,24 +1930,63 @@ namespace HelloBoids
 
 							// NOTE: here we assume the Fire() occurs immediately using a lightspeed laser and the damage is instantaneous 
 							//       and does not need any travel time to reach the currentTarget
-							object[] damages = CalculateDamage(currentBoid, wep, currentTarget); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
-							if (damages != null)
-								for (int j = 0; j < damages.Length; j++)
+							object[] damages = null;
+							
+							try
+							{
+								try 
 								{
-									if (damages[j] is DamageSystem.Damage)
-										mDamageSystem.Add((DamageSystem.Damage)damages[j]);
-									else if (damages[j] is DamageOverTimeSystem.DamageOverTime)
-										mDamageOverTimeSystem.Add ((DamageOverTimeSystem.DamageOverTime)damages[j]);
-									else 
-										throw new Exception("Do_Droid_Logic() - Unexpected Damge type. " + damages[j].GetType().Name);
+								damages = CalculateDamage(currentBoid, wep, currentTarget); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
 								}
+								catch(Exception ex)
+								{
+									Console.WriteLine ("Do_Droid_Logic() - CaculateDamage error....");	
+								}
+								
+								if (damages != null)
+									for (int j = 0; j < damages.Length; j++)
+									{
+										if (damages[j] is DamageSystem.Damage)
+											try
+											{
+											mDamageSystem.Add((DamageSystem.Damage)damages[j]);
+											}
+											catch (Exception ex)
+											{
+												Console.WriteLine("Do_Droid_Logic() - DS.Add() ERROR");
+											}
+										else if (damages[j] is DamageOverTimeSystem.DamageOverTime)
+											
+											try
+											{
+												mDamageOverTimeSystem.Add ((DamageOverTimeSystem.DamageOverTime)damages[j]);
+											}
+											catch (Exception ex)
+											{
+												Console.WriteLine("Do_Droid_Logic() - DS_OVER_TIME.Add() ERROR");
+											}
+										else 
+											throw new Exception("Do_Droid_Logic() - Unexpected Damge type. " + damages[j].GetType().Name);
+									}
 
-							mIntervalTimers.Reset(timerID, "droid_canfire");
+								try
+								{
+									mIntervalTimers.Reset(timerID, "droid_canfire");
+								}
+								catch (Exception ex)
+								{
+									Console.WriteLine("Do_Droid_Logic() - TIMER RESET");
+								}
+							}
+							catch (Exception ex)
+							{
+								Console.WriteLine ("Do_Droid_Logic() - INNER TRY  " + ex.Message);
+							}
 						}
 					}
 					catch (Exception ex)
 					{
-						Console.WriteLine ("Do_Droid_Logic() - " + ex.Message);
+						Console.WriteLine ("Do_Droid_Logic() - TESTING " + ex.Message);
 					}
 				}
 			});
@@ -2402,8 +2468,9 @@ namespace HelloBoids
 			// add the modifier(s) to this skill.  Recall that modifiers behave just like any other type of PRODUCTION and must be registered as PRODUCTION 
 			// at the appropriate time (eg On USE of the Skill, or on EQUIP of an Item, etc.)
 			v.AddModifier(b.SpanIndex, PRODUCTS.TargetingSkillModifier, 1);
+			
 			// add the skill to the DROID as if it was being added to an OPERATOR for a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
-			b.Skills.Add(SKILLS.Targeting, v);
+			b.Skills.Add(v.SkillType, v);
 				
 			////////////////////////
 			
@@ -5336,7 +5403,6 @@ return (0,0);
 	public struct SkillModifier
 	{ 
 		public int EntityIndex; 
-		public int TargetIndex;
 		public PRODUCTS Product;  // modifiers are a type of PRODUCT for instance PRODUCT.MoraleBoost
 		public SKILLS SkillToTarget;      // the skill that will be affected eg Skill.Morale
 		public int Bonus;         // can be negative or positive e.g  +1 Morale
@@ -5364,10 +5430,10 @@ return (0,0);
 		//}
 		
 		
-		public void AddModifier(int entityIndex, PRODUCTS product, int bonus)
+		public void AddModifier(int producerIndex, PRODUCTS product, int bonus)
 		{
 			SkillModifier m;
-			m.EntityIndex = entityIndex;
+			m.EntityIndex = producerIndex;
 			m.SkillToTarget = SkillType;
 			m.Product = product;
 			m.Bonus = bonus;

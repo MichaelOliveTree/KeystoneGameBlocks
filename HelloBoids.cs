@@ -649,6 +649,54 @@ namespace HelloBoids
         public DataProcessorsStore mDataProcessor;
 #endif
 		
+		public struct SkillSystem
+		{
+			public struct ModificationResult
+			{
+				public int EntityIndex;
+				public int TargetIndex;
+				public SKILLS SkillType;
+				public int Amount;
+			}
+			
+			
+			public void Apply(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
+			{
+				// NOTE: the store used here must refer to the actual memStore the Droid uses
+				//       to store it's data or else there is no way to update that Droid...Duh!
+				//       This is OK though!  We just need to know that although all the RECORDS
+				//       will be used in List<DamageResult>records, NOT ALL of the SPAN records
+				//       will be used.  No problem.  We just use memSpan[records[i].EntityIndex] 
+				//       to know which ones to use
+				//       
+				if (store == null) return;
+				Span<LivingEntity> memSpan = store.Span;
+				List<ModificationResult> records = (List<ModificationResult>)parameters[0];					
+				
+				if (records != null)
+				{
+					for (int i = 0; i < records.Count; i++)
+					{
+						LivingEntity e = (LivingEntity)memSpan[records[i].TargetIndex]; // todo: this should be the target  to which the Modification should be applied
+						// = records[i].Amount;
+						
+						SKILLS s = records[i].SkillType;
+						//e.Skills[s].AddExternalModifier(records[i].Amount);
+						
+						
+						// todo: we need to be able to clear ALL external Bonuses
+						//       right? 
+						
+						//e.Skills[(int)m.SkillToTarget].Bonuses += m.Bonus;
+						
+						
+						
+					}
+				}
+			}
+		}
+		
+		
 		// todo: might exist in Game01.Rules.Processors
 		public struct SkillModificationSystem
 		{
@@ -659,24 +707,24 @@ namespace HelloBoids
 			}
 			
 			List<Consumption> mRecords;
-			List<HealthSystem.DamageResult> mDamageResults;
+			List<SkillSystem.ModificationResult> mSkillModResults;
 			
 			public SkillModificationSystem()
 			{
 				mRecords = new List<Consumption>();
-				mDamageResults = new List<HealthSystem.DamageResult>();
+				mSkillModResults = new List<SkillSystem.ModificationResult>();
 			}
 			
 			public void Add (Consumption d)
 			{
 				mRecords.Add (d);
-				//Console.WriteLine ("DamageSystem.Add() - Record count == " + mRecords.Count.ToString());
+				//Console.WriteLine ("SkillModificationSystem.Add() - Record count == " + mRecords.Count.ToString());
 			}
 			
 			public void Clear()
 			{
 				mRecords.Clear();
-				mDamageResults.Clear();
+				mSkillModResults.Clear();
 			}
 					
 			public void Process(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
@@ -686,19 +734,19 @@ namespace HelloBoids
 				
 				if (mRecords != null)
 				{
-					mDamageResults.Clear();
+					mSkillModResults.Clear();
 					
 					for (int i = 0; i < mRecords.Count; i++)
 					{
 						int amount = mRecords[i].Amount;
-						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = mRecords[i].EntityIndex, Amount = amount});
+						mSkillModResults.Add (new SkillSystem.ModificationResult() {EntityIndex = mRecords[i].EntityIndex, TargetIndex = mRecords[i].TargetIndex, Amount = amount});
 						
 						// todo: remove damage that has been processed....
 						
 					}
 				
-					// use the same LivingEntityStore as the one passed in, for applying health changes to the Droid
-					BoidSimulation.mHealthSystem.Process(store, new object[] {mDamageResults}, seed, gt);
+					// use the same LivingEntityStore as the one passed in, for applying Skill changes to the Droid
+					BoidSimulation.mSkillSystem.Apply(store, new object[] {mSkillModResults}, seed, gt);
 				}
 			}
 		}
@@ -711,8 +759,8 @@ namespace HelloBoids
 				public int Amount;
 			}
 			
-			// todo: rename Apply() ?
-			public void Process(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
+
+			public void Apply(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
 			{
 				// NOTE: the store used here must refer to the actual memStore the Droid uses
 				//       to store it's data or else there is no way to update that Droid...Duh!
@@ -786,7 +834,7 @@ namespace HelloBoids
 					}
 				
 					// use the same LivingEntityStore as the one passed in, for applying health changes to the Droid
-					BoidSimulation.mHealthSystem.Process(store, new object[] {mDamageResults}, seed, gt);
+					BoidSimulation.mHealthSystem.Apply(store, new object[] {mDamageResults}, seed, gt);
 				}
 			}
 		}
@@ -850,7 +898,7 @@ namespace HelloBoids
 					}
 
 					// use the same LivingEntityStore as the one passed in, for applying health changes to the Droid
-					BoidSimulation.mHealthSystem.Process(store, new object[]{ mDamageResults }, seed, gt);
+					BoidSimulation.mHealthSystem.Apply(store, new object[]{ mDamageResults }, seed, gt);
 				}
 			}
 			
@@ -928,6 +976,7 @@ namespace HelloBoids
 		public static DamageOverTimeSystem mDamageOverTimeSystem = new DamageOverTimeSystem();
 		public static HealthSystem mHealthSystem = new HealthSystem();
 		public static SkillModificationSystem mSkillModificationSystem = new SkillModificationSystem();
+		public static SkillSystem mSkillSystem = new SkillSystem();
 		
 		
         public BoidSimulation(int numBoids, double width, double height, double depth, bool useOctree = false)
@@ -1080,11 +1129,10 @@ namespace HelloBoids
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine("Update - Production " + ex.Message);
+					Console.WriteLine("Update() - UpdateProduction() " + ex.Message);
 				}
 				
-				
-				ComponentStore<LivingEntity> livingEntityStore = null;
+			
 				
 				try
 				{
@@ -1092,16 +1140,21 @@ namespace HelloBoids
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine("Update 1 " + ex.Message);
+					Console.WriteLine("Update() - Do_Droid_Logic() " + ex.Message);
 				}
 				
+				ComponentStore<LivingEntity> livingEntityStore = null;
+				livingEntityStore = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
+				
+				//  modifications before damage?  I think this is probably the way to
 				try
 				{
-					livingEntityStore = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
+					mSkillModificationSystem.Clear();
+					mSkillModificationSystem.Process(livingEntityStore, null, Seeds.Master, gt);
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine("Update 2 " + ex.Message);
+					Console.WriteLine("Update() - Skill Modification System " + ex.Message);
 				}
 				
 				
@@ -1112,7 +1165,7 @@ namespace HelloBoids
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine("Update 3 " + ex.Message);
+					Console.WriteLine("Update() - Damage System " + ex.Message);
 				}
 				
 				
@@ -1123,8 +1176,9 @@ namespace HelloBoids
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine("Update 4 " + ex.Message);
+					Console.WriteLine("Update() - Damage Over Time System " + ex.Message);
 				}
+				
 				
 				
 				try
@@ -1133,7 +1187,7 @@ namespace HelloBoids
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine("Update 5 " + ex.Message);
+					Console.WriteLine("Update() - mDataProcessor.Update() " + ex.Message);
 				}				
 	#endif
 			}
@@ -2342,7 +2396,9 @@ namespace HelloBoids
 			v.SkillType = SKILLS.Targeting;
 			v.Level = 1;     			// the level of this skill
 			v.Modifiers = null;
-		
+			v.BaseValue = 2;
+	
+	
 			// add the modifier(s) to this skill.  Recall that modifiers behave just like any other type of PRODUCTION and must be registered as PRODUCTION 
 			// at the appropriate time (eg On USE of the Skill, or on EQUIP of an Item, etc.)
 			v.AddModifier(b.SpanIndex, PRODUCTS.TargetingSkillModifier, 1);
@@ -2379,7 +2435,7 @@ namespace HelloBoids
 			Consumption c;
 			c.EntityArrayIndex = b.Index;
 			c.EntityIndex = b.SpanIndex;
-			c.ProducerID = p.EntityIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
+			c.TargetIndex = p.EntityIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
 			c.ProductID = p.ProductID;
 			c.Value =  null;
 			c.Amount = 1;
@@ -2920,22 +2976,22 @@ namespace HelloBoids
 				{
 					for (int j = 0; j < distributionList.Length; j++)
 					{
-						bool found = false;
-						for (int k = 0; k < consumers.Count; k++)
-						{
+						//bool found = false;
+						//for (int k = 0; k < consumers.Count; k++)
+						//{
 							// NOTE: BEWARE  of using confusing mix of EntityIndex (Span[] index, and EntityArrayIndex which is Boids[] index)
 							//       In KGB this shouldn't be a problem since we wont have them both, but for this test harnass we do
-							if (consumers[k].EntityIndex == distributionList[j])
-							{
-								found = true;
+							//if (consumers[k].EntityIndex == distributionList[j])
+							//{
+								//found = true;
 								
 								try
 								{
 									SkillModifier modifier = (SkillModifier)production[i].Value;
 									
 									Consumption[] consumptionResult = new Consumption[distributionList.Length];
-									consumptionResult[j].EntityIndex = consumers[j].EntityIndex; // the entity that is consuming a product
-									consumptionResult[j].ProducerID = production[i].EntityIndex; // the producer of the product that is being consumed by entity.ID == EntityID.
+									consumptionResult[j].TargetIndex = consumers[j].EntityIndex; // the entity that is consuming a product
+									consumptionResult[j].EntityIndex = production[i].EntityIndex; // the producer of the product that is being consumed by entity.ID == EntityID.
 									consumptionResult[j].ProductID = productID;          // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer.  Actually, I think we've modified this so that "PRODUCTS.HeatSignature" and "Products.HeatDamage" are two seperate products that may or may not both be consumed by any given Consumer.
 									consumptionResult[j].Value = modifier;
 									consumptionResult[j].Amount = modifier.Bonus; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
@@ -2948,10 +3004,10 @@ namespace HelloBoids
 									Console.WriteLine("......");
 								}
 								// the Modifier PRODUCTS.TargetingSkillModifier must be applied to the SKILLS.Targeting of the DROID's 'Crew Station'
-								continue;
-							}
-						}
-						if (!found) throw new ArgumentOutOfRangeException("Consumer is not registered.");
+								//continue;
+							//}
+						//}
+						//if (!found) throw new ArgumentOutOfRangeException("Consumer is not registered.");
 					}
 				}	
 				} 
@@ -5234,8 +5290,8 @@ return (0,0);
 			// other players in the networked game can receive the "results" of 
 			// having consumed a product
 			public int EntityArrayIndex;
-			public int EntityIndex; // the entity that is consuming a product
-			public int ProducerID; // the producer of the product that is being consumed by entity.ID == EntityID.
+			public int TargetIndex; // the entity that is consuming a product
+			public int EntityIndex; // the producer of the product that is being consumed by entity.ID == EntityID.
 			public uint ProductID;     // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer
 			public object Value;
 			public int Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
@@ -5279,7 +5335,8 @@ return (0,0);
 
 	public struct SkillModifier
 	{ 
-		public int EntityIndex;    
+		public int EntityIndex; 
+		public int TargetIndex;
 		public PRODUCTS Product;  // modifiers are a type of PRODUCT for instance PRODUCT.MoraleBoost
 		public SKILLS SkillToTarget;      // the skill that will be affected eg Skill.Morale
 		public int Bonus;         // can be negative or positive e.g  +1 Morale
@@ -5293,7 +5350,19 @@ return (0,0);
 	{
 		public SKILLS SkillType;
 		public int Level;     			// the level of this skill
-		public SkillModifier[] Modifiers;
+		public int BaseValue; 
+		
+		// These are modifiers that this Skill struct naturally PRODUCES 
+		// (as in PRODUCTION and as in, modifiers that are built in to this specific Skill). 
+		// These are NOT external modifiers that are added to this Skill!
+		public SkillModifier[] Modifiers; 
+		//public int Value()
+		//{
+		//	int result = BaseValue;
+			
+			//if (Modifiers != null)
+		//}
+		
 		
 		public void AddModifier(int entityIndex, PRODUCTS product, int bonus)
 		{

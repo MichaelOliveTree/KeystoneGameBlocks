@@ -739,7 +739,8 @@ namespace HelloBoids
 					for (int i = 0; i < mRecords.Count; i++)
 					{
 						int amount = mRecords[i].Amount;
-						mSkillModResults.Add (new SkillSystem.ModificationResult() {EntityIndex = mRecords[i].EntityIndex, TargetIndex = mRecords[i].TargetIndex, Amount = amount});						
+						mSkillModResults.Add (new SkillSystem.ModificationResult() {EntityIndex = mRecords[i].EntityIndex, TargetIndex = mRecords[i].TargetIndex, Amount = amount});	
+					
 					}
 				
 					// use the same LivingEntityStore as the one passed in, for applying Skill changes to the Droid
@@ -983,8 +984,11 @@ namespace HelloBoids
             // FormMainBase.SendNetMessage(msg)
 		}
 		
-		private System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>> mProduction = new System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>>();
-        private System.Collections.Concurrent.ConcurrentDictionary<uint, List<Consumption>> mConsumption  = new System.Collections.Concurrent.ConcurrentDictionary<uint, List<Consumption>>();
+		// NOTE: mLimitedProduction may not be necessary as we now track the NumUses for any given Production and if
+		//       p.NumUses == 0, then we remove that production at the end of UpdateProduction();
+		// private System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>> mLimitedProduction;
+		private System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>> mProduction;
+        private System.Collections.Concurrent.ConcurrentDictionary<uint, List<Consumption>> mConsumption;
 		
         public List<Boid> Boids { get; set; }
         public Seeds Seeds { get; set; }
@@ -1029,6 +1033,12 @@ namespace HelloBoids
        		MaxSpeed = EntryClass.MAX_SPEED;
         	TurnFactor = EntryClass.TURN_FACTOR; // For boundary avoidance
 	
+			// NOTE: mLimitedProduction may not be necessary as we now track the NumUses for any given Production and if
+			//       p.NumUses == 0, then we remove that production at the end of UpdateProduction();
+			//mLimitedProduction = new System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>>();
+			mProduction = new System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>>();
+        	mConsumption  = new System.Collections.Concurrent.ConcurrentDictionary<uint, List<Consumption>>();
+			
 #if USE_MEMORY_T
 
             mDataProcessor = new DataProcessorsStore(EntryClass.mCStoreCol);
@@ -1159,7 +1169,15 @@ namespace HelloBoids
 				
 				try
 				{
+					// production that occurs every frame
 					UpdateProduction(gt);
+					
+					// NOTE: mLimitedProduction may not be necessary as we now track the NumUses for any given Production and if
+			//       p.NumUses == 0, then we remove that production at the end of UpdateProduction();
+					// unlike normal production, limited production only occurs for .NumUses which typically is just 1 use
+					// that would occur for example when an x-ray laser is fired and XRAYS are produced just for the initial 
+					// impact of the laser against the target as opposed to occuring every frame indefinetely.
+					//UpdateLimitedProduction(gt);
 				}
 				catch (Exception ex)
 				{
@@ -1574,11 +1592,9 @@ namespace HelloBoids
 		private void Do_Droid_Logic(int seed, double maxDistance)
 		{
 			//Console.WriteLine("Do_Droid_Logic() - BEGIN ");
-			
 			ThreadedRandom random = new ThreadedRandom(seed);
 			const double MAX_SEARCH_DISTANCE = 35d;
 	
-
 			// todo: we could pass in an array of store to our Processor functions... rather than just one.
 			//       but it would have to be an array of object[] like parameters and we'd have to cast them
 			// OR, our various processors can just grab the Stores that are needed.  There's no need really to 
@@ -1902,13 +1918,16 @@ namespace HelloBoids
 					Console.WriteLine("Do_Droid_Logic() - droid_canfire " + currentBoid.SpanIndex.ToString() + " key does not exist");
 				}
 				
-				if (canFire)
+				if (canFire) // TODO: Establish CANFIRE PER WEAPON
            	 	{
                 	// Console.WriteLine("Do_Droid_Logic() - Droid " + currentBoid.SpanIndex.ToString() + " Can Fire = " + canFire.ToString());
                 	mIntervalTimers.Reset(timerID, "droid_canfire");
             			
 					List<Boid> targets = null;
-					List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE); // TODO: Hopefully this FindNearestTarget() can be optimized.... spatial searches even with Octree is slow.
+					double[] distances = null;
+					//List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE); // TODO: Hopefully this FindNearestTarget() can be optimized.... spatial searches even with Octree is slow.
+					List<EntityNode> tmp = FindNearestTarget(currentBoid, neighbors, out distances);
+					
 					if (tmp != null)
 						targets = tmp.OfType<Boid>().ToList();
 					// Console.WriteLine("Do_Droid_Logic() - Droid " + currentBoid.SpanIndex.ToString() + " Has Found Target == " + (target != null).ToString());
@@ -1920,7 +1939,7 @@ namespace HelloBoids
 					try
 					{
 						Boid currentTarget = targets[0];
-						double distanceToTargetSquared = Vector3d.GetDistance3dSquared(currentBoid.Translation, currentTarget.Translation);
+						double distanceToTargetSquared = distances[0];
 						
 						if (CanHit(currentTarget))
 						{
@@ -1993,6 +2012,28 @@ namespace HelloBoids
 			
 			// see Keystone.Game01.Messages.   public class AttackResults since
 			// we need results going over the network
+		}
+		
+		
+		private List<EntityNode> FindNearestTarget (EntityNode currentBoid, List<int> neighbors, out double[] distances)
+		{
+			distances = null;
+			if (neighbors == null || neighbors.Count == 0) return null;
+			
+			EntityNode[] tmp = new EntityNode[neighbors.Count];
+			distances = new double[neighbors.Count];
+						
+			for (int i = 0; i < neighbors.Count; i++)
+			{
+				Boid currentTarget = Boids[neighbors[i]];
+				distances[i] = Vector3d.GetDistance3dSquared(currentBoid.Translation, currentTarget.Translation);
+				tmp[i] = currentTarget;
+			}
+
+			// Sort 'the keys double[]' (distances) and rearrange associated data 'EntityNode[]' (results) accordingly
+			Array.Sort(distances, tmp);
+
+			return new List<EntityNode>(tmp);
 		}
 		
 		///<summary>
@@ -2461,17 +2502,30 @@ namespace HelloBoids
 			Skill v;
 			v.SkillType = SKILLS.Targeting;
 			v.Level = 1;     			// the level of this skill
-			v.Modifiers = null;
-			v.BaseValue = 2;
-	
-	
+			v.Production = null;
+			//v.Modifiers = null;
+			v.BaseValue = 1;
+			v.EffectiveValue = 0;
+			
 			// add the modifier(s) to this skill.  Recall that modifiers behave just like any other type of PRODUCTION and must be registered as PRODUCTION 
 			// at the appropriate time (eg On USE of the Skill, or on EQUIP of an Item, etc.)
-			v.AddModifier(b.SpanIndex, PRODUCTS.TargetingSkillModifier, 1);
+			v.AddProduction(b.SpanIndex, PRODUCTS.TargetingSkillModifier, 1, true, -1);
+			//v.AddModifier(b.SpanIndex, PRODUCTS.TargetingSkillModifier, 1, true, -1);
 			
 			// add the skill to the DROID as if it was being added to an OPERATOR for a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
-			b.Skills.Add(v.SkillType, v);
-				
+			b.OperatorSkills.Add(v.SkillType, v);
+			
+			// add the same skill to the tactical station
+			v.SkillType = SKILLS.Targeting;
+			v.Level = 2;     			// the level of this skill
+			v.Production = null;
+			//v.Modifiers = null;
+			v.BaseValue = 2;
+			v.EffectiveValue = 0; // todo: this should be a Getter perhaps and not a public variable
+			v.AddProduction(b.SpanIndex, PRODUCTS.TargetingSkillModifier, 1, true, -1);
+			
+			// add the skill to the DROID as if it was being added to a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
+			b.TacticalStationSkills.Add(v.SkillType, v);
 			////////////////////////
 			
 			// todo: generate Droids with some variance for age, size, and speed
@@ -2490,10 +2544,13 @@ namespace HelloBoids
 			Production p;
 			p.EntityArrayIndex = b.Index;
 			p.EntityIndex = b.SpanIndex;
-			p.ProductID = 	(uint)v.Modifiers[0].Product;
+			p.ProductID = 	(uint)v.Production[0].Product;
 			p.Location = Vector3d.Zero();
-			p.Value = v.Modifiers[0];
-			p.Amount = v.Modifiers[0].Bonus; // this will use the 
+			p.Enabled = true;
+			p.Value = v.Production[0];
+			p.Amount = v.Production[0].Amount; // this will use the 
+			p.NumUses = -1;
+			p.CooldownBetweenUses = 0;
 			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
 			p.DistributionList = new int[] {b.SpanIndex};
 			p.SearchPrimitive  = null;
@@ -2861,8 +2918,20 @@ namespace HelloBoids
 				mProductionSemaphore.Wait(-1);
 				uint productID = p.ProductID; 
 				//Console.WriteLine ("RegisterProduction()  - productID == " + productID.ToString());
-	            List<Production> production = mProduction.GetOrAdd(productID, (key) =>  new List<Production>());
-            	mProduction[productID].Add(p);
+				
+				// NOTE: mLimitedProduction may not be necessary as we now track the NumUses for any given Production and if
+				//       p.NumUses == 0, then we remove that production at the end of UpdateProduction();
+				//if (limited)
+				//{
+				//	List<Production> production = mLimitedProduction.GetOrAdd(productID, (key) => new List<Production>());
+				//	mLimitedProduction[productID].Add(p);
+				//}
+				//else
+				{
+	            	List<Production> production = mProduction.GetOrAdd(productID, (key) =>  new List<Production>());
+            	
+					mProduction[productID].Add(p);
+				}
 			}
 			finally
 			{
@@ -3006,134 +3075,214 @@ namespace HelloBoids
 			return Boids[index];
 		}
 		
+		/*
+		// NOTE: mLimitedProduction may not be necessary as we now track the NumUses for any given Production and if
+		//       p.NumUses == 0, then we remove that production at the end of UpdateProduction();
+		private void UpdateLimitedProduction (GameTime gt)
+		{
+			uint productID = (uint)PRODUCTS.TargetingSkillModifier;
+		
+			
+			foreach (KeyValuePair<uint, List<Production>> entry in mLimitedProduction)
+			{	
+				productID = entry.Key;
+				List<Production> production = entry.Value;
+				
+				// March.10.2026 - Production now always occurs automatically without every needing to call Script.OnUpdate()
+				//                 because ALL Production and Consumption must be REGISTERED by the Scripts.  In the future
+				//                 we can always support dynamic insertion of PRODUCTION during a call to Script.OnUpdate() but
+				//                 this should not be used regularly because we do not want to have to force Script.OnUpdate() to
+				//                 be called everyframe since we've switched to using a DATA ORIENTED PROCESSING MODEL.
+				for (int i = 0; i < production.Count; i++)
+				{
+					// 2) Determine consumer distrubtion - find all valid consumers that match the terms of this production result
+					// TODO: FindConsumers is very slow.  I must not run that simulation each period for Zones that are beyond a certain range from player.
+					// TODO:  Verify that we are in fact running Production for entities in every zone we load.  That is a bug.
+					List<Consumption> consumers = mConsumption[productID];
+					if (consumers == null) continue;
+
+					// PRODUCTS.TargetingSkillModifier is generated by the OPERATOR (yes, for now still just a Skill assigned to each Droid, but eventually within KGB, it will apply to a crew member assigned to a Tactical Crew Station)
+					int[] distributionList = production[i].DistributionList;
+					if (distributionList ==  null) continue; // return if using parallel.For
+
+					// verify all Entities in the distribution list match an Entity in the registered consumers of this productID.
+					// NOTE: Just because a consumer is consuming the same ProductID, does NOT mean it's consuming the production of 
+					//       the current sourceEntity.  Consider a reactor that produces POWER, it may only power weapons and the engines
+					//       and a second Reactor or Auxillary power source provides energy for things like computers, sensors, etc even 
+					//       though it's the same PRODUCT ID.
+					try
+					{
+					if (distributionList.Length > 0)
+					{
+						for (int j = 0; j < distributionList.Length; j++)
+						{
+							//bool found = false;
+							//for (int k = 0; k < consumers.Count; k++)
+							//{
+								// NOTE: BEWARE  of using confusing mix of EntityIndex (Span[] index, and EntityArrayIndex which is Boids[] index)
+								//       In KGB this shouldn't be a problem since we wont have them both, but for this test harnass we do
+								//if (consumers[k].EntityIndex == distributionList[j])
+								//{
+									//found = true;
+
+									try
+									{
+										SkillModifier modifier = (SkillModifier)production[i].Value;
+
+										Consumption[] consumptionResult = new Consumption[distributionList.Length];
+										consumptionResult[j].TargetIndex = consumers[j].EntityIndex; // the entity that is consuming a product
+										consumptionResult[j].EntityIndex = production[i].EntityIndex; // the producer of the product that is being consumed by entity.ID == EntityID.
+										consumptionResult[j].ProductID = productID;          // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer.  Actually, I think we've modified this so that "PRODUCTS.HeatSignature" and "Products.HeatDamage" are two seperate products that may or may not both be consumed by any given Consumer.
+										consumptionResult[j].Value = modifier;
+										consumptionResult[j].Amount = modifier.Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
+
+										mSkillModificationSystem.Add (consumptionResult[j]);
+									}
+									catch (Exception ex)
+									{
+										Console.WriteLine("......");
+									}
+									// the Modifier PRODUCTS.TargetingSkillModifier must be applied to the SKILLS.Targeting of the DROID's 'Crew Station'
+									//continue;
+								//}
+							//}
+							//if (!found) throw new ArgumentOutOfRangeException("Consumer is not registered.");
+						}
+					}	
+					} 
+					catch (Exception ex)
+					{
+						Console.WriteLine("UpdateProduction() - " + ex.Message);
+					}
+
+					// CONSIDER ProcessOpticalSensors()... we are essentially initiating the PRODUCTION
+					// of optical emission by taking all of the optical  producers (each Boid inside Boids[] array)
+					// and then doing a spatial search for all other Droids in range of that emission, we 
+					// create a OPTICAL_SIGNATURE that takes the form of a "contact" item and is transmitted
+					// back to the original emitter Droid's "eye" which  is an optical sensor and currently is stored in
+					// Dictionary<> mNeighbors;
+
+				}
+			}
+		}
+		*/
+		
 		private void UpdateProduction(GameTime gt)
         {
-			// TODO: This is extraordinarily slow.... 
-			
             uint productID = (uint)PRODUCTS.TargetingSkillModifier;
-			List<Production> production = mProduction[productID];
-
-			if (production == null) return;
-
-            // March.10.2026 - Production now always occurs automatically without every needing to call Script.OnUpdate()
-			//                 because ALL Production and Consumption must be REGISTERED by the Scripts.  In the future
-			//                 we can always support dynamic insertion of PRODUCTION during a call to Script.OnUpdate() but
-			//                 this should not be used regularly because we do not want to have to force Script.OnUpdate() to
-			//                 be called everyframe since we've switched to using a DATA ORIENTED PROCESSING MODEL.
-            for (int i = 0; i < production.Count; i++)
-            {
-				// 2) Determine consumer distrubtion - find all valid consumers that match the terms of this production result
-				// TODO: FindConsumers is very slow.  I must not run that simulation each period for Zones that are beyond a certain range from player.
-				// TODO:  Verify that we are in fact running Production for entities in every zone we load.  That is a bug.
-				List<Consumption> consumers = mConsumption[productID];
-				if (consumers == null) continue;
-
-				// PRODUCTS.TargetingSkillModifier is generated by the OPERATOR (yes, for now still just a Skill assigned to each Droid, but eventually within KGB, it will apply to a crew member assigned to a Tactical Crew Station)
-				int[] distributionList = production[i].DistributionList;
-				if (distributionList ==  null) continue; // return if using parallel.For
+		
+			foreach (KeyValuePair<uint, List<Production>> entry in mProduction)
+			{	
+				productID = entry.Key;
+				List<Production> production = entry.Value;
 				
-				// verify all Entities in the distribution list match an Entity in the registered consumers of this productID.
-				// NOTE: Just because a consumer is consuming the same ProductID, does NOT mean it's consuming the production of 
-				//       the current sourceEntity.  Consider a reactor that produces POWER, it may only power weapons and the engines
-				//       and a second Reactor or Auxillary power source provides energy for things like computers, sensors, etc even 
-				//       though it's the same PRODUCT ID.
-				try
+				// March.10.2026 - Production now always occurs automatically without every needing to call Script.OnUpdate()
+				//                 because ALL Production and Consumption must be REGISTERED by the Scripts.  In the future
+				//                 we can always support dynamic insertion of PRODUCTION during a call to Script.OnUpdate() but
+				//                 this should not be used regularly because we do not want to have to force Script.OnUpdate() to
+				//                 be called everyframe since we've switched to using a DATA ORIENTED PROCESSING MODEL.
+				for (int i = 0; i < production.Count; i++)
 				{
-				if (distributionList.Length > 0)
-				{
-					for (int j = 0; j < distributionList.Length; j++)
+					// 2) Determine consumer distrubtion - find all valid consumers that match the terms of this production result
+					// TODO: FindConsumers is very slow.  I must not run that simulation each period for Zones that are beyond a certain range from player.
+					// TODO:  Verify that we are in fact running Production for entities in every zone we load.  That is a bug.
+					List<Consumption> consumers = mConsumption[productID];
+					if (consumers == null) continue;
+
+					// PRODUCTS.TargetingSkillModifier is generated by the OPERATOR (yes, for now still just a Skill assigned to each Droid, but eventually within KGB, it will apply to a crew member assigned to a Tactical Crew Station)
+					int[] distributionList = production[i].DistributionList;
+					if (distributionList ==  null) continue; // return if using parallel.For
+
+					// verify all Entities in the distribution list match an Entity in the registered consumers of this productID.
+					// NOTE: Just because a consumer is consuming the same ProductID, does NOT mean it's consuming the production of 
+					//       the current sourceEntity.  Consider a reactor that produces POWER, it may only power weapons and the engines
+					//       and a second Reactor or Auxillary power source provides energy for things like computers, sensors, etc even 
+					//       though it's the same PRODUCT ID.
+					try
 					{
-						//bool found = false;
-						//for (int k = 0; k < consumers.Count; k++)
-						//{
-							// NOTE: BEWARE  of using confusing mix of EntityIndex (Span[] index, and EntityArrayIndex which is Boids[] index)
-							//       In KGB this shouldn't be a problem since we wont have them both, but for this test harnass we do
-							//if (consumers[k].EntityIndex == distributionList[j])
-							//{
-								//found = true;
-								
-								try
-								{
-									SkillModifier modifier = (SkillModifier)production[i].Value;
-									
-									Consumption[] consumptionResult = new Consumption[distributionList.Length];
-									consumptionResult[j].TargetIndex = consumers[j].EntityIndex; // the entity that is consuming a product
-									consumptionResult[j].EntityIndex = production[i].EntityIndex; // the producer of the product that is being consumed by entity.ID == EntityID.
-									consumptionResult[j].ProductID = productID;          // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer.  Actually, I think we've modified this so that "PRODUCTS.HeatSignature" and "Products.HeatDamage" are two seperate products that may or may not both be consumed by any given Consumer.
-									consumptionResult[j].Value = modifier;
-									consumptionResult[j].Amount = modifier.Bonus; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
+						if (distributionList.Length > 0)
+						{
+							for (int j = 0; j < distributionList.Length; j++)
+							{
+								//bool found = false;
+								//for (int k = 0; k < consumers.Count; k++)
+								//{
+									// NOTE: BEWARE  of using confusing mix of EntityIndex (Span[] index, and EntityArrayIndex which is Boids[] index)
+									//       In KGB this shouldn't be a problem since we wont have them both, but for this test harnass we do
+									//if (consumers[k].EntityIndex == distributionList[j])
+									//{
+										//found = true;
 
-									
-									mSkillModificationSystem.Add (consumptionResult[j]);
-								}
-								catch (Exception ex)
-								{
-									Console.WriteLine("......");
-								}
-								// the Modifier PRODUCTS.TargetingSkillModifier must be applied to the SKILLS.Targeting of the DROID's 'Crew Station'
-								//continue;
-							//}
-						//}
-						//if (!found) throw new ArgumentOutOfRangeException("Consumer is not registered.");
+										try
+										{
+											SkillModifier modifier = (SkillModifier)production[i].Value;
+											if (modifier.Enabled)
+											{
+												if (modifier.NumUses > 0 || modifier.NumUses == -1 )
+												{
+													Consumption[] consumptionResult = new Consumption[distributionList.Length];
+													consumptionResult[j].TargetIndex = consumers[j].EntityIndex; // the entity that is consuming a product
+													consumptionResult[j].EntityIndex = production[i].EntityIndex; // the producer of the product that is being consumed by entity.ID == EntityID.
+													consumptionResult[j].ProductID = productID;          // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer.  Actually, I think we've modified this so that "PRODUCTS.HeatSignature" and "Products.HeatDamage" are two seperate products that may or may not both be consumed by any given Consumer.
+													consumptionResult[j].Value = modifier;
+													consumptionResult[j].Amount = modifier.Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
+
+													mSkillModificationSystem.Add (consumptionResult[j]);
+													if (modifier.NumUses > 0)
+														modifier.NumUses--;
+												}
+												else if (modifier.NumUses == 0)
+												{
+													modifier.Enabled = false;
+												}
+											}
+
+
+
+										}
+										catch (Exception ex)
+										{
+											Console.WriteLine("......");
+										}
+										// the Modifier PRODUCTS.TargetingSkillModifier must be applied to the SKILLS.Targeting of the DROID's 'Crew Station'
+										//continue;
+									//}
+								//}
+								//if (!found) throw new ArgumentOutOfRangeException("Consumer is not registered.");
+							} // end for
+						}
+					} 
+					catch (Exception ex)
+					{
+						Console.WriteLine("UpdateProduction() - " + ex.Message);
 					}
-				}	
-				} 
-				catch (Exception ex)
-				{
-					Console.WriteLine("UpdateProduction() - " + ex.Message);
-				}
-				
-				// CONSIDER ProcessOpticalSensors()... we are essentially initiating the PRODUCTION
-				// of optical emission by taking all of the optical  producers (each Boid inside Boids[] array)
-				// and then doing a spatial search for all other Droids in range of that emission, we 
-				// create a OPTICAL_SIGNATURE that takes the form of a "contact" item and is transmitted
-				// back to the original emitter Droid's "eye" which  is an optical sensor and currently is stored in
-				// Dictionary<> mNeighbors;
-				
-				
-				/*
-				// TODO: so for testing purposes here, we simulate the OPERATOR of the DROID as PRODUCING a "PRODUCTS.TargetingSkillModifier"
-				//       that the TacticalStation will CONSUME (but for now the Droid will CONSUME that as well until KeystoneGameBlocks can be developed in full again)
-				// TODO: we need to be able to run a Processor here which may result in multiple Consumption[] items.
-				Consumption[] consumptionResult = new Consumption[consumers.Count];
-				
-				// System.Diagnostics.Debug.WriteLine("Simulation.UpdateProduction() - " + consumers.Count + " found.");
-				// 3) Consume - pass the production to the consumption handler
-				for (int j = 0; j < consumers.Count; j++)
-				{
-					// invoke appropriate delegate processors... passing in the potential Consumers?
-					consumptionResult[j].EntityIndex = consumers[j].EntityIndex; // the entity that is consuming a product
-					consumptionResult[j].ProducerID = production[i].EntityIndex; // the producer of the product that is being consumed by entity.ID == EntityID.
-					consumptionResult[j].ProductID = productID;          // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer.  Actually, I think we've modified this so that "PRODUCTS.HeatSignature" and "Products.HeatDamage" are two seperate products that may or may not both be consumed by any given Consumer.
-					consumptionResult[j].Value = 
-					consumptionResult[j].Amount = production[i].Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
 
-					//public string TargetID; // NOTE: this does mean that an entity performing consumption can change properties of other nodes and not just itself. Typically though, its only for entities within a single ship hierarchy from Exterior to Interior components
-					//consumptionResult[j].Operations;
-					//consumptionResult[b].Properties
+					// CONSIDER ProcessOpticalSensors()... we are essentially initiating the PRODUCTION
+					// of optical emission by taking all of the optical  producers (each Boid inside Boids[] array)
+					// and then doing a spatial search for all other Droids in range of that emission, we 
+					// create a OPTICAL_SIGNATURE that takes the form of a "contact" item and is transmitted
+					// back to the original emitter Droid's "eye" which  is an optical sensor and currently is stored in
+					// Dictionary<> mNeighbors;
+
+				} // end for of current List<production>
+				foreach (Production p in production)
+				{	
+					if (p.NumUses == 0)
+						production.Remove(p);
 					
-					// send a command to change relevant properties based on the consumptionResult.
-					// todo: question is, how would we do someth`ing like an "Explosion" fx when health == 0 after changes to the property?
-					//       Well, a "health" has to be -SOMEVALUE before it is truely destroyed to the point where it is no longer a derelict hull.
-					// well perhaps our script performs a Rule check when the value is changed and initiates the explosion.
-					// todo: well i think we can still use SensorContacts, HelmState and NavPoints, but they need to be able to serialize over the wire to go through loopback.
-					// todo: i think we do want to be able to store for saves purposes some custom gameobject types.
-					// NOTE: we pass in "operations" to perform so that we have ability to things like increment/decrement/add/remove/etc. 
-					for (int b = 0; b < consumptionResult.Length; b++)
-					{
-						//if (consumptionResult[b].Properties == null) continue;
-
-						//KeyCommon.Messages.Entity_ChangeCustomPropertyValue changeProperties = new KeyCommon.Messages.Entity_ChangeCustomPropertyValue();
-						//changeProperties.EntityID = (consumptionResult[b].TargetID);
-						//for (int c = 0; c < consumptionResult[b].Properties.Length; c++)
-						//{
-							//changeProperties.Add(consumptionResult[b].Properties[c], consumptionResult[b].Operations[c]);
-						//}
-						//AppMain.mNetClient.SendMessage(changeProperties);
-					}
 				}
-				*/
-            }
+				
+			} // end foreach
+			
+			foreach (KeyValuePair<uint, List<Production>> entry in mProduction)
+			{	
+				productID = entry.Key;
+				List<Production> production = entry.Value;
+				if (production.Count == 0)
+					mProduction.TryRemove(entry.Key, out production);
+			}
+			
+			
         }
 
 		#endregion
@@ -3174,7 +3323,9 @@ namespace HelloBoids
         private const double BOID_WIDTH = 2.0d;
         public uint ShotsFired = 0;
 		
-		public Dictionary<SKILLS, Skill> Skills;
+		
+		public Dictionary<SKILLS, Skill> TacticalStationSkills;
+		public Dictionary<SKILLS, Skill> OperatorSkills;
 		
 		
 		
@@ -3208,7 +3359,8 @@ namespace HelloBoids
 			// bounding box in World Space which is probably not what we want for KGB Entity but only for KGB EntityNode (which is derived from SceneNode and used for hierarchical bbox structure)
             _box = new BoundingBox(Translation,  BOID_WIDTH);
 				
-			Skills = new Dictionary<SKILLS, Skill>();
+			OperatorSkills = new Dictionary<SKILLS, Skill>();
+			TacticalStationSkills = new Dictionary<SKILLS, Skill>();
 				
         }
 		
@@ -5294,9 +5446,13 @@ return (0,0);
 			public int EntityArrayIndex;
 			public int EntityIndex;  
 			public uint ProductID;
+			public bool Enabled;
 			public Vector3d Location; // location where this production is occurring (eg. explosion, heat signature, etc)
 			public object Value;  // eg. for thrust this contains double, for radar echos, UnitValue is a Vector3d position, for SkillModifiers, it can contain a SkillModifier struct.
-			public int Amount; // infitie = -1, else number of unit's 
+			public int Amount; // infinite = -1, else number of unit's 
+			public int NumUses;
+			public float CooldownBetweenUses;
+			
 			public PRODUCT_DISTRIBUTION_TYPE DistributionMode; 
 			// public Func<Production, string, bool> DistributionFilterFunc; // accepts Production and an EntityID and returns true if the test is passed
 			// used when DistributionType is List.  Contains id of entities consuming this product.  
@@ -5405,7 +5561,10 @@ return (0,0);
 		public int EntityIndex; 
 		public PRODUCTS Product;  // modifiers are a type of PRODUCT for instance PRODUCT.MoraleBoost
 		public SKILLS SkillToTarget;      // the skill that will be affected eg Skill.Morale
-		public int Bonus;         // can be negative or positive e.g  +1 Morale
+		public bool Enabled;
+		public int Amount;         // can be negative or positive e.g  +1 Morale
+		public int NumUses;
+		public float CooldownBetweenUses;
 	}
 	
 	// TODO: an Operator that has for example a targeting skill, (see struct LivingEntity)
@@ -5417,11 +5576,15 @@ return (0,0);
 		public SKILLS SkillType;
 		public int Level;     			// the level of this skill
 		public int BaseValue; 
+		public int EffectiveValue;
 		
 		// These are modifiers that this Skill struct naturally PRODUCES 
 		// (as in PRODUCTION and as in, modifiers that are built in to this specific Skill). 
 		// These are NOT external modifiers that are added to this Skill!
-		public SkillModifier[] Modifiers; 
+	//	public SkillModifier[] Modifiers; 
+		public SkillModifier[] Production;
+		
+		
 		//public int Value()
 		//{
 		//	int result = BaseValue;
@@ -5429,14 +5592,16 @@ return (0,0);
 			//if (Modifiers != null)
 		//}
 		
-		
-		public void AddModifier(int producerIndex, PRODUCTS product, int bonus)
+		/*
+		public void AddModifier(int producerIndex, PRODUCTS product, int amount, bool enabled = true, int numUses = -1)
 		{
 			SkillModifier m;
 			m.EntityIndex = producerIndex;
 			m.SkillToTarget = SkillType;
+			m.Enabled = enabled;
 			m.Product = product;
-			m.Bonus = bonus;
+			m.Amount = amount;
+			m.NumUses = numUses;
 			
 			AddModifier(m);
 		}
@@ -5457,6 +5622,38 @@ return (0,0);
 			}
 			
 			Modifiers[length] = modifier;
+		}
+		*/
+		
+		public void AddProduction(int producerIndex, PRODUCTS product, int amount, bool enabled = true, int numUses = -1)
+		{
+			SkillModifier m;
+			m.EntityIndex = producerIndex;
+			m.SkillToTarget = SkillType;
+			m.Enabled = enabled;
+			m.Product = product;
+			m.Amount = amount;
+			m.NumUses = numUses;
+			m.CooldownBetweenUses = 1; // 1 second
+			AddProduction(m);
+		}
+		
+		public void AddProduction(SkillModifier modifier)
+		{
+			int length = 0;
+			
+			if (Production == null)
+				Production = new SkillModifier[1];
+			else
+			{
+				length = Production.Length;
+				SkillModifier[] tmp = Production;
+				Production.CopyTo(tmp, 0);
+				
+				Production = new SkillModifier[length];
+			}
+			
+			Production[length] = modifier;
 		}
 	}
 

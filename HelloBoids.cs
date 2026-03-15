@@ -1133,6 +1133,11 @@ namespace HelloBoids
             Dispose();
         }
         
+		private EntityNode GetEntity (int index)
+		{
+			return Boids[index];
+		}
+		
 		
         /// <summary>
         /// Update simulation using either Data Oriented Technique or Object Oriented Technique
@@ -1633,18 +1638,7 @@ namespace HelloBoids
              //   - spritesheets
              // 
              // 
-             // game specific
-             //    - power drain
-             //    - fuel drain
-             //    - OnFire
-             //    - InRadiation
-             //    - UnderWater/InVaccuum
-             //    - targetingSkill
-			 //    - TacticalStationOperationsSkill
-             //    - applying accumulated damage
-             //    -   ""         "" damage
-             //    -   ""         "" bufs
-             //    -   ""         "" debufs
+             
              // 
              //    - sensor scan (lambda)
 
@@ -1836,12 +1830,12 @@ namespace HelloBoids
         							//       we can do same for UserData.   We can convert to GetProperties and SetProperties() and we can also
         							//       use other methods of iterating thru the list of custom data. For now, let's just focus on Viewpoint for Chase
         					
-		// is there a way to track the data for an individual Entity via an Index into array of records and to have this record
-		// index maintained during lifetime? indices can be checked in / checked out
+			// is there a way to track the data for an individual Entity via an Index into array of records and to have this record
+			// index maintained during lifetime? indices can be checked in / checked out
 
-		// locally, we dont really need to use entityID as part of a record key either, locally we can use just an Index
-		// and perhaps a lookup value... but i think in short term, we should continue to focus on just Viewpoint and Chase cam
-		// and if that goes well, Stars and see about how it works with LoadTVResource() and restoring DB via a LoadCustomData()
+			// locally, we dont really need to use entityID as part of a record key either, locally we can use just an Index
+			// and perhaps a lookup value... but i think in short term, we should continue to focus on just Viewpoint and Chase cam
+			// and if that goes well, Stars and see about how it works with LoadTVResource() and restoring DB via a LoadCustomData()
         			
 
 			ComponentStore<LivingEntity> testLEComp = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
@@ -1854,7 +1848,9 @@ namespace HelloBoids
 			
 			int count = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 
-            //for (int i = 0; i < Boids.Count; i++)
+            
+							
+			//for (int i = 0; i < Boids.Count; i++)
             {
 				Boid currentBoid = Boids[i];
 				List<int> neighbors = null;
@@ -1871,16 +1867,11 @@ namespace HelloBoids
 				// these will be stored in UserData's local "object[]" and thus boxed
 				// TODO: the BlackBoardData is not threadsafe
 				StationState stationState  = (StationState)currentBoid.BlackBoardData.GetObject("tactical_state");
-				if (stationState.Actions != null)	
-                {
-                    int count = stationState.Actions.Count;
-
-					
-					
-                }
-
-                // 
-            
+				int operatorIndex = currentBoid.SpanIndex;
+				
+				if (!stationState.CanAct(operatorIndex)) return;	
+                
+                
 				Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component));
 				Memory<Weapon> wep = (Memory<Weapon>) currentBoid.GetUserStruct(typeof(Weapon));
 				Memory<Laser_Struct> laser = (Memory<Laser_Struct>)currentBoid.GetUserStruct(typeof(Laser_Struct)); //  Laser_Struct laser = (Laser_Struct)currentBoid.mMemStore_Laser.Span[0];
@@ -2014,7 +2005,37 @@ namespace HelloBoids
 			// we need results going over the network
 		}
 		
+		#region Game_Specific_Tactical_Functions
+		private int GetMaxActionCount()
+		{
+			int result = 0;
+						
+			
+			return result;
+		}
 		
+		private int GetOperatorAssignments()
+		{
+			int result = 0;
+			
+			
+			return result;
+		}
+		
+		
+		// for this specific sensor
+		private int GetMaxTargets()
+		{
+			int result = 0;
+			
+			
+			return result;
+		}
+			
+			
+		#endregion
+			
+			
 		private List<EntityNode> FindNearestTarget (EntityNode currentBoid, List<int> neighbors, out double[] distances)
 		{
 			distances = null;
@@ -3070,11 +3091,7 @@ namespace HelloBoids
         }
 		
 */
-        private EntityNode GetEntity (int index)
-		{
-			return Boids[index];
-		}
-		
+
 		/*
 		// NOTE: mLimitedProduction may not be necessary as we now track the NumUses for any given Production and if
 		//       p.NumUses == 0, then we remove that production at the end of UpdateProduction();
@@ -5402,14 +5419,24 @@ return (0,0);
 		public enum PRODUCTS
 		{
 			None = 0,
+			
+			ElectricalPower,
+			
+			// Fuels
+			
+			
 			// Emissions and Signatures
 			MicrowaveEmission,
 			MicrowaveReflection,
 
 			// Damage Types
 			MicrowaveDamage = 1024,
-
-			// 
+			FireDamage,
+			PlasmaFireDamage,
+			VaccumDamage,
+			RadiationDamage,
+			PressureDamage,   // eg too deep underwater or within a Gas Giant's atmosphere
+			
 			CommandBoost = 2048,
 			MoraleBoost,   // like all modifiers, this too can actually be either negative or positive
 
@@ -5420,6 +5447,9 @@ return (0,0);
 			Haggling
 		}
 
+
+			 
+	
 		public enum SKILLS
 		{
 			HelmOperations,
@@ -5673,6 +5703,9 @@ return (0,0);
 
 		// Queue is First In First Out
 		public System.Collections.Generic.Queue<StationAction> Actions;
+		public int CooldownBetweenActions;  //todo: maybe this is CurrentAction.Duration where "CanAct" = (NumActions < Actions.Count - 1 && elapsed >= CurrentAction.Duration)  the minimum amount of time since the previous action before the next action can take place e.g 4.5 seconds and represents the time it takes to carry out that previous Action and to be ready to carry out the next
+		
+		
 		public int HistoryCount; 
 		public int NumActions;
 		public int MaxActions;        // based on operator's max ability to handle so many simultaneously, tacticalstation TL, tacticalStation damage, and ability to perform that many actions in the first place (eg having enough weapons to use )
@@ -5684,18 +5717,68 @@ return (0,0);
 
 		public void AddContact(SensorContact c)
 		{
+			
 		}
 
 		public void RemoveContact()
 		{
+			
 		}
 
 		public void ClearContacts()
 		{
+			
 		}
 
 		public void AddTarget(Target t)
 		{
+			
+		}
+		
+		   					
+		
+		// todo: Actions that have completed need to be removed from a list?
+		public bool CanAct(int operatorIndex)
+		{
+			// todo: does this station require an operator or is it being managed by AI?
+			bool result = true;
+
+			// maxActions not reached
+			// station is powered and healthy enough
+			// operator is healthy enough and has necessary skills for this particular station
+
+			return result;
+		}
+
+		public int GetMaxActionCount(int operatorIndex, int stationIndex)
+		{
+			int result = 0;
+
+			result = Actions.Count;
+
+			// station powered? (assuming it requires power to function)
+			// station TL
+			// station Damage (damage = CurrentHitPoints / Hitpoints
+			// operator Skill + Bonuses =
+			// opertor Health  // the max time between actions may also slow down as a result of an injured operator
+
+			return result;
+		}
+
+		public int GetOperatorAssignments(int operatorIndex)
+		{
+			int result = 0;
+
+
+			return result;
+		}
+
+		// for this specific sensor
+		public int GetMaxTargets()
+		{
+			int result = 0;
+
+			return result;
 		}
 	}
 		
@@ -13705,13 +13788,18 @@ if (mEntityNodesCollection == null) return null;
 	// NOTE: GameTime does not utilize any Windows Timer.  The "elapsedSeconds" is passed in from 
 	//       an instance of Keystone.Timers.Timer.cs from within the gameloop in AppMain.cs
 	
-    // simulated game time. e.g. 1 minute real time with a TIME_FACTOR = 1000 = 1000 minutes in game time
+	// GameTime is the time elapsed in "game" time which CAN be scaled to go FastForward or Backward.
+	//          GameTime mostly differentiates between REAL-LIFE-TIME where there is no PAUSING
+	//          Real-Life-Time-Total-Elapsed is the seconds from when the game started.  It can never be affected by PAUSE or SCALING.
+	// 
+    // GetSimulatedTime() - SimulatedTime.ElapsedSeconds() is computed as GameTime's ElapsedSeconds * GAME_TIME_FACTOR  E.g. 1 minute GameTime with a TIME_FACTOR = 1000 = 1000 minutes in game time * any scaling as well.
+	
     public class GameTime 
     {        
         public IntervalTimers IntervalTimers;
 
         private DateTime _time;
-        private double mInitialTimeAtStartup;
+        
         private bool mIsPaused;
         private float _timeScaling;                    // used for FFWD and REVERSE time speed ups and slow downs
         private float mGameSecondsPerEachRealSecond;  // eg. 60 gameSeconds for every real life second means every real life minute results in one hour of game time passing
@@ -13719,7 +13807,9 @@ if (mEntityNodesCollection == null) return null;
         private double _totalElapsed; // total elapsed time since the first update
         private double _elapsedSeconds;
         private double mElapsedGameTimeSeconds;
-        private long mTicks;
+        
+		private long mTicksAtStart;
+		private long mTicks;
 		private float _julianDay;
 
         // TODO: use Stopwatch here!!!  
@@ -13728,14 +13818,16 @@ if (mEntityNodesCollection == null) return null;
         /// 
         /// </summary>
         /// <param name="timeScaling">minimum value must be >0.0 unless we want to support reverse time.</param>
-        public GameTime(float timeScaling)
+        public GameTime(float timeScaling = 1.0f)
         {
         	// TODO: what if 0.0 == paused/stopped
             if (timeScaling <= 0f) throw new ArgumentOutOfRangeException("GameTime.ctor() - timeScaling must be greater than 0.");
             _timeScaling = timeScaling;
             
-            _time = new DateTime(2006, 3, 30, 10, 30, 30, 30);
-            
+			_time = new DateTime();
+			mTicksAtStart = _time.Ticks;
+			
+			
             IntervalTimers = new IntervalTimers();
 
             // http://stackoverflow.com/questions/5248827/convert-datetime-to-julian-date-in-c-sharp-tooadate-safe
@@ -13808,6 +13900,7 @@ if (mEntityNodesCollection == null) return null;
             _elapsedSeconds = elapsedSeconds;
             _totalElapsed += _elapsedSeconds;
             mElapsedGameTimeSeconds = _elapsedSeconds * _timeScaling;
+			
             double elapsedMilliseconds = _elapsedSeconds * 1000d;
             _time = _time.Add(new TimeSpan(0, 0, 0, 0, (int)elapsedMilliseconds));
             mTicks = _time.Ticks; 
@@ -13816,6 +13909,8 @@ if (mEntityNodesCollection == null) return null;
             IntervalTimers.Update(elapsedSeconds);
         }
     }
+	
+	
 
     public class IntervalTimers
     {			

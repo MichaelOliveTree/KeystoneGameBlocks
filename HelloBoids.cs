@@ -1613,9 +1613,6 @@ namespace HelloBoids
 
 			//		
 			// NOTE: Really, the below loop is mostly for COMBAT logic only.  
-			// 
-				
-
              // movement of crew (steering)
              //   linear acceleration / decelaration
              //   newtonian ship movement
@@ -1847,9 +1844,7 @@ namespace HelloBoids
 			//Console.WriteLine ("Do_Droid_Logic() - MicroEx.Evaluate() - '" + logicalExpression + "' " + result.ToString());
 			
 			int count = Boids.Count;
-            System.Threading.Tasks.Parallel.For(0, count, i => 
-            
-							
+            System.Threading.Tasks.Parallel.For(0, count, i => 				
 			//for (int i = 0; i < Boids.Count; i++)
             {
 				Boid currentBoid = Boids[i];
@@ -1867,10 +1862,11 @@ namespace HelloBoids
 				// these will be stored in UserData's local "object[]" and thus boxed
 				// TODO: the BlackBoardData is not threadsafe
 				StationState stationState  = (StationState)currentBoid.BlackBoardData.GetObject("tactical_state");
-				int operatorIndex = currentBoid.SpanIndex;
+				int operatorIndex = currentBoid.Index; // we pass Index and NOT SpanIndex because we want to find the Boid in the EntryClass.bSim.Boids[] List
+				int stationIndex = currentBoid.Index;  // for now, our Boid hosts both the TacticalStation and the Operator
+				
 				
 				if (!stationState.CanAct(operatorIndex)) return;	
-                
                 
 				Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component));
 				Memory<Weapon> wep = (Memory<Weapon>) currentBoid.GetUserStruct(typeof(Weapon));
@@ -1880,12 +1876,6 @@ namespace HelloBoids
 				//       The client EXE will have access to those types and the UI elements using them and can update
 				//       those relevant UI elements as necessary
 				
-				
-				// can this Droids TACTICAL STATION perform ANY actions right now?
-				
-				
-				//  - station is not available/powered/healthy/has operator or AI conroller/etc
-				//	- we already have reached maximum number of ongoing actions for this station as well as Operator's skill level?
 				
                 
                 //  - are we in a state of COMBAT?
@@ -1946,7 +1936,7 @@ namespace HelloBoids
 							{
 								try 
 								{
-								damages = CalculateDamage(currentBoid, wep, currentTarget); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
+									damages = CalculateDamage(currentBoid, wep, currentTarget); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
 								}
 								catch(Exception ex)
 								{
@@ -1959,7 +1949,7 @@ namespace HelloBoids
 										if (damages[j] is DamageSystem.Damage)
 											try
 											{
-											mDamageSystem.Add((DamageSystem.Damage)damages[j]);
+												mDamageSystem.Add((DamageSystem.Damage)damages[j]);
 											}
 											catch (Exception ex)
 											{
@@ -2011,12 +2001,15 @@ namespace HelloBoids
 			int result = 0;
 						
 			
+			
+		
 			return result;
 		}
 		
 		private int GetOperatorAssignments()
 		{
 			int result = 0;
+			
 			
 			
 			return result;
@@ -2029,10 +2022,9 @@ namespace HelloBoids
 			int result = 0;
 			
 			
+			
 			return result;
 		}
-			
-			
 		#endregion
 			
 			
@@ -2597,10 +2589,11 @@ namespace HelloBoids
 	
 			// add the required StationState for our tactical station's state to the droid.BlackBoardData which is required by Do_Droid_Logic()
 			StationState stationState;
-			stationState.Index = b.SpanIndex;
+			stationState.Index = b.Index; // we use Index and not SpanIndex because we want to use it to find the Boid element in the EntryClass.bSim.Boids[index] List
 						
 			stationState.HistoryCount = 1;
-			
+			stationState.CooldownBetweenActions = 3.0f;
+	
 			stationState.MaxActions = 2;
 			stationState.NumActions = 0;
 			stationState.Actions = null;
@@ -5703,7 +5696,7 @@ return (0,0);
 
 		// Queue is First In First Out
 		public System.Collections.Generic.Queue<StationAction> Actions;
-		public int CooldownBetweenActions;  //todo: maybe this is CurrentAction.Duration where "CanAct" = (NumActions < Actions.Count - 1 && elapsed >= CurrentAction.Duration)  the minimum amount of time since the previous action before the next action can take place e.g 4.5 seconds and represents the time it takes to carry out that previous Action and to be ready to carry out the next
+		public float CooldownBetweenActions;  //todo: maybe this is CurrentAction.Duration where "CanAct" = (NumActions < Actions.Count - 1 && elapsed >= CurrentAction.Duration)  the minimum amount of time since the previous action before the next action can take place e.g 4.5 seconds and represents the time it takes to carry out that previous Action and to be ready to carry out the next
 		
 		
 		public int HistoryCount; 
@@ -5743,6 +5736,25 @@ return (0,0);
 			// todo: does this station require an operator or is it being managed by AI?
 			bool result = true;
 
+			Boid operatorAndStation = EntryClass.bSim.Boids[operatorIndex];
+			
+			// line 6224
+			Memory<Component> cmp = (Memory<Component>) operatorAndStation.GetUserStruct(typeof(Component));
+			
+			// line 5294
+			Memory<LivingEntity> livingEntity = (Memory<LivingEntity>) operatorAndStation.GetUserStruct(typeof(LivingEntity));
+			
+			//if (livingEntity.Span[0].)
+			//{
+			//	
+			//}
+			
+			//if (operatorAndStation.
+				
+			//  - station is not available/powered/healthy/has operator or AI conroller/etc
+			//	- we already have reached maximum number of ongoing actions for this station as well as Operator's skill level?
+			
+			
 			// maxActions not reached
 			// station is powered and healthy enough
 			// operator is healthy enough and has necessary skills for this particular station

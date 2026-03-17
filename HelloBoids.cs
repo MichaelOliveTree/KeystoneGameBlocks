@@ -1834,7 +1834,10 @@ namespace HelloBoids
 			// and perhaps a lookup value... but i think in short term, we should continue to focus on just Viewpoint and Chase cam
 			// and if that goes well, Stars and see about how it works with LoadTVResource() and restoring DB via a LoadCustomData()
         			
-
+			DoDeviceReadyStatus();
+			
+			DoStationCanActStatus();
+			
 			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
@@ -1867,6 +1870,8 @@ namespace HelloBoids
 				Memory<LivingEntity> stationOperator = (Memory<LivingEntity>) currentBoid.GetUserStruct(typeof(LivingEntity));
 				Memory<TacticalStation> tacticalStation = (Memory<TacticalStation>) currentBoid.GetUserStruct(typeof(TacticalStation));
 				//TacticalStation stationState  = (TacticalStation)currentBoid.BlackBoardData.GetObject("tactical_state");
+				
+				
 				int operatorIndex = currentBoid.Index; // we pass Index and NOT SpanIndex because we want to find the Boid in the EntryClass.bSim.Boids[] List
 				int stationIndex = currentBoid.Index;  // for now, our Boid hosts both the TacticalStation and the Operator
 				
@@ -2001,80 +2006,91 @@ namespace HelloBoids
 			// we need results going over the network
 		}
 		
-		#region Game_Specific_Tactical_Functions
-		private int GetMaxActionCount()
-		{
-			int result = 0;
-						
-			
-			
-		
-			return result;
-		}
-		
-		private int GetOperatorAssignments()
-		{
-			int result = 0;
-			
-			
-			
-			return result;
-		}
-		
-		
-		// for this specific sensor
-		private int GetMaxTargets()
-		{
-			int result = 0;
-			
-			
-			
-			return result;
-		}
-		#endregion
-			
-			
-		private List<EntityNode> FindNearestTarget (EntityNode currentBoid, List<int> neighbors, out double[] distances)
-		{
-			distances = null;
-			if (neighbors == null || neighbors.Count == 0) return null;
-			
-			EntityNode[] tmp = new EntityNode[neighbors.Count];
-			distances = new double[neighbors.Count];
-						
-			for (int i = 0; i < neighbors.Count; i++)
-			{
-				Boid currentTarget = Boids[neighbors[i]];
-				distances[i] = Vector3d.GetDistance3dSquared(currentBoid.Translation, currentTarget.Translation);
-				tmp[i] = currentTarget;
-			}
-
-			// Sort 'the keys double[]' (distances) and rearrange associated data 'EntityNode[]' (results) accordingly
-			Array.Sort(distances, tmp);
-
-			return new List<EntityNode>(tmp);
-		}
-		
-		///<summary>
-		/// This is the target that the operator (either crew member or computer) of a Targeting Crew Station
-		/// will be attempting to fire upon.  
+		/// <summary>
+		/// Loop through all Components and set the Runtime flags that determine if this component/device is ready for use
+		/// NOTE: Using Data Oriented Processing takes some getting used to if you are more familiar with OOP where you iterate
+		/// through all Entities and update every aspect of that Entity all in once swoop before moving on to the next.
+		/// Here you will see, we update each Entity piecemeal, but we perform all the same piecemeal updates to each Entity
+		/// in one loop which is VERY cache friendly and yields supperior performance over the typical OOP method.
 		/// </summary>
-		private List<EntityNode> FindNearestTarget (EntityNode source, double maxDistance)
+		private void DoDeviceReadyStatus()
 		{
-			BoundingBox searchArea = new BoundingBox (source.SpatialNode.BoundingBox.Center, maxDistance * 0.5d);
-			double maxDistanceSquared = maxDistance * maxDistance;
+			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
+			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
+			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 			
-			Func<EntityNode, EntityNode, bool> match = (current, neighbor) =>            {
-                if (current == neighbor) return false;
-                if (Vector3d.GetDistance3dSquared(neighbor.Translation, current.Translation) <= maxDistanceSquared) return true;
-                return false;
-            };
 			
-			List<EntityNode> found  = this.Octree.Query(source, true, searchArea, match);
-			if (found == null) return null;
+			// struct for component properties and stats
+			//Component component = ((ComponentStore<Component>)EntryClass.mCStoreCol.CheckOut<Component>(0)).Span[componentIndex];		
+			//Weapon weapon = ((ComponentStore<Weapon>)EntryClass.mCStoreCol.CheckOut<Weapon>(0)).Span[weaponIndex];
+			//Laser_Struct laser = ((ComponentStore<Laser_Struct>)EntryClass.mCStoreCol.CheckOut<Laser_Struct>(0)).Span[laserIndex];
+				
 			
-			//Console.WriteLine("FindNearestTarget found count == " + found.Count.ToString());
-			return found;		
+			// Game Idea = March 17.2026
+			// What if a Superman type character or a Jesus like figure arrives on a scifi world
+			// and is treated very poorly.  This character is harmed in all sorts of ways over the course
+			// of say 70 years, but was always trying to spread the good news.  
+			// Eventually, this character is very frail with lots of old injuries, and then one day this character
+			// reveals himself to be immortal and perhaps the Son of God and is instantly transformed into His youthful
+			// self.  What do the antagonists of this world do?  What does the protagonist do?
+			//  For a video game, this might be up to the player... it reminds me of Dogville too somewhat... Grace falls
+			// at the end of Dogville.... but what would any particular player do?  I think they should be incentivised throughout
+			// the game to really consider their actions at that point.  It should not be an easy answer... or should it?
+			// This represents the type of thing you can do with interactive simulations that cannot be done in other mediums.
+			
+			int count = (int)allTacticalStations.Size;
+            System.Threading.Tasks.Parallel.For(0, count, i => 		
+			{
+				// if (allComponents.Span[i].IsPowered())
+				//	 allComponents.Span[i].SetRuntimeFlag();
+				
+				
+				// is allComponents.healthy enough
+				
+				
+				// allComponents.hasOperator if required
+				
+				
+				// operator is healthy
+				
+				
+				// operator has necessary skills
+				
+				
+				// 
+				
+				
+			});
+			
+			
+		}
+		
+		private void DoStationCanActStatus()
+		{
+			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
+			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
+			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
+			
+			// struct for component properties and stats
+			// Component component = ((ComponentStore<Component>)EntryClass.mCStoreCol.CheckOut<Component>(0)).Span[componentIndex];		
+			// Weapon weapon = ((ComponentStore<Weapon>)EntryClass.mCStoreCol.CheckOut<Weapon>(0)).Span[weaponIndex];
+			// Laser_Struct laser = ((ComponentStore<Laser_Struct>)EntryClass.mCStoreCol.CheckOut<Laser_Struct>(0)).Span[laserIndex];
+				
+			int count = (int)allTacticalStations.Size;
+            System.Threading.Tasks.Parallel.For(0, count, i => 		
+			{
+				// if (allComponents.Span[i].IsPowered())
+				//	 allComponents.Span[i].SetRuntimeFlag();
+				
+				// has not reach max number of current actions
+				
+				// the cooldown since last action has expired
+				
+				// the runtime flag for CanAct is set.
+				
+				
+			});
+			
 		}
 		
 		
@@ -2491,6 +2507,51 @@ namespace HelloBoids
         }
 #endif
         		
+		
+		
+		private List<EntityNode> FindNearestTarget (EntityNode currentBoid, List<int> neighbors, out double[] distances)
+		{
+			distances = null;
+			if (neighbors == null || neighbors.Count == 0) return null;
+			
+			EntityNode[] tmp = new EntityNode[neighbors.Count];
+			distances = new double[neighbors.Count];
+						
+			for (int i = 0; i < neighbors.Count; i++)
+			{
+				Boid currentTarget = Boids[neighbors[i]];
+				distances[i] = Vector3d.GetDistance3dSquared(currentBoid.Translation, currentTarget.Translation);
+				tmp[i] = currentTarget;
+			}
+
+			// Sort 'the keys double[]' (distances) and rearrange associated data 'EntityNode[]' (results) accordingly
+			Array.Sort(distances, tmp);
+
+			return new List<EntityNode>(tmp);
+		}
+		
+		///<summary>
+		/// This is the target that the operator (either crew member or computer) of a Targeting Crew Station
+		/// will be attempting to fire upon.  
+		/// </summary>
+		private List<EntityNode> FindNearestTarget (EntityNode source, double maxDistance)
+		{
+			BoundingBox searchArea = new BoundingBox (source.SpatialNode.BoundingBox.Center, maxDistance * 0.5d);
+			double maxDistanceSquared = maxDistance * maxDistance;
+			
+			Func<EntityNode, EntityNode, bool> match = (current, neighbor) =>            {
+                if (current == neighbor) return false;
+                if (Vector3d.GetDistance3dSquared(neighbor.Translation, current.Translation) <= maxDistanceSquared) return true;
+                return false;
+            };
+			
+			List<EntityNode> found  = this.Octree.Query(source, true, searchArea, match);
+			if (found == null) return null;
+			
+			//Console.WriteLine("FindNearestTarget found count == " + found.Count.ToString());
+			return found;		
+		}
+		
 		public Boid Spawn(ThreadedRandom rand, int index, double width, double height, double depth)
 		{
 			double posX = rand.NextDouble() * width;
@@ -5338,30 +5399,6 @@ return (0,0);
         // public Entity_Taxonomy Taxonomy;     // ProcGen_ItemType enum can be loaded from a modder's file 
     }
 
-	
-	
-	
-	
-	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
-	public struct LivingEntity
-	{
-		// These will serve as Station Operators for now
-		public long CreationDateTime;
-		public long Age;            // technically, this probably doesnt need to be stored... we only need the CreationDate?  // assign using Utils.GetAge() and find Age via 'age = Utils.GetAge(entity.CreationDate);'
-		public double MaxAge;
-		public int Hitpoints; // CurrentHP
-		
-		public Membership[] Memberships;
-		public Skill[] Skills;
-		
-		//public double
-
-		public double GetAge(double currentTime)
-		{
-			return currentTime - CreationDateTime;
-		}
-	}
-			
 
 #region Game01.GameObjects
 	public class UnitedEarthCode
@@ -5733,125 +5770,6 @@ return (0,0);
 		}
 	}
 
-	
-	public struct TacticalStation
-	{
-		public struct StationAction
-		{
-			public long TimeStarted;     // time this action started
-			public int Duration;         // time to complete this action
-			public int ActionID;         // eg Fire at Target, Lay Mines, Deploy Counter-measures
-		}
-
-		public static int NextID;
-		public int Index;            // index of ComponentStore<Components> where this TacticalStation's general Component struct is stored
-		public int EntityIndex;
-		
-		// NOTE: The "GetLastAction() is simply the Action at index == 0
-
-		// Queue is First In First Out
-		public System.Collections.Generic.Queue<StationAction> Actions;
-		public float CooldownBetweenActions;  //todo: maybe this is CurrentAction.Duration where "CanAct" = (NumActions < Actions.Count - 1 && elapsed >= CurrentAction.Duration)  the minimum amount of time since the previous action before the next action can take place e.g 4.5 seconds and represents the time it takes to carry out that previous Action and to be ready to carry out the next
-		
-		
-		public int HistoryCount; 
-		public int NumActions;
-		public int MaxActions;        // based on operator's max ability to handle so many simultaneously, tacticalstation TL, tacticalStation damage, and ability to perform that many actions in the first place (eg having enough weapons to use )
-
-		public System.Collections.Generic.Dictionary<int, List<SensorContact>> ContactsHistory;
-		public SensorContact[] Contacts;
-		public Target[] Targets;
-
-
-		public void AddContact(SensorContact c)
-		{
-			
-		}
-
-		public void RemoveContact()
-		{
-			
-		}
-
-		public void ClearContacts()
-		{
-			
-		}
-
-		public void AddTarget(Target t)
-		{
-			
-		}
-		
-		   					
-		
-		// todo: Actions that have completed need to be removed from a list?
-		public bool CanAct(int operatorIndex)
-		{
-			// todo: does this station require an operator or is it being managed by AI?
-			bool result = true;
-
-			Boid operatorAndStation = EntryClass.bSim.Boids[operatorIndex];
-
-			
-			// line 6224
-			Memory<Component> cmp = (Memory<Component>) operatorAndStation.GetUserStruct(typeof(Component)); //"HelloBoids.Component"); // );
-			
-			// line 5294
-			Memory<LivingEntity> livingEntity = (Memory<LivingEntity>) operatorAndStation.GetUserStruct(typeof(LivingEntity)); //"HelloBoids.LivingEntity"); //();
-			
-			//if (livingEntity.Span[0].)
-			//{
-			//	
-			//}
-			
-			//if (operatorAndStation.
-				
-			//  - station is not available/powered/healthy/has operator or AI conroller/etc
-			//	- we already have reached maximum number of ongoing actions for this station as well as Operator's skill level?
-			
-			
-			// maxActions not reached
-			// station is powered and healthy enough
-			// operator is healthy enough and has necessary skills for this particular station
-
-			return result;
-		}
-
-		public int GetMaxActionCount(int operatorIndex, int stationIndex)
-		{
-			int result = 0;
-
-			result = Actions.Count;
-
-			// station powered? (assuming it requires power to function)
-			// station TL
-			// station Damage (damage = CurrentHitPoints / Hitpoints
-			// operator Skill + Bonuses =
-			// opertor Health  // the max time between actions may also slow down as a result of an injured operator
-
-			return result;
-		}
-
-		public int GetOperatorAssignments(int operatorIndex)
-		{
-			int result = 0;
-
-
-			return result;
-		}
-
-		// for this specific sensor
-		public int GetMaxTargets()
-		{
-			int result = 0;
-
-			return result;
-		}
-	}
-		
-	
-	
 	/// <summary>
 	/// A SensorContact is a PRODUCT that is produced by a Sensor upon receiving
 	/// and detectinig an emission of the same PRODUCT of that Sensor.
@@ -6078,6 +5996,419 @@ return (0,0);
 	}
 		
 
+	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
+	public struct LivingEntity
+	{
+		public string FullName;
+		
+		// These will serve as Station Operators for now
+		public long CreationDateTime;
+		public long Age;            // technically, this probably doesnt need to be stored... we only need the CreationDate?  // assign using Utils.GetAge() and find Age via 'age = Utils.GetAge(entity.CreationDate);'
+		public double MaxAge;
+		
+		public int Hitpoints; 
+		public int CurrentHP;
+		
+		public Membership[] Memberships;
+		public Skill[] Skills;
+		
+		//public double
+
+		public double GetAge(double currentTime)
+		{
+			return currentTime - CreationDateTime;
+		}
+	}
+			
+		
+		// NOTE: Production and Consumption belong in Entity, not in Component. 
+        //public Production[] Production;   // eg. even a painting on a wall can produce +0.2 aesthic bonus to morale or happiness to crew
+		//public Consumption[] Consumption; // eg. all components can consume damage.  
+	public struct Component  // aka: "Useable Component"
+    {
+        public int Interfaces; // 32 bit flags for the various interfaces (Build and Runtime) used by this component
+        
+		
+		public int EntityID; // Guid.NewGuid().ToString() results in a 36 character string.
+        public int[] ComponentIndices; // all the different component indices used by this Component. For example, a Laser Component would use both WeaponIndex and LaserIndex
+		public string[] ComponentTypenames;
+		
+			
+		public int Level; // technological level. 
+
+		
+        public float MaterialQuality; // cheap vs very fine materials (eg poorly refined steel vs damascus steel)
+        public float Craftsmanship;   // how well the item is put together or manufactured (often taking into account the skill level of the maker)
+        public bool Ruggedized;
+		public bool Repairable; 
+		
+		
+		/// <summary>
+		/// Number of Human (as opposed to software/AI) Operators Required (if 0 then RequiresOperator {get { return NumOperatorsRequired > 0;}}
+		///	      
+		/// NOTE: if this is a medical bed 1 or 2 might be required.  For instance, the First "operator" is the patient and the Second "operator" is the Medical Professional.  
+		///       The second operator isnt always necessary depending on what the first "operator" is doing... if recovering for instance, no second operator is needed.
+		///</summary>
+		public int NumOperatorsRequired; 
+		
+		/// <summary>
+		/// The required skills an Operator must have to use this Component
+		/// </summary>
+		public Skill[] Skills;
+		
+		
+		
+		// 'Defense' is Armor (Armor Faces with Armor Layers and DR and PD)
+		// TODO: i think these simply need to be part of the Component 
+		// https://www.google.com/search?q=memory%3CT%3E+and+span%3CT%3E+from+a+struct+with+nested+structs&rlz=1C1GCPF_enUS1162US1162&oq=memory%3CT%3E+and+span%3CT%3E+from+a+struct+with+nested+structs&gs_lcrp=EgZjaHJvbWUyBggAEEUYOdIBCTExMDEzajBqMagCALACAA&sourceid=chrome&ie=UTF-8
+        public ExternalArmor Defense; 
+        public InternalStructure Internals; 	
+		
+        // stats
+        public int Hitpoints;        
+        public float Cost;
+        public float Weight;
+        public float Volume;
+        public float SurfaceArea;
+
+        // runtime
+		public int[] OperatorIDs;
+		public uint mRuntimeFlags;
+		
+		public int CurrentHP; // HitPoints - Damage == CurrentHP;
+		
+        public bool InUse;
+		
+		public float StartTime; // when "Use" began
+		public float Duration;  // if the "Use" is of a set Duration, track how long that Duration is... for instance, a sleep duration might be 6 hours of gameTime
+		
+		public bool Looping; // Repeating
+		public float CooldownDuration; 
+		
+		
+        public delegate void OnCreate();  // or OnAddedToScene()
+        public delegate void OnDestroy(); // or OnRemovedFromScene()
+		public delegate void OnUseStarted();
+		public delegate void OnUseEnded();
+
+		public void Use(string entityID)
+		{
+ 		}
+		
+		public bool IsOperatorStatusCheckOK(out string errorReason)
+		{
+			const float DAMAGE_PERCENT_THRESHOLD = 0.33f;
+		
+			errorReason = null;
+			
+			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
+			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
+			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
+			
+			// if (allComponents.Span[i].IsPowered())
+				
+			//	 allComponents.Span[i].SetRuntimeFlag();
+				
+				
+			// is allComponents.healthy enough
+				
+				
+			if (this.NumOperatorsRequired > 0)
+			{
+				// allComponents.hasOperator if required
+				if (this.OperatorIDs != null && this.OperatorIDs.Length >= this.NumOperatorsRequired)
+				{
+					// operator(s) is(are) healthy
+					for (int i = 0; i < this.OperatorIDs.Length; i++)
+					{
+						int index = this.OperatorIDs[i];
+						
+						float percentage = allLivingEntities.Span[index].CurrentHP / allLivingEntities.Span[index].Hitpoints;
+						if (percentage <= DAMAGE_PERCENT_THRESHOLD)
+						{
+							errorReason = "Operator '" + allLivingEntities.Span[index].FullName + "' is not Healthy enough to operate this Component.";
+							return false;
+						}
+						
+						
+						if (this.Skills != null)
+						{
+							string name = allLivingEntities.Span[index].FullName;
+							
+							// operator has necessary skills to use this Component\Station
+							Skill[] operatorSkills = allLivingEntities.Span[index].Skills;
+							if (operatorSkills == null)
+							{
+								errorReason = "Operator '" + name + "' does not have the required skills to operate this Component";
+								return false;
+							}
+
+							int totalSkillCount = 0;
+							
+							for (int j = 0; j < this.Skills.Length; j++)
+							{
+								for (int k = 0; k < operatorSkills.Length; k++)
+								{
+									if (operatorSkills[k].SkillType == this.Skills[j].SkillType)
+									{
+										if (operatorSkills[k].Level < this.Skills[j].Level)
+										{
+											
+											int level = this.Skills[j].Level;
+											string skillname = this.Skills[j].SkillType.ToString();
+
+											errorReason = $"Operator {name}, does not have the required skill level {level} for the skill {skillname}.";
+											return false;
+										}
+										else 
+											totalSkillCount++;
+									}
+								}
+							}
+							
+							if (totalSkillCount < this.Skills.Length)
+							{
+								errorReason = $"Operator {name}, does not have the required skills or skill levels for all skills required to use this Component.";
+								return false;
+							}
+						}
+
+					}
+				}
+			}
+		
+			return true;
+		}
+		
+	}
+	
+	
+	
+	public struct TacticalStation
+	{
+		public struct StationAction
+		{
+			public long TimeStarted;     // time this action started
+			public int Duration;         // time to complete this action
+			public int ActionID;         // eg Fire at Target, Lay Mines, Deploy Counter-measures
+		}
+
+		public static int NextID;
+		public int Index;            // index of ComponentStore<Components> where this TacticalStation's general Component struct is stored
+		public int EntityIndex;
+		
+		// NOTE: The "GetLastAction() is simply the Action at index == 0
+
+		// Queue is First In First Out
+		public System.Collections.Generic.Queue<StationAction> Actions;
+		public float CooldownBetweenActions;  //todo: maybe this is CurrentAction.Duration where "CanAct" = (NumActions < Actions.Count - 1 && elapsed >= CurrentAction.Duration)  the minimum amount of time since the previous action before the next action can take place e.g 4.5 seconds and represents the time it takes to carry out that previous Action and to be ready to carry out the next
+		
+		
+		public int HistoryCount; 
+		public int NumActions;
+		public int MaxActions;        // based on operator's max ability to handle so many simultaneously, tacticalstation TL, tacticalStation damage, and ability to perform that many actions in the first place (eg having enough weapons to use )
+
+		public System.Collections.Generic.Queue<List<SensorContact>> ContactsHistory;
+		public List<SensorContact> Contacts;
+		public List<Target> Targets;
+
+
+		public void AddContact(SensorContact c)
+		{
+			
+		}
+
+		public void RemoveContact()
+		{
+			
+		}
+
+		public void ClearContacts()
+		{
+			
+		}
+
+		public void AddTarget(Target t)
+		{
+			
+		}
+		
+		   					
+		
+		// todo: Actions that have completed need to be removed from a list?
+		public bool CanAct(int operatorIndex)
+		{
+			Boid currentDroid = EntryClass.bSim.Boids[this.EntityIndex];
+						
+			// todo: does this station require an operator or is it being managed by AI?
+			bool result = true;
+
+			Boid operatorAndStation = EntryClass.bSim.Boids[operatorIndex];
+
+			
+			// line 6224
+			Memory<Component> cmp = (Memory<Component>) operatorAndStation.GetUserStruct(typeof(Component)); //"HelloBoids.Component"); // );
+			cmp.Span[0].Operators
+				
+			
+			
+			// line 5294
+			Memory<LivingEntity> livingEntity = (Memory<LivingEntity>) operatorAndStation.GetUserStruct(typeof(LivingEntity)); //"HelloBoids.LivingEntity"); //();
+			
+			//if (livingEntity.Span[0].)
+			//{
+			//	
+			//}
+			
+			//if (operatorAndStation.
+				
+			//  - station is not available/powered  
+			
+			// - operators are healthy/has operator/operators skill levels (or AI conroller)
+
+			
+			// maxActions not reached
+			// station is powered 
+			// station is healthy enough
+
+
+			return result;
+		}
+
+		public int GetMaxActionCount(int operatorIndex, int stationIndex)
+		{
+			int result = 0;
+
+			result = Actions.Count;
+
+			// station powered? (assuming it requires power to function)
+			// station TL
+			// station Damage (damage = CurrentHitPoints / Hitpoints
+			// operator Skill + Bonuses =
+			// opertor Health  // the max time between actions may also slow down as a result of an injured operator
+
+			return result;
+		}
+
+		public int GetOperatorAssignments(int operatorIndex)
+		{
+			int result = 0;
+
+
+			return result;
+		}
+
+		// for this specific sensor
+		public int GetMaxTargets()
+		{
+			int result = 0;
+
+			return result;
+		}
+	}
+		
+	
+		
+	
+   // Laser:Weapon:Component
+
+	// In \\KeystoneGameBlocks\\ see \\game01\\Components\\Weapon
+	public struct Weapon 
+    {
+		public int ComponentIndex; // from this we can get the EntityIndex
+		
+        // kinetic energy type weapons build parameters 
+        public float Bore;
+        public int BarrelLength;
+                
+        // stats
+        public int RoF;
+        
+        public float Range;
+        public float Accuracy;
+		public int SnapShot;
+        //public float Malfunction; // 0.0 - 1.0f coefficient for tendancy to malfunction. MaterialQuality and Craftsmanship have impact
+        
+		//	public string Shots;
+		public float Malfunction_ ; // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
+		//public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
+
+		
+		public float CoolDown_;    // RoF expressed as a cooldown value.  For instance, a RoF = 1/5 means once shot per 5 turns (eg 1 per every 5 seconds == 5 second cooldown) RoF = 1 means one shot per one second = 1 second cooldown.  
+		//			public string RoF;
+
+		public DAMAGE_TYPE DamageType;
+        public int Damage; // amount of damage it can inflict
+        public int HalfDamage;
+		
+		//public string Damage;         // this is dice of damage, but often contains a multiplier like (100) afterwards.  We don't need the multiplier since we just compute a min/max damage range or maybe we compute a single damage that then gets modified based on the target evasive maneuvers and such
+		public int AverageDamage;       
+		//			public double KEDamage;
+		//			public double HalfDamage;  // the range at which the amount of damage the weapon can do is at least halved.
+		//			public double VacuumHalfDamage;
+
+
+		//			public string Range; // string description of range (eg: "very long range")
+		public double MaxRange;
+		//			public double MaxRange2;
+		//			public double VacuumMaxRange;
+		//			public double VacuumMaxRange2;
+		
+		//			
+		//			public string Mount;
+		//			public string Direction;
+		
+        // runtime flags
+        public bool IsFiring;
+        public bool IsReloading;
+        public bool IsUnJamming; // represents fix of minor malfunction... does not require a "repair"
+        public bool IsPowered;
+        public bool IsHealthy;
+        
+        // nested weapon.  
+        //public Weapon SecondaryWeapon;
+    }
+	
+	/*
+	ref struct ComponentLaserStruct
+	{
+		public ComponentStruct[] Components;
+		public WeaponStruct[] Weapons;
+		public LaserStruct[] Lasers;
+		public Armor[] Armor;
+		//public ComponentLaserStruct[] Records;
+	}
+	*/
+	
+	
+	public struct Laser_Struct
+	{
+		public int WeaponIndex;
+		
+		// beam specific
+		public int Type;       // type is really just about what types of Damage(s) (ProductID(s)) it results in such as Paralysis, Crushing, Burning, Impaling
+		public float Duration;   // duration of the firing animation in seconds.  This probably doesn't need to be here.  It should be reflected in the Cyclic Rate and RoF cooldowns instead.
+
+		public bool EnergyDrill;
+		public bool FTL;
+		public bool Reliable;
+		public bool Compact;
+		
+		public float BeamOutput;    // kJ - kiloJoules -  what is the difference between this and kW of power... is it the convsion rate of the input power to the output power?
+		public float CyclicRate;    //   Expressed as a cooldown value.  The maximum possible firing rate of the weapon without considering overheating or ammunition capacity. Often, RoF and CyclicRate are the same, but CyclicRate is theoretical maximum given mechanics of the weapon
+		
+		public double PowerReqt;
+
+
+		// TODO: these are like "internal" items and can be used if another power source is no longer connected
+		//			public string PowerCellType;  // TOOD: Need an ENUM
+		//			public int PowerCellQuantity;
+		//			public double PowerCellWeight;
+
+		// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
+		// https://gamedev.stackexchange.com/questions/148961/how-to-design-a-damage-formula-in-an-rpg-which-keeps-weapons-with-different-atta
+
+	}
 	
 	public struct Armor
     {
@@ -6294,166 +6625,6 @@ return (0,0);
     }
 	
 	
-		
-		// NOTE: Production and Consumption belong in Entity, not in Component. 
-        //public Production[] Production;   // eg. even a painting on a wall can produce +0.2 aesthic bonus to morale or happiness to crew
-		//public Consumption[] Consumption; // eg. all components can consume damage.  
-	public struct Component  // aka: "Useable Component"
-    {
-        public int Interfaces; // 32 bit flags for the various interfaces (Build and Runtime) used by this component
-        
-		
-		public int EntityID; // Guid.NewGuid().ToString() results in a 36 character string.
-        public int[] ComponentIndices; // all the different component indices used by this Component. For example, a Laser Component would use both WeaponIndex and LaserIndex
-		public string[] ComponentTypenames;
-		
-			
-		public int TL;
-
-		public float Quality_;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
-		//public string Quality; // todo: this needs to be a coefficient of 0.0 to 1.0
-				
-        public float MaterialQuality; // TODO: i think Quality_ above should be deleted and MaterialQuality kept... along with Craftsmenship which involves how it's put together
-        public float Craftsmanship;
-        public bool Ruggedized;
-		public bool Repairable; 
-		
-		public int NumOperatorsRequired; // number of Human (as opposed to software/AI) Operators Required (if 0 then RequiresOperator {get { return NumOperatorsRequired > 0;}}
-			      
-		// 'Defense' is Armor (Armor Faces with Armor Layers and DR and PD)
-		// TODO: i think these simply need to be part of the Component 
-		// https://www.google.com/search?q=memory%3CT%3E+and+span%3CT%3E+from+a+struct+with+nested+structs&rlz=1C1GCPF_enUS1162US1162&oq=memory%3CT%3E+and+span%3CT%3E+from+a+struct+with+nested+structs&gs_lcrp=EgZjaHJvbWUyBggAEEUYOdIBCTExMDEzajBqMagCALACAA&sourceid=chrome&ie=UTF-8
-        public ExternalArmor Defense; 
-        public InternalStructure Internals; 	
-		
-        // stats
-        public int Hitpoints;
-        public int CurrentHP; // HitPoints - Damage == CurrentHP;
-        
-        public float Cost;
-        public float Weight;
-        public float Volume;
-        public float SurfaceArea;
-
-        // runtime
-		public string[] OperatorIDs;
-        public bool InUse;
-		public float StartTime;
-		public float Duration;
-		public bool Looping; // Repeating
-		public float CooldownDuration; 
-		
-		
-        public delegate void OnCreate();  // or OnAddedToScene()
-        public delegate void OnDestroy(); // or OnRemovedFromScene()
-		public delegate void OnUseStarted();
-		public delegate void OnUseEnded();
-
-		public void Use(string entityID)
-		{
- 		}
-	}
-	
-   // Laser:Weapon:Component
-	
-	
-	// In \\KeystoneGameBlocks\\ see \\game01\\Components\\Weapon
-	public struct Weapon 
-    {
-		public int ComponentIndex; // from this we can get the EntityIndex
-		
-        // kinetic energy type weapons build parameters 
-        public float Bore;
-        public int BarrelLength;
-                
-        // stats
-        public int RoF;
-        
-        public float Range;
-        public float Accuracy;
-		public int SnapShot;
-        //public float Malfunction; // 0.0 - 1.0f coefficient for tendancy to malfunction. MaterialQuality and Craftsmanship have impact
-        
-		//	public string Shots;
-		public float Malfunction_ ; // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
-		//public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
-
-		
-		public float CoolDown_;    // RoF expressed as a cooldown value.  For instance, a RoF = 1/5 means once shot per 5 turns (eg 1 per every 5 seconds == 5 second cooldown) RoF = 1 means one shot per one second = 1 second cooldown.  
-		//			public string RoF;
-
-		public DAMAGE_TYPE DamageType;
-        public int Damage; // amount of damage it can inflict
-        public int HalfDamage;
-		
-		//public string Damage;         // this is dice of damage, but often contains a multiplier like (100) afterwards.  We don't need the multiplier since we just compute a min/max damage range or maybe we compute a single damage that then gets modified based on the target evasive maneuvers and such
-		public int AverageDamage;       
-		//			public double KEDamage;
-		//			public double HalfDamage;  // the range at which the amount of damage the weapon can do is at least halved.
-		//			public double VacuumHalfDamage;
-
-
-		//			public string Range; // string description of range (eg: "very long range")
-		public double MaxRange;
-		//			public double MaxRange2;
-		//			public double VacuumMaxRange;
-		//			public double VacuumMaxRange2;
-		
-		//			
-		//			public string Mount;
-		//			public string Direction;
-		
-        // runtime flags
-        public bool IsFiring;
-        public bool IsReloading;
-        public bool IsUnJamming; // represents fix of minor malfunction... does not require a "repair"
-        public bool IsPowered;
-        public bool IsHealthy;
-        
-        // nested weapon.  
-        //public Weapon SecondaryWeapon;
-    }
-	
-	/*
-	ref struct ComponentLaserStruct
-	{
-		public ComponentStruct[] Components;
-		public WeaponStruct[] Weapons;
-		public LaserStruct[] Lasers;
-		public Armor[] Armor;
-		//public ComponentLaserStruct[] Records;
-	}
-	*/
-	
-	
-	public struct Laser_Struct
-	{
-		public int WeaponIndex;
-		
-		// beam specific
-		public int Type;       // type is really just about what types of Damage(s) (ProductID(s)) it results in such as Paralysis, Crushing, Burning, Impaling
-		public float Duration;   // duration of the firing animation in seconds.  This probably doesn't need to be here.  It should be reflected in the Cyclic Rate and RoF cooldowns instead.
-
-		public bool EnergyDrill;
-		public bool FTL;
-		public bool Reliable;
-		public bool Compact;
-		
-		public float BeamOutput;    // kJ - kiloJoules -  what is the difference between this and kW of power... is it the convsion rate of the input power to the output power?
-		public float CyclicRate;    //   Expressed as a cooldown value.  The maximum possible firing rate of the weapon without considering overheating or ammunition capacity. Often, RoF and CyclicRate are the same, but CyclicRate is theoretical maximum given mechanics of the weapon
-		
-		public double PowerReqt;
-
-
-		// TODO: these are like "internal" items and can be used if another power source is no longer connected
-		//			public string PowerCellType;  // TOOD: Need an ENUM
-		//			public int PowerCellQuantity;
-		//			public double PowerCellWeight;
-
-		// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
-		// https://gamedev.stackexchange.com/questions/148961/how-to-design-a-damage-formula-in-an-rpg-which-keeps-weapons-with-different-atta
-
-	}
 	#endregion // Game01.GameObjects
 
     #region IBuilder implementation

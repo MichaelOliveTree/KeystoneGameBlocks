@@ -174,6 +174,7 @@ namespace HelloBoids
         // the more cpu cycles needed. Tweak these values
         // to find a good balance between performance and
         // simulation/behavior quality
+		public static double MAX_SEARCH_DISTANCE = 35d;
 		public static double SEPERATION_DISTANCE = 50.0d;
 		public static double ALIGNMENT_DISTANCE = 25.5d;
 		public static double COHESION_DISTANCE = 25.5d;
@@ -682,8 +683,7 @@ namespace HelloBoids
 						SKILLS s = records[i].SkillType;
 						//e.Skills[s].AddExternalModifier(records[i].Amount);
 						
-						
-						
+												
 						// e.Skills[(int)m.SkillToTarget].Bonuses += m.Bonus;
 						
 					 	// so lets say we have a TargetingSkillModifier every frame so long as an Operator
@@ -692,7 +692,7 @@ namespace HelloBoids
 						// "UN-USED" does the bonuses get cleared.  
 						
 						// This would entail adding the PRODUCTION but NOT Registering() it.
-						// 
+						
 						
 						
 					}
@@ -1598,7 +1598,7 @@ namespace HelloBoids
 		{
 			//Console.WriteLine("Do_Droid_Logic() - BEGIN ");
 			ThreadedRandom random = new ThreadedRandom(seed);
-			const double MAX_SEARCH_DISTANCE = 35d;
+			
 	
 			// todo: we could pass in an array of store to our Processor functions... rather than just one.
 			//       but it would have to be an array of object[] like parameters and we'd have to cast them
@@ -1835,7 +1835,10 @@ namespace HelloBoids
 			// and if that goes well, Stars and see about how it works with LoadTVResource() and restoring DB via a LoadCustomData()
         			
 
-			ComponentStore<LivingEntity> testLEComp = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
+			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
+			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
+			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
+						
 			// MicroExpressionEvaluator is a neat little library!  Very fast and Very compact and easy to use with web compilers like DotNetFiddle since its just one
 			// completely self contained class with no depenedancies that i can just paste into this single .cs script!
 			// https://github.com/webermania/MicroExpressionEvaluator
@@ -1861,29 +1864,32 @@ namespace HelloBoids
 				
 				// these will be stored in UserData's local "object[]" and thus boxed
 				// TODO: the BlackBoardData is not threadsafe
-				StationState stationState  = (StationState)currentBoid.BlackBoardData.GetObject("tactical_state");
+				Memory<LivingEntity> stationOperator = (Memory<LivingEntity>) currentBoid.GetUserStruct(typeof(LivingEntity));
+				Memory<TacticalStation> tacticalStation = (Memory<TacticalStation>) currentBoid.GetUserStruct(typeof(TacticalStation));
+				//TacticalStation stationState  = (TacticalStation)currentBoid.BlackBoardData.GetObject("tactical_state");
 				int operatorIndex = currentBoid.Index; // we pass Index and NOT SpanIndex because we want to find the Boid in the EntryClass.bSim.Boids[] List
 				int stationIndex = currentBoid.Index;  // for now, our Boid hosts both the TacticalStation and the Operator
 				
+				// TODO: this is just referencing the ONE tacticalStation memory<T> not allTacticalStations so we use [0] not [i]
+				if (!tacticalStation.Span[0].CanAct(operatorIndex)) return;	
 				
-				if (!stationState.CanAct(operatorIndex)) return;	
-                
 				Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component));
 				Memory<Weapon> wep = (Memory<Weapon>) currentBoid.GetUserStruct(typeof(Weapon));
 				Memory<Laser_Struct> laser = (Memory<Laser_Struct>)currentBoid.GetUserStruct(typeof(Laser_Struct)); //  Laser_Struct laser = (Laser_Struct)currentBoid.mMemStore_Laser.Span[0];
+				
 				
 				// NOTE: The EXE will render Sensor Contact info as necessary.
 				//       The client EXE will have access to those types and the UI elements using them and can update
 				//       those relevant UI elements as necessary
 				
 				
-                
                 //  - are we in a state of COMBAT?
 				//		- direct orders?
 				//      - any Contacts in list marked as FOF.Foe + FOF.Hostile as opposed to just FOF.Foe (note: stale contacts are still treated as available in case of need to persue)
 				//      	- FOF.Withdrawing may be ignored for example if ROE says we don't persue in this circumstance including disabled ships and unarmed ships like freighters
 				
-				logicalExpression = wep.Span[0].AverageDamage.ToString() + " < " + testLEComp.Span[currentBoid.SpanIndexLE].Hitpoints.ToString();
+				// TODO: this is just referencing the ONE stationOperator memory<T> not allLivingEntities so we use [0] not [i]
+				logicalExpression = wep.Span[0].AverageDamage.ToString() + " < " + stationOperator.Span[0].Hitpoints.ToString();
 				bool result = MicroEx.Evaluate(logicalExpression);
 				//Console.WriteLine ("Do_Droid_Logic() - MicroEx.Evaluate() - '" + logicalExpression + "' " + result.ToString());
 					
@@ -2541,13 +2547,18 @@ namespace HelloBoids
 			b.TacticalStationSkills.Add(v.SkillType, v);
 			////////////////////////
 			
+	
 			// todo: generate Droids with some variance for age, size, and speed
-			ComponentStore<LivingEntity> testLEComp = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
-			testLEComp.Span[b.SpanIndexLE].Age = 1;
-			testLEComp.Span[b.SpanIndexLE].Hitpoints = 20;
+			//ComponentStore<LivingEntity> testLEComp = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
+			//testLEComp.Span[b.SpanIndexLE].Age = 1;
+			//testLEComp.Span[b.SpanIndexLE].Hitpoints = 20;
+			Memory<LivingEntity> livingEntity = (Memory<LivingEntity>)b.GetUserStruct(typeof(LivingEntity)); // "HelloBoids.LivingEntity");
+			livingEntity.Span[0].Age = 1;
+			livingEntity.Span[0].Hitpoints = 20;
 	
 			// todo: create a "cooldown" interval that is based on the droid's size
 							
+	
 			// TODO: Add to Spawn()
 			//
 			// OnEntityAttached(EntityNode e)
@@ -2588,27 +2599,28 @@ namespace HelloBoids
 			
 	
 			// add the required StationState for our tactical station's state to the droid.BlackBoardData which is required by Do_Droid_Logic()
-			StationState stationState;
-			stationState.Index = b.Index; // we use Index and not SpanIndex because we want to use it to find the Boid element in the EntryClass.bSim.Boids[index] List
+			Memory<TacticalStation> tacticalStation = (Memory<TacticalStation>)b.GetUserStruct(typeof(TacticalStation)); // "HelloBoids.TacticalStation");	
+			tacticalStation.Span[0].Index = b.Index; // we use Index and not SpanIndex because we want to use it to find the Boid element in the EntryClass.bSim.Boids[index] List
 						
-			stationState.HistoryCount = 1;
-			stationState.CooldownBetweenActions = 3.0f;
+			tacticalStation.Span[0].HistoryCount = 1;
+			tacticalStation.Span[0].CooldownBetweenActions = 3.0f;
 	
-			stationState.MaxActions = 2;
-			stationState.NumActions = 0;
-			stationState.Actions = null;
-			stationState.Contacts = null;
-			stationState.ContactsHistory = null;
-			stationState.Targets = null;
-			
-			b.BlackBoardData.SetObject("tactical_state", stationState);
+			tacticalStation.Span[0].MaxActions = 2;
+			tacticalStation.Span[0].NumActions = 0;
+			tacticalStation.Span[0].Actions = null;
+			tacticalStation.Span[0].Contacts = null;
+			tacticalStation.Span[0].ContactsHistory = null;
+			tacticalStation.Span[0].Targets = null;
+
 	
+			//b.BlackBoardData.SetObject("tactical_state", stationState);
 	
 			// NOTE: the following calls to GetUserStruct() returns the typically ONE record (but more potentially for ArmorLayers)
 			//       that is stored within the EntityNode's.  Unlike calls to EntryClass.mColStore.CheckOut(Component);
-			Memory<Component> component = (Memory<Component>)b.GetUserStruct("HelloBoids.Component");
-			Memory<Weapon> weapon = (Memory<Weapon>)b.GetUserStruct("HelloBoids.Weapon");
-			Memory<Laser_Struct> laser = (Memory<Laser_Struct>)b.GetUserStruct("HelloBoids.Laser_Struct");
+			Memory<Component> component = (Memory<Component>)b.GetUserStruct(typeof(Component)); //"HelloBoids.Component");
+			Memory<Weapon> weapon = (Memory<Weapon>)b.GetUserStruct(typeof(Weapon)); //"HelloBoids.Weapon");
+			Memory<Laser_Struct> laser = (Memory<Laser_Struct>)b.GetUserStruct(typeof(Laser_Struct)); //"HelloBoids.Laser_Struct");
+			
 	
 			//Memory<Component> test = (Memory<Component>)b.GetUserStruct(typeof(Component));
 			//Console.WriteLine (test.Equals(component).ToString());
@@ -2688,9 +2700,6 @@ namespace HelloBoids
 		private void Destroy(EntityNode entity)
 		{
 					
-#if MEMORY_T
-        	Console.WriteLine("Destroy() == Started on index " + entity.SpanIndexLE.ToString());
-#endif
 			int lastIndex = this.Boids.Count - 1;
 	
 			// TODO:
@@ -3341,11 +3350,17 @@ namespace HelloBoids
 		
 	#if	USE_MEMORY_T
 		// TODO: these Memory<T> should be stored in base.UserStructs
+		public Memory<LivingEntity> mMemStore_LivingEntity;
+		public Memory<TacticalStation> mMemStore_TacticalStation;
+		
+		
 		public Memory<Component> mMemStore_Component; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
 		public Memory<Weapon> mMemStore_Weapon; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
 		public Memory<Laser_Struct> mMemStore_Laser; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
 		public Memory<ArmorLayer> mMemStore_ArmorLayers; 
 		
+		public int SpanIndexTacticalStation = -1;
+		public int SpanIndexLivingEntity = -1;
 		public int SpanIndexComponent = -1;
 		public int SpanIndexWeapon = -1;
 		public int SpanIndexLaser = -1;
@@ -3397,32 +3412,50 @@ namespace HelloBoids
 			//     string name = object.Span[i].PropertyName 
 			// }
 			
+		
+		    // todo do we need destuuctor for Repository.CheckIn mMemstore?
+		    
 	
 			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
-			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+			ComponentStore<LivingEntity> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
             int checkOutIndex = -1;
 			// NOTE: this second call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
+            mMemStore_LivingEntity = storeLivingEntity.CheckOut(out checkOutIndex);
+            SpanIndexLivingEntity = checkOutIndex;
+			this.AddUserStruct(mMemStore_LivingEntity);
+		
+			
+			ComponentStore<TacticalStation> storeTacticalStation = EntryClass.mCStoreCol.CheckOut<TacticalStation>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+            checkOutIndex = -1;
+			// NOTE: this second call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
+            mMemStore_TacticalStation = storeTacticalStation.CheckOut(out checkOutIndex);
+            SpanIndexTacticalStation = checkOutIndex;
+			this.AddUserStruct(mMemStore_TacticalStation);
+		
+		
+			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
+			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+            checkOutIndex = -1;
+			// NOTE: this second call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
             mMemStore_Component = storeComp.CheckOut(out checkOutIndex);
-			this.AddUserStruct(mMemStore_Component);
             SpanIndexComponent = checkOutIndex;
-			mMemStore_Component.Span[0].Cost = 1234;
+			this.AddUserStruct(mMemStore_Component);
 				
 			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
 			ComponentStore<Weapon> storeWeapon = EntryClass.mCStoreCol.CheckOut<Weapon>(EntryClass.NUM_ENTRIES);
             checkOutIndex = -1;
 			// NOTE: this call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
             mMemStore_Weapon = storeWeapon.CheckOut(out checkOutIndex);
-			this.AddUserStruct(mMemStore_Weapon);
             SpanIndexWeapon = checkOutIndex;
-				
+			this.AddUserStruct(mMemStore_Weapon);		
+		
 			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
 			ComponentStore<Laser_Struct> storeLasers = EntryClass.mCStoreCol.CheckOut<Laser_Struct>(EntryClass.NUM_ENTRIES); 
             checkOutIndex = -1;
 			// NOTE: this call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
             mMemStore_Laser = storeLasers.CheckOut(out checkOutIndex);
-			this.AddUserStruct(mMemStore_Laser);
             SpanIndexLaser = checkOutIndex;
-            			
+            this.AddUserStruct(mMemStore_Laser);
 			
 			// TODO: this may require an array of checkOutIndices based on how many layers as determined from 
 			//       component.ArmorLayersCount
@@ -3430,6 +3463,8 @@ namespace HelloBoids
             checkOutIndex = -1;
             mMemStore_ArmorLayers = storeArmorLayers.CheckOut(out checkOutIndex);
             // SpanIndexArmorLayers = checkOutIndex;
+			this.AddUserStruct(mMemStore_ArmorLayers);
+		
 			
 			PropertyBag bag = new PropertyBag();
 			bag.SetValue += OnSetLaserStructValue;
@@ -4013,6 +4048,38 @@ return (0,0);
             return neighbors;
         }
 #endif
+		#region IDisposable
+		public override void DisposeManagedResources()
+        {
+           if (!mIsDisposed)
+           {
+			   base.Dispose();
+			   
+			   
+			    ComponentStore<LivingEntity> storeLE = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
+			    storeLE.CheckIn(mMemStore_LivingEntity);
+			   
+			    ComponentStore<TacticalStation> storeTactical = EntryClass.mCStoreCol.CheckOut<TacticalStation>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
+			    storeTactical.CheckIn(mMemStore_TacticalStation);
+			   
+				ComponentStore<Component> storeComponent = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
+			    storeComponent.CheckIn(mMemStore_Component);
+				
+			    ComponentStore<Weapon> storeWeapon = EntryClass.mCStoreCol.CheckOut<Weapon>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
+			    storeWeapon.CheckIn(mMemStore_Weapon);
+				
+				ComponentStore<Laser_Struct> storeLaser = EntryClass.mCStoreCol.CheckOut<Laser_Struct>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
+			    storeLaser.CheckIn(mMemStore_Laser);
+				
+			    ComponentStore<ArmorLayer> storeArmorLayer = EntryClass.mCStoreCol.CheckOut<ArmorLayer>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
+			    storeArmorLayer.CheckIn(mMemStore_ArmorLayers);
+				
+				
+				//Console.WriteLine ("Transform.cs.DisposeManagedResources() - Checked In Living_Entity struct");
+			    mIsDisposed = true;
+		   }   
+        }
+	#endregion
     }
 
     // to set flags use  Parent.ChangeState = ChangeStates.Moved | ChangeStates.Rotated | ChangeStates.Scaled
@@ -4153,7 +4220,7 @@ return (0,0);
         public int Index { get { return mIndex; } set {mIndex = value;}}
 		
 		
-	#region
+	#region IDisposable
 		public override void DisposeManagedResources()
         {
            if (!mIsDisposed)
@@ -4226,10 +4293,8 @@ return (0,0);
 
 #if USE_MEMORY_T
         public Memory<Transform_Struct> mMemStore_Transform; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
-		public Memory<LivingEntity> mMemStore_LivingEntity; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
-
+		
         public int SpanIndex = -1;
-		public int SpanIndexLE = -1;
 				
 				
         //[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
@@ -4269,13 +4334,6 @@ return (0,0);
             SpanIndex = index;
             //initialize the memory store
 
-            // todo do we need destuuctor for Repository.CheckIn mMemstore?
-
-			ComponentStore<LivingEntity> storeLE = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
-            index = -1;
-            mMemStore_LivingEntity = storeLE.CheckOut(out index);
-            SpanIndexLE = index;
-            //initialize the memory store
 #else
             mMatrix = Matrix.Identity();
             mScale.x = 1;
@@ -5223,17 +5281,11 @@ return (0,0);
            if (!mIsDisposed)
            {
                 ComponentStore<Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
-			store.CheckIn(mMemStore_Transform);
-            //SpanIndex ;
-            //Console.WriteLine ("Transform.cs.DisposeManagedResources() - Checked In Transform_Struct");
-			
-			ComponentStore<LivingEntity> storeLE = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
-            storeLE.CheckIn(mMemStore_LivingEntity);
-            //SpanIndexLE ;
-			//Console.WriteLine ("Transform.cs.DisposeManagedResources() - Checked In Living_Entity struct");
-			
-			        mIsDisposed = true;
-			      }
+				store.CheckIn(mMemStore_Transform);
+            	//SpanIndex ;
+            	//Console.WriteLine ("Transform.cs.DisposeManagedResources() - Checked In Transform_Struct");
+			    mIsDisposed = true;
+		   }
         }
 #endif
 
@@ -5293,6 +5345,7 @@ return (0,0);
 	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
 	public struct LivingEntity
 	{
+		// These will serve as Station Operators for now
 		public long CreationDateTime;
 		public long Age;            // technically, this probably doesnt need to be stored... we only need the CreationDate?  // assign using Utils.GetAge() and find Age via 'age = Utils.GetAge(entity.CreationDate);'
 		public double MaxAge;
@@ -5680,7 +5733,8 @@ return (0,0);
 		}
 	}
 
-	public struct StationState
+	
+	public struct TacticalStation
 	{
 		public struct StationAction
 		{
@@ -5691,7 +5745,8 @@ return (0,0);
 
 		public static int NextID;
 		public int Index;            // index of ComponentStore<Components> where this TacticalStation's general Component struct is stored
-
+		public int EntityIndex;
+		
 		// NOTE: The "GetLastAction() is simply the Action at index == 0
 
 		// Queue is First In First Out
@@ -5737,12 +5792,13 @@ return (0,0);
 			bool result = true;
 
 			Boid operatorAndStation = EntryClass.bSim.Boids[operatorIndex];
+
 			
 			// line 6224
-			Memory<Component> cmp = (Memory<Component>) operatorAndStation.GetUserStruct(typeof(Component));
+			Memory<Component> cmp = (Memory<Component>) operatorAndStation.GetUserStruct(typeof(Component)); //"HelloBoids.Component"); // );
 			
 			// line 5294
-			Memory<LivingEntity> livingEntity = (Memory<LivingEntity>) operatorAndStation.GetUserStruct(typeof(LivingEntity));
+			Memory<LivingEntity> livingEntity = (Memory<LivingEntity>) operatorAndStation.GetUserStruct(typeof(LivingEntity)); //"HelloBoids.LivingEntity"); //();
 			
 			//if (livingEntity.Span[0].)
 			//{

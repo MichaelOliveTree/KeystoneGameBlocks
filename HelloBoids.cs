@@ -1833,10 +1833,13 @@ namespace HelloBoids
 			// locally, we dont really need to use entityID as part of a record key either, locally we can use just an Index
 			// and perhaps a lookup value... but i think in short term, we should continue to focus on just Viewpoint and Chase cam
 			// and if that goes well, Stars and see about how it works with LoadTVResource() and restoring DB via a LoadCustomData()
-        			
+        	//Console.WriteLine("DoDeviceReadyStatus()");
 			DoDeviceReadyStatus();
 			
+			//Console.WriteLine("DoStationCanActStatus()");
 			DoStationCanActStatus();
+			//Console.WriteLine("continuing Do_Droid_Logic()");
+			
 			
 			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
@@ -1865,18 +1868,16 @@ namespace HelloBoids
 					Console.WriteLine("Do_Droid_Logic() -  key '" + currentBoid.SpanIndex.ToString() + "' does not exist. " + ex.Message);
 				}
 				
-				// these will be stored in UserData's local "object[]" and thus boxed
-				// TODO: the BlackBoardData is not threadsafe
+
 				Memory<LivingEntity> stationOperator = (Memory<LivingEntity>) currentBoid.GetUserStruct(typeof(LivingEntity));
 				Memory<TacticalStation> tacticalStation = (Memory<TacticalStation>) currentBoid.GetUserStruct(typeof(TacticalStation));
-				//TacticalStation stationState  = (TacticalStation)currentBoid.BlackBoardData.GetObject("tactical_state");
-				
-				
+			
 				int operatorIndex = currentBoid.Index; // we pass Index and NOT SpanIndex because we want to find the Boid in the EntryClass.bSim.Boids[] List
 				int stationIndex = currentBoid.Index;  // for now, our Boid hosts both the TacticalStation and the Operator
 				
 				// TODO: this is just referencing the ONE tacticalStation memory<T> not allTacticalStations so we use [0] not [i]
-				if (!tacticalStation.Span[0].CanAct(operatorIndex)) return;	
+				string errorReason;
+				if (!tacticalStation.Span[0].CanAct(out errorReason)) return;	
 				
 				Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component));
 				Memory<Weapon> wep = (Memory<Weapon>) currentBoid.GetUserStruct(typeof(Weapon));
@@ -1933,7 +1934,7 @@ namespace HelloBoids
 						Boid currentTarget = targets[0];
 						double distanceToTargetSquared = distances[0];
 						
-						if (CanHit(currentTarget))
+						if (tacticalStation.Span[0].CanHit(currentTarget))
 						{
 							currentBoid.ShotsFired++;
 							
@@ -2019,50 +2020,30 @@ namespace HelloBoids
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 			
-			
 			// struct for component properties and stats
 			//Component component = ((ComponentStore<Component>)EntryClass.mCStoreCol.CheckOut<Component>(0)).Span[componentIndex];		
 			//Weapon weapon = ((ComponentStore<Weapon>)EntryClass.mCStoreCol.CheckOut<Weapon>(0)).Span[weaponIndex];
 			//Laser_Struct laser = ((ComponentStore<Laser_Struct>)EntryClass.mCStoreCol.CheckOut<Laser_Struct>(0)).Span[laserIndex];
 				
-			
-			// Game Idea = March 17.2026
-			// What if a Superman type character or a Jesus like figure arrives on a scifi world
-			// and is treated very poorly.  This character is harmed in all sorts of ways over the course
-			// of say 70 years, but was always trying to spread the good news.  
-			// Eventually, this character is very frail with lots of old injuries, and then one day this character
-			// reveals himself to be immortal and perhaps the Son of God and is instantly transformed into His youthful
-			// self.  What do the antagonists of this world do?  What does the protagonist do?
-			//  For a video game, this might be up to the player... it reminds me of Dogville too somewhat... Grace falls
-			// at the end of Dogville.... but what would any particular player do?  I think they should be incentivised throughout
-			// the game to really consider their actions at that point.  It should not be an easy answer... or should it?
-			// This represents the type of thing you can do with interactive simulations that cannot be done in other mediums.
-			
+			// TODO: Do these .Is****  functions need to be setting mRuntimeFlags?
 			int count = (int)allTacticalStations.Size;
             System.Threading.Tasks.Parallel.For(0, count, i => 		
 			{
-				// if (allComponents.Span[i].IsPowered())
-				//	 allComponents.Span[i].SetRuntimeFlag();
+				Boid droid = EntryClass.bSim.Boids[allComponents.Span[(int)i].EntityID];
 				
-				
-				// is allComponents.healthy enough
-				
-				
-				// allComponents.hasOperator if required
-				
-				
-				// operator is healthy
-				
-				
-				// operator has necessary skills
-				
-				
-				// 
-				
-				
-			});
-			
-			
+				string errorReason;
+				if (allComponents.Span[(int)i].IsOperatorStatusCheckOK(out errorReason))
+				{
+					Memory<LivingEntity> livingEntity = (Memory<LivingEntity>) droid.GetUserStruct(typeof(LivingEntity)); //"HelloBoids.LivingEntity"); //();
+
+					if (allComponents.Span[(int)i].IsPowered(out errorReason))
+					{
+						if (allComponents.Span[(int)i].IsHealthyEnough(out errorReason))
+						{
+						}
+					}
+				}
+			});			
 		}
 		
 		private void DoStationCanActStatus()
@@ -2079,162 +2060,16 @@ namespace HelloBoids
 			int count = (int)allTacticalStations.Size;
             System.Threading.Tasks.Parallel.For(0, count, i => 		
 			{
-				// if (allComponents.Span[i].IsPowered())
-				//	 allComponents.Span[i].SetRuntimeFlag();
+				string errorReason;
+				if (allTacticalStations.Span[i].CanAct(out errorReason))
+				{
+					// TODO: Do these .Is****  functions need to be setting mRuntimeFlags?
 				
-				// has not reach max number of current actions
-				
-				// the cooldown since last action has expired
-				
-				// the runtime flag for CanAct is set.
-				
-				
+				}
 			});
 			
 		}
 		
-		
-		private double[] GenerateWeaponFitnessScores(EntityNode ship, EntityNode target)
-		{
-			// the different structs used for a "Laser" component 
-			Memory<Component> component = (Memory<Component>)ship.GetUserStruct("HelloBoids.Component");
-			Memory<Weapon> wep = (Memory<Weapon>)ship.GetUserStruct("HelloBoids.Weapon");
-			Memory<Laser_Struct> laser = (Memory<Laser_Struct>)ship.GetUserStruct("HelloBoids.Laser_Struct");
-			
-			// todo: we need just all the weapons from this particular ship.  
-			// ComponetStore<Weapon> would contain ALL for ALL ships
-			ComponentStore<Weapon> allWeapons = (ComponentStore<Weapon>)EntryClass.mCStoreCol.CheckOut<Weapon>(0);
-			
-			// return just the ones for this ship... maybe add a new function and not just GetView()
-			Memory<Weapon> allWeaponsForThisShip = null; // allWeapons.GetView(ship.SpanIndex); 
-
-			
-			uint numRules = 3;
-			uint numWeapons = (uint)allWeaponsForThisShip.Span.Length;
-			double[] scores =  new double[numWeapons];
-			double[] weights = new double[numRules];
-				
-			weights[0] = 2;
-			weights[1] = 5;
-			weights[2] = 0;
-			
-			for (int i = 0; i < numWeapons; i++)
-			{
-				// todo:  is the weapon available? does it need to aim at target? has it been doing so already? time for turret to rotate towards target
-
-				if (allWeaponsForThisShip.Span[0].CoolDown_ == 0)  // if coolDown != 0 then the fitness score should just be 0?
-				{
-					scores[i] = 0;
-				}
-				else
-				{
-					scores[i] = (allWeaponsForThisShip.Span[0].Damage * weights[0]) * (laser.Span[0].PowerReqt * weights[1]);
-				}
-			}
-			
-			return scores;
-		}
-		
-		// NOTE: This only applies for FTL weapons... "CanHit()" must be different for Missiles, Kinetic Energy Weapons and Particle Weapons that are slower than light
-		private bool CanHit(EntityNode target)
-		{
-			bool result = false;
-			
-			
-			// todo: for tactical station, the logic for determining hit+damage should rely on the crew station.css script and not the operator.  Instead, we just grab bonuses or minuses from the operator crew member.
-			//  - time to get a lock
-			//  - bonus for time 
-			//  - bonus for damage
-			//  and remember, it's the tactical station that keeps track of all the weapons available and the targets (including friendlies)
-			
-
-					
-			// stealth
-			
-			// target last acquisition - previous aquisition makes it easier to re-aquire
-			
-			// sensorLockOfTargetTimeElapsed (aka durationOfSensorAquistion) // how much time has this  target been tracked by sensors already
-			
-			// operator skill
-			
-			
-			// operator Health
-			
-			
-			// target distance			
-
-			
-			// target evasive
-			
-			
-			// target deployed counter measures within X time (time * fallOff aka call it 'attenuation')
-					
-			
-			result = true;
-			return result;
-		}
-		
-		/// <summary>
-		/// The resulting damage types and amounts (and duration for damage that can be applied overtime)
-		/// that occur on this successful hit.
-		/// </summary>
-        private object[] CalculateDamage(EntityNode droid, Memory<Weapon> weaponStruct, EntityNode target)
-        {
-			//Console.WriteLine("CalculateDamage() - Created DamageSystem.Damage.");
-			
-			object[] result = new object[2];
-			
-			/*
-			Production laserDamage;
-			laserDamage.Amount = 5;
-			laserDamage.DistributionList = null;
-			laserDamage.EntityID = droid.Index;
-			laserDamage.Location = Vector3d.Zero();
-			laserDamage.ProductID = (uint)PRODUCTS.MicrowaveDamage;
-			laserDamage.SearchPrimitive = null;
-			laserDamage.Value = 1;
-			
-			result[0] = laserDamage;
-			*/
-			
-			DamageSystem.Damage d;
-			d.Amount = 5;  // weaponStruct.BeamOutput;
-			d.EntityIndex = droid.Index;
-			result[0] = d;
-			
-			
-			
-			
-			DamageOverTimeSystem.DamageOverTime dot;
-			dot.Amount = 1;  // weaponStruct.BeamOutput;
-			dot.EntityIndex = droid.Index;
-			dot.Duration = 0.05f;
-			result[1] = dot;
-			
-			
-			// target Armor
-			
-			
-
-			
-			// target distance
-			
-			
-			
-			// weapon %power of maxpower being used vs weapon output
-
-			
-			// weapon Hitpoints
-			
-			
-			
-			
-			//see Keystone.Game01.Messages.   public class AttackResults since
-			// we need results going over the network
-			return result;
-        }
-
-			
 			
         private void DoLifeCycle(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
         {
@@ -2551,6 +2386,115 @@ namespace HelloBoids
 			//Console.WriteLine("FindNearestTarget found count == " + found.Count.ToString());
 			return found;		
 		}
+		
+		
+	
+	
+	
+	
+	
+		private double[] GenerateWeaponFitnessScores(EntityNode ship, EntityNode target)
+		{
+			// the different structs used for a "Laser" component 
+			Memory<Component> component = (Memory<Component>)ship.GetUserStruct("HelloBoids.Component");
+			Memory<Weapon> wep = (Memory<Weapon>)ship.GetUserStruct("HelloBoids.Weapon");
+			Memory<Laser_Struct> laser = (Memory<Laser_Struct>)ship.GetUserStruct("HelloBoids.Laser_Struct");
+			
+			// todo: we need just all the weapons from this particular ship.  
+			// ComponetStore<Weapon> would contain ALL for ALL ships
+			ComponentStore<Weapon> allWeapons = (ComponentStore<Weapon>)EntryClass.mCStoreCol.CheckOut<Weapon>(0);
+			
+			// return just the ones for this ship... maybe add a new function and not just GetView()
+			Memory<Weapon> allWeaponsForThisShip = null; // allWeapons.GetView(ship.SpanIndex); 
+
+			
+			uint numRules = 3;
+			uint numWeapons = (uint)allWeaponsForThisShip.Span.Length;
+			double[] scores =  new double[numWeapons];
+			double[] weights = new double[numRules];
+				
+			weights[0] = 2;
+			weights[1] = 5;
+			weights[2] = 0;
+			
+			for (int i = 0; i < numWeapons; i++)
+			{
+				// todo:  is the weapon available? does it need to aim at target? has it been doing so already? time for turret to rotate towards target
+
+				if (allWeaponsForThisShip.Span[0].CoolDown_ == 0)  // if coolDown != 0 then the fitness score should just be 0?
+				{
+					scores[i] = 0;
+				}
+				else
+				{
+					scores[i] = (allWeaponsForThisShip.Span[0].Damage * weights[0]) * (laser.Span[0].PowerReqt * weights[1]);
+				}
+			}
+			
+			return scores;
+		}
+		
+		
+		/// <summary>
+		/// The resulting damage types and amounts (and duration for damage that can be applied overtime)
+		/// that occur on this successful hit.
+		/// </summary>
+        private object[] CalculateDamage(EntityNode droid, Memory<Weapon> weaponStruct, EntityNode target)
+        {
+			//Console.WriteLine("CalculateDamage() - Created DamageSystem.Damage.");
+			
+			object[] result = new object[2];
+			
+			/*
+			Production laserDamage;
+			laserDamage.Amount = 5;
+			laserDamage.DistributionList = null;
+			laserDamage.EntityID = droid.Index;
+			laserDamage.Location = Vector3d.Zero();
+			laserDamage.ProductID = (uint)PRODUCTS.MicrowaveDamage;
+			laserDamage.SearchPrimitive = null;
+			laserDamage.Value = 1;
+			
+			result[0] = laserDamage;
+			*/
+			
+			DamageSystem.Damage d;
+			d.Amount = 5;  // weaponStruct.BeamOutput;
+			d.EntityIndex = droid.Index;
+			result[0] = d;
+			
+			
+			
+			
+			DamageOverTimeSystem.DamageOverTime dot;
+			dot.Amount = 1;  // weaponStruct.BeamOutput;
+			dot.EntityIndex = droid.Index;
+			dot.Duration = 0.05f;
+			result[1] = dot;
+			
+			
+			// target Armor
+			
+			
+
+			
+			// target distance
+			
+			
+			
+			// weapon %power of maxpower being used vs weapon output
+
+			
+			// weapon Hitpoints
+			
+			
+			
+			
+			//see Keystone.Game01.Messages.   public class AttackResults since
+			// we need results going over the network
+			return result;
+        }
+
 		
 		public Boid Spawn(ThreadedRandom rand, int index, double width, double height, double depth)
 		{
@@ -5625,9 +5569,9 @@ return (0,0);
 			// Consumption here is really PRODUCT CONSUMPTION RESULT struct that gets filled so that
 			// other players in the networked game can receive the "results" of 
 			// having consumed a product
-			public int EntityArrayIndex;
-			public int TargetIndex; // the entity that is consuming a product
-			public int EntityIndex; // the producer of the product that is being consumed by entity.ID == EntityID.
+			public int EntityArrayIndex; // in KGB this would be the Entity.ID or GUID of the Consuming Entity
+			public int TargetIndex; // the index into the Memory<T> of the entity that is consuming a product
+			public int EntityIndex; // the index into the Memory<T> of the producer of the product that is being consumed by entity.ID == EntityID.
 			public uint ProductID;     // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer
 			public object Value;
 			public int Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
@@ -6026,12 +5970,9 @@ return (0,0);
 		//public Consumption[] Consumption; // eg. all components can consume damage.  
 	public struct Component  // aka: "Useable Component"
     {
-        public int Interfaces; // 32 bit flags for the various interfaces (Build and Runtime) used by this component
-        
-		
-		public int EntityID; // Guid.NewGuid().ToString() results in a 36 character string.
-        public int[] ComponentIndices; // all the different component indices used by this Component. For example, a Laser Component would use both WeaponIndex and LaserIndex
-		public string[] ComponentTypenames;
+      
+		public int EntityID; //  this is the bSim.Boids[] element index and NOT the Memory<T> Index of this Component.  in KGB this will be the Guid.NewGuid().ToString() results in a 36 character string.
+        public string FullName;
 		
 			
 		public int Level; // technological level. 
@@ -6095,6 +6036,37 @@ return (0,0);
 		{
  		}
 		
+		public bool IsPowered(out string errorReason)
+		{
+			errorReason = null;
+			bool result = true;
+			
+			
+			return result;
+		}
+		
+		public bool IsFueled(out string errorReason)
+		{
+			errorReason = null;
+			bool result = true;
+			
+			
+			return result;
+		}
+		
+		public bool IsHealthyEnough(out string errorReason)
+		{
+			errorReason = null;
+			bool result = true;
+			
+			
+			return result;
+		}
+		
+		/// <summary>
+		/// Verify if the Component Requires an Operator(s) and whether the Operator(s)
+		/// have the required Skills to use this Component
+		/// </summary>
 		public bool IsOperatorStatusCheckOK(out string errorReason)
 		{
 			const float DAMAGE_PERCENT_THRESHOLD = 0.33f;
@@ -6104,18 +6076,13 @@ return (0,0);
 			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
-			
-			// if (allComponents.Span[i].IsPowered())
-				
-			//	 allComponents.Span[i].SetRuntimeFlag();
-				
-				
-			// is allComponents.healthy enough
-				
-				
+						
+			// NOTE: if this station requires an AI operator at the very least, then NumOperators will be == 1.
+			//       And the operator ID will point to another Component (eg a Computer running some tpe of software...eg Targeting Software)
 			if (this.NumOperatorsRequired > 0)
 			{
-				// allComponents.hasOperator if required
+				// is the operatorID for a component and is it's UserTypeID a Computer running Software that can control this Component?
+				
 				if (this.OperatorIDs != null && this.OperatorIDs.Length >= this.NumOperatorsRequired)
 				{
 					// operator(s) is(are) healthy
@@ -6178,31 +6145,35 @@ return (0,0);
 			}
 		
 			return true;
-		}
-		
+		}	
+
 	}
+	
+	
+	
+	
+	
 	
 	
 	
 	public struct TacticalStation
 	{
-		public struct StationAction
+		public class StationAction
 		{
 			public long TimeStarted;     // time this action started
 			public int Duration;         // time to complete this action
 			public int ActionID;         // eg Fire at Target, Lay Mines, Deploy Counter-measures
 		}
 
-		public static int NextID;
 		public int Index;            // index of ComponentStore<Components> where this TacticalStation's general Component struct is stored
 		public int EntityIndex;
 		
 		// NOTE: The "GetLastAction() is simply the Action at index == 0
 
 		// Queue is First In First Out
-		public System.Collections.Generic.Queue<StationAction> Actions;
+		public System.Collections.Generic.List<StationAction> Actions;
 		public float CooldownBetweenActions;  //todo: maybe this is CurrentAction.Duration where "CanAct" = (NumActions < Actions.Count - 1 && elapsed >= CurrentAction.Duration)  the minimum amount of time since the previous action before the next action can take place e.g 4.5 seconds and represents the time it takes to carry out that previous Action and to be ready to carry out the next
-		
+		                                       // or it might be the Math.Max(thisAction, prevAction) since a previious action might take less time to complete so we will be able to act when it completes first.
 		
 		public int HistoryCount; 
 		public int NumActions;
@@ -6233,49 +6204,120 @@ return (0,0);
 			
 		}
 		
-		   					
+		public void Add (StationAction a)
+		{
+			if (Actions == null) Actions = new List<StationAction>();
+			Actions.Add(a);
+		}
+		
+		public void Remove (StationAction a)
+		{
+			Actions.Remove(a);
+			if (Actions.Count == 0)
+				Actions = null;
+		}
+		   	
+		// NOTE: This only applies for FTL weapons... "CanHit()" must be different for Missiles, Kinetic Energy Weapons and Particle Weapons that are slower than light
+		public bool CanHit(EntityNode target)
+		{
+			bool result = false;
+			
+			
+			// todo: for tactical station, the logic for determining hit+damage should rely on the crew station.css script and not the operator.  Instead, we just grab bonuses or minuses from the operator crew member.
+			//  - time to get a lock
+			//  - bonus for time 
+			//  - bonus for damage
+			//  and remember, it's the tactical station that keeps track of all the weapons available and the targets (including friendlies)
+			
+
+					
+			// stealth
+			
+			// target last acquisition - previous aquisition makes it easier to re-aquire
+			
+			// sensorLockOfTargetTimeElapsed (aka durationOfSensorAquistion) // how much time has this  target been tracked by sensors already
+			
+			// operator skill
+			
+			
+			// operator Health
+			
+			
+			// target distance			
+
+			
+			// target evasive
+			
+			
+			// target deployed counter measures within X time (time * fallOff aka call it 'attenuation')
+					
+			
+			result = true;
+			return result;
+		}
+		
 		
 		// todo: Actions that have completed need to be removed from a list?
-		public bool CanAct(int operatorIndex)
+		///<summary>
+		/// Determines if an Action can be assigned to this Component based on existing Actions
+		/// and skill of Operator.
+		/// </summary>
+		/// <remarks>
+		/// Example of StationActions are as follows:
+		/// 1 - moving a turret to aim at a specific target and fire when ready
+		/// 2 - prioritizing targets
+		/// 3 - assigning targets to weapons
+		/// 4 - monitoring guided missiles to ensure they are on course, otherwise they may need to be given a destruct order to avoid hazards to friendly ships (including your own)
+		/// </remarks>
+		public bool CanAct(out string errorReason)
 		{
-			Boid currentDroid = EntryClass.bSim.Boids[this.EntityIndex];
-						
-			// todo: does this station require an operator or is it being managed by AI?
+			Boid station = EntryClass.bSim.Boids[this.EntityIndex];
+			errorReason = null;
 			bool result = true;
 
-			Boid operatorAndStation = EntryClass.bSim.Boids[operatorIndex];
-
-			
-			// line 6224
-			Memory<Component> cmp = (Memory<Component>) operatorAndStation.GetUserStruct(typeof(Component)); //"HelloBoids.Component"); // );
-			cmp.Span[0].Operators
+		#if DEBUG
+			Memory<Component> cmp = (Memory<Component>) station.GetUserStruct(typeof(Component)); //"HelloBoids.Component"); // );
+			System.Diagnostics.Debug.Assert (station.Index == cmp.Span[0].EntityID);
+		#endif
 				
-			
-			
-			// line 5294
-			Memory<LivingEntity> livingEntity = (Memory<LivingEntity>) operatorAndStation.GetUserStruct(typeof(LivingEntity)); //"HelloBoids.LivingEntity"); //();
-			
-			//if (livingEntity.Span[0].)
-			//{
-			//	
-			//}
-			
-			//if (operatorAndStation.
 				
-			//  - station is not available/powered  
-			
-			// - operators are healthy/has operator/operators skill levels (or AI conroller)
+			if (!cmp.IsEmpty)
+			{
+				string name = cmp.Span[0].FullName;
+				int max = MaxActions;
+				int diff = NumActions;
+				if (diff <= 0)
+				{
+					errorReason = $"Station {name}, is already performing the maximum {max} number of simultaneous actions allowed based on the Level of this Station, it's current condition and the skill and condition of it's currrent Operator.";
+					return false;
+				}
+				
+				// check the cooldowns (if a slot is available, then doesn't this mean the cooldown has expired?  
+				// once a cooldown expires, the action is removed from the list of current actions correct?
+				
+				List<int>toRemove = new List<int>();
+				int pos = 0;
+				foreach (var item in Actions)
+				{
+					double elapsed = Utils.GetAge(item.TimeStarted);
+					bool hasElapsed = elapsed > item.Duration;
+					if (hasElapsed)
+					{
+						toRemove.Add(pos);
+					}
+					pos++;
+					
+				}
 
-			
-			// maxActions not reached
-			// station is powered 
-			// station is healthy enough
-
-
+				if (toRemove.Count > 0)
+					for (int i = 0; i < toRemove.Count; i++)
+						Actions.RemoveAt(toRemove[i]);
+				
+			}
 			return result;
 		}
 
-		public int GetMaxActionCount(int operatorIndex, int stationIndex)
+		public int GetMaxActionCount()
 		{
 			int result = 0;
 
@@ -6284,9 +6326,9 @@ return (0,0);
 			// station powered? (assuming it requires power to function)
 			// station TL
 			// station Damage (damage = CurrentHitPoints / Hitpoints
-			// operator Skill + Bonuses =
+			// operator Skill + Bonuses (can limit max actions as well) =
 			// opertor Health  // the max time between actions may also slow down as a result of an injured operator
-
+			
 			return result;
 		}
 

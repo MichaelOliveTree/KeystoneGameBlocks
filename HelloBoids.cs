@@ -1617,7 +1617,14 @@ namespace HelloBoids
              //   linear acceleration / decelaration
              //   newtonian ship movement
              //   movement of ships via Steering 
-             //
+             //   SEE https://github.com/vazgriz/PID_Controller
+			 //     - MIT License
+			 //     - specifically has a sample for controlling a Turret
+			 //     - https://github.com/vazgriz/PID_Controller/blob/master/Assets/Scripts/Turret.cs
+			 //     - Also see stage\\projects\\waypointfollower.txt
+			
+			
+			
              // physics Update
              //   N-Body
              // laser bolts
@@ -1840,6 +1847,8 @@ namespace HelloBoids
 			DoStationCanActStatus();
 			//Console.WriteLine("continuing Do_Droid_Logic()");
 			
+			DoWeaponsCanFire();
+			
 			
 			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
@@ -1877,7 +1886,11 @@ namespace HelloBoids
 				
 				// TODO: this is just referencing the ONE tacticalStation memory<T> not allTacticalStations so we use [0] not [i]
 				string errorReason;
+				
+				// TODO: I believe here we just want to check the runtime flags since these should already have been set correct?
 				if (!tacticalStation.Span[0].CanAct(out errorReason)) return;	
+				
+				
 				
 				Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component));
 				Memory<Weapon> wep = (Memory<Weapon>) currentBoid.GetUserStruct(typeof(Weapon));
@@ -1902,6 +1915,9 @@ namespace HelloBoids
 				string timerID = currentBoid.SpanIndex.ToString();
 				bool canFire = false;
 				
+				// NOTE: above we check if each individual weapon can fire... we do not care
+				//       about whether one particular Droid has multiple lasers on it... if any one or both
+				//       can fire, both can be used independantly.
 				try
 				{
 					canFire = mIntervalTimers.IsReady(timerID, "droid_canfire");
@@ -1913,8 +1929,7 @@ namespace HelloBoids
 				
 				if (canFire) // TODO: Establish CANFIRE PER WEAPON
            	 	{
-                	// Console.WriteLine("Do_Droid_Logic() - Droid " + currentBoid.SpanIndex.ToString() + " Can Fire = " + canFire.ToString());
-                	mIntervalTimers.Reset(timerID, "droid_canfire");
+
             			
 					List<Boid> targets = null;
 					double[] distances = null;
@@ -1944,56 +1959,41 @@ namespace HelloBoids
 							//       and does not need any travel time to reach the currentTarget
 							object[] damages = null;
 							
-							try
+							try 
 							{
-								try 
-								{
-									damages = CalculateDamage(currentBoid, wep, currentTarget); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
-								}
-								catch(Exception ex)
-								{
-									Console.WriteLine ("Do_Droid_Logic() - CaculateDamage error....");	
-								}
-								
-								if (damages != null)
-									for (int j = 0; j < damages.Length; j++)
-									{
-										if (damages[j] is DamageSystem.Damage)
-											try
-											{
-												mDamageSystem.Add((DamageSystem.Damage)damages[j]);
-											}
-											catch (Exception ex)
-											{
-												Console.WriteLine("Do_Droid_Logic() - DS.Add() ERROR");
-											}
-										else if (damages[j] is DamageOverTimeSystem.DamageOverTime)
-											
-											try
-											{
-												mDamageOverTimeSystem.Add ((DamageOverTimeSystem.DamageOverTime)damages[j]);
-											}
-											catch (Exception ex)
-											{
-												Console.WriteLine("Do_Droid_Logic() - DS_OVER_TIME.Add() ERROR");
-											}
-										else 
-											throw new Exception("Do_Droid_Logic() - Unexpected Damge type. " + damages[j].GetType().Name);
-									}
+								damages = CalculateDamage(currentBoid, wep, currentTarget); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
+							}
+							catch(Exception ex)
+							{
+								Console.WriteLine ("Do_Droid_Logic() - CaculateDamage error....");	
+							}
 
-								try
+							if (damages != null)
+								for (int j = 0; j < damages.Length; j++)
 								{
-									mIntervalTimers.Reset(timerID, "droid_canfire");
+									if (damages[j] is DamageSystem.Damage)
+										try
+										{
+											mDamageSystem.Add((DamageSystem.Damage)damages[j]);
+										}
+									catch (Exception ex)
+									{
+										Console.WriteLine("Do_Droid_Logic() - DS.Add() ERROR");
+									}
+									else if (damages[j] is DamageOverTimeSystem.DamageOverTime)
+
+										try
+										{
+											mDamageOverTimeSystem.Add ((DamageOverTimeSystem.DamageOverTime)damages[j]);
+										}
+									catch (Exception ex)
+									{
+										Console.WriteLine("Do_Droid_Logic() - DS_OVER_TIME.Add() ERROR");
+									}
+									else 
+										throw new Exception("Do_Droid_Logic() - Unexpected Damge type. " + damages[j].GetType().Name);
 								}
-								catch (Exception ex)
-								{
-									Console.WriteLine("Do_Droid_Logic() - TIMER RESET");
-								}
-							}
-							catch (Exception ex)
-							{
-								Console.WriteLine ("Do_Droid_Logic() - INNER TRY  " + ex.Message);
-							}
+
 						}
 					}
 					catch (Exception ex)
@@ -2019,11 +2019,6 @@ namespace HelloBoids
 			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
-			
-			// struct for component properties and stats
-			//Component component = ((ComponentStore<Component>)EntryClass.mCStoreCol.CheckOut<Component>(0)).Span[componentIndex];		
-			//Weapon weapon = ((ComponentStore<Weapon>)EntryClass.mCStoreCol.CheckOut<Weapon>(0)).Span[weaponIndex];
-			//Laser_Struct laser = ((ComponentStore<Laser_Struct>)EntryClass.mCStoreCol.CheckOut<Laser_Struct>(0)).Span[laserIndex];
 				
 			// TODO: Do these .Is****  functions need to be setting mRuntimeFlags?
 			int count = (int)allTacticalStations.Size;
@@ -2052,11 +2047,6 @@ namespace HelloBoids
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 			
-			// struct for component properties and stats
-			// Component component = ((ComponentStore<Component>)EntryClass.mCStoreCol.CheckOut<Component>(0)).Span[componentIndex];		
-			// Weapon weapon = ((ComponentStore<Weapon>)EntryClass.mCStoreCol.CheckOut<Weapon>(0)).Span[weaponIndex];
-			// Laser_Struct laser = ((ComponentStore<Laser_Struct>)EntryClass.mCStoreCol.CheckOut<Laser_Struct>(0)).Span[laserIndex];
-				
 			int count = (int)allTacticalStations.Size;
             System.Threading.Tasks.Parallel.For(0, count, i => 		
 			{
@@ -2070,6 +2060,103 @@ namespace HelloBoids
 			
 		}
 		
+		private void DoWeaponsCanFire()
+		{
+			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
+			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
+			ComponentStore<Weapon> allWeapons  = EntryClass.mCStoreCol.CheckOut<Weapon>(0);
+			
+			
+			
+			EntityNode ent = (EntityNode)EntryClass.bSim.Boids[droidIndex];
+			
+			int count = (int)allWeapons.Size;
+            System.Threading.Tasks.Parallel.For(0, count, i => 		
+			{
+				string errorReason;
+				string timerID = allWeapons.Span[(int)i].Index.ToString();
+				bool canFire = false;
+				
+				uint USER_RUNTIME_FLAG_1 = 1 << 0;
+				uint USER_RUNTIME_FLAG_2 = 1 << 1;
+				uint USER_RUNTIME_FLAG_3 = 1 << 2;
+				uint USER_RUNTIME_FLAG_4 = 1 << 3;
+				uint USER_RUNTIME_FLAG_5 = 1 << 4;
+				uint USER_RUNTIME_FLAG_6 = 1 << 5;
+				uint USER_RUNTIME_FLAG_7 = 1 << 6;
+				uint USER_RUNTIME_FLAG_8 = 1 << 7;
+				
+				
+				bool flagValue = canFire;
+				// TODO: what if the runtime flags were all stored in a seperate ComponentStore<T>  
+				//       that also contained UserTypeID
+				//       Actually, we can store the UserInterfaceStruct flags in a uint bitflag, we just
+				//       use that to determine  if we should call GetUserStruct<> for the various structs.
+				//       Enum.HasFlag() used to be slow in older versions of .net, but direct bitwise
+				//       operations has always been very fast so we should use them so we know whether
+				//       a specific type of user struct exists before calling GetUseStruct(type);
+				
+				// if its in component, then component  has to contain an Index to the EntityNode.  
+				// Othewise the EntityNode to gain access to the flags,needs a reference to the Componet struct 
+				// which of course it would likely have...
+				// NOTE: A LivingEntity would NOT have a Component but both need these UserTypeID and UserRuntimeFlags
+				//       so ultimately, these really need to exist in the Entity or in a seperate ComponetStore<> that
+				//       ALWAYS matches the index of the array of EntityNodes.   
+				// TODO: the problem with KGB is GUID needs to be kept in the saved XML, but index refers to where its
+				//       stored in these ComponentStore<T>   so what do we do here?  I dont think we can guarantee
+				//       the order of Entities within these arrays across server and clients.  These
+				//       structs must always be local machine ONLY.  
+				
+				// A HASH of EntityIDs could yeild an Integer that we can use for sorting them within a List<>
+				// This then needs to constantly update whenever Entities are Added/Removed from the Scene...
+				// Also for MMO, this needs to be managed for each "ZONE" 
+				// https://discussions.unity.com/t/staticentityidrange-for-simple-fast-scene-loading-and-external-entity-refs/725631/7
+				
+				// if we use an unsigned long for our entity IDs that gives us 18446744073709551615 
+				// if we allow up to max uint for number of Entities in a given game that is 4,294,967,295
+				// that allows for 4,294,967,295 unique games containing 4,294,967,295 unique Entities.
+				// or more games if the max number of Entities in any is less.
+				// For reference, Counterstrike is said to have total number of matches in the TENS of BILLIONS
+				// since 1999 to 2026
+				// BUT THERE IS A MAJOR PROBLEM WITH THESE ENTITY RANGES FOR A GAME LIKE SCIFICOMMAND where 
+				// anyone can create prefabs.... they would always need to grab an unique INT from a SERVER
+				// to ensure uniqueness across the prefabs of all other creators, including those assets made for the official released version of ScifiCommand.
+				// So, GUID is  better...  
+				// We probably must HASH the GUID and use that as a way to sort Entities in our List<EntityNode>
+				
+				allWeapons.Span[(int)i].SetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
+				bool hasStruct = allWeapons.Span[(int)i].GetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
+				
+				allWeapons.Span[(int)i].SetUserRuntimeFlag(USER_RUNTIME_FLAG_1, flagValue);
+				bool hasRuntimeFlag = allWeapons.Span[(int)i].GetUserRuntimeFlag(USER_RUNTIME_FLAG_1);
+				try
+				{
+					// todo: is it better to use mIntervalTimers here than to implement checks elsewhere?
+					canFire = mIntervalTimers.IsReady(timerID, "droid_canfire");
+					// Console.WriteLine("DoWeaponsCanFire() - Droid " + timerID + " Can Fire = " + canFire.ToString());
+					if (canFire)
+					{	
+						// set the runtime flag
+						bool suspend = true;  // we do not want this timer to start over until we start it again
+                		mIntervalTimers.Reset(timerID, "droid_canfire", suspend);
+					}
+					
+					// set the GAME SPECIFIC runtime flag
+					// the runtime flags can only be in Entity or in Component.  It should not be in the various structs
+					// themselves, because it needs to affect ALL structs and we dont want to manage a copy of those across
+					// every flag OBVIOUSLY.
+					
+					
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("DoWeaponsCanFire() - droid_canfire " + timerID + " key does not exist");
+				}
+				
+				// TODO: Do these .Is****  functions need to be setting mRuntimeFlags?
+			});
+			
+		}
 			
         private void DoLifeCycle(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
         {
@@ -6357,7 +6444,7 @@ return (0,0);
 	// In \\KeystoneGameBlocks\\ see \\game01\\Components\\Weapon
 	public struct Weapon 
     {
-		public int ComponentIndex; // from this we can get the EntityIndex
+		public int Index; // from this we can get the EntityIndex
 		
         // kinetic energy type weapons build parameters 
         public float Bore;
@@ -14321,7 +14408,7 @@ if (mEntityNodesCollection == null) return null;
         //    return null;
         //}
 
-        public void Reset(string nodeID, string name)
+        public void Reset(string nodeID, string name, bool suspend = false)
         {
 #if CONCURRENT_TIMERS
 			string key = GetKey(nodeID, name);
@@ -14347,7 +14434,9 @@ if (mEntityNodesCollection == null) return null;
             else
                 System.Diagnostics.Debug.WriteLine("GameTime.Reset() - " + nodeID + " using name " + name + " does not exist.");
 #endif
-        }
+        
+			tp.IsPaused = suspend;	
+		}
 
         public bool IsReady(string nodeID, string name)
         {
@@ -16903,5 +16992,308 @@ if (mEntityNodesCollection == null) return null;
                 : val1IsDec ? val1Dec == val2Dec : ValidateBool(val1) == ValidateBool(val2);
         }
     }
-}
 
+/*
+	// NOTE: The below code I only put through an initial pass of removing Unity3d specific attributes, variable types, and such...
+	//       There's still some more that needs to be fixed, but
+#region PID Controller including one for a Turret https://github.com/vazgriz/PID_Controller/blob/master/Assets/Scripts/Horizontal.cs
+	
+	public abstract class Controller  {
+		public abstract PIDController GetController();
+		public abstract void SetTarget(int index);
+		public abstract float Power { get; set; }
+	}
+
+
+	public class SinMover  {
+		float amplitude;
+		float frequency;
+
+		new Transform transform;
+		Vector3d startPosition;
+
+		void Start() {
+			transform = GetComponent<Transform>();
+			startPosition = transform.position;
+		}
+
+		void Update() {
+			transform.position = startPosition + new Vector3d(Math.Sin(Time.time * frequency) * amplitude, 0, 0);
+		}
+	}
+
+
+
+	public class PIDController {
+		public enum DerivativeMeasurement {
+			Velocity,
+			ErrorRateOfChange
+		}
+
+		//PID coefficients
+		public float proportionalGain;
+		public float integralGain;
+		public float derivativeGain;
+
+		public float outputMin = -1;
+		public float outputMax = 1;
+		public float integralSaturation;
+		public DerivativeMeasurement derivativeMeasurement;
+
+		public float valueLast;
+		public float errorLast;
+		public float integrationStored;
+		public float velocity;  //only used for the info display
+		public bool derivativeInitialized;
+
+		public void Reset() {
+			derivativeInitialized = false;
+		}
+
+		public float Update(float dt, float currentValue, float targetValue) {
+			if (dt <= 0) throw new ArgumentOutOfRangeException(nameof(dt));
+
+			float error = targetValue - currentValue;
+
+			//calculate P term
+			float P = proportionalGain * error;
+
+			
+			//calculate I term
+			integrationStored = Math.Clamp(integrationStored + (error * dt), -integralSaturation, integralSaturation);
+			float I = integralGain * integrationStored;
+
+			//calculate both D terms
+			float errorRateOfChange = (error - errorLast) / dt;
+			errorLast = error;
+
+			float valueRateOfChange = (currentValue - valueLast) / dt;
+			valueLast = currentValue;
+			velocity = valueRateOfChange;
+
+			//choose D term to use
+			float deriveMeasure = 0;
+
+			if (derivativeInitialized) {
+				if (derivativeMeasurement == DerivativeMeasurement.Velocity) {
+					deriveMeasure = -valueRateOfChange;
+				} else {
+					deriveMeasure = errorRateOfChange;
+				}
+			} else {
+				derivativeInitialized = true;
+			}
+
+			float D = derivativeGain * deriveMeasure;
+
+			float result = P + I + D;
+
+			return Math.Clamp(result, outputMin, outputMax);
+		}
+
+		float AngleDifference(float a, float b) {
+			return (a - b + 540) % 360 - 180;   //calculate modular difference, and remap to [-180, 180]
+		}
+
+		public float UpdateAngle(float dt, float currentAngle, float targetAngle) {
+			if (dt <= 0) throw new ArgumentOutOfRangeException(nameof(dt));
+			float error = AngleDifference(targetAngle, currentAngle);
+
+			//calculate P term
+			float P = proportionalGain * error;
+
+			//calculate I term
+			integrationStored = Math.Clamp(integrationStored + (error * dt), -integralSaturation, integralSaturation);
+			float I = integralGain * integrationStored;
+
+			//calculate both D terms
+			float errorRateOfChange = AngleDifference(error, errorLast) / dt;
+			errorLast = error;
+
+			float valueRateOfChange = AngleDifference(currentAngle, valueLast) / dt;
+			valueLast = currentAngle;
+			velocity = valueRateOfChange;
+
+			//choose D term to use
+			float deriveMeasure = 0;
+
+			if (derivativeInitialized) {
+				if (derivativeMeasurement == DerivativeMeasurement.Velocity) {
+					deriveMeasure = -valueRateOfChange;
+				} else {
+					deriveMeasure = errorRateOfChange;
+				}
+			} else {
+				derivativeInitialized = true;
+			}
+
+			float D = derivativeGain * deriveMeasure;
+
+			float result = P + I + D;
+
+			return Math.Clamp(result, outputMin, outputMax);
+		}
+	}
+
+	public class Turret : Controller {
+
+		PIDController controller;
+		float power;
+		Transform target;
+
+		new Rigidbody rigidbody;
+
+		public override float Power {
+			get {
+				return power;
+			}
+			set {
+				power = value;
+			}
+		}
+
+		void Start() {
+			rigidbody = GetComponent<Rigidbody>();
+		}
+
+		public override PIDController GetController() {
+			return controller;
+		}
+
+		public override void SetTarget(int index) {
+		}
+
+		void FixedUpdate() {
+			var targetPosition = target.position;
+			targetPosition.y = rigidbody.position.y;    //ignore difference in Y
+			var targetDir = (targetPosition - rigidbody.position).normalized;
+			var forwardDir = rigidbody.rotation * Vector3d.Forward();
+
+			var currentAngle = Vector3d.SignedAngle(Vector3d.Forward(), forwardDir, Vector3d.Up());
+			var targetAngle = Vector3d.SignedAngle(Vector3d.Forward(), targetDir, Vector3d.Up());
+
+			float input = controller.UpdateAngle(Time.fixedDeltaTime, currentAngle, targetAngle);
+			rigidbody.AddTorque(new Vector3d(0, input * power, 0));
+		}
+	}
+
+
+	public class Horizontal : Controller {
+
+		PIDController controller;
+		float power;
+		Transform[] targets;
+		GameObject flameRight;
+		GameObject flameLeft;
+		float flameSize;
+
+		new Rigidbody rigidbody;
+		List<Vector3d> targetPositions;
+		Vector3d targetPosition;
+
+		public override float Power {
+			get {
+				return power;
+			}
+			set {
+				power = value;
+			}
+		}
+
+		void Start() {
+			rigidbody = GetComponent<Rigidbody>();
+
+			targetPositions = new List<Vector3d>();
+			foreach (var target in targets) {
+				targetPositions.Add(target.position);
+			}
+		}
+
+		public override PIDController GetController() {
+			return controller;
+		}
+
+		public override void SetTarget(int index) {
+			targetPosition = targetPositions[index];
+		}
+
+		void SetScale(GameObject go, float scale) {
+			scale = Math.Clamp(scale, 0, 1);
+
+			if (scale < 0.1f) {
+				go.SetActive(false);
+			} else {
+				go.SetActive(true);
+				go.GetComponent<Transform>().localScale = new Vector3d(scale, scale, scale) * flameSize;
+			}
+		}
+
+		void FixedUpdate() {
+			float throttle = controller.Update(Time.fixedDeltaTime, rigidbody.position.x, targetPosition.x);
+			rigidbody.AddForce(new Vector3d(throttle * power, 0, 0));
+
+			SetScale(flameRight, -throttle);
+			SetScale(flameLeft, throttle);
+		}
+	}
+
+	public class Vertical : Controller {
+		PIDController controller;
+		float power;
+		Transform[] targets;
+		GameObject flame;
+		float flameSize;
+
+		new Rigidbody rigidbody;
+		List<Vector3d> targetPositions;
+		Vector3d targetPosition;
+
+		public override float Power {
+			get {
+				return power;
+			}
+			set {
+				power = value;
+			}
+		}
+
+		void Start() {
+			rigidbody = GetComponent<Rigidbody>();
+
+			targetPositions = new List<Vector3d>();
+			foreach (var target in targets) {
+				targetPositions.Add(target.position);
+			}
+
+			SetTarget(0);
+		}
+
+		public override PIDController GetController() {
+			return controller;
+		}
+
+		public override void SetTarget(int index) {
+			targetPosition = targetPositions[index];
+		}
+
+		void SetScale(GameObject go, float scale) {
+			scale = Mathf.Clamp(scale, 0, 1);
+
+			if (scale < 0.1f) {
+				go.SetActive(false);
+			} else {
+				go.SetActive(true);
+				go.GetComponent<Transform>().localScale = new Vector3d(scale, scale, scale) * flameSize;
+			}
+		}
+
+		void FixedUpdate() {
+			float throttle = controller.Update(Time.fixedDeltaTime, rigidbody.position.y, targetPosition.y);
+			rigidbody.AddForce(new Vector3d(0, throttle * power, 0));
+
+			SetScale(flame, throttle);
+		}
+	}
+   #endregion  */
+   
+}

@@ -1605,57 +1605,69 @@ namespace HelloBoids
 			// OR, our various processors can just grab the Stores that are needed.  There's no need really to 
 			// grab the stores outside of the processor functions only to just pass them there...  
 	
-
-			// POLICIES AND RULES 
-			// todo: the ai captain needs a "mission" or "objectives" for each mission
-			// ordinance Rules
-			// ROE example: see HelloConditions.cs
-
-			//		
-			// NOTE: Really, the below loop is mostly for COMBAT logic only.  
-             // movement of crew (steering)
+ 			
+			 // Sensor scan 
+			 //  - spatial searches using Search Radius to find adjacents/neibhors
+			             
+             //  Sensor Scans
+			 //    - atmospheric composition
+			 //    - geological - minerals
+			 //    - archaeological (ground penetrating radars and such)
+			 //
+			 //    - biological life analysis
+			 //    - specific racial signatures 
+			 //    - specific person signatures (much slower if the search area is not very limited)
+			 //    - specific atoms, molecules
+			 //    - specific energy signatures
+			 //    
+			 
+             //    - AreaOfInterest 
+			
+             // Crew/NPC movement (steering)
              //   linear acceleration / decelaration
-             //   newtonian ship movement
-             //   movement of ships via Steering 
+			 // Ship movement - Gravitation / N-Body
+             // Ship movement - Newtonian Physics
+             // Ship movement - Steering
+			 // Ship movement - Lerping to a destination over a specific time period
              //   SEE https://github.com/vazgriz/PID_Controller
 			 //     - MIT License
 			 //     - specifically has a sample for controlling a Turret
 			 //     - https://github.com/vazgriz/PID_Controller/blob/master/Assets/Scripts/Turret.cs
 			 //     - Also see stage\\projects\\waypointfollower.txt
 			
-			
-			
-             // physics Update
-             //   N-Body
-             // laser bolts
-             // missiles
+			 // Turret aiming - PID controllers
+             // laser / particle cannons - movement
+             // missiles - PID controllers again
 
              // particle Systems
              // motion fields
              // 
 
+			 // Collisions - could benefit from sharing Adjacents / Neighbors from Sensor Scans or vice-versa
              // collisions (BoundingBox.Min, BoundingBox.Max, and Sphere.Center and Sphere.Radius need to be in a Memory<T> struct)
              //
-
-             // Animations 
+			
+             // Animations (LODs used to prevent animations when too far away?)
              //   - interpolation Animations
-             //   - spritesheets
-             // 
+             //   - spritesheets, atlas texture animations
              // 
              
-             // 
-             //    - sensor scan (lambda)
-
-             //    - planetary scan
-             //    - AreaOfInterest 
-             //    // - storing data on interior Walls for fast iteration of mouse picking
-             //    // walls and floors and ceilings.  <-- This is mostly for when our view is such that
-             //    // we cannot first determine the closest edge and use that to find any wall on that edge
-             //    // For instance, imagine a camera that is more like a FPS view or a bullet or laser hits a Walls
+			 // 
+			 // 
+             //    - storing data on interior Walls for fast iteration of mouse picking
+             //    walls and floors and ceilings.  <-- This is mostly for when our view is such that
+             //    we cannot first determine the closest edge and use that to find any wall on that edge
+             //    For instance, imagine a camera that is more like a FPS view or a bullet or laser hits a Walls
 
              //    - storing data on interior Walls and Floors and Ceilings "damage"
 
 
+			
+		// POLICIES AND RULES 
+		// todo: the ai captain needs a "mission" or "objectives" for each mission
+		// ordinance Rules
+		// ROE example: see HelloConditions.cs
+			
 		// http://www.gamasutra.com/view/news/198377/Video_Valves_system_for_creating_AIdriven_dynamic_dialog.php   <- now on Youtube @ https://www.youtube.com/watch?v=tAbBID3N64A
 		// http://www.valvesoftware.com/publications/2012/GDC2012_Ruskin_Elan_DynamicDialog.pdf
 		// NOTE: in Valve's Zombie game, for the npc voice logic, they share
@@ -1846,9 +1858,7 @@ namespace HelloBoids
 			//Console.WriteLine("DoStationCanActStatus()");
 			DoStationCanActStatus();
 			//Console.WriteLine("continuing Do_Droid_Logic()");
-			
 			DoWeaponsCanFire();
-			
 			
 			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
@@ -1860,6 +1870,12 @@ namespace HelloBoids
 			string logicalExpression = "false != true";
 			//bool result = MicroEx.Evaluate(logicalExpression);
 			//Console.WriteLine ("Do_Droid_Logic() - MicroEx.Evaluate() - '" + logicalExpression + "' " + result.ToString());
+			
+			// TODO: this is just referencing the ONE stationOperator memory<T> not allLivingEntities so we use [0] not [i]
+			logicalExpression = 1.ToString() + " < " + 2.ToString();
+			bool result = MicroEx.Evaluate(logicalExpression);
+			//Console.WriteLine ("Do_Droid_Logic() - MicroEx.Evaluate() - '" + logicalExpression + "' " + result.ToString());
+					
 			
 			int count = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 				
@@ -1877,25 +1893,21 @@ namespace HelloBoids
 					Console.WriteLine("Do_Droid_Logic() -  key '" + currentBoid.SpanIndex.ToString() + "' does not exist. " + ex.Message);
 				}
 				
-
+				//Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component));
 				Memory<LivingEntity> stationOperator = (Memory<LivingEntity>) currentBoid.GetUserStruct(typeof(LivingEntity));
 				Memory<TacticalStation> tacticalStation = (Memory<TacticalStation>) currentBoid.GetUserStruct(typeof(TacticalStation));
-			
+    		    Memory<Weapon> wep = (Memory<Weapon>) currentBoid.GetUserStruct(typeof(Weapon));
+				//Memory<Laser_Struct> laser = (Memory<Laser_Struct>)currentBoid.GetUserStruct(typeof(Laser_Struct)); //  Laser_Struct laser = (Laser_Struct)currentBoid.mMemStore_Laser.Span[0];
+				
+				// todo: we need to be able to get the indices we want
+				//       based on the typeof(UserStruct) we want
+				// eg: int tacticalStationStructIndex = currentBoid.GetStructIndexWithinMemoryT(typeof(TacticalStation));
+				
 				int operatorIndex = currentBoid.Index; // we pass Index and NOT SpanIndex because we want to find the Boid in the EntryClass.bSim.Boids[] List
 				int stationIndex = currentBoid.Index;  // for now, our Boid hosts both the TacticalStation and the Operator
-				
-				// TODO: this is just referencing the ONE tacticalStation memory<T> not allTacticalStations so we use [0] not [i]
-				string errorReason;
-				
-				// TODO: I believe here we just want to check the runtime flags since these should already have been set correct?
-				if (!tacticalStation.Span[0].CanAct(out errorReason)) return;	
-				
-				
-				
-				Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component));
-				Memory<Weapon> wep = (Memory<Weapon>) currentBoid.GetUserStruct(typeof(Weapon));
-				Memory<Laser_Struct> laser = (Memory<Laser_Struct>)currentBoid.GetUserStruct(typeof(Laser_Struct)); //  Laser_Struct laser = (Laser_Struct)currentBoid.mMemStore_Laser.Span[0];
-				
+
+				if (!allComponents.Span[(int)currentBoid.SpanIndexComponent].CanAct) return;
+							
 				
 				// NOTE: The EXE will render Sensor Contact info as necessary.
 				//       The client EXE will have access to those types and the UI elements using them and can update
@@ -1907,11 +1919,7 @@ namespace HelloBoids
 				//      - any Contacts in list marked as FOF.Foe + FOF.Hostile as opposed to just FOF.Foe (note: stale contacts are still treated as available in case of need to persue)
 				//      	- FOF.Withdrawing may be ignored for example if ROE says we don't persue in this circumstance including disabled ships and unarmed ships like freighters
 				
-				// TODO: this is just referencing the ONE stationOperator memory<T> not allLivingEntities so we use [0] not [i]
-				logicalExpression = wep.Span[0].AverageDamage.ToString() + " < " + stationOperator.Span[0].Hitpoints.ToString();
-				bool result = MicroEx.Evaluate(logicalExpression);
-				//Console.WriteLine ("Do_Droid_Logic() - MicroEx.Evaluate() - '" + logicalExpression + "' " + result.ToString());
-					
+
 				string timerID = currentBoid.SpanIndex.ToString();
 				bool canFire = false;
 				
@@ -1928,21 +1936,23 @@ namespace HelloBoids
 				}
 				
 				if (canFire) // TODO: Establish CANFIRE PER WEAPON
-           	 	{
-
-            			
+           	 	{           			
 					List<Boid> targets = null;
 					double[] distances = null;
 					//List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE); // TODO: Hopefully this FindNearestTarget() can be optimized.... spatial searches even with Octree is slow.
+					
+					// use the existing neigbors from "Eyes" (optical scanner) to find the single closest but valid target available to the current droid
+					// This overloaded version of FindNearestTarget() returns the sorted list of neighbors from closest to furthest along with their distances to the current droid
 					List<EntityNode> tmp = FindNearestTarget(currentBoid, neighbors, out distances);
 					
-					if (tmp != null)
-						targets = tmp.OfType<Boid>().ToList();
-					// Console.WriteLine("Do_Droid_Logic() - Droid " + currentBoid.SpanIndex.ToString() + " Has Found Target == " + (target != null).ToString());
-					
-					if (targets == null || targets.Count == 0) 
-						return;      // NOTE: for parallel.For we use "return"
+					if (tmp != null && tmp.Count > 0)
+						return;     // NOTE: for parallel.For we use "return"
 						// continue; // NOTE: for regular for() loop we use "continue"
+					
+					targets = tmp.OfType<Boid>().ToList();
+					
+					Console.WriteLine("Do_Droid_Logic() - Droid " + currentBoid.SpanIndex.ToString() + " Has Found Target == " + (targets != null).ToString());
+					
 					
 					try
 					{
@@ -1961,6 +1971,7 @@ namespace HelloBoids
 							
 							try 
 							{
+								// todo: change parameter currentBoid to tacticalStation?
 								damages = CalculateDamage(currentBoid, wep, currentTarget); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
 							}
 							catch(Exception ex)
@@ -1993,7 +2004,6 @@ namespace HelloBoids
 									else 
 										throw new Exception("Do_Droid_Logic() - Unexpected Damge type. " + damages[j].GetType().Name);
 								}
-
 						}
 					}
 					catch (Exception ex)
@@ -2027,13 +2037,13 @@ namespace HelloBoids
 				Boid droid = EntryClass.bSim.Boids[allComponents.Span[(int)i].EntityID];
 				
 				string errorReason;
-				if (allComponents.Span[(int)i].IsOperatorStatusCheckOK(out errorReason))
+				if (allComponents.Span[(int)i].DoIsOperatorStatusCheckOK(out errorReason))
 				{
 					Memory<LivingEntity> livingEntity = (Memory<LivingEntity>) droid.GetUserStruct(typeof(LivingEntity)); //"HelloBoids.LivingEntity"); //();
 
-					if (allComponents.Span[(int)i].IsPowered(out errorReason))
+					if (allComponents.Span[(int)i].DoIsPowered(out errorReason))
 					{
-						if (allComponents.Span[(int)i].IsHealthyEnough(out errorReason))
+						if (allComponents.Span[(int)i].DoIsHealthyEnough(out errorReason))
 						{
 						}
 					}
@@ -2057,7 +2067,6 @@ namespace HelloBoids
 				
 				}
 			});
-			
 		}
 		
 		private void DoWeaponsCanFire()
@@ -2067,9 +2076,9 @@ namespace HelloBoids
 			ComponentStore<Weapon> allWeapons  = EntryClass.mCStoreCol.CheckOut<Weapon>(0);
 			
 			
-			
-			EntityNode ent = (EntityNode)EntryClass.bSim.Boids[droidIndex];
-			
+			// NOTE: we really want to avoid having to reference a Droid from the array as it 
+			//       impacts our cache coherency
+			//EntityNode ent = (EntityNode)EntryClass.bSim.Boids[droidIndex];
 			int count = (int)allWeapons.Size;
             System.Threading.Tasks.Parallel.For(0, count, i => 		
 			{
@@ -2085,6 +2094,15 @@ namespace HelloBoids
 				uint USER_RUNTIME_FLAG_6 = 1 << 5;
 				uint USER_RUNTIME_FLAG_7 = 1 << 6;
 				uint USER_RUNTIME_FLAG_8 = 1 << 7;
+				
+				uint USER_STRUCT_FLAG_1 = 1 << 0;
+				uint USER_STRUCT_FLAG_2 = 1 << 1;
+				uint USER_STRUCT_FLAG_3 = 1 << 2;
+				uint USER_STRUCT_FLAG_4 = 1 << 3;
+				uint USER_STRUCT_FLAG_5 = 1 << 4;
+				uint USER_STRUCT_FLAG_6 = 1 << 5;
+				uint USER_STRUCT_FLAG_7= 1 << 6;
+				uint USER_STRUCT_FLAG_8 = 1 << 7;
 				
 				
 				bool flagValue = canFire;
@@ -2123,12 +2141,13 @@ namespace HelloBoids
 				// to ensure uniqueness across the prefabs of all other creators, including those assets made for the official released version of ScifiCommand.
 				// So, GUID is  better...  
 				// We probably must HASH the GUID and use that as a way to sort Entities in our List<EntityNode>
+
+					
+				allComponents.Span[(int)i].SetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
+				bool hasStruct = allComponents.Span[(int)i].GetUserStructFlag(USER_STRUCT_FLAG_1);
 				
-				allWeapons.Span[(int)i].SetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
-				bool hasStruct = allWeapons.Span[(int)i].GetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
-				
-				allWeapons.Span[(int)i].SetUserRuntimeFlag(USER_RUNTIME_FLAG_1, flagValue);
-				bool hasRuntimeFlag = allWeapons.Span[(int)i].GetUserRuntimeFlag(USER_RUNTIME_FLAG_1);
+				allComponents.Span[(int)i].SetUserRuntimeFlag(USER_RUNTIME_FLAG_1, flagValue);
+				bool hasRuntimeFlag = allComponents.Span[(int)i].GetUserRuntimeFlag(USER_RUNTIME_FLAG_1);
 				try
 				{
 					// todo: is it better to use mIntervalTimers here than to implement checks elsewhere?
@@ -2621,7 +2640,7 @@ namespace HelloBoids
 			// add the modifier(s) to this skill.  Recall that modifiers behave just like any other type of PRODUCTION and must be registered as PRODUCTION 
 			// at the appropriate time (eg On USE of the Skill, or on EQUIP of an Item, etc.)
 			v.AddProduction(b.SpanIndex, PRODUCTS.TargetingSkillModifier, 1, true, -1);
-			//v.AddModifier(b.SpanIndex, PRODUCTS.TargetingSkillModifier, 1, true, -1);
+
 			
 			// add the skill to the DROID as if it was being added to an OPERATOR for a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
 			b.OperatorSkills.Add(v.SkillType, v);
@@ -2714,11 +2733,6 @@ namespace HelloBoids
 			Memory<Laser_Struct> laser = (Memory<Laser_Struct>)b.GetUserStruct(typeof(Laser_Struct)); //"HelloBoids.Laser_Struct");
 			
 	
-			//Memory<Component> test = (Memory<Component>)b.GetUserStruct(typeof(Component));
-			//Console.WriteLine (test.Equals(component).ToString());
-
-	
-	
 	// TEMP HACK - this would normally be done in the relevant scripit - initialize the memory store vars from the serialized
 /*			component.Span[0].TL = 1;
 			component.Span[0].Quality_ = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
@@ -2733,23 +2747,22 @@ namespace HelloBoids
 */
 			// beam specific
 			laser.Span[0].Type = 1;     
-			laser.Span[0].Duration = 0.25f;   // duration in seconds
-			
 			laser.Span[0].EnergyDrill = false;
 			laser.Span[0].FTL = true;
-			laser.Span[0].Reliable = true;
-			laser.Span[0].Compact = true;
-			
-			weapon.Span[0].Malfunction_ = 0.2f; // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
-			//public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
-									
 			laser.Span[0].BeamOutput = 10f; // kW
 			laser.Span[0].CyclicRate = 1;
+			
+			weapon.Span[0].Reliable = true;
+			weapon.Span[0].Compact = true;
+		
 			weapon.Span[0].Accuracy = 10;
 			weapon.Span[0].SnapShot = 2;
+			weapon.Span[0].Malfunction_ = 0.2f; // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
+			//public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
+			
 //			public string Shots;
 			
-			weapon.Span[0].CoolDown_ = 0.3f;
+			weapon.Span[0].CoolDown_ = 0.3f; // this is the cooldown between when this weapon can be fired again.  It is RoF and perhaps CyclicRate too ultimately. Any "ANIMATION" of the weapon firing should last less than the time of this cooldown!
 //			public string RoF;
 			
 //			weapon.Span[0].PowerReqt = 0.0f;
@@ -2777,9 +2790,7 @@ namespace HelloBoids
 //			public double VacuumMaxRange;
 //			public double VacuumMaxRange2;
     
-   
-		
-	
+  
 		    if (this.Octree != null)
             {
            		Octree.Add((EntityNode)b);
@@ -2826,7 +2837,7 @@ namespace HelloBoids
 		}
 
 		
-		///<summary>
+		/// <summary>
 		/// Called by UpdateClasses() regardless of whether Octree is used or not.
 		/// Called by Memory<T> ONLY if Octree is NOT used.  Otherwise it uses non-recursive Octree code within the DoFlocking() method.
 		/// </summary>
@@ -4234,21 +4245,32 @@ return (0,0);
         protected int mIndex;
         protected BoundingBox _box;
         protected OctreeOctant _octant;
-		protected Dictionary<string, object> mUserStructs;
-		protected UserData mUserData;
+		protected Dictionary<string, Tuple<int, object>> mUserStructs;
+		protected Dictionary<Type, int> mUserStructIndices;
 		
+		protected UserData mUserData;
+		protected int mUserTypeID;   // can be defined by game##.dll or by an enum that is generated into a compiled binary at runtime
 		
         public EntityNode(int index, double x, double y, double z, double xV, double yV) 
 			: base (x, y, z, xV, yV)
         {
             mIndex = index;
+			mUserTypeID = -1;
 				
 			mUserData = EntryClass.mCStoreUserData.CheckOut(index.ToString());
 				
         }
 		
 		
-		public void AddUserStruct(object memStore)
+	
+		
+		
+		
+		public UserData BlackBoardData { get {return mUserData;} set {mUserData = value;} }
+		
+		public int UserTypeID { get {return mUserTypeID; } set {mUserTypeID = value;}}
+		
+		public void AddUserStruct(object memStore, int indexWithinMemStore)
 		{
 			string genericTypeName = memStore.GetType().FullName;
 			// our Memory<T>'s will look as follows:
@@ -4264,18 +4286,24 @@ return (0,0);
         	// Remove the generic arity part (e.g., "`1")
         	//genericTypeName = genericTypeName.Substring(0, genericTypeName.IndexOf('`'));
 			
-			AddUserStruct (genericTypeName, memStore);
+			AddUserStruct (genericTypeName, memStore, indexWithinMemStore);
 		}
 		
-		public UserData BlackBoardData { get {return mUserData;} set {mUserData = value;} }
-		
-		public void AddUserStruct(string typename, object memStore)
+		public void AddUserStruct(string typename, object memStore, int indexWithinMemStore)
 		{
-			if (mUserStructs == null) mUserStructs = new Dictionary<string, object>();
+			if (mUserStructs == null) mUserStructs = new Dictionary<string, Tuple<int, object>>();
 			
 			//Console.WriteLine ("EntityNode.AddUserStruct() - Adding User Struct '" + typename + "'");
-			mUserStructs.Add(typename, memStore);
+			Tuple<int, object> t = new Tuple<int, object>(indexWithinMemStore, memStore);
+			mUserStructs.Add(typename, t); //memStore);
 		}
+		
+		
+		public int GetStructIndexWithinMemoryT(Type t)
+		{
+			
+		}
+			
 		
 		public object GetUserStruct (Type t)
 		{
@@ -5387,6 +5415,76 @@ return (0,0);
     // END NODES
 	
 
+
+#region Policy Rules
+	
+	/// <summary>
+	/// Rules should be sorted from highest number of Conditions to lowest so that we always test against highest number first so we can potentially early-exit
+	/// <summary>
+	public class Rule
+	{
+		public string Concept;
+		public string Description;
+		public Condition[] Conditions;
+		//public Response Response;
+		//public Remember Remember;
+		//public Trigger Trigger;
+
+		public void Add(Condition c)
+		{
+			// following is using Keystone namespace but actually is in KeyStandardLibrary
+			// Keystone.Extensions.ArrayExtensions.	
+		}
+
+		public void Remove (Condition c)
+		{
+
+		}
+	}
+							
+	public class Condition
+	{
+		public string Name;
+		public string Description;
+		public int operandLeft;
+		public int operandRight;
+		public int evalType;
+
+		// geater than
+		public bool Evaluate()
+		{
+			switch (evalType)
+			{
+				case 0:
+					 return operandLeft < operandRight;
+
+				case 1:
+					 return operandLeft > operandRight;
+
+				case 2:
+					return operandLeft == operandRight;
+				default:
+					throw new ArgumentOutOfRangeException("Condition.Evaluate() - Unexpected evalType '" + evalType.ToString() + "'");
+			}
+		}
+	}
+	
+	public class Query
+	{
+		// should NOT need to be concurrent, correct?
+		Dictionary<string, object> mKVPs = new Dictionary<string, object>();
+
+
+		public void Add(string name, object value)
+		{
+			if (mKVPs == null) mKVPs = new Dictionary<string, object>();
+
+			mKVPs.Add (name, value);
+		}
+	}
+
+#endregion 
+	
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// STRUCTS AND IENTITYSYSTEMS
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -5430,8 +5528,79 @@ return (0,0);
         // public Entity_Taxonomy Taxonomy;     // ProcGen_ItemType enum can be loaded from a modder's file 
     }
 
-
+	
 #region Game01.GameObjects
+	
+	// similar to Advantages and Disadvantages
+	public enum StrengthAndWeaknesses
+	{
+		PanicsUnderPressure,
+		GreatUnderPressure
+	}
+
+	public enum ActionType : int
+	{
+		Target,
+		FireAt,
+		Ram,
+		DeployCounterMeasure,
+		DeployMine,
+		DeployProbe
+	}
+
+	public enum PRODUCTS
+	{
+		None = 0,
+
+		ElectricalPower,
+
+		// Fuels
+
+
+		// Emissions and Signatures
+		MicrowaveEmission,
+		MicrowaveReflection,
+
+		// Damage Types
+		MicrowaveDamage = 1024,
+		FireDamage,
+		PlasmaFireDamage,
+		VaccumDamage,
+		RadiationDamage,
+		PressureDamage,   // eg too deep underwater or within a Gas Giant's atmosphere
+
+		CommandBoost = 2048,
+		MoraleBoost,   // like all modifiers, this too can actually be either negative or positive
+
+		// Skill Modifiers
+		TacticalOperationsSkillModifier = 4096,
+		TargetingSkillModifier,
+
+		Haggling
+	}
+
+
+			 
+	
+	public enum SKILLS
+	{
+		HelmOperations,
+		TacticalOperations,
+		Piloting,
+		Targeting,
+		Engineering,
+		SensorOperations,
+
+		Command,
+		Morale
+	}
+
+	public enum PRODUCT_DISTRIBUTION_TYPE
+	{
+		List = 0,
+		Region
+	}
+	
 	public class UnitedEarthCode
 	{
 
@@ -5512,76 +5681,6 @@ return (0,0);
 		}
 	}
 
-	
-		// similar to Advantages and Disadvantages
-		public enum StrengthAndWeaknesses
-		{
-			PanicsUnderPressure,
-			GreatUnderPressure
-		}
-
-		public enum ActionType : int
-		{
-			Target,
-			FireAt,
-			Ram,
-			DeployCounterMeasure,
-			DeployMine,
-			DeployProbe
-		}
-
-		public enum PRODUCTS
-		{
-			None = 0,
-			
-			ElectricalPower,
-			
-			// Fuels
-			
-			
-			// Emissions and Signatures
-			MicrowaveEmission,
-			MicrowaveReflection,
-
-			// Damage Types
-			MicrowaveDamage = 1024,
-			FireDamage,
-			PlasmaFireDamage,
-			VaccumDamage,
-			RadiationDamage,
-			PressureDamage,   // eg too deep underwater or within a Gas Giant's atmosphere
-			
-			CommandBoost = 2048,
-			MoraleBoost,   // like all modifiers, this too can actually be either negative or positive
-
-			// Skill Modifiers
-			TacticalOperationsSkillModifier = 4096,
-			TargetingSkillModifier,
-
-			Haggling
-		}
-
-
-			 
-	
-		public enum SKILLS
-		{
-			HelmOperations,
-			TacticalOperations,
-			Piloting,
-			Targeting,
-			Engineering,
-			SensorOperations,
-
-			Command,
-			Morale
-		}
-
-		public enum PRODUCT_DISTRIBUTION_TYPE
-		{
-			List = 0,
-			Region
-		}
 		
 		public struct Production
     	{
@@ -5929,73 +6028,6 @@ return (0,0);
 	
 	
 	
-	public class Query
-	{
-		// should NOT need to be concurrent, correct?
-		Dictionary<string, object> mKVPs = new Dictionary<string, object>();
-
-
-		public void Add(string name, object value)
-		{
-			if (mKVPs == null) mKVPs = new Dictionary<string, object>();
-
-			mKVPs.Add (name, value);
-		}
-	}
-
-
-	/// <summary>
-	/// Rules should be sorted from highest number of Conditions to lowest so that we always test against highest number first so we can potentially early-exit
-	/// <summary>
-	public class Rule
-	{
-		public string Concept;
-		public string Description;
-		public Condition[] Conditions;
-		//public Response Response;
-		//public Remember Remember;
-		//public Trigger Trigger;
-
-		public void Add(Condition c)
-		{
-			// following is using Keystone namespace but actually is in KeyStandardLibrary
-			// Keystone.Extensions.ArrayExtensions.	
-		}
-
-		public void Remove (Condition c)
-		{
-
-		}
-	}
-							
-	public class Condition
-	{
-		public string Name;
-		public string Description;
-		public int operandLeft;
-		public int operandRight;
-		public int evalType;
-
-		// geater than
-		public bool Evaluate()
-		{
-			switch (evalType)
-			{
-				case 0:
-					 return operandLeft < operandRight;
-
-				case 1:
-					 return operandLeft > operandRight;
-
-				case 2:
-					return operandLeft == operandRight;
-				default:
-					throw new ArgumentOutOfRangeException("Condition.Evaluate() - Unexpected evalType '" + evalType.ToString() + "'");
-			}
-		}
-	}
-
-
 	
 
 	
@@ -6043,12 +6075,28 @@ return (0,0);
 		public Membership[] Memberships;
 		public Skill[] Skills;
 		
-		//public double
+		// LivingEntity vs Component both have this mRuntimeFlags but they are unique to each interface because typically LivingEntity and Component structs DO NOT exist within the same Entity.
+		// - this could conceivably change in the future if for instance a Cyborg or Robot was also a "Character" that was needed the LivingEntity struct.
+		public uint mRuntimeFlags;
 
 		public double GetAge(double currentTime)
 		{
 			return currentTime - CreationDateTime;
 		}
+	}
+	
+	[Flags]
+	public enum USER_RUNTIME_FLAGS : uint
+	{
+		IsPowered =          0,
+		IsFueled =            1 << 0,
+		IsHealthyEnough =    1 << 1, 
+		OperatorHasSkills =  1 << 2, 
+		IsOperatorStatusOK = 1 << 3,
+		IsInUse =            1 << 4,  // aka isFiring for weapons)
+		CanAct =             1 << 5,  // (for tacticalStations),
+		IsReloading =        1 << 6, 
+		IsUnJamming =        1 << 7 // denotes a quick fix in the field requiring less than 1 minute to resolve (isFixingMinorMalfunction), 
 	}
 			
 		
@@ -6057,13 +6105,10 @@ return (0,0);
 		//public Consumption[] Consumption; // eg. all components can consume damage.  
 	public struct Component  // aka: "Useable Component"
     {
-      
 		public int EntityID; //  this is the bSim.Boids[] element index and NOT the Memory<T> Index of this Component.  in KGB this will be the Guid.NewGuid().ToString() results in a 36 character string.
         public string FullName;
 		
-			
 		public int Level; // technological level. 
-
 		
         public float MaterialQuality; // cheap vs very fine materials (eg poorly refined steel vs damascus steel)
         public float Craftsmanship;   // how well the item is put together or manufactured (often taking into account the skill level of the maker)
@@ -6101,15 +6146,21 @@ return (0,0);
 
         // runtime
 		public int[] OperatorIDs;
-		public uint mRuntimeFlags;
+		// LivingEntity vs Component both have this mRuntimeFlags but they are unique to each interface because typically LivingEntity and Component structs DO NOT exist within the same Entity.
+		// - this could conceivably change in the future if for instance a Cyborg or Robot was also a "Character" that was needed the LivingEntity struct. 
+		public uint mUserRuntimeFlags;
+		public uint mUserStructFlags;
 		
 		public int CurrentHP; // HitPoints - Damage == CurrentHP;
 		
-        public bool InUse;
 		
 		public float StartTime; // when "Use" began
 		public float Duration;  // if the "Use" is of a set Duration, track how long that Duration is... for instance, a sleep duration might be 6 hours of gameTime
 		
+		// todo: these bools would go into runtime stats as bitflags
+		// along with isPowered, isFueld, isHealthyEnough, hasSkills, isOperatorStatusOK, isInUse(aka isFiring for weapons), canAct (for tacticalStations),
+		// isReloading, isUnJamming (isFixingMalfunction), 
+        public bool InUse;
 		public bool Looping; // Repeating
 		public float CooldownDuration; 
 		
@@ -6123,7 +6174,27 @@ return (0,0);
 		{
  		}
 		
-		public bool IsPowered(out string errorReason)
+		public void SetUserStructFlag(uint flag, bool value)
+		{
+			mUserStructFlags |= flag;
+		}
+		
+		public bool	GetUserStructFlag(uint flag)
+		{
+			return (flag & mUserStructFlags) != 0;	
+		}
+		
+		public void SetUserRuntimeFlag(uint flag, bool value)
+		{
+			mUserRuntimeFlags |= flag;
+		}
+		
+		public bool GetUserRuntimeFlag(uint flag)
+		{
+			return (flag & mUserRuntimeFlags) != 0;	
+		}
+							
+		public bool DoIsPowered(out string errorReason)
 		{
 			errorReason = null;
 			bool result = true;
@@ -6132,7 +6203,7 @@ return (0,0);
 			return result;
 		}
 		
-		public bool IsFueled(out string errorReason)
+		public bool DoIsFueled(out string errorReason)
 		{
 			errorReason = null;
 			bool result = true;
@@ -6141,7 +6212,7 @@ return (0,0);
 			return result;
 		}
 		
-		public bool IsHealthyEnough(out string errorReason)
+		public bool DoIsHealthyEnough(out string errorReason)
 		{
 			errorReason = null;
 			bool result = true;
@@ -6154,7 +6225,7 @@ return (0,0);
 		/// Verify if the Component Requires an Operator(s) and whether the Operator(s)
 		/// have the required Skills to use this Component
 		/// </summary>
-		public bool IsOperatorStatusCheckOK(out string errorReason)
+		public bool DoIsOperatorStatusCheckOK(out string errorReason)
 		{
 			const float DAMAGE_PERCENT_THRESHOLD = 0.33f;
 		
@@ -6226,21 +6297,124 @@ return (0,0);
 								return false;
 							}
 						}
-
 					}
 				}
 			}
 		
 			return true;
 		}	
-
+		
+		public bool IsInUse 
+		{
+			get {return (mUserRuntimeFlags & (uint)USER_RUNTIME_FLAGS.IsInUse) == (uint)USER_RUNTIME_FLAGS.IsInUse;}
+			set 
+			{
+				if (value)
+                	mUserRuntimeFlags |= (uint)USER_RUNTIME_FLAGS.IsInUse;
+                else
+                    mUserRuntimeFlags &= ~(uint)USER_RUNTIME_FLAGS.IsInUse;
+			}
+		}
+		
+		public bool CanAct 
+		{
+			get {return (mUserRuntimeFlags & (uint)USER_RUNTIME_FLAGS.CanAct) == (uint)USER_RUNTIME_FLAGS.CanAct;}
+			set 
+			{
+				if (value)
+                	mUserRuntimeFlags |= (uint)USER_RUNTIME_FLAGS.CanAct;
+                else
+                    mUserRuntimeFlags &= ~(uint)USER_RUNTIME_FLAGS.CanAct;
+			}
+		}
+		
+		public bool IsPowered 
+		{
+			get {return (mUserRuntimeFlags & (uint)USER_RUNTIME_FLAGS.IsPowered) == (uint)USER_RUNTIME_FLAGS.IsPowered;}
+			set 
+			{
+				if (value)
+                	mUserRuntimeFlags |= (uint)USER_RUNTIME_FLAGS.IsPowered;
+                else
+                    mUserRuntimeFlags &= ~(uint)USER_RUNTIME_FLAGS.IsPowered;
+			}
+		}
+		
+		public bool IsFueled 
+		{
+			get {return (mUserRuntimeFlags & (uint)USER_RUNTIME_FLAGS.IsFueled) == (uint)USER_RUNTIME_FLAGS.IsFueled;}
+			set 
+			{
+				if (value)
+                	mUserRuntimeFlags |= (uint)USER_RUNTIME_FLAGS.IsFueled;
+                else
+                    mUserRuntimeFlags &= ~(uint)USER_RUNTIME_FLAGS.IsFueled;
+			}
+		}
+		
+		public bool IsHealthyEnough // component is healthy enough and can function
+		{
+			get {return (mUserRuntimeFlags & (uint)USER_RUNTIME_FLAGS.IsHealthyEnough) == (uint)USER_RUNTIME_FLAGS.IsHealthyEnough;}
+			set 
+			{
+				if (value)
+                	mUserRuntimeFlags |= (uint)USER_RUNTIME_FLAGS.IsHealthyEnough;
+                else
+                    mUserRuntimeFlags &= ~(uint)USER_RUNTIME_FLAGS.IsHealthyEnough;
+			}
+		}
+				
+		public bool IsOperatorStatusOK // operator is healthy enough
+		{
+			get {return (mUserRuntimeFlags & (uint)USER_RUNTIME_FLAGS.IsOperatorStatusOK) == (uint)USER_RUNTIME_FLAGS.IsOperatorStatusOK;}
+			set 
+			{
+				if (value)
+                	mUserRuntimeFlags |= (uint)USER_RUNTIME_FLAGS.IsOperatorStatusOK;
+                else
+                    mUserRuntimeFlags &= ~(uint)USER_RUNTIME_FLAGS.IsOperatorStatusOK;
+			}
+		}
+		
+		public bool OperatorHasSkills 
+		{
+			get {return (mUserRuntimeFlags & (uint)USER_RUNTIME_FLAGS.OperatorHasSkills) == (uint)USER_RUNTIME_FLAGS.OperatorHasSkills;}
+			set 
+			{
+				if (value)
+                	mUserRuntimeFlags |= (uint)USER_RUNTIME_FLAGS.OperatorHasSkills;
+                else
+                    mUserRuntimeFlags &= ~(uint)USER_RUNTIME_FLAGS.OperatorHasSkills;
+			}
+		}
+		
+		public bool IsReloading 
+		{
+			get {return (mUserRuntimeFlags & (uint)USER_RUNTIME_FLAGS.IsReloading) == (uint)USER_RUNTIME_FLAGS.IsReloading;}
+			set 
+			{
+				if (value)
+                	mUserRuntimeFlags |= (uint)USER_RUNTIME_FLAGS.IsReloading;
+                else
+                    mUserRuntimeFlags &= ~(uint)USER_RUNTIME_FLAGS.IsReloading;
+			}
+		}
+		
+		
+		public bool IsUnJamming // aka fixing a minor malfuction that can be resolved in under 60 seconds
+		{
+			get {return (mUserRuntimeFlags & (uint)USER_RUNTIME_FLAGS.IsUnJamming) == (uint)USER_RUNTIME_FLAGS.IsUnJamming;}
+			set 
+			{
+				if (value)
+                	mUserRuntimeFlags |= (uint)USER_RUNTIME_FLAGS.IsUnJamming;
+                else
+                    mUserRuntimeFlags &= ~(uint)USER_RUNTIME_FLAGS.IsUnJamming;
+			}
+		}
+		
+		
 	}
-	
-	
-	
-	
-	
-	
 	
 	
 	public struct TacticalStation
@@ -6316,8 +6490,7 @@ return (0,0);
 			//  - bonus for damage
 			//  and remember, it's the tactical station that keeps track of all the weapons available and the targets (including friendlies)
 			
-
-					
+				
 			// stealth
 			
 			// target last acquisition - previous aquisition makes it easier to re-aquire
@@ -6449,7 +6622,9 @@ return (0,0);
         // kinetic energy type weapons build parameters 
         public float Bore;
         public int BarrelLength;
-                
+        public bool Reliable;
+		public bool Compact;
+		
         // stats
         public int RoF;
         
@@ -6488,11 +6663,11 @@ return (0,0);
 		//			public string Direction;
 		
         // runtime flags
-        public bool IsFiring;
+        //public bool IsFiring; // todo: for weapons this is Component.isInUse, 
         public bool IsReloading;
         public bool IsUnJamming; // represents fix of minor malfunction... does not require a "repair"
-        public bool IsPowered;
-        public bool IsHealthy;
+        //public bool IsPowered;
+        //public bool IsHealthy;
         
         // nested weapon.  
         //public Weapon SecondaryWeapon;
@@ -6516,17 +6691,15 @@ return (0,0);
 		
 		// beam specific
 		public int Type;       // type is really just about what types of Damage(s) (ProductID(s)) it results in such as Paralysis, Crushing, Burning, Impaling
-		public float Duration;   // duration of the firing animation in seconds.  This probably doesn't need to be here.  It should be reflected in the Cyclic Rate and RoF cooldowns instead.
-
+		
 		public bool EnergyDrill;
 		public bool FTL;
-		public bool Reliable;
-		public bool Compact;
+
 		
 		public float BeamOutput;    // kJ - kiloJoules -  what is the difference between this and kW of power... is it the convsion rate of the input power to the output power?
 		public float CyclicRate;    //   Expressed as a cooldown value.  The maximum possible firing rate of the weapon without considering overheating or ammunition capacity. Often, RoF and CyclicRate are the same, but CyclicRate is theoretical maximum given mechanics of the weapon
 		
-		public double PowerReqt;
+		public double PowerReqt;    // todo: this might be part of PoweredComponent struct.  Depends on whether we just put it into Component struct because PoweredComponent struct may not have many fields to hold... but then again, that is not entirely bad is it as long as we are good at only doing updates to one struct at a time.  For instance, applying / distributing power to all Powered structs in one swoop
 
 
 		// TODO: these are like "internal" items and can be used if another power source is no longer connected

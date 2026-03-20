@@ -87,7 +87,7 @@ using System.IO;
 			// We probably must HASH the GUID and use that as a way to sort Entities in our List<EntityNode>
 
 					
-	`		//
+	    	//
 			// // https://erikmcclure.com/blog/multithreading-problems-in-game-design/
 			/*
 			Updating game entities in parallel while maintaining determinism requires strict control over update ordering and data access, typically achieved using an Entity-Component-System (ECS) architecture with a job system or double-buffering. Determinism ensures that given the same initial state and inputs, the simulation produces identical results every time, regardless of the machine or number of CPU cores used.Reddit
@@ -220,7 +220,7 @@ namespace HelloBoids
         public static double DEPTH = 800d;
 		public static double BOID_SIZE = 2d;             // since this is 2D, we need a size for the Octree's Z depth 
 		public static uint NUM_ENTRIES = 768;
-        public static uint NUM_ITERATIONS = 20;
+        public static uint NUM_ITERATIONS = 400;
         public static double MAX_RUNTIME_SECONDS = 5.5;
 		
 		// Note: the larger the various distance values below,
@@ -1474,7 +1474,7 @@ namespace HelloBoids
 #if USE_MEMORY_T
 		
 		
-        private System.Collections.Concurrent.ConcurrentDictionary<int, List<int>> mNeighbors = new System.Collections.Concurrent.ConcurrentDictionary<int, List<int>>();
+        private System.Collections.Concurrent.ConcurrentDictionary<int, List<Tuple<int, double>>> mNeighbors = new System.Collections.Concurrent.ConcurrentDictionary<int, List<Tuple<int, double>>>();
 
 		///<summary>
 		/// The Droid's Eyes are treated as Optical Sensors and are processed to find the adjacent Droids to each other Droids based on their sight distance.
@@ -1525,14 +1525,14 @@ namespace HelloBoids
 				Span<Transform.Transform_Struct> memSpan = store.Span;
 				EntityNode currentBoid = Boids[(int)i];
 				
-				mNeighbors.TryAdd(currentBoid.SpanIndex, new List<int>(4));
+				mNeighbors.TryAdd(currentBoid.SpanIndex, new List<Tuple<int, double>>(4));
 				
 		#if SPATIAL_SEARCH == false
 
 			   if (i > Boids.Count - 1)
 				   Console.WriteLine("ProcessOpticalScanners() - Out of range i == " + i.ToString() + " but count == " + Boids.Count.ToString());
 
-				mNeighbors[currentBoid.SpanIndex] = GetNeighbors(Boids[i], largestDistance, largestDistanceSquared);
+				mNeighbors[currentBoid.SpanIndex] =   GetNeighbors(Boids[i], largestDistance, largestDistanceSquared);
 		#endif
 				
 			
@@ -1585,7 +1585,11 @@ namespace HelloBoids
 
 									if (currentOctant.MaxRadius * 2d <= largestDistance)
 									{
-							 			mNeighbors[currentBoid.SpanIndex].Add(potentialNeighbor.SpanIndex);
+										double distanceToNeighboringBoidSquared;
+										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
+										distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[potentialNeighbor.SpanIndex].Translation, memSpan[(int)i].Translation);
+										
+							 			mNeighbors[currentBoid.SpanIndex].Add(new Tuple<int, double> (potentialNeighbor.SpanIndex, distanceToNeighboringBoidSquared));
                          			}   
                          			else
 									{   
@@ -1606,7 +1610,7 @@ namespace HelloBoids
 										//System.Diagnostics.Debug.WriteLine("Calculated distanceSquared to neighboring boid = " + distanceToNeighboringBoidSquared.ToString());
 										if (distanceToNeighboringBoidSquared <= largestDistanceSquared)
 
-											mNeighbors[currentBoid.SpanIndex].Add(potentialNeighbor.SpanIndex);
+											mNeighbors[currentBoid.SpanIndex].Add(new Tuple<int, double>(potentialNeighbor.SpanIndex, distanceToNeighboringBoidSquared));
      								}       
              					}  // end for ents[]        
 							}
@@ -1908,15 +1912,26 @@ namespace HelloBoids
         	//Console.WriteLine("DoDeviceReadyStatus()");
 			DoDeviceReadyStatus();
 			
+			
+			
 			//Console.WriteLine("DoStationCanActStatus()");
 			DoStationCanActStatus();
 			//Console.WriteLine("continuing Do_Droid_Logic()");
 			
+			
+			
 			DoEnableDisableSensors();
 			
+			
+			
+			//Console.WriteLine("DoContactListSorting()");
 			DoContactListSorting(); // based on policies
 			
+			
+			
+			//Console.WriteLine("DoTargetPrioritization()");
 			DoTargetPrioritization();
+			
 			
 			// todo: if we had a list of all weapons for every ship to pass all at once
 			//       as well as all targets for each ship to pass all at once, we could run this
@@ -1925,35 +1940,22 @@ namespace HelloBoids
 			
 			
 			
+			
 			DoWeaponsCanFire();
 			
-			
-			
-			
+
 			
 			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 						
-			// MicroExpressionEvaluator is a neat little library!  Very fast and Very compact and easy to use with web compilers like DotNetFiddle since its just one
-			// completely self contained class with no depenedancies that i can just paste into this single .cs script!
-			// https://github.com/webermania/MicroExpressionEvaluator
-			string logicalExpression = "false != true";
-			//bool result = MicroEx.Evaluate(logicalExpression);
-			//Console.WriteLine ("Do_Droid_Logic() - MicroEx.Evaluate() - '" + logicalExpression + "' " + result.ToString());
-			
-			// TODO: this is just referencing the ONE stationOperator memory<T> not allLivingEntities so we use [0] not [i]
-			logicalExpression = 1.ToString() + " < " + 2.ToString();
-			bool result = MicroEx.Evaluate(logicalExpression);
-			//Console.WriteLine ("Do_Droid_Logic() - MicroEx.Evaluate() - '" + logicalExpression + "' " + result.ToString());
-					
 			
 			int count = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 				
 			//for (int i = 0; i < Boids.Count; i++)
             {
 				Boid currentBoid = Boids[i];
-				List<int> neighbors = null;
+				List<Tuple<int, double>> neighbors = null;
 				
 				try
 				{
@@ -1964,9 +1966,10 @@ namespace HelloBoids
 					Console.WriteLine("Do_Droid_Logic() -  key '" + currentBoid.SpanIndex.ToString() + "' does not exist. " + ex.Message);
 				}
 				
-				//Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component));
 				int componentIndex;
-				Memory<LivingEntity> stationOperator = (Memory<LivingEntity>) currentBoid.GetUserStruct(typeof(LivingEntity), out componentIndex);
+				Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component), out componentIndex);
+				int livingEntityIndex;
+				Memory<LivingEntity> stationOperator = (Memory<LivingEntity>) currentBoid.GetUserStruct(typeof(LivingEntity), out livingEntityIndex);
 				int tacticalIndex;
 				Memory<TacticalStation> tacticalStation = (Memory<TacticalStation>) currentBoid.GetUserStruct(typeof(TacticalStation), out tacticalIndex);
 				int wepIndex;
@@ -1993,7 +1996,6 @@ namespace HelloBoids
 				//      - any Contacts in list marked as FOF.Foe + FOF.Hostile as opposed to just FOF.Foe (note: stale contacts are still treated as available in case of need to persue)
 				//      	- FOF.Withdrawing may be ignored for example if ROE says we don't persue in this circumstance including disabled ships and unarmed ships like freighters
 				
-
 				string timerID = currentBoid.SpanIndex.ToString();
 				bool canFire = false;
 				
@@ -2163,7 +2165,77 @@ namespace HelloBoids
 		/// </summary>
 		private void DoContactListSorting()
 		{
+			int count = Boids.Count;
+            System.Threading.Tasks.Parallel.For(0, count, i => 		
+			{
+				Boid current = Boids[i];
+				List<Tuple<int, double>> neighbors = null;
+				bool success = mNeighbors.TryGetValue(current.SpanIndex, out neighbors);
+					
+				if (success)
+				{
+					//Console.WriteLine("abc");
+					List<SensorContact> contacts = new List<SensorContact>();
+					for (int j = 0; j < neighbors.Count; j++)
+					{
+						SensorContact c = new SensorContact ();
+				
+						// NOTE: Here we will only have one set of SensorContacts and never any duplicates
+						//       because each Droid only has one Sensor (optical sensors == eyes)
+						c.ContactIndex = neighbors[(int)j].Item1; // index within the Boid[] array of the detected Droid
+						c.Index = (int)i;
+
+						//Console.WriteLine("def");
+						Boid b =  this.Boids[c.ContactIndex];
+						c.Position = b.Translation;
+						c.Velocity = b.Velocity;
+						c.Distance = 0; //distances[i];
+						// float Heading
+
+						//Console.WriteLine("ghi");
+						// contact details
+						// string Name; // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
+						// string RegistryNumber;
+						// int ContactIndex;    // EntityIndex
+						// TYPE Type;
+						// FoF FriendOrFoe;
+						// SIZE Size;	
+
+						// sensor specific details
+						// long TimeAcquired;
+						// int AcquisitionStatus;   // New, UpToDate, AcquisitionLost,  contact if HistoryLength > 1 but this ContactStatus == AcquisitionLost
+						// Target.STATUS ContactStatus;
+
+						// int[] SensorsIndices;   // the sensorIDs that have all acquired this target
+						// string[] SensorsTypes;  // the types of Sensors corresponding to the SensorsIndices
+						
+						contacts.Add(c);
+					}
+				}	 
+			});
+				
+			// each droid' TacticalStation needs to store a list of the merged SensorContacts
 			
+			
+												
+
+			/*
+			public struct SensorContact // NOTE: our Droids have one optical sensor... a single binocular system comprised of two eyes
+			{
+				const int HistoryLength = 1;
+			}
+	
+			Target t = new Target()
+			t.EntityIndex = 
+			t.WeaponsAssigned;
+			t.TargetedBy;      // other Ships/Vehciles/Entities, ground radars, factions, etc that are targeting this Target
+			t.Status = 
+			t.CrewStatus = 
+			t.Hitpoints =   ; // max hitpoints of target... should a Sensor be able to know this exact number?  It's really just a game thing and maybe we should just use visual observations of condition of ship instead
+			t.CurrentHitpoints =   ; // used to determine % damage of Target
+			*/
+			
+
 		}
 		
 		/// <summary>
@@ -2195,7 +2267,6 @@ namespace HelloBoids
 			// - sparring
 			// - theater (performances, orchestras, bands, etc)
 			// - nap/sleep
-				
 		}
 			
 		/// <summary>
@@ -2210,7 +2281,7 @@ namespace HelloBoids
 			
 			if (ship == null || target == null) 
 			{
-				Console.WriteLine("DoWeaponFitnessScores() - paramters 'ship' or 'target' is null.");
+				//Console.WriteLine("DoWeaponFitnessScores() - paramters 'ship' or 'target' is null.");
 				return null;
 			}
 			
@@ -2448,7 +2519,7 @@ namespace HelloBoids
 				//      because the code inside the Paralle.For() is treated as a Lambda
 				Span<Transform.Transform_Struct> memSpan = store.Span;
 				EntityNode currentBoid = Boids[(int)i];
-				List<int>neighbors;
+				List<Tuple<int, double>>neighbors;
 				bool r = mNeighbors.TryGetValue(currentBoid.SpanIndex, out neighbors); 
 				
 				if (neighbors == null || neighbors.Count == 0) return;
@@ -2456,7 +2527,7 @@ namespace HelloBoids
 				
 				// DEBUG TEST
 				for (int z = 0; z < nCount; z++)
-					if (neighbors[z] > length  - 1)
+					if (neighbors[z].Item1 > length  - 1)
 						Console.WriteLine("Neighbor value is OUT OF RANGE " + neighbors[z].ToString());
 				
 				// END TEST
@@ -2482,7 +2553,7 @@ namespace HelloBoids
                         for (int j = 0; j < nCount; j++)
                         {
                             //if (j == currentIndex) continue; // <- this check will already have been performed in building of neighbors list
-                            double distanceSquared = Vector3d.GetDistance3dSquared(memSpan[(int)i].Translation, memSpan[neighbors[j]].Translation);
+                            double distanceSquared = Vector3d.GetDistance3dSquared(memSpan[(int)i].Translation, memSpan[neighbors[j].Item1].Translation);
 							//double distanceSquared = Vector3d.GetDistance3dSquared(currentBoidTranslation, memSpan[neighbors[j]].Translation);
 							
                             if (distanceSquared < seperatationDistanceSquare)
@@ -2490,7 +2561,7 @@ namespace HelloBoids
                                 if (distanceSquared > 0d) // Hypnotron Dec.4.2025 - required divide by 0 check
                                 {
                                     // TODO: are these two results equal?
-                                    steer += (memSpan[(int)i].Translation - memSpan[neighbors[j]].Translation) / separationDistance ;
+                                    steer += (memSpan[(int)i].Translation - memSpan[neighbors[j].Item1].Translation) / separationDistance ;
 									//steer += (currentBoidTranslation - memSpan[neighbors[j]].Translation) / separationDistance ;
                                 }
                             }
@@ -2514,12 +2585,12 @@ namespace HelloBoids
                         for (int j = 0; j < neighbors.Count; j++)
                         {
                             //if (j == currentIndex) continue; // <- this check will already have been performed in building of neighbors list
-                            double distanceSquared = Vector3d.GetDistance3dSquared(memSpan[(int)i].Translation, memSpan[neighbors[j]].Translation);
+                            double distanceSquared = Vector3d.GetDistance3dSquared(memSpan[(int)i].Translation, memSpan[neighbors[j].Item1].Translation);
 							//double distanceSquared = Vector3d.GetDistance3dSquared(currentBoidTranslation, memSpan[neighbors[j]].Translation);
 							
                             if (distanceSquared < alignmentDistanceSquared)
                             {
-                                neighborsVelocity += memSpan[neighbors[j]].Velocity;
+                                neighborsVelocity += memSpan[neighbors[j].Item1].Velocity;
                                 foundCount++;
                             }
                         }
@@ -2548,7 +2619,7 @@ namespace HelloBoids
                     {
                         for (int j = 0; j < nCount; j++)
                             //if (j == currentIndex) continue; // <- this check will already have been performed in building of neighbors list
-                            neighborsAvgCenter += memSpan[neighbors[j]].Translation;
+                            neighborsAvgCenter += memSpan[neighbors[j].Item1].Translation;
 
                         neighborsAvgCenter /= nCount;
                         coh = (neighborsAvgCenter - memSpan[(int)i].Translation) * cohesionFactor;
@@ -2604,7 +2675,7 @@ namespace HelloBoids
         		
 		
 		
-		private List<EntityNode> FindNearestTarget (EntityNode currentBoid, List<int> neighbors, out double[] distances)
+		private List<EntityNode> FindNearestTarget (EntityNode currentBoid, List<Tuple<int, double>> neighbors, out double[] distances)
 		{
 			distances = null;
 			if (neighbors == null || neighbors.Count == 0) return null;
@@ -2614,7 +2685,7 @@ namespace HelloBoids
 						
 			for (int i = 0; i < neighbors.Count; i++)
 			{
-				Boid currentTarget = Boids[neighbors[i]];
+				Boid currentTarget = Boids[neighbors[i].Item1];
 				distances[i] = Vector3d.GetDistance3dSquared(currentBoid.Translation, currentTarget.Translation);
 				tmp[i] = currentTarget;
 			}
@@ -2628,19 +2699,22 @@ namespace HelloBoids
 		///<summary>
 		/// This is the target that the operator (either crew member or computer) of a Targeting Crew Station
 		/// will be attempting to fire upon.  
+		/// Return value is a List of Tuples containing the EntityNode and Distance to that Entity
 		/// </summary>
-		private List<EntityNode> FindNearestTarget (EntityNode source, double maxDistance)
+		private List<Tuple<EntityNode, double>> FindNearestTarget (EntityNode source, double maxDistance)
 		{
 			BoundingBox searchArea = new BoundingBox (source.SpatialNode.BoundingBox.Center, maxDistance * 0.5d);
 			double maxDistanceSquared = maxDistance * maxDistance;
 			
-			Func<EntityNode, EntityNode, bool> match = (current, neighbor) =>            {
-                if (current == neighbor) return false;
-                if (Vector3d.GetDistance3dSquared(neighbor.Translation, current.Translation) <= maxDistanceSquared) return true;
-                return false;
+			Func<EntityNode, EntityNode, Tuple<bool, double>> match = (current, neighbor) =>            {
+                
+				if (current == neighbor) return new Tuple<bool, double>(false, -1);
+                double distanceSquared = Vector3d.GetDistance3dSquared(neighbor.Translation, current.Translation);
+				if (distanceSquared <= maxDistanceSquared) return new Tuple<bool, double>(true, distanceSquared);
+                return new Tuple<bool, double>(false, -1);
             };
 			
-			List<EntityNode> found  = this.Octree.Query(source, true, searchArea, match);
+			List<Tuple<EntityNode, double>> found  = this.Octree.Query(source, true, searchArea, match);
 			if (found == null) return null;
 			
 			//Console.WriteLine("FindNearestTarget found count == " + found.Count.ToString());
@@ -6046,12 +6120,18 @@ return (0,0);
 			Enormous
 		}
 		
-		const int HistoryLength = 1;
-		public long TimeAcquired;
-		public int AcquisitionStatus;   // New, UpToDate, AcquisitionLost,  contact if HistoryLength > 1 but this ContactStatus == AcquisitionLost
-		public Target.STATUS ContactStatus;
-		public int Index;
-		public int ContactIndex;    // EntityIndex
+		
+				
+		public int Index;           // Index of this Contact within the Memory<T> contacts? Or, the Index of the TactialStation or Sensor that detected this Contact?
+		
+		public int ContactIndex;       // EntityIndex
+		public string Name;            // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
+		public string RegistryNumber;
+		
+		public TYPE Type;              // unknown, mine, missile, satelite, carrier, asteroid, frigate, etc.
+		public FoF FriendOrFoe;
+		public SIZE Size;
+		
 		public Vector3d Position;
 		public Vector3d Velocity;
 		public double Distance;     // range to target
@@ -6069,13 +6149,11 @@ return (0,0);
 		If you are facing North (Heading) and a target is to your right, the relative bearing is 
 		(East). If you turn East to follow it, your new heading is, but the bearing to the target changes as you close the distance. 
 		*/
-	
-		public TYPE Type;
-		public FoF FriendOrFoe;
-		public SIZE Size;
-		
-		public string Name; // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
-		public string RegistryNumber;
+
+
+		public long TimeAcquired;
+		public int AcquisitionStatus;   // New, UpToDate, AcquisitionLost,  contact if HistoryLength > 1 but this ContactStatus == AcquisitionLost
+		public Target.STATUS ContactStatus;
 		
 		public int[] SensorsIndices;   // the sensorIDs that have all acquired this target
 		public string[] SensorsTypes;  // the types of Sensors corresponding to the SensorsIndices
@@ -8197,7 +8275,7 @@ if (mEntityNodesCollection == null) return null;
         /// <param name="recurse"></param>
         /// <param name="match"></param>
         /// <returns></returns>
-        public virtual List<EntityNode> Query(EntityNode refEnt, bool recurse, BoundingBox searchArea, Func<EntityNode, EntityNode, bool> match)
+        public virtual List<Tuple<EntityNode, double>> Query(EntityNode refEnt, bool recurse, BoundingBox searchArea, Func<EntityNode, EntityNode, Tuple<bool, double>> match) // todo: maybe use Tuple<bool, object> 
         {
             if (match == null) throw new ArgumentNullException("SceneNode.Query() - match cannot be null.");
 
@@ -8205,13 +8283,14 @@ if (mEntityNodesCollection == null) return null;
                 return null;
             //Console.WriteLine ("Query B");
 
-            List<EntityNode> results = new List<EntityNode>();
+            List<Tuple<EntityNode, double>> results = new List<Tuple<EntityNode, double>>();
 
             if (mEntityNodesCollection != null)
                 for (int i = 0; i < mEntityNodesCollection.Count; i++)
                 {
-                    if (match(mEntityNodesCollection[i], refEnt))
-                        results.Add(mEntityNodesCollection[i]);
+					Tuple<bool, double> r = match(mEntityNodesCollection[i], refEnt);
+                    if (r.Item1)
+                        results.Add(new Tuple<EntityNode, double> (mEntityNodesCollection[i], r.Item2));
                 }
 //if (!recurse)
  //  Console.WriteLine("%%");
@@ -8226,7 +8305,7 @@ if (mEntityNodesCollection == null) return null;
                     {
 						if (mChildOctants[j] == null) continue;
 						
-                        List<EntityNode> nestedResults = mChildOctants[j].Query(refEnt, recurse, searchArea, match);
+                        List<Tuple<EntityNode, double>> nestedResults = mChildOctants[j].Query(refEnt, recurse, searchArea, match);
                         if (nestedResults != null)
                             results.AddRange(nestedResults);
 
@@ -16451,7 +16530,7 @@ if (mEntityNodesCollection == null) return null;
 
 	}
 	
-	/********************************************************************
+/********************************************************************
  *
  *  PropertyBag.cs
  *  --------------
@@ -16992,6 +17071,19 @@ if (mEntityNodesCollection == null) return null;
     }
 	
 	
+	/*
+	// MicroExpressionEvaluator (class MicroEx) is a neat little library!  Very fast and Very compact and easy to use with web compilers like DotNetFiddle since its just one
+			// completely self contained class with no depenedancies that i can just paste into this single .cs script!
+			// https://github.com/webermania/MicroExpressionEvaluator
+			string logicalExpression = "false != true";
+			//bool result = MicroEx.Evaluate(logicalExpression);
+			//Console.WriteLine ("Do_Droid_Logic() - MicroEx.Evaluate() - '" + logicalExpression + "' " + result.ToString());
+
+			// TODO: this is just referencing the ONE stationOperator memory<T> not allLivingEntities so we use [0] not [i]
+			logicalExpression = 1.ToString() + " < " + 2.ToString();
+			bool result = MicroEx.Evaluate(logicalExpression);
+			//Console.WriteLine ("Do_Droid_Logic() - MicroEx.Evaluate() - '" + logicalExpression + "' " + result.ToString());
+	*/	
 	
 	// https://github.com/webermania/MicroExpressionEvaluator
 	// Apache 2.0 license  // todo: include

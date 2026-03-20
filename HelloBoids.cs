@@ -35,7 +35,60 @@ using Microsoft.CSharp;
 using System.IO;
 
 
-// // https://erikmcclure.com/blog/multithreading-problems-in-game-design/
+
+			// @LT Gaming
+			// @ObsidianAnt
+			// @EnterElysium
+			// 
+			// The Art of Moebius (French artist with amazing scifi landscapes
+			// re: proc-gen of Moons in Elite Dangerous, "the composition of the regolith and atmosphere tends to match that of the host planet they orbit, just as our moon is similar to Earth)
+
+			// "Starship EVO"           <-- like the simple geometry, materials with no textures
+			// "Fallen Frontier"
+			// "C-Beams"
+			// "D.O.R.F RTS"
+			// "SAD:Frontier"           <-- newtonian
+			// "Children of Dead Earth" <-- newtonian + n-body gravitation, ship building, space combat
+			
+
+			// NOTES: On Indices and GUIDS
+			//   
+			//       that also contained UserTypeID
+			//       Actually, we can store the UserInterfaceStruct flags in a uint bitflag, we just
+			//       use that to determine  if we should call GetUserStruct<> for the various structs.
+			//       Enum.HasFlag() used to be slow in older versions of .net, but direct bitwise
+			//       operations has always been very fast so we should use them so we know whether
+			//       a specific type of user struct exists before calling GetUseStruct(type);
+
+			// Entity.mUserTypeID is required. mUserTypeID does NOT belong in Component or LivingEntity
+			// 
+			// KGB DOES need a GUID primarily because of saved prefabs that can be created by and shared amongst all players.
+			// 
+			// TODO: the problem with KGB is GUID needs to be kept in the saved XML, but index refers to where its
+			//       stored in these ComponentStore<T>   so what do we do here?  I dont think we can guarantee
+			//       the order of Entities within these arrays across server and clients.  These
+			//       structs must always be local machine ONLY.  
+
+			// A HASH of EntityIDs could yeild an Integer that we can use for sorting them within a List<>
+			// This then needs to constantly update whenever Entities are Added/Removed from the Scene...
+			// Also for MMO, this needs to be managed for each "ZONE" 
+			// https://discussions.unity.com/t/staticentityidrange-for-simple-fast-scene-loading-and-external-entity-refs/725631/7
+
+			// if we use an unsigned long for our entity IDs that gives us 18446744073709551615 
+			// if we allow up to max uint for number of Entities in a given game that is 4,294,967,295
+			// that allows for 4,294,967,295 unique games containing 4,294,967,295 unique Entities.
+			// or more games if the max number of Entities in any is less.
+			// For reference, Counterstrike is said to have total number of matches in the TENS of BILLIONS
+			// since 1999 to 2026
+			// BUT THERE IS A MAJOR PROBLEM WITH THESE ENTITY RANGES FOR A GAME LIKE SCIFICOMMAND where 
+			// anyone can create prefabs.... they would always need to grab an unique INT from a SERVER
+			// to ensure uniqueness across the prefabs of all other creators, including those assets made for the official released version of ScifiCommand.
+			// So, GUID is  better...  
+			// We probably must HASH the GUID and use that as a way to sort Entities in our List<EntityNode>
+
+					
+	`		//
+			// // https://erikmcclure.com/blog/multithreading-problems-in-game-design/
 			/*
 			Updating game entities in parallel while maintaining determinism requires strict control over update ordering and data access, typically achieved using an Entity-Component-System (ECS) architecture with a job system or double-buffering. Determinism ensures that given the same initial state and inputs, the simulation produces identical results every time, regardless of the machine or number of CPU cores used.Reddit
 			ReddiHere are the key approaches to achieve parallel, deterministic updates:
@@ -1858,7 +1911,25 @@ namespace HelloBoids
 			//Console.WriteLine("DoStationCanActStatus()");
 			DoStationCanActStatus();
 			//Console.WriteLine("continuing Do_Droid_Logic()");
+			
+			DoEnableDisableSensors();
+			
+			DoContactListSorting(); // based on policies
+			
+			DoTargetPrioritization();
+			
+			// todo: if we had a list of all weapons for every ship to pass all at once
+			//       as well as all targets for each ship to pass all at once, we could run this
+			//       processor in a single call from here...
+			DoWeaponFitnessScores(null, null);
+			
+			
+			
 			DoWeaponsCanFire();
+			
+			
+			
+			
 			
 			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
@@ -1894,9 +1965,12 @@ namespace HelloBoids
 				}
 				
 				//Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component));
-				Memory<LivingEntity> stationOperator = (Memory<LivingEntity>) currentBoid.GetUserStruct(typeof(LivingEntity));
-				Memory<TacticalStation> tacticalStation = (Memory<TacticalStation>) currentBoid.GetUserStruct(typeof(TacticalStation));
-    		    Memory<Weapon> wep = (Memory<Weapon>) currentBoid.GetUserStruct(typeof(Weapon));
+				int componentIndex;
+				Memory<LivingEntity> stationOperator = (Memory<LivingEntity>) currentBoid.GetUserStruct(typeof(LivingEntity), out componentIndex);
+				int tacticalIndex;
+				Memory<TacticalStation> tacticalStation = (Memory<TacticalStation>) currentBoid.GetUserStruct(typeof(TacticalStation), out tacticalIndex);
+				int wepIndex;
+    		    Memory<Weapon> wep = (Memory<Weapon>) currentBoid.GetUserStruct(typeof(Weapon), out wepIndex);
 				//Memory<Laser_Struct> laser = (Memory<Laser_Struct>)currentBoid.GetUserStruct(typeof(Laser_Struct)); //  Laser_Struct laser = (Laser_Struct)currentBoid.mMemStore_Laser.Span[0];
 				
 				// todo: we need to be able to get the indices we want
@@ -1906,7 +1980,7 @@ namespace HelloBoids
 				int operatorIndex = currentBoid.Index; // we pass Index and NOT SpanIndex because we want to find the Boid in the EntryClass.bSim.Boids[] List
 				int stationIndex = currentBoid.Index;  // for now, our Boid hosts both the TacticalStation and the Operator
 
-				if (!allComponents.Span[(int)currentBoid.SpanIndexComponent].CanAct) return;
+				if (!allComponents.Span[componentIndex].CanAct) return;
 							
 				
 				// NOTE: The EXE will render Sensor Contact info as necessary.
@@ -2039,7 +2113,8 @@ namespace HelloBoids
 				string errorReason;
 				if (allComponents.Span[(int)i].DoIsOperatorStatusCheckOK(out errorReason))
 				{
-					Memory<LivingEntity> livingEntity = (Memory<LivingEntity>) droid.GetUserStruct(typeof(LivingEntity)); //"HelloBoids.LivingEntity"); //();
+					int livingEntIndex;
+					Memory<LivingEntity> livingEntity = (Memory<LivingEntity>) droid.GetUserStruct(typeof(LivingEntity), out livingEntIndex); //"HelloBoids.LivingEntity"); //();
 
 					if (allComponents.Span[(int)i].DoIsPowered(out errorReason))
 					{
@@ -2068,6 +2143,121 @@ namespace HelloBoids
 				}
 			});
 		}
+		
+		
+		/// <summary>
+		/// based on policies
+		/// </summary>
+		private void DoEnableDisableSensors()
+		{
+			// TODO: this comment doesnt belong here, but for now remember
+			// HELM station would be influenced by Orders, Mission and Posture for example
+			// if ordered to defend another ship, helm would try to maneuver such that this ship
+			// is physically located between the ship-to-defend and a threat
+			
+			
+		}
+		
+		/// <summary>
+		/// based on policies
+		/// </summary>
+		private void DoContactListSorting()
+		{
+			
+		}
+		
+		/// <summary>
+		/// based on policies
+		/// </summary>
+		private void DoTargetPrioritization()
+		{
+			// a carrier with very few fighters remaining might be a low tactical threat
+			// but high strategic threat... 
+			// if a carrier is a primary mission objective that should increase its priority when scoring
+			
+			// a ship that is a primary target, but is not fleeing, can perhaps be scored lower since there will be time
+			// to target it later if there are more dangerous threats to deal with first.
+			// if a primary target is attempting to escape, the ETA that it will reach an escape trajectory should be used
+			// to wieght it's prioritization score
+			
+			// NPC non-jobs 
+			// -read
+			// - study for promotion
+			// - train for promotion
+			// - play cards, board games
+			// - socialize at cantina
+			// - meditate, spirtual seeking/studying
+			// - network with the crew
+			// - listen to music
+			// - play music/instrument
+			// - art (painting, sculpting, writing poetry, 
+			// - excercise, yoga, batleth*,  
+			// - sparring
+			// - theater (performances, orchestras, bands, etc)
+			// - nap/sleep
+				
+		}
+			
+		/// <summary>
+		/// based on policies
+		/// </summary>	
+		private double[] DoWeaponFitnessScores(EntityNode ship, EntityNode target)
+		{
+			// NOTE: weapon fitness scores of friendlies can be combined into one table to 
+			// determine how to coordinate firepower on various ships during combat
+			
+			// todo: we should estimate min, average, and max damage that each weapon might have against a particular target
+			
+			if (ship == null || target == null) 
+			{
+				Console.WriteLine("DoWeaponFitnessScores() - paramters 'ship' or 'target' is null.");
+				return null;
+			}
+			
+			// the different structs used for a "Laser" component 
+			//todo: i should pass the array of Memory<T> and the indices arrays
+			int componentIndex;
+			Memory<Component> component = (Memory<Component>)ship.GetUserStruct("HelloBoids.Component", out componentIndex);
+			int wepIndex;
+			Memory<Weapon> wep = (Memory<Weapon>)ship.GetUserStruct("HelloBoids.Weapon", out wepIndex);
+			int laserIndex; 
+			Memory<Laser_Struct> laser = (Memory<Laser_Struct>)ship.GetUserStruct("HelloBoids.Laser_Struct", out laserIndex);
+			
+			// todo: we need just all the weapons from this particular ship.  
+			// ComponetStore<Weapon> would contain ALL for ALL ships
+			ComponentStore<Weapon> allWeapons = (ComponentStore<Weapon>)EntryClass.mCStoreCol.CheckOut<Weapon>(0);
+			
+			// return just the ones for this ship... maybe add a new function and not just GetView()
+			Memory<Weapon> allWeaponsForThisShip = null; // allWeapons.GetView(ship.SpanIndex); 
+
+			
+			uint numRules = 3;
+			uint numWeapons = (uint)allWeaponsForThisShip.Span.Length;
+			double[] scores =  new double[numWeapons];
+			double[] weights = new double[numRules];
+				
+			weights[0] = 2;
+			weights[1] = 5;
+			weights[2] = 0;
+			
+			for (int i = 0; i < numWeapons; i++)
+			{
+				// todo:  is the weapon available? does it need to aim at target? has it been doing so already? time for turret to rotate towards target
+
+				if (allWeaponsForThisShip.Span[0].CoolDown_ == 0)  // if coolDown != 0 then the fitness score should just be 0?
+				{
+					scores[i] = 0;
+				}
+				else
+				{
+					scores[i] = (allWeaponsForThisShip.Span[0].Damage * weights[0]) * (laser.Span[0].PowerReqt * weights[1]);
+				}
+			}
+			
+			return scores;
+		}
+		
+		
 		
 		private void DoWeaponsCanFire()
 		{
@@ -2106,43 +2296,7 @@ namespace HelloBoids
 				
 				
 				bool flagValue = canFire;
-				// TODO: what if the runtime flags were all stored in a seperate ComponentStore<T>  
-				//       that also contained UserTypeID
-				//       Actually, we can store the UserInterfaceStruct flags in a uint bitflag, we just
-				//       use that to determine  if we should call GetUserStruct<> for the various structs.
-				//       Enum.HasFlag() used to be slow in older versions of .net, but direct bitwise
-				//       operations has always been very fast so we should use them so we know whether
-				//       a specific type of user struct exists before calling GetUseStruct(type);
 				
-				// if its in component, then component  has to contain an Index to the EntityNode.  
-				// Othewise the EntityNode to gain access to the flags,needs a reference to the Componet struct 
-				// which of course it would likely have...
-				// NOTE: A LivingEntity would NOT have a Component but both need these UserTypeID and UserRuntimeFlags
-				//       so ultimately, these really need to exist in the Entity or in a seperate ComponetStore<> that
-				//       ALWAYS matches the index of the array of EntityNodes.   
-				// TODO: the problem with KGB is GUID needs to be kept in the saved XML, but index refers to where its
-				//       stored in these ComponentStore<T>   so what do we do here?  I dont think we can guarantee
-				//       the order of Entities within these arrays across server and clients.  These
-				//       structs must always be local machine ONLY.  
-				
-				// A HASH of EntityIDs could yeild an Integer that we can use for sorting them within a List<>
-				// This then needs to constantly update whenever Entities are Added/Removed from the Scene...
-				// Also for MMO, this needs to be managed for each "ZONE" 
-				// https://discussions.unity.com/t/staticentityidrange-for-simple-fast-scene-loading-and-external-entity-refs/725631/7
-				
-				// if we use an unsigned long for our entity IDs that gives us 18446744073709551615 
-				// if we allow up to max uint for number of Entities in a given game that is 4,294,967,295
-				// that allows for 4,294,967,295 unique games containing 4,294,967,295 unique Entities.
-				// or more games if the max number of Entities in any is less.
-				// For reference, Counterstrike is said to have total number of matches in the TENS of BILLIONS
-				// since 1999 to 2026
-				// BUT THERE IS A MAJOR PROBLEM WITH THESE ENTITY RANGES FOR A GAME LIKE SCIFICOMMAND where 
-				// anyone can create prefabs.... they would always need to grab an unique INT from a SERVER
-				// to ensure uniqueness across the prefabs of all other creators, including those assets made for the official released version of ScifiCommand.
-				// So, GUID is  better...  
-				// We probably must HASH the GUID and use that as a way to sort Entities in our List<EntityNode>
-
-					
 				allComponents.Span[(int)i].SetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
 				bool hasStruct = allComponents.Span[(int)i].GetUserStructFlag(USER_STRUCT_FLAG_1);
 				
@@ -2496,51 +2650,6 @@ namespace HelloBoids
 		
 	
 	
-	
-	
-	
-		private double[] GenerateWeaponFitnessScores(EntityNode ship, EntityNode target)
-		{
-			// the different structs used for a "Laser" component 
-			Memory<Component> component = (Memory<Component>)ship.GetUserStruct("HelloBoids.Component");
-			Memory<Weapon> wep = (Memory<Weapon>)ship.GetUserStruct("HelloBoids.Weapon");
-			Memory<Laser_Struct> laser = (Memory<Laser_Struct>)ship.GetUserStruct("HelloBoids.Laser_Struct");
-			
-			// todo: we need just all the weapons from this particular ship.  
-			// ComponetStore<Weapon> would contain ALL for ALL ships
-			ComponentStore<Weapon> allWeapons = (ComponentStore<Weapon>)EntryClass.mCStoreCol.CheckOut<Weapon>(0);
-			
-			// return just the ones for this ship... maybe add a new function and not just GetView()
-			Memory<Weapon> allWeaponsForThisShip = null; // allWeapons.GetView(ship.SpanIndex); 
-
-			
-			uint numRules = 3;
-			uint numWeapons = (uint)allWeaponsForThisShip.Span.Length;
-			double[] scores =  new double[numWeapons];
-			double[] weights = new double[numRules];
-				
-			weights[0] = 2;
-			weights[1] = 5;
-			weights[2] = 0;
-			
-			for (int i = 0; i < numWeapons; i++)
-			{
-				// todo:  is the weapon available? does it need to aim at target? has it been doing so already? time for turret to rotate towards target
-
-				if (allWeaponsForThisShip.Span[0].CoolDown_ == 0)  // if coolDown != 0 then the fitness score should just be 0?
-				{
-					scores[i] = 0;
-				}
-				else
-				{
-					scores[i] = (allWeaponsForThisShip.Span[0].Damage * weights[0]) * (laser.Span[0].PowerReqt * weights[1]);
-				}
-			}
-			
-			return scores;
-		}
-		
-		
 		/// <summary>
 		/// The resulting damage types and amounts (and duration for damage that can be applied overtime)
 		/// that occur on this successful hit.
@@ -2569,9 +2678,7 @@ namespace HelloBoids
 			d.EntityIndex = droid.Index;
 			result[0] = d;
 			
-			
-			
-			
+
 			DamageOverTimeSystem.DamageOverTime dot;
 			dot.Amount = 1;  // weaponStruct.BeamOutput;
 			dot.EntityIndex = droid.Index;
@@ -2582,7 +2689,6 @@ namespace HelloBoids
 			// target Armor
 			
 			
-
 			
 			// target distance
 			
@@ -2663,7 +2769,8 @@ namespace HelloBoids
 			//ComponentStore<LivingEntity> testLEComp = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
 			//testLEComp.Span[b.SpanIndexLE].Age = 1;
 			//testLEComp.Span[b.SpanIndexLE].Hitpoints = 20;
-			Memory<LivingEntity> livingEntity = (Memory<LivingEntity>)b.GetUserStruct(typeof(LivingEntity)); // "HelloBoids.LivingEntity");
+			int livingEntIndex;
+			Memory<LivingEntity> livingEntity = (Memory<LivingEntity>)b.GetUserStruct(typeof(LivingEntity), out livingEntIndex); // "HelloBoids.LivingEntity");
 			livingEntity.Span[0].Age = 1;
 			livingEntity.Span[0].Hitpoints = 20;
 	
@@ -2710,7 +2817,8 @@ namespace HelloBoids
 			
 	
 			// add the required StationState for our tactical station's state to the droid.BlackBoardData which is required by Do_Droid_Logic()
-			Memory<TacticalStation> tacticalStation = (Memory<TacticalStation>)b.GetUserStruct(typeof(TacticalStation)); // "HelloBoids.TacticalStation");	
+			int tacticalIndex;
+			Memory<TacticalStation> tacticalStation = (Memory<TacticalStation>)b.GetUserStruct(typeof(TacticalStation), out tacticalIndex); // "HelloBoids.TacticalStation");	
 			tacticalStation.Span[0].Index = b.Index; // we use Index and not SpanIndex because we want to use it to find the Boid element in the EntryClass.bSim.Boids[index] List
 						
 			tacticalStation.Span[0].HistoryCount = 1;
@@ -2728,9 +2836,12 @@ namespace HelloBoids
 	
 			// NOTE: the following calls to GetUserStruct() returns the typically ONE record (but more potentially for ArmorLayers)
 			//       that is stored within the EntityNode's.  Unlike calls to EntryClass.mColStore.CheckOut(Component);
-			Memory<Component> component = (Memory<Component>)b.GetUserStruct(typeof(Component)); //"HelloBoids.Component");
-			Memory<Weapon> weapon = (Memory<Weapon>)b.GetUserStruct(typeof(Weapon)); //"HelloBoids.Weapon");
-			Memory<Laser_Struct> laser = (Memory<Laser_Struct>)b.GetUserStruct(typeof(Laser_Struct)); //"HelloBoids.Laser_Struct");
+			int componentIndex;
+			Memory<Component> component = (Memory<Component>)b.GetUserStruct(typeof(Component), out componentIndex); //"HelloBoids.Component");
+			int wepIndex;
+			Memory<Weapon> weapon = (Memory<Weapon>)b.GetUserStruct(typeof(Weapon), out wepIndex); //"HelloBoids.Weapon");
+			int laserIndex;
+			Memory<Laser_Struct> laser = (Memory<Laser_Struct>)b.GetUserStruct(typeof(Laser_Struct), out laserIndex); //"HelloBoids.Laser_Struct");
 			
 	
 	// TEMP HACK - this would normally be done in the relevant scripit - initialize the memory store vars from the serialized
@@ -2782,7 +2893,6 @@ namespace HelloBoids
 //			public double KEDamage = 3.0d;
 //			public double HalfDamage; 
 //			public double VacuumHalfDamage;
-
 			
 //			public string Range; // string description of range (eg: "very long range")
 			weapon.Span[0].MaxRange = 10;
@@ -3456,7 +3566,7 @@ namespace HelloBoids
 		public Memory<LivingEntity> mMemStore_LivingEntity;
 		public Memory<TacticalStation> mMemStore_TacticalStation;
 		
-		
+		/*
 		public Memory<Component> mMemStore_Component; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
 		public Memory<Weapon> mMemStore_Weapon; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
 		public Memory<Laser_Struct> mMemStore_Laser; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
@@ -3467,6 +3577,7 @@ namespace HelloBoids
 		public int SpanIndexComponent = -1;
 		public int SpanIndexWeapon = -1;
 		public int SpanIndexLaser = -1;
+		*/
 	#endif		
 		
         public Boid(int index, double x, double y, double z,  double xV, double yV)
@@ -3516,57 +3627,46 @@ namespace HelloBoids
 			// }
 			
 		
-		    // todo do we need destuuctor for Repository.CheckIn mMemstore?
-		    
-	
 			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
 			ComponentStore<LivingEntity> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
             int checkOutIndex = -1;
 			// NOTE: this second call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
-            mMemStore_LivingEntity = storeLivingEntity.CheckOut(out checkOutIndex);
-            SpanIndexLivingEntity = checkOutIndex;
-			this.AddUserStruct(mMemStore_LivingEntity);
+            Memory<LivingEntity> memLivingEnt = storeLivingEntity.CheckOut(out checkOutIndex);
+			this.AddUserStruct(memLivingEnt, checkOutIndex);
 		
-			
 			ComponentStore<TacticalStation> storeTacticalStation = EntryClass.mCStoreCol.CheckOut<TacticalStation>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
             checkOutIndex = -1;
 			// NOTE: this second call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
-            mMemStore_TacticalStation = storeTacticalStation.CheckOut(out checkOutIndex);
-            SpanIndexTacticalStation = checkOutIndex;
-			this.AddUserStruct(mMemStore_TacticalStation);
-		
-		
+            Memory<TacticalStation> memTact = storeTacticalStation.CheckOut(out checkOutIndex);
+			this.AddUserStruct(memTact, checkOutIndex);
+				
 			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
 			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
             checkOutIndex = -1;
 			// NOTE: this second call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
-            mMemStore_Component = storeComp.CheckOut(out checkOutIndex);
-            SpanIndexComponent = checkOutIndex;
-			this.AddUserStruct(mMemStore_Component);
+            Memory<Component> memCmp = storeComp.CheckOut(out checkOutIndex);
+			this.AddUserStruct(memCmp, checkOutIndex);
 				
 			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
 			ComponentStore<Weapon> storeWeapon = EntryClass.mCStoreCol.CheckOut<Weapon>(EntryClass.NUM_ENTRIES);
             checkOutIndex = -1;
 			// NOTE: this call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
-            mMemStore_Weapon = storeWeapon.CheckOut(out checkOutIndex);
-            SpanIndexWeapon = checkOutIndex;
-			this.AddUserStruct(mMemStore_Weapon);		
+            Memory<Weapon> memWep = storeWeapon.CheckOut(out checkOutIndex);
+			this.AddUserStruct(memWep, checkOutIndex);		
 		
 			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
 			ComponentStore<Laser_Struct> storeLasers = EntryClass.mCStoreCol.CheckOut<Laser_Struct>(EntryClass.NUM_ENTRIES); 
             checkOutIndex = -1;
 			// NOTE: this call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
-            mMemStore_Laser = storeLasers.CheckOut(out checkOutIndex);
-            SpanIndexLaser = checkOutIndex;
-            this.AddUserStruct(mMemStore_Laser);
+            Memory<Laser_Struct>memLaser = storeLasers.CheckOut(out checkOutIndex);
+            this.AddUserStruct(memLaser, checkOutIndex);
 			
 			// TODO: this may require an array of checkOutIndices based on how many layers as determined from 
 			//       component.ArmorLayersCount
 			ComponentStore<ArmorLayer> storeArmorLayers = EntryClass.mCStoreCol.CheckOut<ArmorLayer>(EntryClass.NUM_ENTRIES); 
             checkOutIndex = -1;
-            mMemStore_ArmorLayers = storeArmorLayers.CheckOut(out checkOutIndex);
-            // SpanIndexArmorLayers = checkOutIndex;
-			this.AddUserStruct(mMemStore_ArmorLayers);
+            Memory<ArmorLayer> memArmor = storeArmorLayers.CheckOut(out checkOutIndex);
+			this.AddUserStruct(memArmor, checkOutIndex);
 		
 			
 			PropertyBag bag = new PropertyBag();
@@ -3688,9 +3788,6 @@ namespace HelloBoids
 		{
 			
 		}
-		
-		
-		
 		
 		
 	#endregion // ShouldBeInEntityScript_NotHERE_ButCantRunScriptsFromWebCSharpCompiler
@@ -4114,12 +4211,10 @@ return (0,0);
         public static List<int> FindNeighbors(List<Boid> allBoids, double distance, int currentIndex, Func<Boid, Boid, double, bool> condition)
         {
             List<int> neighbors = new List<int>();
-
 			int debug = 0;
 			
 			try
 			{
-				
 				for (int i = 0; i < allBoids.Count; i++)
 				{
 					debug = i;
@@ -4127,7 +4222,6 @@ return (0,0);
 					if (currentIndex > allBoids.Count - 1) continue;
 					if (condition(allBoids[i], allBoids[currentIndex], distance))
 						neighbors.Add(i);
-
 				}
 			}
 			catch (Exception ex)
@@ -4158,7 +4252,15 @@ return (0,0);
            {
 			   base.Dispose();
 			   
+			   foreach (object memT in mUserStructs.Values)
+			   {
+				   //object store = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); 
+				   //store.CheckIn(memT);
+			   }
 			   
+			   // TODO: we need a common interface for these 
+			   //IComponentStore perhaps
+			   /*
 			    ComponentStore<LivingEntity> storeLE = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
 			    storeLE.CheckIn(mMemStore_LivingEntity);
 			   
@@ -4176,7 +4278,8 @@ return (0,0);
 				
 			    ComponentStore<ArmorLayer> storeArmorLayer = EntryClass.mCStoreCol.CheckOut<ArmorLayer>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
 			    storeArmorLayer.CheckIn(mMemStore_ArmorLayers);
-				
+				*/
+			   
 				
 				//Console.WriteLine ("Transform.cs.DisposeManagedResources() - Checked In Living_Entity struct");
 			    mIsDisposed = true;
@@ -4262,13 +4365,9 @@ return (0,0);
         }
 		
 		
-	
-		
-		
+		public int UserTypeID { get {return mUserTypeID; } set {mUserTypeID = value;}}
 		
 		public UserData BlackBoardData { get {return mUserData;} set {mUserData = value;} }
-		
-		public int UserTypeID { get {return mUserTypeID; } set {mUserTypeID = value;}}
 		
 		public void AddUserStruct(object memStore, int indexWithinMemStore)
 		{
@@ -4298,29 +4397,28 @@ return (0,0);
 			mUserStructs.Add(typename, t); //memStore);
 		}
 		
+
 		
-		public int GetStructIndexWithinMemoryT(Type t)
-		{
-			
-		}
-			
-		
-		public object GetUserStruct (Type t)
+		public object GetUserStruct (Type t, out int index)
 		{
 			string typename = t.FullName;
 			
-			return GetUserStruct( typename);
+			return GetUserStruct( typename, out index);
 		}
 		
-		public object GetUserStruct(string typename)
+		public object GetUserStruct(string typename, out int index)
 		{
+			index = -1;
 			//Console.WriteLine ("EntityNode.GetUserStruct '" + typename + "'");
 			if (mUserStructs == null) return null;
 			
-			object result;
+			
+			Tuple<int, object> result;
 			if (mUserStructs.TryGetValue(typename, out result))
-				return result;
-				
+			{
+				index = result.Item1;
+				return result.Item2;
+			}	
 			return null;
 		}
 		
@@ -6536,7 +6634,8 @@ return (0,0);
 			bool result = true;
 
 		#if DEBUG
-			Memory<Component> cmp = (Memory<Component>) station.GetUserStruct(typeof(Component)); //"HelloBoids.Component"); // );
+			int componentIndex;
+			Memory<Component> cmp = (Memory<Component>) station.GetUserStruct(typeof(Component), out componentIndex); //"HelloBoids.Component"); // );
 			System.Diagnostics.Debug.Assert (station.Index == cmp.Span[0].EntityID);
 		#endif
 				

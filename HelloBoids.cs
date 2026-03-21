@@ -2161,7 +2161,7 @@ namespace HelloBoids
 		}
 		
 		/// <summary>
-		/// based on policies
+		/// This is mostly just creating 'SensorContact' from "neighbors" .... based on policies
 		/// </summary>
 		private void DoContactListSorting()
 		{
@@ -2170,61 +2170,61 @@ namespace HelloBoids
 			{
 				Boid current = Boids[i];
 				List<Tuple<int, double>> neighbors = null;
+				// TODO: our List<Tuple<int, double>> tells us which Droid (int) index was detected and the (double) distance to that Droid 
+				//       but it does not tell  us which Sensor component made this detection.  We will need a way to add that.
 				bool success = mNeighbors.TryGetValue(current.SpanIndex, out neighbors);
 					
 				if (success)
 				{
-					//Console.WriteLine("abc");
 					List<SensorContact> contacts = new List<SensorContact>();
 					for (int j = 0; j < neighbors.Count; j++)
 					{
 						SensorContact c = new SensorContact ();
 				
 						// NOTE: Here we will only have one set of SensorContacts and never any duplicates
-						//       because each Droid only has one Sensor (optical sensors == eyes)
+						//       because each Droid only has one Sensor ('Optical Sensor' == eyes)
 						c.ContactIndex = neighbors[(int)j].Item1; // index within the Boid[] array of the detected Droid
 						c.Index = (int)i;
 
-						//Console.WriteLine("def");
 						Boid b =  this.Boids[c.ContactIndex];
-						c.Position = b.Translation;
-						c.Velocity = b.Velocity;
-						c.Distance = 0; //distances[i];
-						// float Heading
-
-						//Console.WriteLine("ghi");
-						// contact details
-						// string Name; // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
-						// string RegistryNumber;
-						// int ContactIndex;    // EntityIndex
-						// TYPE Type;
-						// FoF FriendOrFoe;
-						// SIZE Size;	
-
-						// sensor specific details
-						// long TimeAcquired;
-						// int AcquisitionStatus;   // New, UpToDate, AcquisitionLost,  contact if HistoryLength > 1 but this ContactStatus == AcquisitionLost
-						// Target.STATUS ContactStatus;
-
-						// int[] SensorsIndices;   // the sensorIDs that have all acquired this target
-						// string[] SensorsTypes;  // the types of Sensors corresponding to the SensorsIndices
 						
+						// contact details are needed to find the correct SensorContact to potentially merge with an existing SensorContact for this detected Entity
+						c.Name =  "Droid_" + b.SpanIndex.ToString(); // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
+						c.RegistryNumber = c.Name;
+						c.Type = SensorContact.TYPE.Drone;
+						c.ContactStatus = Target.STATUS.Unknown;
+						c.FriendOrFoe = SensorContact.FoF.Unknown;
+											
+						// telemetry
+						SensorContact.ContactTelemetry t;
+						t.Radius = (float)b.BoundingBox.Radius;    // how might size be spoofed?
+						t.Position = b.Translation;
+						t.Velocity = b.Velocity;
+						t.Distance = neighbors[(int)j].Item2;
+						t.Heading = 0;
+						t.TimeAcquired = Utils.NowTicks();
+						t.TimeLast = t.TimeAcquired;
+						
+						c.Add(t);
 						contacts.Add(c);
 					}
+					
+					// add all of the SensorContacts to the current Droid.  In KGB
+					// this will be the TacticalStation instead, and it will be responsible for
+					// properly merging these SensorContacts with existing ones so as to maintain
+					// proper SensorContact histories for all detected Entities.
+					current.Add(contacts);
 				}	 
 			});
-				
-			// each droid' TacticalStation needs to store a list of the merged SensorContacts
+		}
+		
+		/// <summary>
+		/// based on policies
+		/// </summary>
+		private void DoTargetPrioritization()
+		{
 			
-			
-												
-
 			/*
-			public struct SensorContact // NOTE: our Droids have one optical sensor... a single binocular system comprised of two eyes
-			{
-				const int HistoryLength = 1;
-			}
-	
 			Target t = new Target()
 			t.EntityIndex = 
 			t.WeaponsAssigned;
@@ -2235,14 +2235,26 @@ namespace HelloBoids
 			t.CurrentHitpoints =   ; // used to determine % damage of Target
 			*/
 			
-
-		}
-		
-		/// <summary>
-		/// based on policies
-		/// </summary>
-		private void DoTargetPrioritization()
-		{
+			int count = Boids.Count;
+            System.Threading.Tasks.Parallel.For(0, count, i => 		
+			{
+				Boid current = Boids[i];
+				
+				List<SensorContact> contacts = current.GetSensorContacts();
+				List<Target> targets = current.GetTargets();
+				
+				if (contacts == null) return;
+				
+				for (int j = 0; j < contacts.Count; j++)
+				{
+					SensorContact c = contacts[j];
+					
+					
+					
+				}
+			});
+			
+			
 			// a carrier with very few fighters remaining might be a low tactical threat
 			// but high strategic threat... 
 			// if a carrier is a primary mission objective that should increase its priority when scoring
@@ -3678,6 +3690,75 @@ namespace HelloBoids
         }
 		
 		
+		#region SensorContacts and Target manipulation belongs in SCRIPTS ULTIMATELY
+		private List<Target> mTargets;
+		public List<Target> GetTargets()
+		{
+			return mTargets;
+		}
+		
+		public void Add (Target t)
+		{
+			if (mTargets == null) mTargets = new List<Target>();
+			
+			// if the target already exists, replace it with current data?
+			int found = -1;
+			for (int i = 0; i < mTargets.Count; i++)
+				if (mTargets[i].EntityIndex == t.EntityIndex)
+				{
+					found = i;
+					break;
+				}
+			
+			if (found == -1)
+				mTargets.Add(t);
+			else
+				mTargets[found] = t;
+			
+		}
+		
+		public void Add (Target[] t)
+		{
+			if (t == null || t.Length == 0) return;
+			
+			for (int i = 0; i < t.Length; i++)
+				Add(t[i]);
+		}
+		
+		// TODO: this should normally be in TacticalStation script correct?
+		private List<SensorContact> mSensorContacts;
+		public List<SensorContact> GetSensorContacts()
+		{
+			return mSensorContacts;
+		}
+		
+		public void Add (SensorContact c)
+		{
+			if (mSensorContacts == null) mSensorContacts = new List<SensorContact>();
+			
+			int found = -1;
+			for (int i = 0; i < mSensorContacts.Count; i++)
+				if (mSensorContacts[i].Name == c.Name)
+				{
+					found = i;
+					break;
+				}
+			
+			if (found == -1) 
+				mSensorContacts.Add (c);
+			else 
+				mSensorContacts[found].Add(c.Telemetry);
+		}
+		
+		public void Add (List<SensorContact> contacts)
+		{
+			if (contacts == null) return;
+			for (int i = 0; i < contacts.Count; i++)
+				Add(contacts[i]);
+		}
+	#endregion
+			
+			
 	#region ShouldBeInEntityScript_NotHERE_ButCantRunScriptsFromWebCSharpCompiler
 		private void OnInitializeEntity()
 		{
@@ -6093,6 +6174,7 @@ return (0,0);
 		public enum TYPE
 		{
 			Unknown,
+			Drone,
 			Asteroid,
 			Debris,
 			Mine,
@@ -6109,33 +6191,93 @@ return (0,0);
 			GroundRadar	
 		}
 		
+		/*  decided to go with SensorContact.Radius instead 
 		public enum SIZE
 		{
-			VerySmall = 0,
-			Small,
-			Medium,
-			Large,
-			VeryLarge,
-			Huge,
-			Enormous
+			VerySmall = 0,      // Drone, Mine
+			Small,              // X-Wing, Tie Fighter
+			Medium,             // Mellenium Falcon
+			Large,              // 
+			VeryLarge,          // USS Enterprise
+			Huge,               // Super StarDestroyer
+			Enormous            // Death Star
 		}
-		
+		*/
 		
 				
 		public int Index;           // Index of this Contact within the Memory<T> contacts? Or, the Index of the TactialStation or Sensor that detected this Contact?
 		
 		public int ContactIndex;       // EntityIndex
 		public string Name;            // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
-		public string RegistryNumber;
+		public string RegistryNumber;  
+		public FoF FriendOrFoe;        // Friend, Foe, Unknown
 		
-		public TYPE Type;              // unknown, mine, missile, satelite, carrier, asteroid, frigate, etc.
-		public FoF FriendOrFoe;
-		public SIZE Size;
+		public TYPE Type;              // unknown, drone, mine, missile, satelite, carrier, asteroid, frigate, etc.
 		
-		public Vector3d Position;
-		public Vector3d Velocity;
-		public double Distance;     // range to target
-		public float Heading;       // NOTE: Bearing is the direction to fly to get somewhere specific see Google AI Overview notes below
+		public Target.STATUS ContactStatus;  // withdrawing, combat ineffective, disabled, etc
+		
+		
+		public struct ContactTelemetry
+		{
+			public long TimeLast; // this can be used to determine how stale a Sensor contact is.  gt.Time - LastDetectionTime == 0 then this is current.  Otherwise it's stale and we should add the previous telemetry to "History"
+			public long TimeAcquired;
+				
+			 // how might Radius be spoofed?  Also, if two or more ships are in very close formation, can this result in the hiding of one or more
+			// of those ships via emergent behavior?  I think we would need to explicitly program this...  it would depend on the closeness of 
+			// the ships, whether they had transponders for IFF, the Level of the Sensor that made the detection(s), and perhaps the skill of the Operator
+			public float Radius;             
+			public Vector3d Position;
+			public Vector3d Velocity;
+			public double Distance;     // range to target
+			public float Heading;       // NOTE: Bearing is the direction to fly to get somewhere specific see Google AI Overview notes below
+		
+
+			public int GetStaleAmount(GameTime gt)
+			{
+				// TODO: NowTicks should actually be set to the frequency of the updates for Sensors.
+				//       and NEVER "real-time" NowTicks as used below.  Any "NowTicks()" should result from a DateTimeNow 
+				//       that is manually incremented by the Fixed Time Step.
+				long lag = gt.Ticks - TimeLast;
+				
+				// CURRENT
+				if (lag == 0)
+				{
+					
+				}
+				
+				
+				return 0;
+				
+			}
+		}
+		
+		public ContactTelemetry[] Telemetry;
+		
+		// NOTE: It is assumed the ContactTelemetry being Added is for the exact
+		//       same SensorContact as the existing ones in the Telemetry[] 
+		public void Add(ContactTelemetry t)
+		{
+			Telemetry = Utils.ArrayAppend (Telemetry, t);
+		}
+		
+		public void Add(ContactTelemetry[] t)
+		{
+			if (t != null && t.Length > 0)
+				for (int i = 0; i < t.Length; i++)
+					Add(t[i]);
+		}
+		
+		public void Clear()
+		{
+			Telemetry = null;
+		}
+		
+		
+				
+		public int[] SensorsIndices;   // the sensorIDs that have all acquired this target
+		public int[] SensorsTypes;     // the UserTypeIDs of Sensors corresponding to the SensorsIndices
+		
+		
 		
 		/* Target Bearing is the angular direction from your current position to a target (often relative to North or your bow),
 		while Target Heading is the direction the target itself is moving or pointing. Bearings tell you where to look, whereas headings indicate the target's trajectory. 
@@ -6151,12 +6293,6 @@ return (0,0);
 		*/
 
 
-		public long TimeAcquired;
-		public int AcquisitionStatus;   // New, UpToDate, AcquisitionLost,  contact if HistoryLength > 1 but this ContactStatus == AcquisitionLost
-		public Target.STATUS ContactStatus;
-		
-		public int[] SensorsIndices;   // the sensorIDs that have all acquired this target
-		public string[] SensorsTypes;  // the types of Sensors corresponding to the SensorsIndices
 	}
 	
 	
@@ -14620,8 +14756,10 @@ if (mEntityNodesCollection == null) return null;
             _totalElapsed += _elapsedSeconds;
             mElapsedGameTimeSeconds = _elapsedSeconds * _timeScaling;
 			
-            double elapsedMilliseconds = _elapsedSeconds * 1000d;
-            _time = _time.Add(new TimeSpan(0, 0, 0, 0, (int)elapsedMilliseconds));
+            //double elapsedMilliseconds = _elapsedSeconds * 1000d;
+            //_time = _time.Add(new TimeSpan(0, 0, 0, 0, (int)elapsedMilliseconds));
+			_time = _time.AddSeconds(elapsedSeconds);
+			
             mTicks = _time.Ticks; 
 
 
@@ -15712,7 +15850,11 @@ if (mEntityNodesCollection == null) return null;
 		}
 		#endregion
 		
-			
+		
+		// TODO: these Now.Ticks should be based on GAME TIME and never REAL-TIME.
+		//       So for instance, if we advance a frame by a FIXED TIME STEP of 0.025 then
+		//       the tickCounter should advance by that much which is what we do
+		//       in GameTime.Ticks() except its not a static method
 		public static long NowTicks()
 		{
 			return DateTime.Now.Ticks;
@@ -15733,7 +15875,6 @@ if (mEntityNodesCollection == null) return null;
 			Console.WriteLine("Show Age using DateTime As TimeSpan : {0}", DateTime.FromOADate(diff));
 			return diff;
 		}
-		
 		
         public static string GetTimeString()
         {
@@ -15806,9 +15947,32 @@ if (mEntityNodesCollection == null) return null;
 
             return A | R | G | B;
         }
-		
-		
-		
+				
+		// ArrayExtensions from KeystoneStandardLibrary.Extensions.ArrayExtensions
+		/// <summary>
+        /// Grow an array by one element and append new element there.
+        /// </summary>
+        /// <remarks>
+        /// This method RETURNS the new array and does NOT change the array passed in.
+        /// </remarks>
+        public static T[] ArrayAppend<T>(T[] array, T element) // public static T[] ArrayAppend<T>(this T[] array, T element)
+        {
+            T[] tmp;
+            if (array == null)
+            {
+                tmp = new T[1];
+                tmp[0] = element;
+            }
+            else
+            {
+                tmp = new T[array.Length + 1];
+                array.CopyTo(tmp, 0);
+                tmp[array.Length] = element;
+            }
+
+            return tmp;
+        }
+
 		
     }
 

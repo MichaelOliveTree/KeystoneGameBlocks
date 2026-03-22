@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using KeyCommon.Traversal;
 using Keystone.Collision;
+using Keystone.Culling;  // RegionPVS, FrustumInfo, PlanedFrustum, VisibleItemInfo, LightInfo
 using Keystone.Entities;
 using Keystone.FX;
 using Keystone.Portals;

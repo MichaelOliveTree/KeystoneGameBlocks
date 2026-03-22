@@ -1,4 +1,6 @@
-Keystone Game Blocks and SciFi Command are copyright October 2025 by Michael Preston Joseph (TP_WalksWithGod@proton.me 
+Keystone Game Blocks and SciFi Command are copyright October 2025 by Michael Preston Joseph (hypnotron.v1.0@gmail.com  
+or
+TP_WalksWithGod@proton.me 
 or
 MichaelWalksWithGod@gmail.com)
 
@@ -62,13 +64,13 @@ Michael P. Joseph
   
 KGB TODO ITEMS:
 - Yes, the main plugin used for editing BehaviorTrees, Appearance (in Unity Appearance nodes are referred to as Renderers), Particle Systems, Animations, etc is ANNOYING TO USE AND EXTREMELY BARE BONES and NEEDS TLC.  I had cleaned this Plugin up A LOT but when my laptop was stolen, I lost 4 months of work and over half the code in the included \\stage\\ folder that needs to be integrated into the main branch, are rewrites of all the code that was lost, including those that resulted in a better experience when using that Plugin (KeyEntityEditPlugin).  But the problems with the plugin are all mostly very minor and just amount to things that "need to be done..." as opposed to any serious bug hunting efforts.
-- The fix for the axial billboarding (e.g billboard Lasers) code was lost and I need to fix again.
-- The fix for the planet rings shader was lost and I need to fix again.  The previous fix was to do all shadowing in model space... that needs to be done again.
+- [FIXED - BUT NOT VERIFIED RE: ->] The fix for the axial billboarding (e.g billboard Lasers) code was lost and I need to fix again.
+- [WIP - RegionPVS.Draw() has been updated for it's portion of the overall fix.  Rings2.fx still needs to be updated. RE: ->] The fix for the planet rings shader was lost and I need to fix again.  The previous fix was to do all shadowing in model space... that needs to be done again.
+- [WIP - Basic update() code logic for this is in place now. RE: ->] Stats + Skills + Attributes "Status Effects aka Buffs/Debuffs" System
 - Lots of the updated Prefabs for the player's test ship and interior in SciFiCommand were lost including the Rotary Missile Magazine.obj I had designed (programmer art) in Blender and had finished animating and was working on the final scripting of in \\Keystone\\data\\mods\\caesar\\scripts_entities\\TacticalStation.css 
 - Audio nodes for Music, sound FX and 3D Spatial Audio are not completed.
 - Mission Editor (create a Reference Version - and not to be confused with the already built in Scene Editor) designed for SciFi Command and loadable as a Plugin.  The Mission Editor can be used to Add/Remove/Modify "mission objects" to a Scene that are stored and loaded seperately from the main scene.  The goal is to allow users to create custom Mission Editors that are game specific.
 - 2D and 3D GUI that is built on top of the existing Node based 3D Scene Composition to provide a consistant and intuitive way for developing User Interfaces, including UIs that can be attached to in world 3D objects.
-- Stats + Skills + Attributes "Status Effects aka Buffs/Debuffs" System
 - Physics
 - DX12 and Vulkan renderers
 - Linux / WINE support testing.  I believe the Truevision3d graphics engine will work on Linux using WINE but I have not tested it myself nor have I been using Mono.  Would love to test this in the future however.

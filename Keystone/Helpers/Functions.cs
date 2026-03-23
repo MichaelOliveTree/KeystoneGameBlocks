@@ -8,15 +8,11 @@ namespace Keystone.Helpers
 {
     public class Functions
     {
-        public static byte[] StringToByteArray(string str, int totalFixedLength)
-        {
-            if (str == null) throw new ArgumentNullException();
-            if (str.Length > totalFixedLength) throw new ArgumentOutOfRangeException();
 
-            return System.Text.Encoding.ASCII.GetBytes(str.PadRight(totalFixedLength, '\0'));
+        // TODO: All of these should be moved to KeyStandardLibrary\Utilities 
+        // 
 
-        }
-        
+
         /// <summary>
         /// Returns a converted RegionSpaceRay from source Region to Destination Region
         /// </summary>

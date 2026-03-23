@@ -6,6 +6,7 @@ using System.Xml;
 
 namespace KeyCommon.Helpers
 {
+    // TODO: This entire class should be moved and renamed to something like  KeyCommon.IO.DataHelper
     public static class ExtensionMethods
     {
         private const ushort TYPE_STRING = 0;
@@ -506,6 +507,10 @@ namespace KeyCommon.Helpers
         //        return null;
         //    }
         //}
+
+
+
+        
 
         #region XML attributes
         /// <summary>
@@ -1098,7 +1103,7 @@ namespace KeyCommon.Helpers
             return result;
         }
 
-#endregion
+#endregion // end Read/Write XML Attributes
 
 
         public static void Read(this PropertySpec spec, NetBuffer buffer)
@@ -1997,6 +2002,8 @@ namespace KeyCommon.Helpers
             {
                 // todo: ArrayExtensions should belong in KeyCommon.dll so that our scripts have access to them
                // Keystone.Extensions.ArrayExtensions.ArrayRemove(array, currentValue)
+               // Well, they are currently in KeyStandardLibrary...  actually I think that is probably ok... 
+               
             }
             return result;
         }

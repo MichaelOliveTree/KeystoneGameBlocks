@@ -6,6 +6,15 @@ namespace Keystone.Extensions
 {
     public static class ArrayExtensions
     {
+        public static byte[] StringToByteArray(string str, int totalFixedLength)
+        {
+            if (str == null) throw new ArgumentNullException();
+            if (str.Length > totalFixedLength) throw new ArgumentOutOfRangeException();
+
+            return System.Text.Encoding.ASCII.GetBytes(str.PadRight(totalFixedLength, '\0'));
+
+        }
+
         #region Arrays
         public static int ArrayCount<T>(this T[] array)
         {

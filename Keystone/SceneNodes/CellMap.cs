@@ -1587,7 +1587,7 @@ namespace Keystone.SceneNodes
     //                header.DataOffset = dataOffset;
 
     //                // write header
-    //                writer.Write(Helpers.Functions.StringToByteArray(header.Name, 256));
+    //                writer.Write(Keystone.Extensions.ArrayExtensions.StringToByteArray(header.Name, 256));
     //                writer.Write(header.DataLength);
     //                writer.Write(header.DataOffset);
 

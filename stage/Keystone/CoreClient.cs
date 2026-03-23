@@ -26,7 +26,9 @@ namespace Keystone
 
         // core client
         private GraphicsDevice _window;
-        private static Helpers.ThreadSafeDictionary<string, Viewport> _viewports;
+
+        // todo: this is static, why?  was this a mistake?
+        private static Helpers.ThreadSafeDictionary<string, Viewport> _viewports; // TODO: I think this should be turned into a ConcurrentDictionary<string, Viewport>
         private AudioManager _audio;
         private DeviceCaps _deviceCaps;
         private TVInternalObjects _internals;

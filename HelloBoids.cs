@@ -2036,6 +2036,24 @@ namespace HelloBoids
 		private void DoTargetPrioritization()
 		{
 			
+			Policy roePolicy = new Policy();
+			Query q = new Query(EntryClass.mCStoreUserData);
+			
+			Rule r = new Rule("ROE - Friendly Fire", "Earth Alliance Directive 209 states Captains must not fire on Friendly forces.");
+			
+			
+			
+			string name = null;
+			string description = null;
+			string entityKey = null;
+			Condition.EVAL_TYPE eval = Condition.EVAL_TYPE.EQUALS;
+			string operandLeft = null;
+			string operandRight = null;
+			
+			Condition c = new Condition(name, description, entityKey, eval, operandLeft, operandRight);
+			c = new Condition(name, description, entityKey, eval, IsCombatant, operandRight);
+			
+			
 			/*
 			Target t = new Target()
 			t.EntityIndex = 
@@ -2062,6 +2080,7 @@ namespace HelloBoids
 					SensorContact c = contacts[j];
 					
 					
+					//Console.WriteLine("test..." + i.ToString());
 					
 				}
 			});
@@ -2091,6 +2110,16 @@ namespace HelloBoids
 			// - sparring
 			// - theater (performances, orchestras, bands, etc)
 			// - nap/sleep
+		}
+		
+		private string IsCombatant(object[] args)
+		{
+			
+			string entityIndex = (string)args[0];
+			
+			
+			
+			return "false";
 		}
 			
 		/// <summary>
@@ -17199,132 +17228,209 @@ if (mEntityNodesCollection == null) return null;
 			
 	public class Policy
 	{
-		// eg: RoE (Rules of Engagement)
+		// eg: A Policy contains a list of Queries that represent testing for a 
+		//     related series of conditions.
+		//     For instance, a subset of the Rules of Engagement (RoE) policy says "Do Not Fire On Friendlies" 
+		//     needs to check for the following:
+		//     - Is the target a member of "Membership_Earth_Alliance"
+		//     - Is the target a member of "Colonial_Expeditionary_Fleet"
+		//     - Has the target fired upon us or an ally, and thus, is in breach of this policy itself?
 		
-		private List<Rule> mRules;
+		// Let's say the question is, Can this Target vessel be fired upon?  
+		// we want to build this query up as a type of Policy for When can a vessel be fired upon?
+		
+		private List<Query> mQueries;
+		private string mErrorReason;
 		
 		
 		public Policy()
 		{
+			mQueries = new List<Query>();
+		}
+		
+		public Query[] Queries {get {if (mQueries == null) return null; return mQueries.ToArray();}}
+		
+		
+		public void Add(Query q)
+		{
+			if (mQueries == null) mQueries = new List<Query>();
+			mQueries.Add(q);
+		}
+		
+		public bool Execute ()
+		{
+			if (mQueries == null || mQueries.Count == 0) return true;
 			
-		}
-		
-		public Rule[] Rules { get{ if (mRules == null) return null;  return mRules.ToArray();}}
-		
-		public void Add(Rule r)
-		{
-			if (mRules == null) mRules = new List<Rule>();
+			for (int i = 0; i < mQueries.Count; i++)
+			{
+				UserDataStore context = mQueries[i].Context;
+				if (!mQueries[i].Execute()) return false;
+			}
 			
-			mRules.Add(r);
-			
-		}
-		
-
-	}
-	
-	/// <summary>
-	/// Rules should be sorted from highest number of Conditions to lowest so that we always test against highest number first so we can potentially early-exit
-	/// <summary>
-	public class Rule
-	{
-		public string Concept;
-		public string Description;
-		public Condition[] Conditions;
-		//public Response Response;
-		//public Remember Remember;
-		//public Trigger Trigger;
-
-		public void Add(Condition c)
-		{
-			// following is using Keystone namespace but actually is in KeyStandardLibrary
-			// Keystone.Extensions.ArrayExtensions.	
-		}
-
-		public void Remove (Condition c)
-		{
-
-		}
-		
-		public bool Evaluate()
-		{
 			return true;
 		}
 	}
-							
-	public class Condition
-	{
-		public string Name;
-		public string Description;
-		public int operandLeft;
-		public int operandRight;
-		public int evalType;
-
-		// geater than
-		public bool Evaluate()
-		{
-			switch (evalType)
-			{
-				case 0:
-					 return operandLeft < operandRight;
-
-				case 1:
-					 return operandLeft > operandRight;
-
-				case 2:
-					return operandLeft == operandRight;
-				default:
-					throw new ArgumentOutOfRangeException("Condition.Evaluate() - Unexpected evalType '" + evalType.ToString() + "'");
-			}
-		}
-	}
 	
-	
-	
-	// I think the "Policy" and the "Query" is the same thing.  For instance, a Policy/Query 
-	// would be "Can this Target Entity be fired upon?
-	// So Rules that would be evaluated are
-	// - what is the current combat status?
-	// - what type of Entity is the Target?
-	// - has the Target fired first if we have a only fire in self defense rule enabled
-	// - 
+		
 	public class Query 
 	{
-		
 		private UserDataStore mContext;
-
-
+		private List<Rule> mRules;
+		
+		
 		public Query(UserDataStore uds)
 		{
 			if (uds == null) throw new ArgumentNullException("Query.ctor() - UserDataStore parameter cannot be null.");
 			mContext = uds;
 		}
 		
+		public UserDataStore Context {get {return mContext;}}
 		
-		// Let's say the question is, Can this Target vessel be fired upon?  
-		// we want to build this query up as a type of Policy for When can a vessel be fired upon?
-
+		public Rule[] Rules { get {if (mRules == null) return null; return mRules.ToArray();}}
 		
-		public bool Execute (Policy p, EntityNode t)
+		public bool Execute ()
 		{
-			Rule[] rules = p.Rules;
+			if (mRules == null || mRules.Count == 0) return true;
 			
-			for (int i = 0; i < rules.Length; i++)
-				if (!rules[i].Evaluate()) return false;
-		
-			// the rule is IsFriendly, but to evaluate to true ultimately, a friendly
-			// can be Earth_Alliance or Colonial_Expeditionary_Fleet
-			string entityID = t.Index.ToString();
-			
-			bool isFriendly = mContext[entityID].GetBool("Membership_Earth_Alliance");
-			if (!isFriendly) return false;
-			isFriendly = mContext[entityID].GetBool("Colonial_Expeditionary_Fleet");
-			if (!isFriendly) return false;
-			
+			for (int i = 0; i < mRules.Count; i++)
+				if (!mRules[i].Evaluate(mContext)) return false;
 			
 			return true;
 		}
 	}
 
+	
+	/// <summary>
+	/// Rules should be sorted from highest number of Conditions to lowest so that we always test against highest number first so we can potentially early-exit
+	/// <summary>
+	public class Rule
+	{
+		private string mConcept;
+		private string mDescription;
+		private Condition[] mConditions;
+		//public Response Response;
+		//public Remember Remember;
+		//public Trigger Trigger;
+		public string ErrorReason;
+		
+		public Rule (string concept, string description)
+		{
+			mConcept = concept;
+			mDescription = description;
+		}
+		
+		public void Add(Condition c)
+		{
+			// ArrayAppend() is using Keystone namespace but actually is in KeyStandardLibrary
+			// Keystone.Extensions.ArrayExtensions.	
+			mConditions = Utils.ArrayAppend<Condition>(mConditions, c);
+		}
+
+		public void Remove (Condition c)
+		{
+			//mConditions = Utils.ArrayRemove<Condition>(mConditions, c);
+		}
+		
+		public bool Evaluate(UserDataStore context)
+		{
+			if (mConditions == null || mConditions.Length == 0) return true;
+			
+			for (int i = 0; i < mConditions.Length; i++)
+			{
+				if (mConditions[i].LeftOperandIsDelegate)
+				{
+					// the LEFT and/or RIGHT operands might require the use of a delegate
+					string entityKey = mConditions[i].EntityKey;
+					string result = mConditions[i].OperandLeftDelegate(new object[]{entityKey});
+				}
+				else
+				{	
+					string left = context[mConditions[i].EntityKey].GetString(mConditions[i].OperandLeft);
+					
+					string right = context[mConditions[i].EntityKey].GetString(mConditions[i].OperandRight);  
+										
+
+					switch (mConditions[i].mEvalType)
+					{
+						case Condition.EVAL_TYPE.EQUALS:
+							if (left != right) return false; // todo: ErrorReason = 
+							break;
+							
+						case Condition.EVAL_TYPE.NOT_EQUALS:
+							if (left == right) return false; // todo: ErrorReason = 
+							break;
+
+						case Condition.EVAL_TYPE.LESS_THAN:
+							if (MicroEx.Evaluate(left + " >= " + right)) return false; // todo: ErrorReason = 
+							break;
+							//return OperandLeft < OperandRight;
+
+						case Condition.EVAL_TYPE.GREATER_THAN:
+							if (MicroEx.Evaluate(left + " <= " + right)) return false; // todo: ErrorReason = 
+							break;
+							//return OperandLeft > OperandRight;
+
+						default:
+							throw new ArgumentOutOfRangeException("Condition.Evaluate() - Unexpected evalType '" + mConditions[i].mEvalType.ToString() + "'");
+					}
+				}
+			}
+			return true;
+		}
+	}
+	
+	
+	public class Condition
+	{
+		public enum EVAL_TYPE : int
+		{
+			EQUALS = 0,
+			NOT_EQUALS = 1,
+			LESS_THAN = 2,
+			GREATER_THAN = 3
+		}
+		
+		public string Name;
+		public string Description;
+		
+		// The 'key' into our UserDataStore context that will return the 'value' we want for the left operand
+		public string OperandLeft;
+		
+		// there's generally no reason for BOTH the left and right operands to be a delegate.  
+		// The left will be our delegate and the right will be the operand we want to compare the result of the delegate to
+		public Func<object[], string> OperandLeftDelegate; 
+		
+		// The 'key' into our UserDataStore context that will return the 'value' we want for the right operand
+		public string OperandRight;
+		public EVAL_TYPE mEvalType;
+		public bool LeftOperandIsDelegate;
+		
+		public string EntityKey;
+		
+		
+		public Condition (string name, string description, string entityKey, EVAL_TYPE eval, string operandLeft, string operandRight)
+		{
+			Name = name;
+			Description = description;
+			OperandLeft = operandLeft;
+			OperandRight = operandRight;
+			mEvalType = eval;
+			EntityKey = entityKey; // our UserDataStore holds a Dictionary<string, UserData> with the string 'key' being the EntityID the UserData belongs too. 
+			LeftOperandIsDelegate = false;
+		}
+		
+		public Condition (string name, string description, string entityKey, EVAL_TYPE eval, Func<object[], string> operandLeft, string operandRight)
+		{
+			Name = name;
+			Description = description;
+			OperandLeft = null; // operandLeft;
+			OperandRight = null; //operandRight;
+			mEvalType = eval;
+			EntityKey = entityKey; // our UserDataStore holds a Dictionary<string, UserData> with the string 'key' being the EntityID the UserData belongs too. 
+			LeftOperandIsDelegate = true;
+		}
+	}
+	
 #endregion 
 
 	

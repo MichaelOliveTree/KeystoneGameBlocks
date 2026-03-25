@@ -2042,45 +2042,59 @@ namespace HelloBoids
 			Rule r = new Rule("ROE - Friendly Fire", "Earth Alliance Directive 209 states Captains must not fire on Friendly forces.");
 			
 			
-			
-			string name = null;
-			string description = null;
+			// in Spawn() we randomly assign each Boid to either 'Red' or 'Blue' factions.
+			string name = "Never fire on Same Faction";
+			string description = "Never fire on any Droid that is a member of our Faction.";
 			string entityKey = null;
-			Condition.EVAL_TYPE eval = Condition.EVAL_TYPE.EQUALS;
-			string operandLeft = null;
-			string operandRight = null;
+			Condition.EVAL_TYPE eval = Condition.EVAL_TYPE.NOT_EQUALS;
+			string operandLeft = "Red";
+			string operandRight = "faction";
 			
-			Condition c = new Condition(name, description, entityKey, eval, operandLeft, operandRight);
-			c = new Condition(name, description, entityKey, eval, IsCombatant, operandRight);
+			Condition condition = new Condition(name, description, entityKey, eval, operandLeft, operandRight);
+			condition = new Condition(name, description, entityKey, eval, IsCombatant, operandRight);
+			
+			r.Add(condition);
+			q.Add(r);
+			roePolicy.Add(q);
 			
 			
-			/*
-			Target t = new Target()
-			t.EntityIndex = 
-			t.WeaponsAssigned;
-			t.TargetedBy;      // other Ships/Vehciles/Entities, ground radars, factions, etc that are targeting this Target
-			t.Status = 
-			t.CrewStatus = 
-			t.Hitpoints =   ; // max hitpoints of target... should a Sensor be able to know this exact number?  It's really just a game thing and maybe we should just use visual observations of condition of ship instead
-			t.CurrentHitpoints =   ; // used to determine % damage of Target
-			*/
 			
 			int count = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 		
 			{
 				Boid current = Boids[i];
 				
+								
 				List<SensorContact> contacts = current.GetSensorContacts();
-				List<Target> targets = current.GetTargets();
-				
-				if (contacts == null) return;
-				
+				if (contacts == null || contacts.Count == 0) return;
+								
+				//List<Target> targets = current.GetTargets();
+				current.ClearTargets();
+								
 				for (int j = 0; j < contacts.Count; j++)
 				{
 					SensorContact c = contacts[j];
-					
-					
-					//Console.WriteLine("test..." + i.ToString());
+					string entityKey = i.ToString();
+					condition.EntityKey = entityKey;
+					condition.OperandLeft = "faction";
+					condition.OperandRight = (EntryClass.mCStoreUserData[entityKey].GetString("faction") == "Red") ? "Red" : "Blue";
+					Console.WriteLine("Rules of Engagement execute staRTING...");
+					if (roePolicy.Execute())
+					{
+						Console.WriteLine("Rules of Engagement execute completed...");
+						Target t = new Target();
+						t.EntityIndex = c.ContactIndex;
+						t.WeaponsAssigned = null;
+						t.TargetedBy = new int[]{i};      // other Ships/Vehciles/Entities, ground radars, factions, etc that are targeting this Target
+						t.Status = Target.STATUS.Active; //
+						t.CrewStatus = Target.CREWSTATUS.Alive;
+						t.Hitpoints = 20; // Boids[c.ContactIndex].Hitpoints; // max hitpoints of target... should a Sensor be able to know this exact number?  It's really just a game thing and maybe we should just use visual observations of condition of ship instead
+						t.CurrentHitPoints = 18; // Boids[c.ContactIndex].CurrentHP ; // used to determine % damage of Target
+						
+						Console.WriteLine("adding target...");
+						current.Add(t);
+						Console.WriteLine("target added...");
+					}
 					
 				}
 			});
@@ -2659,6 +2673,30 @@ namespace HelloBoids
 			mIntervalTimers.Register(id, "droid_isfiring", 0.06d);
 			////////////////////////
 			
+			
+			// todo: generate Droids with some variance for age, size, and speed
+			//ComponentStore<LivingEntity> testLEComp = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
+			//testLEComp.Span[b.SpanIndexLE].Age = 1;
+			//testLEComp.Span[b.SpanIndexLE].Hitpoints = 20;
+			int livingEntIndex;
+			Memory<LivingEntity> livingEntity = (Memory<LivingEntity>)b.GetUserStruct(typeof(LivingEntity), out livingEntIndex); // "HelloBoids.LivingEntity");
+			livingEntity.Span[0].Age = 1;
+			livingEntity.Span[0].Hitpoints = 20;
+	
+			//b.BlackBoardData.SetObject("tactical_state", stationState);
+			string factionColor = "Red";
+			factionColor = (rand.NextDouble() >= 0.5d) ? "Red" : "Blue";
+			
+			// TODO: b.BlackBoardData does not match mCStoreUserData[entityKey]
+			string entityKey = b.Index.ToString();
+			Console.WriteLine("set faction color string");
+			EntryClass.mCStoreUserData[entityKey].SetString("faction", factionColor);
+			Console.WriteLine("done settting faction color string");
+			
+			b.BlackBoardData.SetString("faction", factionColor);
+			System.Diagnostics.Debug.Assert(b.BlackBoardData == EntryClass.mCStoreUserData[entityKey], "UserData objects do not match.");
+			
+			
 	
 			// SKILLS
 			////////////////////////
@@ -2691,16 +2729,7 @@ namespace HelloBoids
 			b.TacticalStationSkills.Add(v.SkillType, v);
 			////////////////////////
 			
-	
-			// todo: generate Droids with some variance for age, size, and speed
-			//ComponentStore<LivingEntity> testLEComp = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
-			//testLEComp.Span[b.SpanIndexLE].Age = 1;
-			//testLEComp.Span[b.SpanIndexLE].Hitpoints = 20;
-			int livingEntIndex;
-			Memory<LivingEntity> livingEntity = (Memory<LivingEntity>)b.GetUserStruct(typeof(LivingEntity), out livingEntIndex); // "HelloBoids.LivingEntity");
-			livingEntity.Span[0].Age = 1;
-			livingEntity.Span[0].Hitpoints = 20;
-	
+		
 			// todo: create a "cooldown" interval that is based on the droid's size
 							
 	
@@ -2759,7 +2788,7 @@ namespace HelloBoids
 			tacticalStation.Span[0].Targets = null;
 
 	
-			//b.BlackBoardData.SetObject("tactical_state", stationState);
+			
 	
 			// NOTE: the following calls to GetUserStruct() returns the typically ONE record (but more potentially for ArmorLayers)
 			//       that is stored within the EntityNode's.  Unlike calls to EntryClass.mColStore.CheckOut(Component);
@@ -3564,6 +3593,12 @@ namespace HelloBoids
 			
 			for (int i = 0; i < t.Length; i++)
 				Add(t[i]);
+		}
+		
+		public void ClearTargets()
+		{
+			if (mTargets != null)
+				mTargets.Clear();
 		}
 		
 		// TODO: this should normally be in TacticalStation script correct?
@@ -17275,7 +17310,7 @@ if (mEntityNodesCollection == null) return null;
 	public class Query 
 	{
 		private UserDataStore mContext;
-		private List<Rule> mRules;
+		private Rule[] mRules;
 		
 		
 		public Query(UserDataStore uds)
@@ -17286,13 +17321,21 @@ if (mEntityNodesCollection == null) return null;
 		
 		public UserDataStore Context {get {return mContext;}}
 		
-		public Rule[] Rules { get {if (mRules == null) return null; return mRules.ToArray();}}
+		public Rule[] Rules { get {return mRules;}}
+		
+		public void Add(Rule r)
+		{
+			// ArrayAppend() is using Keystone namespace but actually is in KeyStandardLibrary
+			// Keystone.Extensions.ArrayExtensions.	
+			mRules = Utils.ArrayAppend<Rule>(mRules, r);
+		}
 		
 		public bool Execute ()
 		{
-			if (mRules == null || mRules.Count == 0) return true;
+			if (mRules == null || mRules.Length == 0) return true;
 			
-			for (int i = 0; i < mRules.Count; i++)
+			Console.WriteLine("Executing rules");
+			for (int i = 0; i < mRules.Length; i++)
 				if (!mRules[i].Evaluate(mContext)) return false;
 			
 			return true;
@@ -17335,6 +17378,7 @@ if (mEntityNodesCollection == null) return null;
 		{
 			if (mConditions == null || mConditions.Length == 0) return true;
 			
+			Console.WriteLine("Evaluating " + mConditions.Length.ToString() + " conditions");
 			for (int i = 0; i < mConditions.Length; i++)
 			{
 				if (mConditions[i].LeftOperandIsDelegate)
@@ -17345,10 +17389,9 @@ if (mEntityNodesCollection == null) return null;
 				}
 				else
 				{	
+					// left is the KVP to look up.  right is what we want to compare it against 
 					string left = context[mConditions[i].EntityKey].GetString(mConditions[i].OperandLeft);
-					
-					string right = context[mConditions[i].EntityKey].GetString(mConditions[i].OperandRight);  
-										
+					string right = mConditions[i].OperandRight; // context[mConditions[i].EntityKey].GetString(mConditions[i].OperandRight);  			
 
 					switch (mConditions[i].mEvalType)
 					{

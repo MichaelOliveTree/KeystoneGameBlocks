@@ -12,8 +12,6 @@
 
 //#define DEBUG_OUTPUT
 
-
-
 using System.Collections;
 using System.ComponentModel;
 
@@ -185,15 +183,13 @@ using System.IO;
 
 
 
-
 // FIXES Feb.8.2026
 //   - started adding code for Laser fire damage effects processing 
 //   - Added destructor and IDisposable Dispose() to ComponentStoreCollection.cs and ComponentStore.cs and BoidSimulation.cs
 //   - Added destructor to Transform.cs for freeing up the memory of Memory<T>... i think this still needs work to keep the Memory<T> blocks packed correctly.
 //   - Fixed Semaphore.Wait(-1) which means wait indefinetely for ComponentStoreCollection.CheckOut() and ComponentStore.CheckOut()
 
-
-			
+	
 // TODO: THE SAMPLE FROM GITHUB https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
 // and simply uses System.Drawing to draw the boids.  I will want to just use a simple 3d pyramid type boid .obj instead.
 // https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
@@ -237,13 +233,11 @@ namespace HelloBoids
 		public static double COHESION_FACTOR = 0.1d;
 		public static double TURN_FACTOR = 0.1d; // For boundary avoidance
 		public static double MAX_SPEED = 5d;
-		
-        		
+				
 		private static bool useOctree = false;
 		private static uint OctreeMaxDepth = 12;         // NOTE: this is ignored if Octree.EnforceMaxDepth == false in which case the splitthreshHold and radius of the entity being added is the main determinant
 		private static uint OctreeSplitThreshold = 8;
 		
-	
 		public static HelloBoids.UserDataStore mCStoreUserData;
         public static HelloBoids.ComponentStoreCollection mCStoreCol;
         public static BoidSimulation bSim;
@@ -254,12 +248,10 @@ namespace HelloBoids
 		
         private static bool mMainLoopIsRunning;
 		private static bool mGameLoopIsRunning;
-		
-		       
+		 
         private static object mMainLoopLock; 
 		private static object mGameLoopLock; 
 		private static object mRenderLoopLock;
-		
 			
 		// Debugging Aids
 		// fragment the memory to account for fact that our
@@ -2014,7 +2006,7 @@ namespace HelloBoids
 						t.Velocity = b.Velocity;
 						t.Distance = neighbors[(int)j].Item2;
 						t.Heading = 0;
-						t.TimeAcquired = Utils.NowTicks();
+						t.TimeAcquired = Utils.NowTicks(); // todo: this needs to eventually just be gt.Ticks <-- which must come from 'gametime fixedstep' and not 'real-time'
 						t.TimeLast = t.TimeAcquired;
 						
 						c.Add(t);
@@ -2035,36 +2027,11 @@ namespace HelloBoids
 		/// </summary>
 		private void DoTargetPrioritization()
 		{
-			
-			Policy roePolicy = new Policy();
-			Query q = new Query(EntryClass.mCStoreUserData);
-			
-			Rule r = new Rule("ROE - Friendly Fire", "Earth Alliance Directive 209 states Captains must not fire on Friendly forces.");
-			
-			
-			// in Spawn() we randomly assign each Boid to either 'Red' or 'Blue' factions.
-			string name = "Never fire on Same Faction";
-			string description = "Never fire on any Droid that is a member of our Faction.";
-			string entityKey = null;
-			Condition.EVAL_TYPE eval = Condition.EVAL_TYPE.NOT_EQUALS;
-			string operandLeft = "Red";
-			string operandRight = "faction";
-			
-			Condition condition = new Condition(name, description, entityKey, eval, operandLeft, operandRight);
-			condition = new Condition(name, description, entityKey, eval, IsCombatant, operandRight);
-			
-			r.Add(condition);
-			q.Add(r);
-			roePolicy.Add(q);
-			
-			
-			
 			int count = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 		
 			{
 				Boid current = Boids[i];
 				
-								
 				List<SensorContact> contacts = current.GetSensorContacts();
 				if (contacts == null || contacts.Count == 0) return;
 								
@@ -2073,29 +2040,55 @@ namespace HelloBoids
 								
 				for (int j = 0; j < contacts.Count; j++)
 				{
+					// entityKey will usually be the ID of the target Entity (aka Droid or Ship).  But not always.  Sometimes it may be our own ship.  It depends on the specific rule.			
+					string targetKey = contacts[j].ContactIndex.ToString();
+					string currentKey = i.ToString();
+					
+					Policy roePolicy = new Policy();
+					Query q = new Query(EntryClass.mCStoreUserData);
+
+					Rule r = new Rule("ROE - Friendly Fire", "Earth Alliance Directive 209 states Captains must not fire on Friendly forces.");
+
+					// Condition 1 == in Spawn() we randomly assign each Boid to either 'Red' or 'Blue' factions.
+					string name = "Never fire on Same Faction";
+					string description = "Never fire on any Droid that is a member of our Faction.";
+					 
+					Condition.EVAL_TYPE eval = Condition.EVAL_TYPE.NOT_EQUALS;
+					string operandLeft = "faction";
+					string friendlyFaction = EntryClass.mCStoreUserData[currentKey].GetString("faction");  
+					string operandRight = friendlyFaction;
+					
+					Condition condition = new Condition(name, description, targetKey, eval, operandLeft, operandRight);
+											
+					r.Add(condition);
+
+					// Condition 2 == This Entity is not currently fighting us or one of our Allies in the arena
+					eval = Condition.EVAL_TYPE.EQUALS;
+					operandRight = "false";
+					
+					object[] delegateArgs = new object[]{currentKey, targetKey};
+					condition = new Condition(name, description, targetKey, eval, IsCombatant, operandRight, delegateArgs);
+					r.Add(condition);
+			
+					q.Add(r);
+					roePolicy.Add(q);
+			
 					SensorContact c = contacts[j];
-					string entityKey = i.ToString();
-					condition.EntityKey = entityKey;
-					condition.OperandLeft = "faction";
-					condition.OperandRight = (EntryClass.mCStoreUserData[entityKey].GetString("faction") == "Red") ? "Red" : "Blue";
-					Console.WriteLine("Rules of Engagement execute staRTING...");
+					
 					if (roePolicy.Execute())
 					{
-						Console.WriteLine("Rules of Engagement execute completed...");
 						Target t = new Target();
 						t.EntityIndex = c.ContactIndex;
 						t.WeaponsAssigned = null;
 						t.TargetedBy = new int[]{i};      // other Ships/Vehciles/Entities, ground radars, factions, etc that are targeting this Target
 						t.Status = Target.STATUS.Active; //
 						t.CrewStatus = Target.CREWSTATUS.Alive;
-						t.Hitpoints = 20; // Boids[c.ContactIndex].Hitpoints; // max hitpoints of target... should a Sensor be able to know this exact number?  It's really just a game thing and maybe we should just use visual observations of condition of ship instead
+						t.Hitpoints = 20;        // Boids[c.ContactIndex].Hitpoints; // max hitpoints of target... should a Sensor be able to know this exact number?  It's really just a game thing and maybe we should just use visual observations of condition of ship instead
 						t.CurrentHitPoints = 18; // Boids[c.ContactIndex].CurrentHP ; // used to determine % damage of Target
-						
-						Console.WriteLine("adding target...");
+
 						current.Add(t);
-						Console.WriteLine("target added...");
+						//Console.WriteLine("Rules of Engagement execute completed... Target added.");
 					}
-					
 				}
 			});
 			
@@ -2128,9 +2121,28 @@ namespace HelloBoids
 		
 		private string IsCombatant(object[] args)
 		{
+			// todo: we need both the key of the tacticalstation (currently just the current Droid)
+			//       and the potential target contact key and index
+			string currentKey = (string)args[0];
+			int currentIndex = int.Parse(currentKey);
+										
+			string targetKey = (string)args[1];
+			int targetIndex = int.Parse(targetKey);
 			
-			string entityIndex = (string)args[0];
+				
+			Boid B = Boids[int.Parse(currentKey)];
 			
+			//EntityNode tactical = B.Children[0];      // tactical station
+			// UserData data = tactical.BlackBoardData; // station operator
+					
+			
+			// the tacticalStation will have it's list of Contacts and Targets 
+			List<SensorContact> contacts = B.GetSensorContacts();
+			
+			for (int i = 0; i < contacts.Count; i++)
+				if (contacts[i].ContactIndex == targetIndex)
+				{
+				}
 			
 			
 			return "false";
@@ -2168,7 +2180,6 @@ namespace HelloBoids
 			// return just the ones for this ship... maybe add a new function and not just GetView()
 			Memory<Weapon> allWeaponsForThisShip = null; // allWeapons.GetView(ship.SpanIndex); 
 
-			
 			uint numRules = 3;
 			uint numWeapons = (uint)allWeaponsForThisShip.Span.Length;
 			double[] scores =  new double[numWeapons];
@@ -2181,7 +2192,6 @@ namespace HelloBoids
 			for (int i = 0; i < numWeapons; i++)
 			{
 				// todo:  is the weapon available? does it need to aim at target? has it been doing so already? time for turret to rotate towards target
-
 				if (allWeaponsForThisShip.Span[0].CoolDown_ == 0)  // if coolDown != 0 then the fitness score should just be 0?
 				{
 					scores[i] = 0;
@@ -2196,13 +2206,11 @@ namespace HelloBoids
 		}
 		
 		
-		
 		private void DoWeaponsCanFire()
 		{
 			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			ComponentStore<Weapon> allWeapons  = EntryClass.mCStoreCol.CheckOut<Weapon>(0);
-			
 			
 			// NOTE: we really want to avoid having to reference a Droid from the array as it 
 			//       impacts our cache coherency
@@ -2232,7 +2240,6 @@ namespace HelloBoids
 				uint USER_STRUCT_FLAG_7= 1 << 6;
 				uint USER_STRUCT_FLAG_8 = 1 << 7;
 				
-				
 				bool flagValue = canFire;
 				
 				allComponents.Span[(int)i].SetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
@@ -2257,7 +2264,6 @@ namespace HelloBoids
 					// themselves, because it needs to affect ALL structs and we dont want to manage a copy of those across
 					// every flag OBVIOUSLY.
 					
-					
 				}
 				catch (Exception ex)
 				{
@@ -2266,7 +2272,6 @@ namespace HelloBoids
 				
 				// TODO: Do these .Is****  functions need to be setting mRuntimeFlags?
 			});
-			
 		}
 			
         private void DoLifeCycle(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
@@ -2340,7 +2345,7 @@ namespace HelloBoids
 		
 		private void DoParallelTest(ComponentStore<Transform.Transform_Struct> store, int start, int end)
 		{
-			int l = store.Span.Length;;
+			int l = store.Span.Length;
 			int a = l * start * end;
 			Console.WriteLine(a.ToString());
 		}
@@ -2588,8 +2593,7 @@ namespace HelloBoids
 			return found;		
 		}
 		
-		
-	
+			
 	
 		/// <summary>
 		/// The resulting damage types and amounts (and duration for damage that can be applied overtime)
@@ -2683,18 +2687,18 @@ namespace HelloBoids
 			livingEntity.Span[0].Age = 1;
 			livingEntity.Span[0].Hitpoints = 20;
 	
-			//b.BlackBoardData.SetObject("tactical_state", stationState);
+
+			// NOTE: since each Droid will have an "Operator" and "TacticalStation" merged into it's blackboarddata,
+			//       all we really need to do is stick to a naming convention like "operator_#####"  and "tactical_#####" 
+			//       when adding those Keys.
+			
 			string factionColor = "Red";
 			factionColor = (rand.NextDouble() >= 0.5d) ? "Red" : "Blue";
-			
-			// TODO: b.BlackBoardData does not match mCStoreUserData[entityKey]
-			string entityKey = b.Index.ToString();
-			Console.WriteLine("set faction color string");
-			EntryClass.mCStoreUserData[entityKey].SetString("faction", factionColor);
-			Console.WriteLine("done settting faction color string");
-			
 			b.BlackBoardData.SetString("faction", factionColor);
-			System.Diagnostics.Debug.Assert(b.BlackBoardData == EntryClass.mCStoreUserData[entityKey], "UserData objects do not match.");
+			string entityKey = b.Index.ToString();
+			//EntryClass.mCStoreUserData[entityKey].SetString("faction", factionColor);
+			System.Diagnostics.Debug.Assert(b.BlackBoardData == EntryClass.mCStoreUserData[entityKey], "Spawn() -- UserData objects do not match.");
+			
 			
 			
 	
@@ -17312,7 +17316,6 @@ if (mEntityNodesCollection == null) return null;
 		private UserDataStore mContext;
 		private Rule[] mRules;
 		
-		
 		public Query(UserDataStore uds)
 		{
 			if (uds == null) throw new ArgumentNullException("Query.ctor() - UserDataStore parameter cannot be null.");
@@ -17334,7 +17337,7 @@ if (mEntityNodesCollection == null) return null;
 		{
 			if (mRules == null || mRules.Length == 0) return true;
 			
-			Console.WriteLine("Executing rules");
+			//Console.WriteLine("Executing rules");
 			for (int i = 0; i < mRules.Length; i++)
 				if (!mRules[i].Evaluate(mContext)) return false;
 			
@@ -17378,44 +17381,50 @@ if (mEntityNodesCollection == null) return null;
 		{
 			if (mConditions == null || mConditions.Length == 0) return true;
 			
-			Console.WriteLine("Evaluating " + mConditions.Length.ToString() + " conditions");
+			//Console.WriteLine("Evaluating " + mConditions.Length.ToString() + " conditions");
 			for (int i = 0; i < mConditions.Length; i++)
 			{
+				string left = null;
+				string right = null;
 				if (mConditions[i].LeftOperandIsDelegate)
 				{
 					// the LEFT and/or RIGHT operands might require the use of a delegate
-					string entityKey = mConditions[i].EntityKey;
-					string result = mConditions[i].OperandLeftDelegate(new object[]{entityKey});
+					left = mConditions[i].OperandLeftDelegate(mConditions[i].DelegateArgs);
+					right = mConditions[i].OperandRight;
+					//Console.WriteLine("Condition.Evaluate() - Left IS a delegate LEFT == " + left + " RIGHT == " + right);
 				}
 				else
 				{	
 					// left is the KVP to look up.  right is what we want to compare it against 
-					string left = context[mConditions[i].EntityKey].GetString(mConditions[i].OperandLeft);
-					string right = mConditions[i].OperandRight; // context[mConditions[i].EntityKey].GetString(mConditions[i].OperandRight);  			
+					System.Diagnostics.Debug.Assert (context != null, "Context is not null.");
+					left = context[mConditions[i].EntityKey].GetString(mConditions[i].OperandLeft);
+					right = mConditions[i].OperandRight; // context[mConditions[i].EntityKey].GetString(mConditions[i].OperandRight);  		
+					//Console.WriteLine("Condition.Evaluate() - Left is NOT a delegate LEFT == " + left + " RIGHT == " + right);
+				}
+				
+				switch (mConditions[i].mEvalType)
+				{
+					case Condition.EVAL_TYPE.EQUALS:
+						if (left != right) return false; // todo: ErrorReason = 
+						break;
 
-					switch (mConditions[i].mEvalType)
-					{
-						case Condition.EVAL_TYPE.EQUALS:
-							if (left != right) return false; // todo: ErrorReason = 
-							break;
-							
-						case Condition.EVAL_TYPE.NOT_EQUALS:
-							if (left == right) return false; // todo: ErrorReason = 
-							break;
+					case Condition.EVAL_TYPE.NOT_EQUALS:
+						if (left == right) return false; // todo: ErrorReason = 
+						break;
 
-						case Condition.EVAL_TYPE.LESS_THAN:
-							if (MicroEx.Evaluate(left + " >= " + right)) return false; // todo: ErrorReason = 
-							break;
-							//return OperandLeft < OperandRight;
+					case Condition.EVAL_TYPE.LESS_THAN:
+						if (MicroEx.Evaluate(left + " >= " + right)) return false; // todo: ErrorReason = 
+						break;
+						//return OperandLeft < OperandRight;
 
-						case Condition.EVAL_TYPE.GREATER_THAN:
-							if (MicroEx.Evaluate(left + " <= " + right)) return false; // todo: ErrorReason = 
-							break;
-							//return OperandLeft > OperandRight;
+					case Condition.EVAL_TYPE.GREATER_THAN:
+						if (MicroEx.Evaluate(left + " <= " + right)) return false; // todo: ErrorReason = 
+						break;
+						//return OperandLeft > OperandRight;
 
-						default:
-							throw new ArgumentOutOfRangeException("Condition.Evaluate() - Unexpected evalType '" + mConditions[i].mEvalType.ToString() + "'");
-					}
+					default:
+						throw new ArgumentOutOfRangeException("Condition.Evaluate() - Unexpected evalType '" + mConditions[i].mEvalType.ToString() + "'");
+
 				}
 			}
 			return true;
@@ -17436,17 +17445,18 @@ if (mEntityNodesCollection == null) return null;
 		public string Name;
 		public string Description;
 		
-		// The 'key' into our UserDataStore context that will return the 'value' we want for the left operand
-		public string OperandLeft;
-		
+		public bool LeftOperandIsDelegate;
 		// there's generally no reason for BOTH the left and right operands to be a delegate.  
 		// The left will be our delegate and the right will be the operand we want to compare the result of the delegate to
 		public Func<object[], string> OperandLeftDelegate; 
+		public object[] DelegateArgs;
 		
+		// The 'key' into our UserDataStore context that will return the 'value' we want for the left operand
+		public string OperandLeft;
 		// The 'key' into our UserDataStore context that will return the 'value' we want for the right operand
 		public string OperandRight;
 		public EVAL_TYPE mEvalType;
-		public bool LeftOperandIsDelegate;
+		
 		
 		public string EntityKey;
 		
@@ -17462,12 +17472,14 @@ if (mEntityNodesCollection == null) return null;
 			LeftOperandIsDelegate = false;
 		}
 		
-		public Condition (string name, string description, string entityKey, EVAL_TYPE eval, Func<object[], string> operandLeft, string operandRight)
+		public Condition (string name, string description, string entityKey, EVAL_TYPE eval, Func<object[], string> operandLeft, string operandRight, object[] delegateArgs)
 		{
 			Name = name;
 			Description = description;
-			OperandLeft = null; // operandLeft;
-			OperandRight = null; //operandRight;
+
+			DelegateArgs = delegateArgs;
+			OperandLeftDelegate = operandLeft;
+			OperandRight = operandRight;
 			mEvalType = eval;
 			EntityKey = entityKey; // our UserDataStore holds a Dictionary<string, UserData> with the string 'key' being the EntityID the UserData belongs too. 
 			LeftOperandIsDelegate = true;

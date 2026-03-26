@@ -2701,7 +2701,6 @@ namespace HelloBoids
 			
 			
 			
-	
 			// SKILLS
 			////////////////////////
 			Skill v;
@@ -2869,6 +2868,41 @@ namespace HelloBoids
 			return b;
 		}
 		
+		// todo: typically production and consumption would be handled in \\data\\mods\\caesar\\scripts_entities\\sensortype.css
+		private EntityNode CreateOpticalSensor()
+		{
+			EntityNode opticalSensors = null; // the Droid's eyes
+						
+			// each Droid can Produce a 'PRODUCT.OpticalReflection' 
+			Production p;
+			p.EntityArrayIndex = opticalSensors.Index;
+			p.EntityIndex = opticalSensors.SpanIndex;
+			p.ProductID = 	(uint)v.Production[0].Product;
+			p.Location = Vector3d.Zero();
+			p.Enabled = true;
+			p.Value = v.Production[0];
+			p.Amount = v.Production[0].Amount;
+			p.NumUses = -1;
+			p.CooldownBetweenUses = 0;
+			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
+			p.DistributionList = new int[] {opticalSensors.SpanIndex};
+			p.SearchPrimitive  = null;
+	
+			// each Droid can Consume a 'PRODUCT.OpticalReflection' 
+			Consumption c;
+			c.EntityArrayIndex = opticalSensors.Index;
+			c.EntityIndex = opticalSensors.SpanIndex;
+			c.TargetIndex = p.EntityIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
+			c.ProductID = p.ProductID;
+			c.Value =  null;
+			c.Amount = 1;
+			c.Operations = null;
+			
+			RegisterProduction(opticalSensors, p);
+			RegisterConsumption(opticalSensors, c);
+			
+			return opticalSensors;
+		}
 		
 		private void Destroy(EntityNode entity)
 		{
@@ -5622,9 +5656,10 @@ return (0,0);
 
 
 		// Emissions and Signatures
-		MicrowaveEmission,
+		OpticalReflection,    // aka: VisibleLightReflection,  camoflauge can reduce this "reflection" 
 		MicrowaveReflection,
-
+		MicrowaveEmission,
+		
 		// Damage Types
 		MicrowaveDamage = 1024,
 		FireDamage,
@@ -6734,7 +6769,74 @@ return (0,0);
 	}
 		
 	
+	/// Sensors are Consumers of things like MicrowaveSignature, SoundSignature, etc
+	/// but in the case of Active Sensors, like an active Radar and Ladar, they can PRODUCE
+	/// MicrowaveEmissions, LaserEmissions, etc when they are being USED.
+	public struct Sensor
+	{
+		//"Sensory Instruments and Electronics must be placed in Periscope, Body, Superstructure, Pod, equipment Pod, Turret, Popturret, Arm, Wing, Open Mount, Leg or Module."
+		public int Index;            // index of ComponentStore<Components> where this TacticalStation's general Component struct is stored
+		public int EntityIndex;
+				
+		// optical
+		//    eyes
+		//    telescopes
+		//    periscopes
+		//    magnifyers
 		
+		// radar/ladar
+			public bool NoTargeting;
+			public string SearchOption;
+			public bool FTL;   // if FTL, range is in light-seconds
+			public long Range;
+			public long ScanRating;
+			// types using Radar and Ladar
+		    	// case Radar
+            	// case NavigationalRadar <-- uses NoTargeting = true
+            	// case AntiCollisionRadar
+		    	// case Ladar
+            	// case AESA
+            	// case HiResImagingRadar
+		 		// case LowResImagingRadar
+
+		// scientific sensors
+		//  	Case LowResPlanetarySurveyArray   // can have options for using Microwaves, Ultrasound if in atmosphere or water, Radar, etc?
+    	//       case MedResPlanetarySurveyArray
+        //       case HighResPlanetarySurveyArray
+		
+		// following used by "Other types of scanners"
+			// float Range As Single
+			// long ScanRating As Long
+			
+			// Types of "other"
+			//    Thermal, Passive IR
+			//     PassiveInfrared
+    		//     Thermograph
+   			//    PassiveRadar
+    		//     PESA
+		
+			// Case Geophone
+			// Case MAD
+     		// Case MultiScanner
+            // Case ChemScanner
+            // Case RadScanner
+            // Case BioScanner
+            // Case GravScanner
+		
+		
+		// sonar
+			// bool DepthFinding As Boolean
+			// bool DippingSonar As Boolean
+			// bool TowedArray As Boolean
+			// bool NoTargeting As Boolean
+			// float Range As Single
+			// long ScanRating As Long
+			
+		// sound
+			// long Level 
+		
+		
+	}
 	
    // Laser:Weapon:Component
 

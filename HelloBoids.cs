@@ -1038,6 +1038,8 @@ namespace HelloBoids
         private System.Collections.Concurrent.ConcurrentDictionary<uint, List<Consumption>> mConsumption;
 		
         public List<Boid> Boids { get; set; }
+		public List<EntityNode> Sensors {get; set;}
+		
         public Seeds Seeds { get; set; }
 						 
 		public ThreadedRandom mTHRandom;
@@ -1143,10 +1145,12 @@ namespace HelloBoids
 			Console.WriteLine("BoidSimulation.ctor() - Preparing to Spawn " + numBoids + " with SEED == " + this.Seeds.Master.ToString());
 
 			
-			//NOTE: List<> which stores our Boids is not threadsafe and so for .Add() we must prefill it with 
+			//NOTE: List<> (which stores our Boids and EntityNode) is not threadsafe and so for .Add() we must prefill it with 
 			// null items so we can use direct assignment (eg Boids[i] = b;  rather than Boids.Add(b); when spawning them
 			// NOTE: either of the below two lines of code will work to fill the list to the desired amount with nulls
 			Boids = new List<Boid>(new Boid[numBoids]);
+			Sensors = new List<EntityNode>(new EntityNode[numBoids]);
+			
 			//Boids = Enumerable.Repeat<Boid>(null, numBoids).ToList();
 
 			// Spawn the Boids using Parallel.For() and optional memory fragmenting
@@ -1165,8 +1169,9 @@ namespace HelloBoids
 				// spawn will add to the Octree 
 				Boid b = Spawn(mTHRandom, i, width, height, depth);
 				// NOTE: direct assignment since List<> is not threadsafe
-                Boids[i] = b;
+                Boids[i] = b; 
                 //Boids.Add(b);
+				// NOTE: Sensors[i] is performed within Spawn()
 
                 if (EntryClass.NUM_TO_PIN > 0)
                     MemoryFragmenter.Cleanup();
@@ -2662,7 +2667,16 @@ namespace HelloBoids
             double vX = (rand.NextDouble() - 0.5d) * 2d;
             double vY = (rand.NextDouble() - 0.5d) * 2d;
 
-            Boid b = new Boid(index, posX, posY, posZ, vX, vY);
+			string entityKey = "boid_" + index.ToString(); // prefix with "boid_" to not duplicate with "sensor_"
+            Boid b = new Boid(entityKey, index, posX, posY, posZ, vX, vY);
+			
+			// TODO: finish creating the optical sensors for our Droids
+			// TODO: I think we need to remove all struct creation from within Boid or EntityNode because we are unable
+			//       to manage the Index values properly that way.
+	//		EntityNode eyes = CreateOpticalSensor(index);
+	//		EntryClass.bSim.Sensors[index] = eyes; // NOTE: Sensors is already preallocated so that we can do a direct assignment to the subscript 'index' which IS threadsafe
+			//b.Add(eyes); // we dont technically have to use nested Entities at the moment because this Droid simulation is 'relatively' very simple still
+			
 			
 			// TODO: i need to ensure that the SpanIndex and Index are consistantly used across Memory<T>
 			//       SpanIndex can change as Memory<T> records are added/removed when Entities are added/removed from the Scene.
@@ -2679,14 +2693,59 @@ namespace HelloBoids
 			
 			
 			// todo: generate Droids with some variance for age, size, and speed
-			//ComponentStore<LivingEntity> testLEComp = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
-			//testLEComp.Span[b.SpanIndexLE].Age = 1;
-			//testLEComp.Span[b.SpanIndexLE].Hitpoints = 20;
-			int livingEntIndex;
-			Memory<LivingEntity> livingEntity = (Memory<LivingEntity>)b.GetUserStruct(typeof(LivingEntity), out livingEntIndex); // "HelloBoids.LivingEntity");
-			livingEntity.Span[0].Age = 1;
-			livingEntity.Span[0].Hitpoints = 20;
-	
+		
+		
+			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
+			ComponentStore<LivingEntity> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+            int checkOutIndex = -1;
+			// NOTE: this second call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
+            Memory<LivingEntity> memLivingEnt = storeLivingEntity.CheckOut(out checkOutIndex);
+			memLivingEnt.Span[0].Age = 1;
+			memLivingEnt.Span[0].Hitpoints = 20;
+			b.AddUserStruct(memLivingEnt, checkOutIndex);
+		
+			
+			
+			ComponentStore<TacticalStation> storeTacticalStation = EntryClass.mCStoreCol.CheckOut<TacticalStation>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+            checkOutIndex = -1;
+			// NOTE: this second call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
+            Memory<TacticalStation> memTact = storeTacticalStation.CheckOut(out checkOutIndex);
+			b.AddUserStruct(memTact, checkOutIndex);
+				
+			
+			// THIS COMPONENT IS ASSOCIATED WITH THE LASER
+			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
+			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+            checkOutIndex = -1;
+			// NOTE: this second call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
+            Memory<Component> memCmp = storeComp.CheckOut(out checkOutIndex);
+			b.AddUserStruct(memCmp, checkOutIndex);
+				
+			
+			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
+			ComponentStore<Weapon> storeWeapon = EntryClass.mCStoreCol.CheckOut<Weapon>(EntryClass.NUM_ENTRIES);
+            checkOutIndex = -1;
+			// NOTE: this call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
+            Memory<Weapon> memWep = storeWeapon.CheckOut(out checkOutIndex);
+			b.AddUserStruct(memWep, checkOutIndex);		
+		
+			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
+			ComponentStore<Laser_Struct> storeLasers = EntryClass.mCStoreCol.CheckOut<Laser_Struct>(EntryClass.NUM_ENTRIES); 
+            checkOutIndex = -1;
+			// NOTE: this call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
+            Memory<Laser_Struct>memLaser = storeLasers.CheckOut(out checkOutIndex);
+            b.AddUserStruct(memLaser, checkOutIndex);
+			
+			
+			
+			// TODO: this may require an array of checkOutIndices based on how many layers as determined from 
+			//       component.ArmorLayersCount
+			ComponentStore<ArmorLayer> storeArmorLayers = EntryClass.mCStoreCol.CheckOut<ArmorLayer>(EntryClass.NUM_ENTRIES); 
+            checkOutIndex = -1;
+            Memory<ArmorLayer> memArmor = storeArmorLayers.CheckOut(out checkOutIndex);
+			b.AddUserStruct(memArmor, checkOutIndex);
+			
+
 
 			// NOTE: since each Droid will have an "Operator" and "TacticalStation" merged into it's blackboarddata,
 			//       all we really need to do is stick to a naming convention like "operator_#####"  and "tactical_#####" 
@@ -2695,7 +2754,7 @@ namespace HelloBoids
 			string factionColor = "Red";
 			factionColor = (rand.NextDouble() >= 0.5d) ? "Red" : "Blue";
 			b.BlackBoardData.SetString("faction", factionColor);
-			string entityKey = b.Index.ToString();
+
 			//EntryClass.mCStoreUserData[entityKey].SetString("faction", factionColor);
 			System.Diagnostics.Debug.Assert(b.BlackBoardData == EntryClass.mCStoreUserData[entityKey], "Spawn() -- UserData objects do not match.");
 			
@@ -2868,45 +2927,67 @@ namespace HelloBoids
 			return b;
 		}
 		
-		// todo: typically production and consumption would be handled in \\data\\mods\\caesar\\scripts_entities\\sensortype.css
-		private EntityNode CreateOpticalSensor()
+		// todo: typically creation of structs and production and consumption would be handled in an Entity script - eg eventually for KGB it might be  \\data\\mods\\caesar\\scripts_entities\\sensor_radar.css
+		private EntityNode CreateOpticalSensor(int index)
 		{
-			EntityNode opticalSensors = null; // the Droid's eyes
-						
+			// TODO: the problem we are having with 'index' right now is that every EntityNode
+			//       creates a Transform_Struct which is sized initially to EntryClass.NUM_ENTRIES and I do not think
+			//       it can handle expansions properly OR when Boid's create the various structs it needs (eg LivingEntity) that then
+			//       do not correspond index wise necessarily to their transform struct's spanIndex 
+			// SO we need a more robust solution to handling these indices and for finding these index
+			// values
+			
+			
+			//index += (int)EntryClass.NUM_ENTRIES;
+			string entityKey = "sensor_" + index.ToString(); // prefix with "sensor_" to not duplicate with "boid_"
+			
+			EntityNode opticalSensor = new EntityNode(entityKey, index, 0, 0, 0, 0, 0); // the Droid's eyes
+					
+			ComponentStore<Sensor> storeSensor = EntryClass.mCStoreCol.CheckOut<Sensor>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+            int checkOutIndex = -1;
+			// NOTE: this second call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
+            Memory<Sensor> memSensor = storeSensor.CheckOut(out checkOutIndex);
+			opticalSensor.AddUserStruct(memSensor, checkOutIndex);
+			
+			// initialize values for sensor
+			memSensor.Span[0].EntityIndex = opticalSensor.Index;
+			memSensor.Span[0].Index = opticalSensor.SpanIndex;
+			memSensor.Span[0].Range = 100;
+			//memSensor.Span[0].ScanRating = 2000; // <-- this is a computed stat based on TL and Power, that generally ranges from 10 - 40+  (google "gurps vehicles 2nd edition radar scan rating")
+			
 			// each Droid can Produce a 'PRODUCT.OpticalReflection' 
 			Production p;
-			p.EntityArrayIndex = opticalSensors.Index;
-			p.EntityIndex = opticalSensors.SpanIndex;
-			p.ProductID = 	(uint)v.Production[0].Product;
+			p.EntityArrayIndex = opticalSensor.Index;
+			p.EntityIndex = opticalSensor.SpanIndex;
+			p.ProductID = 	(uint)PRODUCTS.OpticalReflection;
 			p.Location = Vector3d.Zero();
 			p.Enabled = true;
-			p.Value = v.Production[0];
-			p.Amount = v.Production[0].Amount;
+			p.Value = 1;
+			p.Amount = -1; // this should be diminished by the range of the sensor 
 			p.NumUses = -1;
 			p.CooldownBetweenUses = 0;
 			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
-			p.DistributionList = new int[] {opticalSensors.SpanIndex};
+			p.DistributionList = new int[] {opticalSensor.SpanIndex};
 			p.SearchPrimitive  = null;
 	
 			// each Droid can Consume a 'PRODUCT.OpticalReflection' 
 			Consumption c;
-			c.EntityArrayIndex = opticalSensors.Index;
-			c.EntityIndex = opticalSensors.SpanIndex;
+			c.EntityArrayIndex = opticalSensor.Index;
+			c.EntityIndex = opticalSensor.SpanIndex;
 			c.TargetIndex = p.EntityIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
-			c.ProductID = p.ProductID;
+			c.ProductID = (uint)PRODUCTS.OpticalReflection;
 			c.Value =  null;
 			c.Amount = 1;
 			c.Operations = null;
 			
-			RegisterProduction(opticalSensors, p);
-			RegisterConsumption(opticalSensors, c);
+			RegisterProduction(opticalSensor, p);
+			RegisterConsumption(opticalSensor, c);
 			
-			return opticalSensors;
+			return opticalSensor;
 		}
 		
 		private void Destroy(EntityNode entity)
 		{
-					
 			int lastIndex = this.Boids.Count - 1;
 	
 			// TODO:
@@ -3547,35 +3628,16 @@ namespace HelloBoids
     public class Boid : EntityNode
     {
         private const double BOID_WIDTH = 2.0d;
-        public uint ShotsFired = 0;
+        public uint ShotsFired = 0; // todo: belongs in TacticalStation 
 		
 		
 		public Dictionary<SKILLS, Skill> TacticalStationSkills;
 		public Dictionary<SKILLS, Skill> OperatorSkills;
 		
+
 		
-		
-	#if	USE_MEMORY_T
-		// TODO: these Memory<T> should be stored in base.UserStructs
-		public Memory<LivingEntity> mMemStore_LivingEntity;
-		public Memory<TacticalStation> mMemStore_TacticalStation;
-		
-		/*
-		public Memory<Component> mMemStore_Component; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
-		public Memory<Weapon> mMemStore_Weapon; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
-		public Memory<Laser_Struct> mMemStore_Laser; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
-		public Memory<ArmorLayer> mMemStore_ArmorLayers; 
-		
-		public int SpanIndexTacticalStation = -1;
-		public int SpanIndexLivingEntity = -1;
-		public int SpanIndexComponent = -1;
-		public int SpanIndexWeapon = -1;
-		public int SpanIndexLaser = -1;
-		*/
-	#endif		
-		
-        public Boid(int index, double x, double y, double z,  double xV, double yV)
-            : base(index, x, y, z, xV, yV)
+        public Boid(string entityID, int index, double x, double y, double z,  double xV, double yV)
+            : base(entityID, index, x, y, z, xV, yV)
         {
 				
 #if USE_MEMORY_T
@@ -3695,47 +3757,6 @@ namespace HelloBoids
 			//     string name = object.Span[i].PropertyName 
 			// }
 			
-		
-			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
-			ComponentStore<LivingEntity> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-            int checkOutIndex = -1;
-			// NOTE: this second call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
-            Memory<LivingEntity> memLivingEnt = storeLivingEntity.CheckOut(out checkOutIndex);
-			this.AddUserStruct(memLivingEnt, checkOutIndex);
-		
-			ComponentStore<TacticalStation> storeTacticalStation = EntryClass.mCStoreCol.CheckOut<TacticalStation>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-            checkOutIndex = -1;
-			// NOTE: this second call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
-            Memory<TacticalStation> memTact = storeTacticalStation.CheckOut(out checkOutIndex);
-			this.AddUserStruct(memTact, checkOutIndex);
-				
-			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
-			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-            checkOutIndex = -1;
-			// NOTE: this second call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
-            Memory<Component> memCmp = storeComp.CheckOut(out checkOutIndex);
-			this.AddUserStruct(memCmp, checkOutIndex);
-				
-			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
-			ComponentStore<Weapon> storeWeapon = EntryClass.mCStoreCol.CheckOut<Weapon>(EntryClass.NUM_ENTRIES);
-            checkOutIndex = -1;
-			// NOTE: this call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
-            Memory<Weapon> memWep = storeWeapon.CheckOut(out checkOutIndex);
-			this.AddUserStruct(memWep, checkOutIndex);		
-		
-			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
-			ComponentStore<Laser_Struct> storeLasers = EntryClass.mCStoreCol.CheckOut<Laser_Struct>(EntryClass.NUM_ENTRIES); 
-            checkOutIndex = -1;
-			// NOTE: this call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
-            Memory<Laser_Struct>memLaser = storeLasers.CheckOut(out checkOutIndex);
-            this.AddUserStruct(memLaser, checkOutIndex);
-			
-			// TODO: this may require an array of checkOutIndices based on how many layers as determined from 
-			//       component.ArmorLayersCount
-			ComponentStore<ArmorLayer> storeArmorLayers = EntryClass.mCStoreCol.CheckOut<ArmorLayer>(EntryClass.NUM_ENTRIES); 
-            checkOutIndex = -1;
-            Memory<ArmorLayer> memArmor = storeArmorLayers.CheckOut(out checkOutIndex);
-			this.AddUserStruct(memArmor, checkOutIndex);
 		
 			
 			PropertyBag bag = new PropertyBag();
@@ -4414,7 +4435,9 @@ return (0,0);
     public class EntityNode : Transform
     {
         protected string mID;
-        protected int mIndex;
+        
+		protected int mIndex;
+		
         protected BoundingBox _box;
         protected OctreeOctant _octant;
 		protected Dictionary<string, Tuple<int, object>> mUserStructs;
@@ -4423,13 +4446,14 @@ return (0,0);
 		protected UserData mUserData;
 		protected int mUserTypeID;   // can be defined by game##.dll or by an enum that is generated into a compiled binary at runtime
 		
-        public EntityNode(int index, double x, double y, double z, double xV, double yV) 
+        public EntityNode(string entityID, int index, double x, double y, double z, double xV, double yV) 
 			: base (x, y, z, xV, yV)
         {
             mIndex = index;
 			mUserTypeID = -1;
 				
-			mUserData = EntryClass.mCStoreUserData.CheckOut(index.ToString());
+			mID = entityID;
+			mUserData = EntryClass.mCStoreUserData.CheckOut(mID);
 				
         }
 		
@@ -6788,8 +6812,9 @@ return (0,0);
 			public bool NoTargeting;
 			public string SearchOption;
 			public bool FTL;   // if FTL, range is in light-seconds
-			public long Range;
-			public long ScanRating;
+			public int Range;
+			public int ScanRating;  // <-- this is a computed stat based on TL and Power, that generally ranges from 10 - 40+  (google "gurps vehicles 2nd edition radar scan rating")
+		
 			// types using Radar and Ladar
 		    	// case Radar
             	// case NavigationalRadar <-- uses NoTargeting = true
@@ -7333,7 +7358,7 @@ return (0,0);
 
         public int MaxEntityCount { get; set; }
 
-		protected EntitySystemBase(string guid) : base(guid.GetHashCode(), 0, 0, 0, 0, 0)
+		protected EntitySystemBase(string guid) : base(guid, guid.GetHashCode(), 0, 0, 0, 0, 0)
 		{
 			
 		}

@@ -1524,7 +1524,10 @@ namespace HelloBoids
 				Span<Transform.Transform_Struct> memSpan = store.Span;
 				EntityNode currentBoid = Boids[(int)i];
 				
-				mNeighbors.TryAdd(currentBoid.SpanIndex, new List<Tuple<int, double>>(4));
+				int currentInternalIndex = currentBoid.GetUserStructIndex(typeof(Transform.Transform_Struct));
+				
+				// add a List<Tuple> to our mNeighbors Dictionary<> that will hold any adjacents for this current Droid
+				mNeighbors.TryAdd(currentInternalIndex, new List<Tuple<int, double>>(4));
 				
 		#if SPATIAL_SEARCH == false
 
@@ -1581,14 +1584,15 @@ namespace HelloBoids
 								for (int j = 0; j < ents.Length; j++)
 								{
 									EntityNode potentialNeighbor = ents[j];
-
+									int potentialInternalIndex = potentialNeighbor.GetUserStructIndex(typeof(Transform.Transform_Struct));
+									
 									if (currentOctant.MaxRadius * 2d <= largestDistance)
 									{
 										double distanceToNeighboringBoidSquared;
 										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
-										distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[potentialNeighbor.SpanIndex].Translation, memSpan[(int)i].Translation);
+										distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[potentialInternalIndex].Translation, memSpan[(int)i].Translation);
 										
-							 			mNeighbors[currentBoid.SpanIndex].Add(new Tuple<int, double> (potentialNeighbor.SpanIndex, distanceToNeighboringBoidSquared));
+							 			mNeighbors[currentInternalIndex].Add(new Tuple<int, double> (potentialInternalIndex, distanceToNeighboringBoidSquared));
                          			}   
                          			else
 									{   
@@ -1600,7 +1604,7 @@ namespace HelloBoids
 										double distanceToNeighboringBoidSquared;
 										// TODO: if i stored the SpanIndex in the Octree instead of the EntityNode perhaps that would help?
 										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
-											distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[potentialNeighbor.SpanIndex].Translation, memSpan[(int)i].Translation);
+											distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[potentialInternalIndex].Translation, memSpan[(int)i].Translation);
 											//distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[potentialNeighbor.SpanIndex].Translation, currentBoidTranslation);
 
 										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
@@ -1609,7 +1613,7 @@ namespace HelloBoids
 										//System.Diagnostics.Debug.WriteLine("Calculated distanceSquared to neighboring boid = " + distanceToNeighboringBoidSquared.ToString());
 										if (distanceToNeighboringBoidSquared <= largestDistanceSquared)
 
-											mNeighbors[currentBoid.SpanIndex].Add(new Tuple<int, double>(potentialNeighbor.SpanIndex, distanceToNeighboringBoidSquared));
+											mNeighbors[currentInternalIndex].Add(new Tuple<int, double>(potentialInternalIndex, distanceToNeighboringBoidSquared));
      								}       
              					}  // end for ents[]        
 							}
@@ -1733,48 +1737,55 @@ namespace HelloBoids
 			
 			
 			
-			//Console.WriteLine("DoContactListSorting()");
+			Console.WriteLine("DoContactListSorting()");
 			DoContactListSorting(); // based on policies
 			
 			
 			
-			//Console.WriteLine("DoTargetPrioritization()");
+			Console.WriteLine("DoTargetPrioritization()");
 			DoTargetPrioritization();
 			
 			
 			// todo: if we had a list of all weapons for every ship to pass all at once
 			//       as well as all targets for each ship to pass all at once, we could run this
 			//       processor in a single call from here...
+			//Console.WriteLine("DoWeaponFitnessScores()");
 			DoWeaponFitnessScores(null, null);
 			
 			
 			
-			
+			//Console.WriteLine("DoWeaponsCanFire()");
 			DoWeaponsCanFire();
 			
 
-			
+			//Console.WriteLine("preparing for loop()");
 			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 						
-			
+			//Console.WriteLine("1");
 			int count = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 				
 			//for (int i = 0; i < Boids.Count; i++)
             {
 				Boid currentBoid = Boids[i];
+				int currentInternalIndex = currentBoid.GetUserStructIndex(typeof(Transform.Transform_Struct));
+				
+				//Console.WriteLine("2");
+				
 				List<Tuple<int, double>> neighbors = null;
 				
 				try
 				{
-					bool success = mNeighbors.TryGetValue(currentBoid.SpanIndex, out neighbors);
+					//Console.WriteLine("3");
+					bool success = mNeighbors.TryGetValue(currentInternalIndex, out neighbors);
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine("Do_Droid_Logic() -  key '" + currentBoid.SpanIndex.ToString() + "' does not exist. " + ex.Message);
+					Console.WriteLine("Do_Droid_Logic() -  internal index '" + currentInternalIndex.ToString() + "' does not exist. " + ex.Message);
 				}
 				
+				//Console.WriteLine("4");
 				int componentIndex;
 				Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component), out componentIndex);
 				int livingEntityIndex;
@@ -1792,8 +1803,9 @@ namespace HelloBoids
 				int operatorIndex = currentBoid.Index; // we pass Index and NOT SpanIndex because we want to find the Boid in the EntryClass.bSim.Boids[] List
 				int stationIndex = currentBoid.Index;  // for now, our Boid hosts both the TacticalStation and the Operator
 
-				if (!allComponents.Span[componentIndex].CanAct) return;
-							
+				//Console.WriteLine("5 - ComponentIndex = " + componentIndex.ToString());
+//				if (!allComponents.Span[componentIndex].CanAct) return;
+				//Console.WriteLine("6");		
 				
 				// NOTE: The EXE will render Sensor Contact info as necessary.
 				//       The client EXE will have access to those types and the UI elements using them and can update
@@ -1805,7 +1817,10 @@ namespace HelloBoids
 				//      - any Contacts in list marked as FOF.Foe + FOF.Hostile as opposed to just FOF.Foe (note: stale contacts are still treated as available in case of need to persue)
 				//      	- FOF.Withdrawing may be ignored for example if ROE says we don't persue in this circumstance including disabled ships and unarmed ships like freighters
 				
-				string timerID = currentBoid.SpanIndex.ToString();
+				// NOTE: The issue here is sometimes we iterate through List<Boids> and other times
+				//       by mem.Span.Length.  So to be consistant, we try to keep the Span indices matching
+				//       
+				string timerID = currentInternalIndex.ToString();
 				bool canFire = false;
 				
 				// NOTE: above we check if each individual weapon can fire... we do not care
@@ -1813,15 +1828,17 @@ namespace HelloBoids
 				//       can fire, both can be used independantly.
 				try
 				{
+					//Console.WriteLine("7");
 					canFire = mIntervalTimers.IsReady(timerID, "droid_canfire");
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine("Do_Droid_Logic() - droid_canfire " + currentBoid.SpanIndex.ToString() + " key does not exist");
+					Console.WriteLine("Do_Droid_Logic() - droid_canfire " + currentInternalIndex.ToString() + " key does not exist");
 				}
 				
 				if (canFire) // TODO: Establish CANFIRE PER WEAPON
-           	 	{           			
+           	 	{  
+					Console.WriteLine("8 - CanFire");
 					List<Boid> targets = null;
 					double[] distances = null;
 					//List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE); // TODO: Hopefully this FindNearestTarget() can be optimized.... spatial searches even with Octree is slow.
@@ -1830,13 +1847,15 @@ namespace HelloBoids
 					// This overloaded version of FindNearestTarget() returns the sorted list of neighbors from closest to furthest along with their distances to the current droid
 					List<EntityNode> tmp = FindNearestTarget(currentBoid, neighbors, out distances);
 					
+					Console.WriteLine("8.5 - CanFire");
+					
 					if (tmp != null && tmp.Count > 0)
 						return;     // NOTE: for parallel.For we use "return"
 						// continue; // NOTE: for regular for() loop we use "continue"
 					
 					targets = tmp.OfType<Boid>().ToList();
 					
-					Console.WriteLine("Do_Droid_Logic() - Droid " + currentBoid.SpanIndex.ToString() + " Has Found Target == " + (targets != null).ToString());
+					Console.WriteLine("Do_Droid_Logic() - Droid " + currentInternalIndex.ToString() + " Has Found Target == " + (targets != null).ToString());
 					
 					
 					try
@@ -1978,10 +1997,12 @@ namespace HelloBoids
             System.Threading.Tasks.Parallel.For(0, count, i => 		
 			{
 				Boid current = Boids[i];
+				int currentInternalIndex = current.GetUserStructIndex(typeof(Transform.Transform_Struct));
+				
 				List<Tuple<int, double>> neighbors = null;
 				// TODO: our List<Tuple<int, double>> tells us which Droid (int) index was detected and the (double) distance to that Droid 
 				//       but it does not tell  us which Sensor component made this detection.  We will need a way to add that.
-				bool success = mNeighbors.TryGetValue(current.SpanIndex, out neighbors);
+				bool success = mNeighbors.TryGetValue(currentInternalIndex, out neighbors);
 					
 				if (success)
 				{
@@ -1996,9 +2017,9 @@ namespace HelloBoids
 						c.Index = (int)i;
 
 						Boid b =  this.Boids[c.ContactIndex];
-						
+						int sensorContactInternalIndex = b.GetUserStructIndex(typeof(Transform.Transform_Struct));
 						// contact details are needed to find the correct SensorContact to potentially merge with an existing SensorContact for this detected Entity
-						c.Name =  "Droid_" + b.SpanIndex.ToString(); // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
+						c.Name =  "Droid_" + sensorContactInternalIndex.ToString(); // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
 						c.RegistryNumber = c.Name;
 						c.Type = SensorContact.TYPE.Drone;
 						c.ContactStatus = Target.STATUS.Unknown;
@@ -2046,8 +2067,8 @@ namespace HelloBoids
 				for (int j = 0; j < contacts.Count; j++)
 				{
 					// entityKey will usually be the ID of the target Entity (aka Droid or Ship).  But not always.  Sometimes it may be our own ship.  It depends on the specific rule.			
-					string targetKey = contacts[j].ContactIndex.ToString();
-					string currentKey = i.ToString();
+					string targetKey = "boid_" + contacts[j].ContactIndex.ToString();
+					string currentKey = "boid_" + i.ToString();
 					
 					Policy roePolicy = new Policy();
 					Query q = new Query(EntryClass.mCStoreUserData);
@@ -2128,14 +2149,18 @@ namespace HelloBoids
 		{
 			// todo: we need both the key of the tacticalstation (currently just the current Droid)
 			//       and the potential target contact key and index
-			string currentKey = (string)args[0];
-			int currentIndex = int.Parse(currentKey);
-										
-			string targetKey = (string)args[1];
-			int targetIndex = int.Parse(targetKey);
 			
+			string currentKey = (string)args[0];
+			string[] sp = currentKey.Split("_");
+			int currentIndex = int.Parse(sp[1]);
+			//Console.WriteLine("Parsed Current index == " + currentIndex.ToString());
+			
+			string targetKey = (string)args[1];
+			sp = targetKey.Split("_");
+			int targetIndex = int.Parse(sp[1]);
+			//Console.WriteLine("Parsed Target index == " + targetIndex.ToString());
 				
-			Boid B = Boids[int.Parse(currentKey)];
+			Boid B = Boids[currentIndex];
 			
 			//EntityNode tactical = B.Children[0];      // tactical station
 			// UserData data = tactical.BlackBoardData; // station operator
@@ -2172,11 +2197,11 @@ namespace HelloBoids
 			// the different structs used for a "Laser" component 
 			//todo: i should pass the array of Memory<T> and the indices arrays
 			int componentIndex;
-			Memory<Component> component = (Memory<Component>)ship.GetUserStruct("HelloBoids.Component", out componentIndex);
+			Memory<Component> component = (Memory<Component>)ship.GetUserStruct(typeof(Component), out componentIndex);
 			int wepIndex;
-			Memory<Weapon> wep = (Memory<Weapon>)ship.GetUserStruct("HelloBoids.Weapon", out wepIndex);
+			Memory<Weapon> wep = (Memory<Weapon>)ship.GetUserStruct(typeof(Weapon), out wepIndex);
 			int laserIndex; 
-			Memory<Laser_Struct> laser = (Memory<Laser_Struct>)ship.GetUserStruct("HelloBoids.Laser_Struct", out laserIndex);
+			Memory<Laser_Struct> laser = (Memory<Laser_Struct>)ship.GetUserStruct(typeof(Laser_Struct), out laserIndex);
 			
 			// todo: we need just all the weapons from this particular ship.  
 			// ComponetStore<Weapon> would contain ALL for ALL ships
@@ -2396,8 +2421,9 @@ namespace HelloBoids
 				//      because the code inside the Paralle.For() is treated as a Lambda
 				Span<Transform.Transform_Struct> memSpan = store.Span;
 				EntityNode currentBoid = Boids[(int)i];
+				int currentInternalIndex = currentBoid.GetUserStructIndex(typeof(Transform.Transform_Struct));
 				List<Tuple<int, double>>neighbors;
-				bool r = mNeighbors.TryGetValue(currentBoid.SpanIndex, out neighbors); 
+				bool r = mNeighbors.TryGetValue(currentInternalIndex, out neighbors); 
 				
 				if (neighbors == null || neighbors.Count == 0) return;
                 int nCount = neighbors.Count;
@@ -2669,7 +2695,7 @@ namespace HelloBoids
 
 			string entityKey = "boid_" + index.ToString(); // prefix with "boid_" to not duplicate with "sensor_"
             Boid b = new Boid(entityKey, index, posX, posY, posZ, vX, vY);
-			
+			int currentInternalIndex = b.GetUserStructIndex(typeof(Transform.Transform_Struct));
 			// TODO: finish creating the optical sensors for our Droids
 			// TODO: I think we need to remove all struct creation from within Boid or EntityNode because we are unable
 			//       to manage the Index values properly that way.
@@ -2677,12 +2703,13 @@ namespace HelloBoids
 	//		EntryClass.bSim.Sensors[index] = eyes; // NOTE: Sensors is already preallocated so that we can do a direct assignment to the subscript 'index' which IS threadsafe
 			//b.Add(eyes); // we dont technically have to use nested Entities at the moment because this Droid simulation is 'relatively' very simple still
 			
+			Console.WriteLine("Spawn() - index == " + index.ToString() + " INTERNAL = " + currentInternalIndex.ToString());
 			
 			// TODO: i need to ensure that the SpanIndex and Index are consistantly used across Memory<T>
 			//       SpanIndex can change as Memory<T> records are added/removed when Entities are added/removed from the Scene.
 			//       The "index" however in KGB is actually an _id GUID and is a string.
 			//       Here "index" only refers to where this Droid exists within the List<>
-			string id = b.SpanIndex.ToString();
+			string id = currentInternalIndex.ToString();
 	
 			// TIMERS
 			////////////////////////
@@ -2702,7 +2729,7 @@ namespace HelloBoids
             Memory<LivingEntity> memLivingEnt = storeLivingEntity.CheckOut(out checkOutIndex);
 			memLivingEnt.Span[0].Age = 1;
 			memLivingEnt.Span[0].Hitpoints = 20;
-			b.AddUserStruct(memLivingEnt, checkOutIndex);
+			b.AddUserStruct(typeof(LivingEntity), memLivingEnt, checkOutIndex);
 		
 			
 			
@@ -2710,7 +2737,7 @@ namespace HelloBoids
             checkOutIndex = -1;
 			// NOTE: this second call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
             Memory<TacticalStation> memTact = storeTacticalStation.CheckOut(out checkOutIndex);
-			b.AddUserStruct(memTact, checkOutIndex);
+			b.AddUserStruct(typeof(TacticalStation), memTact, checkOutIndex);
 				
 			
 			// THIS COMPONENT IS ASSOCIATED WITH THE LASER
@@ -2719,7 +2746,7 @@ namespace HelloBoids
             checkOutIndex = -1;
 			// NOTE: this second call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
             Memory<Component> memCmp = storeComp.CheckOut(out checkOutIndex);
-			b.AddUserStruct(memCmp, checkOutIndex);
+			b.AddUserStruct(typeof(Component), memCmp, checkOutIndex);
 				
 			
 			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
@@ -2727,14 +2754,14 @@ namespace HelloBoids
             checkOutIndex = -1;
 			// NOTE: this call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
             Memory<Weapon> memWep = storeWeapon.CheckOut(out checkOutIndex);
-			b.AddUserStruct(memWep, checkOutIndex);		
+			b.AddUserStruct(typeof(Weapon), memWep, checkOutIndex);		
 		
 			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
 			ComponentStore<Laser_Struct> storeLasers = EntryClass.mCStoreCol.CheckOut<Laser_Struct>(EntryClass.NUM_ENTRIES); 
             checkOutIndex = -1;
 			// NOTE: this call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
             Memory<Laser_Struct>memLaser = storeLasers.CheckOut(out checkOutIndex);
-            b.AddUserStruct(memLaser, checkOutIndex);
+            b.AddUserStruct(typeof(Laser_Struct), memLaser, checkOutIndex);
 			
 			
 			
@@ -2743,7 +2770,7 @@ namespace HelloBoids
 			ComponentStore<ArmorLayer> storeArmorLayers = EntryClass.mCStoreCol.CheckOut<ArmorLayer>(EntryClass.NUM_ENTRIES); 
             checkOutIndex = -1;
             Memory<ArmorLayer> memArmor = storeArmorLayers.CheckOut(out checkOutIndex);
-			b.AddUserStruct(memArmor, checkOutIndex);
+			b.AddUserStruct(typeof(Armor), memArmor, checkOutIndex);
 			
 
 
@@ -2772,7 +2799,7 @@ namespace HelloBoids
 			
 			// add the modifier(s) to this skill.  Recall that modifiers behave just like any other type of PRODUCTION and must be registered as PRODUCTION 
 			// at the appropriate time (eg On USE of the Skill, or on EQUIP of an Item, etc.)
-			v.AddProduction(b.SpanIndex, PRODUCTS.TargetingSkillModifier, 1, true, -1);
+			v.AddProduction(currentInternalIndex, PRODUCTS.TargetingSkillModifier, 1, true, -1);
 
 			
 			// add the skill to the DROID as if it was being added to an OPERATOR for a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
@@ -2785,7 +2812,7 @@ namespace HelloBoids
 			//v.Modifiers = null;
 			v.BaseValue = 2;
 			v.EffectiveValue = 0; // todo: this should be a Getter perhaps and not a public variable
-			v.AddProduction(b.SpanIndex, PRODUCTS.TargetingSkillModifier, 1, true, -1);
+			v.AddProduction(currentInternalIndex, PRODUCTS.TargetingSkillModifier, 1, true, -1);
 			
 			// add the skill to the DROID as if it was being added to a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
 			b.TacticalStationSkills.Add(v.SkillType, v);
@@ -2803,7 +2830,7 @@ namespace HelloBoids
 			// each Droid can Produce a TargetingSkillModifier as if it had an "OPERATOR"
 			Production p;
 			p.EntityArrayIndex = b.Index;
-			p.EntityIndex = b.SpanIndex;
+			p.EntityIndex = currentInternalIndex;
 			p.ProductID = 	(uint)v.Production[0].Product;
 			p.Location = Vector3d.Zero();
 			p.Enabled = true;
@@ -2812,13 +2839,13 @@ namespace HelloBoids
 			p.NumUses = -1;
 			p.CooldownBetweenUses = 0;
 			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
-			p.DistributionList = new int[] {b.SpanIndex};
+			p.DistributionList = new int[] {currentInternalIndex};
 			p.SearchPrimitive  = null;
 	
 			// each Droid can Consume a TargetingSkillModifier as if it had a TACTICAL CREW STATION
 			Consumption c;
 			c.EntityArrayIndex = b.Index;
-			c.EntityIndex = b.SpanIndex;
+			c.EntityIndex = currentInternalIndex;
 			c.TargetIndex = p.EntityIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
 			c.ProductID = p.ProductID;
 			c.Value =  null;
@@ -2851,15 +2878,18 @@ namespace HelloBoids
 
 	
 			
+			int transformIndex;
+			Memory<Transform.Transform_Struct> transformStruct = (Memory<Transform.Transform_Struct>)b.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
+			
 	
 			// NOTE: the following calls to GetUserStruct() returns the typically ONE record (but more potentially for ArmorLayers)
 			//       that is stored within the EntityNode's.  Unlike calls to EntryClass.mColStore.CheckOut(Component);
 			int componentIndex;
-			Memory<Component> component = (Memory<Component>)b.GetUserStruct(typeof(Component), out componentIndex); //"HelloBoids.Component");
+			Memory<Component> component = (Memory<Component>)b.GetUserStruct(typeof(Component), out componentIndex); 
 			int wepIndex;
-			Memory<Weapon> weapon = (Memory<Weapon>)b.GetUserStruct(typeof(Weapon), out wepIndex); //"HelloBoids.Weapon");
+			Memory<Weapon> weapon = (Memory<Weapon>)b.GetUserStruct(typeof(Weapon), out wepIndex); 
 			int laserIndex;
-			Memory<Laser_Struct> laser = (Memory<Laser_Struct>)b.GetUserStruct(typeof(Laser_Struct), out laserIndex); //"HelloBoids.Laser_Struct");
+			Memory<Laser_Struct> laser = (Memory<Laser_Struct>)b.GetUserStruct(typeof(Laser_Struct), out laserIndex); 
 			
 	
 	// TEMP HACK - this would normally be done in the relevant scripit - initialize the memory store vars from the serialized
@@ -2941,24 +2971,25 @@ namespace HelloBoids
 			//index += (int)EntryClass.NUM_ENTRIES;
 			string entityKey = "sensor_" + index.ToString(); // prefix with "sensor_" to not duplicate with "boid_"
 			
-			EntityNode opticalSensor = new EntityNode(entityKey, index, 0, 0, 0, 0, 0); // the Droid's eyes
+			EntityNode opticalSensor = new EntityNode(entityKey, index, 0, 0, 0, 0, 0); // OpticalSensor is the Droid's 'eyes'
 					
 			ComponentStore<Sensor> storeSensor = EntryClass.mCStoreCol.CheckOut<Sensor>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
             int checkOutIndex = -1;
 			// NOTE: this second call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
             Memory<Sensor> memSensor = storeSensor.CheckOut(out checkOutIndex);
-			opticalSensor.AddUserStruct(memSensor, checkOutIndex);
-			
+			opticalSensor.AddUserStruct(typeof(Sensor), memSensor, checkOutIndex);
+			int currentInternalIndex = opticalSensor.GetUserStructIndex(typeof(Transform.Transform_Struct));
+				
 			// initialize values for sensor
-			memSensor.Span[0].EntityIndex = opticalSensor.Index;
-			memSensor.Span[0].Index = opticalSensor.SpanIndex;
+			memSensor.Span[0].EntityIndex = currentInternalIndex;
+			memSensor.Span[0].Index = currentInternalIndex;
 			memSensor.Span[0].Range = 100;
 			//memSensor.Span[0].ScanRating = 2000; // <-- this is a computed stat based on TL and Power, that generally ranges from 10 - 40+  (google "gurps vehicles 2nd edition radar scan rating")
 			
 			// each Droid can Produce a 'PRODUCT.OpticalReflection' 
 			Production p;
 			p.EntityArrayIndex = opticalSensor.Index;
-			p.EntityIndex = opticalSensor.SpanIndex;
+			p.EntityIndex = currentInternalIndex;
 			p.ProductID = 	(uint)PRODUCTS.OpticalReflection;
 			p.Location = Vector3d.Zero();
 			p.Enabled = true;
@@ -2967,13 +2998,13 @@ namespace HelloBoids
 			p.NumUses = -1;
 			p.CooldownBetweenUses = 0;
 			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
-			p.DistributionList = new int[] {opticalSensor.SpanIndex};
+			p.DistributionList = new int[] {currentInternalIndex};
 			p.SearchPrimitive  = null;
 	
 			// each Droid can Consume a 'PRODUCT.OpticalReflection' 
 			Consumption c;
 			c.EntityArrayIndex = opticalSensor.Index;
-			c.EntityIndex = opticalSensor.SpanIndex;
+			c.EntityIndex = currentInternalIndex;
 			c.TargetIndex = p.EntityIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
 			c.ProductID = (uint)PRODUCTS.OpticalReflection;
 			c.Value =  null;
@@ -3080,7 +3111,8 @@ namespace HelloBoids
 #if USE_MEMORY_T
 			Console.WriteLine ("GetNeighbors - Memory<T> Using SpatialQueryLocal()");
             ComponentStore<Transform.Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
-            List<EntityNode> found = SpatialQueryLocal(store.Span, currentBoid.SpatialNode, currentBoid.SpanIndex, largestDistanceSquared, true, searchArea);
+			int currentInternalIndex = currentBoid.GetUserStructIndex(typeof(Transform.Transform_Struct));
+            List<EntityNode> found = SpatialQueryLocal(store.Span, currentBoid.SpatialNode, currentInternalIndex, largestDistanceSquared, true, searchArea);
 
 #else
             List<EntityNode> found = this.Octree.Query(currentBoid, true, searchArea, match);
@@ -3152,10 +3184,12 @@ namespace HelloBoids
                 {
                     for (int i = 0; i < current.EntityNodes.Length; i++)
                     {
-                        if (current.EntityNodes[i].SpanIndex == refIndex) continue;
+						int childInternalIndex = current.EntityNodes[i].GetUserStructIndex(typeof(Transform.Transform_Struct));
+						
+                        if (childInternalIndex == refIndex) continue;
                         // TODO: WE MUST CACHE span<T> and not access neighbor.Translation and current.Translation... we need to directly
                         //        access the indices of the Span<T> here... otherwise its TOO SLOW
-                        double calc = Vector3d.GetDistance3dSquared(memSpan[current.EntityNodes[i].SpanIndex].Translation, memSpan[refIndex].Translation);
+                        double calc = Vector3d.GetDistance3dSquared(memSpan[childInternalIndex].Translation, memSpan[refIndex].Translation);
                         //System.Diagnostics.Debug.WriteLine("Calculated distance = " + calc.ToString());
                         if (calc <= distance)
                             results.Add(current.EntityNodes[i]);
@@ -4434,14 +4468,13 @@ return (0,0);
 	
     public class EntityNode : Transform
     {
-        protected string mID;
+        protected string mID; // entityKey
         
-		protected int mIndex;
+		protected int mIndex; // index within a List<Boids> or List<Sensors> etc.
 		
         protected BoundingBox _box;
         protected OctreeOctant _octant;
-		protected Dictionary<string, Tuple<int, object>> mUserStructs;
-		protected Dictionary<Type, int> mUserStructIndices;
+		
 		
 		protected UserData mUserData;
 		protected int mUserTypeID;   // can be defined by game##.dll or by an enum that is generated into a compiled binary at runtime
@@ -4462,66 +4495,12 @@ return (0,0);
 		
 		public UserData BlackBoardData { get {return mUserData;} set {mUserData = value;} }
 		
-		public void AddUserStruct(object memStore, int indexWithinMemStore)
-		{
-			string genericTypeName = memStore.GetType().FullName;
-			// our Memory<T>'s will look as follows:
-			// 'System.Memory`1[[HelloBoids.Laser_Struct, nkj43iat.exe, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]]'
-			
-			// if we want to parse out just the first string
-			int start = genericTypeName.IndexOf("[[") + 2;
-			int end = genericTypeName.IndexOf(",");
-											  
-		    genericTypeName = genericTypeName.Substring(start, end - start);
-			
-			// For Memory<T> just use the above, the below is  NOT what we want
-        	// Remove the generic arity part (e.g., "`1")
-        	//genericTypeName = genericTypeName.Substring(0, genericTypeName.IndexOf('`'));
-			
-			AddUserStruct (genericTypeName, memStore, indexWithinMemStore);
-		}
-		
-		public void AddUserStruct(string typename, object memStore, int indexWithinMemStore)
-		{
-			if (mUserStructs == null) mUserStructs = new Dictionary<string, Tuple<int, object>>();
-			
-			//Console.WriteLine ("EntityNode.AddUserStruct() - Adding User Struct '" + typename + "'");
-			Tuple<int, object> t = new Tuple<int, object>(indexWithinMemStore, memStore);
-			mUserStructs.Add(typename, t); //memStore);
-		}
-		
-
-		
-		public object GetUserStruct (Type t, out int index)
-		{
-			string typename = t.FullName;
-			
-			return GetUserStruct( typename, out index);
-		}
-		
-		public object GetUserStruct(string typename, out int index)
-		{
-			index = -1;
-			//Console.WriteLine ("EntityNode.GetUserStruct '" + typename + "'");
-			if (mUserStructs == null) return null;
-			
-			
-			Tuple<int, object> result;
-			if (mUserStructs.TryGetValue(typename, out result))
-			{
-				index = result.Item1;
-				return result.Item2;
-			}	
-			return null;
-		}
-		
         public BoundingBox BoundingBox
         {
             get { return _box; }
         }
 
-
-        public OctreeOctant SpatialNode
+		public OctreeOctant SpatialNode
         {
 
             get { return _octant; }
@@ -4602,11 +4581,13 @@ return (0,0);
         // difference in translation between current and previous
         protected Vector3d mTranslationDelta;
 
+		protected Dictionary<Type, Tuple<int, object>> mUserStructs;
+		//protected Dictionary<Type, int> mUserStructIndices;
+				
 #if USE_MEMORY_T
         public Memory<Transform_Struct> mMemStore_Transform; // This var must be accessible to any DATAPROCESSOR if USE_MEMORY<T> == TRUE
 		
-        public int SpanIndex = -1;
-				
+	
 				
         //[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
         public struct Transform_Struct
@@ -4636,15 +4617,11 @@ return (0,0);
 
         protected Transform()
         {
-
 #if USE_MEMORY_T
-
             ComponentStore<Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
             int index = -1;
             mMemStore_Transform = store.CheckOut(out index);
-            SpanIndex = index;
-            //initialize the memory store
-
+			AddUserStruct(typeof(Transform.Transform_Struct), mMemStore_Transform, index);
 #else
             mMatrix = Matrix.Identity();
             mScale.x = 1;
@@ -4723,9 +4700,90 @@ return (0,0);
 				mVelocity.x = xV;
 				mVelocity.y = yV;
 			#endif
-	
 		}
 
+				/*
+		/// <summary>
+		/// The typeAsKey is the T part of the Memory<T> we pass in, and NOT the Typeof(Memory<T>)
+		/// </summary>
+		public void AddUserStruct(object memStore, int indexWithinMemStore)
+		{
+			// NOTE: We pass in the Memory<T> and not just the Typeof(T)
+			//       So we need to get the internal type used by the Memory<T>
+			
+			string genericTypeName = memStore.GetType().FullName;
+			// our Memory<T>'s will look as follows:
+			// 'System.Memory`1[[HelloBoids.Laser_Struct, nkj43iat.exe, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]]'
+			Console.WriteLine("Transform.AddUserStruct() - Typename = '" + genericTypeName + "'");
+			
+			// if we want to parse out just the first string
+			int start = genericTypeName.IndexOf("[[") + 2;
+			int end = genericTypeName.IndexOf(",");
+											  
+		    genericTypeName = genericTypeName.Substring(start, end - start);
+			
+			start = genericTypeName.IndexOf("+");
+			end =
+			
+			// For Memory<T> just use the above, the below is  NOT what we want
+        	// Remove the generic arity part (e.g., "`1")
+        	//genericTypeName = genericTypeName.Substring(0, genericTypeName.IndexOf('`'));
+			Console.WriteLine("Transform.AddUserStruct() - Typename = '" + genericTypeName + "'");
+			
+			AddUserStruct (typeAsKey, memStore, indexWithinMemStore);
+		}
+		*/
+		
+		/// <summary>
+		/// The typeAsKey is the T part of the Memory<T> we pass in, and NOT the Typeof(Memory<T>)
+		/// </summary>
+		public void AddUserStruct(Type t, object memStore, int indexWithinMemStore)
+		{
+			if (mUserStructs == null) mUserStructs = new Dictionary<Type, Tuple<int, object>>();
+			
+			//Console.WriteLine ("EntityNode.AddUserStruct() - Adding User Struct '" + typename + "'");
+			Tuple<int, object> tup = new Tuple<int, object>(indexWithinMemStore, memStore);
+			mUserStructs.Add(t, tup); //memStore);
+			
+			//Console.WriteLine ("Transform.AddUserStruct() - INTERNAL = " + tup.Item1.ToString());
+		}
+			
+		public object GetUserStruct(Type t, out int index)
+		{
+			index = -1;
+			//Console.WriteLine ("EntityNode.GetUserStruct '" + typename + "'");
+			if (mUserStructs == null) return null;
+			
+			Tuple<int, object> result;
+			if (mUserStructs.TryGetValue(t, out result))
+			{
+				index = result.Item1;
+				return result.Item2;
+			}	
+			return null;
+		}
+		
+		public int GetUserStructIndex(Type t)
+		{
+			int index = -1;
+			//Console.WriteLine ("Transform.GetUserStruct '" + t.Name + "'");
+			if (mUserStructs == null) return index;
+			
+			
+			Tuple<int, object> result;
+			if (mUserStructs.TryGetValue(t, out result))
+			{
+				index = result.Item1;
+			}
+			//else 
+			//{
+				//Console.WriteLine ("Transform.GetUserStruct() - FAILED TO FIND '" + t.Name + "'  UserStruct.Count ==  " + mUserStructs.Count.ToString());
+				//List<Type> keyList = new List<Type>(this.mUserStructs.Keys);
+				//Console.WriteLine ("Transform.GetUserStruct() -  Position 0 == " + keyList[0].ToString());
+			
+			//}
+			return index;
+		}
 		
         #region ResourceBase members
 

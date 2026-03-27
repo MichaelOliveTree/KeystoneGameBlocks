@@ -1737,12 +1737,12 @@ namespace HelloBoids
 			
 			
 			
-			Console.WriteLine("DoContactListSorting()");
+			//Console.WriteLine("DoContactListSorting()");
 			DoContactListSorting(); // based on policies
 			
 			
 			
-			Console.WriteLine("DoTargetPrioritization()");
+			//Console.WriteLine("DoTargetPrioritization()");
 			DoTargetPrioritization();
 			
 			
@@ -1838,7 +1838,7 @@ namespace HelloBoids
 				
 				if (canFire) // TODO: Establish CANFIRE PER WEAPON
            	 	{  
-					Console.WriteLine("8 - CanFire");
+					//Console.WriteLine("8 - CanFire");
 					List<Boid> targets = null;
 					double[] distances = null;
 					//List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE); // TODO: Hopefully this FindNearestTarget() can be optimized.... spatial searches even with Octree is slow.
@@ -1847,15 +1847,16 @@ namespace HelloBoids
 					// This overloaded version of FindNearestTarget() returns the sorted list of neighbors from closest to furthest along with their distances to the current droid
 					List<EntityNode> tmp = FindNearestTarget(currentBoid, neighbors, out distances);
 					
-					Console.WriteLine("8.5 - CanFire");
+					//Console.WriteLine("8.5 - CanFire");
 					
-					if (tmp != null && tmp.Count > 0)
+					if (tmp == null || tmp.Count == 0)
 						return;     // NOTE: for parallel.For we use "return"
 						// continue; // NOTE: for regular for() loop we use "continue"
 					
+					//Console.WriteLine("9 - Some targets found..." + tmp.Count.ToString());
 					targets = tmp.OfType<Boid>().ToList();
 					
-					Console.WriteLine("Do_Droid_Logic() - Droid " + currentInternalIndex.ToString() + " Has Found Target == " + (targets != null).ToString());
+					//Console.WriteLine("Do_Droid_Logic() - Droid " + currentInternalIndex.ToString() + " Has Found Target == " + (targets != null).ToString());
 					
 					
 					try
@@ -2013,10 +2014,10 @@ namespace HelloBoids
 				
 						// NOTE: Here we will only have one set of SensorContacts and never any duplicates
 						//       because each Droid only has one Sensor ('Optical Sensor' == eyes)
-						c.ContactIndex = neighbors[(int)j].Item1; // index within the Boid[] array of the detected Droid
+						c.ContactEntityArrayIndex = neighbors[(int)j].Item1; // index within the Boid[] array of the detected Droid
 						c.Index = (int)i;
 
-						Boid b =  this.Boids[c.ContactIndex];
+						Boid b =  this.Boids[c.ContactEntityArrayIndex];
 						int sensorContactInternalIndex = b.GetUserStructIndex(typeof(Transform.Transform_Struct));
 						// contact details are needed to find the correct SensorContact to potentially merge with an existing SensorContact for this detected Entity
 						c.Name =  "Droid_" + sensorContactInternalIndex.ToString(); // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
@@ -2067,7 +2068,7 @@ namespace HelloBoids
 				for (int j = 0; j < contacts.Count; j++)
 				{
 					// entityKey will usually be the ID of the target Entity (aka Droid or Ship).  But not always.  Sometimes it may be our own ship.  It depends on the specific rule.			
-					string targetKey = "boid_" + contacts[j].ContactIndex.ToString();
+					string targetKey = "boid_" + contacts[j].ContactEntityArrayIndex.ToString();
 					string currentKey = "boid_" + i.ToString();
 					
 					Policy roePolicy = new Policy();
@@ -2104,7 +2105,7 @@ namespace HelloBoids
 					if (roePolicy.Execute())
 					{
 						Target t = new Target();
-						t.EntityIndex = c.ContactIndex;
+						t.EntityArrayIndex = c.ContactEntityArrayIndex;
 						t.WeaponsAssigned = null;
 						t.TargetedBy = new int[]{i};      // other Ships/Vehciles/Entities, ground radars, factions, etc that are targeting this Target
 						t.Status = Target.STATUS.Active; //
@@ -2152,15 +2153,15 @@ namespace HelloBoids
 			
 			string currentKey = (string)args[0];
 			string[] sp = currentKey.Split("_");
-			int currentIndex = int.Parse(sp[1]);
+			int currentEntityArrayIndex = int.Parse(sp[1]);
 			//Console.WriteLine("Parsed Current index == " + currentIndex.ToString());
 			
 			string targetKey = (string)args[1];
 			sp = targetKey.Split("_");
-			int targetIndex = int.Parse(sp[1]);
+			int targetEntiyArrayIndex = int.Parse(sp[1]);
 			//Console.WriteLine("Parsed Target index == " + targetIndex.ToString());
 				
-			Boid B = Boids[currentIndex];
+			Boid B = Boids[currentEntityArrayIndex];
 			
 			//EntityNode tactical = B.Children[0];      // tactical station
 			// UserData data = tactical.BlackBoardData; // station operator
@@ -2170,7 +2171,7 @@ namespace HelloBoids
 			List<SensorContact> contacts = B.GetSensorContacts();
 			
 			for (int i = 0; i < contacts.Count; i++)
-				if (contacts[i].ContactIndex == targetIndex)
+				if (contacts[i].ContactEntityArrayIndex == targetEntiyArrayIndex)
 				{
 				}
 			
@@ -2703,7 +2704,7 @@ namespace HelloBoids
 	//		EntryClass.bSim.Sensors[index] = eyes; // NOTE: Sensors is already preallocated so that we can do a direct assignment to the subscript 'index' which IS threadsafe
 			//b.Add(eyes); // we dont technically have to use nested Entities at the moment because this Droid simulation is 'relatively' very simple still
 			
-			Console.WriteLine("Spawn() - index == " + index.ToString() + " INTERNAL = " + currentInternalIndex.ToString());
+	//		Console.WriteLine("Spawn() - array index == " + index.ToString() + " INTERNAL = " + currentInternalIndex.ToString());
 			
 			// TODO: i need to ensure that the SpanIndex and Index are consistantly used across Memory<T>
 			//       SpanIndex can change as Memory<T> records are added/removed when Entities are added/removed from the Scene.
@@ -2829,8 +2830,8 @@ namespace HelloBoids
 			
 			// each Droid can Produce a TargetingSkillModifier as if it had an "OPERATOR"
 			Production p;
-			p.EntityArrayIndex = b.Index;
-			p.EntityIndex = currentInternalIndex;
+			p.ProducerEntityArrayIndex = b.Index;
+			p.ProducerEntitySpanIndex = currentInternalIndex;
 			p.ProductID = 	(uint)v.Production[0].Product;
 			p.Location = Vector3d.Zero();
 			p.Enabled = true;
@@ -2844,9 +2845,9 @@ namespace HelloBoids
 	
 			// each Droid can Consume a TargetingSkillModifier as if it had a TACTICAL CREW STATION
 			Consumption c;
-			c.EntityArrayIndex = b.Index;
-			c.EntityIndex = currentInternalIndex;
-			c.TargetIndex = p.EntityIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
+			c.ConsumerEntityArrayIndex = b.Index;
+			c.ConsumerInternalIndex = currentInternalIndex;
+			c.ProducerInternalIndex = p.ProducerEntitySpanIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
 			c.ProductID = p.ProductID;
 			c.Value =  null;
 			c.Amount = 1;
@@ -2988,8 +2989,8 @@ namespace HelloBoids
 			
 			// each Droid can Produce a 'PRODUCT.OpticalReflection' 
 			Production p;
-			p.EntityArrayIndex = opticalSensor.Index;
-			p.EntityIndex = currentInternalIndex;
+			p.ProducerEntityArrayIndex = opticalSensor.Index;
+			p.ProducerEntitySpanIndex = currentInternalIndex;
 			p.ProductID = 	(uint)PRODUCTS.OpticalReflection;
 			p.Location = Vector3d.Zero();
 			p.Enabled = true;
@@ -3003,9 +3004,9 @@ namespace HelloBoids
 	
 			// each Droid can Consume a 'PRODUCT.OpticalReflection' 
 			Consumption c;
-			c.EntityArrayIndex = opticalSensor.Index;
-			c.EntityIndex = currentInternalIndex;
-			c.TargetIndex = p.EntityIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
+			c.ConsumerEntityArrayIndex = opticalSensor.Index;
+			c.ConsumerInternalIndex = currentInternalIndex;
+			c.ProducerInternalIndex = p.ProducerEntityArrayIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
 			c.ProductID = (uint)PRODUCTS.OpticalReflection;
 			c.Value =  null;
 			c.Amount = 1;
@@ -3308,7 +3309,7 @@ namespace HelloBoids
         {
 			int found = -1;
 			for (int i = 0; i < mProduction.Count; i++)
-				if (mProduction[productID][i].EntityIndex == entity.Index)
+				if (mProduction[productID][i].ProducerEntityArrayIndex == entity.Index)
 				{
 					found = (int)i;
 					break;
@@ -3562,8 +3563,8 @@ namespace HelloBoids
 												if (modifier.NumUses > 0 || modifier.NumUses == -1 )
 												{
 													Consumption[] consumptionResult = new Consumption[distributionList.Length];
-													consumptionResult[j].TargetIndex = consumers[j].EntityIndex; // the entity that is consuming a product
-													consumptionResult[j].EntityIndex = production[i].EntityIndex; // the producer of the product that is being consumed by entity.ID == EntityID.
+													consumptionResult[j].ConsumerEntityArrayIndex = consumers[j].ConsumerEntityArrayIndex; // the entity that is consuming a product
+													consumptionResult[j].ConsumerInternalIndex = production[i].ProducerArrayIndex; // the producer of the product that is being consumed by entity.ID == EntityID.
 													consumptionResult[j].ProductID = productID;          // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer.  Actually, I think we've modified this so that "PRODUCTS.HeatSignature" and "Products.HeatDamage" are two seperate products that may or may not both be consumed by any given Consumer.
 													consumptionResult[j].Value = modifier;
 													consumptionResult[j].Amount = modifier.Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
@@ -3708,7 +3709,7 @@ namespace HelloBoids
 			// if the target already exists, replace it with current data?
 			int found = -1;
 			for (int i = 0; i < mTargets.Count; i++)
-				if (mTargets[i].EntityIndex == t.EntityIndex)
+				if (mTargets[i].EntityArrayIndex == t.EntityArrayIndex)
 				{
 					found = i;
 					break;
@@ -4376,8 +4377,10 @@ return (0,0);
            {
 			   base.Dispose();
 			   
-			   foreach (object memT in mUserStructs.Values)
+			   foreach (Type t in mUserStructs.Keys)
 			   {
+				   //object store = EntryClass.mCStoreCol.CheckOut<t.BaseType>(0);
+				   
 				   //object store = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); 
 				   //store.CheckIn(memT);
 			   }
@@ -5867,8 +5870,8 @@ return (0,0);
     	{
 			// todo: should i have a frequency or Hz?  Gravitation would be at Physics frequency, but other's should be 1 hz or every 1000 ms
 			// production is not serialized to XML because they are created by the scripts in code
-			public int EntityArrayIndex;
-			public int EntityIndex;  
+			public int ProducerEntityArrayIndex;
+			public int ProducerEntitySpanIndex;  
 			public uint ProductID;
 			public bool Enabled;
 			public Vector3d Location; // location where this production is occurring (eg. explosion, heat signature, etc)
@@ -5936,9 +5939,9 @@ return (0,0);
 			// Consumption here is really PRODUCT CONSUMPTION RESULT struct that gets filled so that
 			// other players in the networked game can receive the "results" of 
 			// having consumed a product
-			public int EntityArrayIndex; // in KGB this would be the Entity.ID or GUID of the Consuming Entity
-			public int TargetIndex; // the index into the Memory<T> of the entity that is consuming a product
-			public int EntityIndex; // the index into the Memory<T> of the producer of the product that is being consumed by entity.ID == EntityID.
+			public int ConsumerEntityArrayIndex; // in KGB this would be the Entity.ID or GUID of the Consuming Entity
+			public int ConsumerInternalIndex; // the index into the Memory<T> of the entity that is consuming a product
+			public int ProducerInternalIndex; // the index into the Memory<T> of the producer of the product that is being consumed by entity.ID == EntityID.
 			public uint ProductID;     // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer
 			public object Value;
 			public int Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
@@ -5982,7 +5985,7 @@ return (0,0);
 
 	public struct SkillModifier
 	{ 
-		public int EntityIndex; 
+		public int ProducerEntityArrayIndex; 
 		public PRODUCTS Product;  // modifiers are a type of PRODUCT for instance PRODUCT.MoraleBoost
 		public SKILLS SkillToTarget;      // the skill that will be affected eg Skill.Morale
 		public bool Enabled;
@@ -6049,10 +6052,10 @@ return (0,0);
 		}
 		*/
 		
-		public void AddProduction(int producerIndex, PRODUCTS product, int amount, bool enabled = true, int numUses = -1)
+		public void AddProduction(int producerEntityArrayIndex, PRODUCTS product, int amount, bool enabled = true, int numUses = -1)
 		{
 			SkillModifier m;
-			m.EntityIndex = producerIndex;
+			m.ProducerEntityArrayIndex = producerEntityArrayIndex;
 			m.SkillToTarget = SkillType;
 			m.Enabled = enabled;
 			m.Product = product;
@@ -6135,7 +6138,7 @@ return (0,0);
 				
 		public int Index;           // Index of this Contact within the Memory<T> contacts? Or, the Index of the TactialStation or Sensor that detected this Contact?
 		
-		public int ContactIndex;       // EntityIndex
+		public int ContactEntityArrayIndex;       // EntityIndex
 		public string Name;            // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
 		public string RegistryNumber;  
 		public FoF FriendOrFoe;        // Friend, Foe, Unknown
@@ -6254,7 +6257,7 @@ return (0,0);
 			HeavilyDepleted
 		}
 		
-		public int EntityIndex;
+		public int EntityArrayIndex;
 		public int[] WeaponsAssigned;
 		public int[] TargetedBy;      // other Ships/Vehciles/Entities, ground radars, factions, etc that are targeting this Target
 		public STATUS Status;
@@ -17573,7 +17576,7 @@ if (mEntityNodesCollection == null) return null;
 				string right = null;
 				if (mConditions[i].LeftOperandIsDelegate)
 				{
-					// the LEFT and/or RIGHT operands might require the use of a delegate
+					// the LEFT operand delegate to invoke.  The RIGHT operand is what we want to compare it against 
 					left = mConditions[i].OperandLeftDelegate(mConditions[i].DelegateArgs);
 					right = mConditions[i].OperandRight;
 					//Console.WriteLine("Condition.Evaluate() - Left IS a delegate LEFT == " + left + " RIGHT == " + right);

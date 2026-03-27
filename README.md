@@ -20,6 +20,11 @@ MichaelWalksWithGod@gmail.com
 
 Also, if you are interested in licensing from me the applicable code contained within this Game Framework (the code to which I have full copyrights), contact me via the previous email addresses provided.  I am very busy these days, but I will try to get back to you ASAP.
 
+Additional Contact Infromation (I'm providing the following contact email address just in case I fail to respond to your emails within 20 days.  In such a case, please try the following contact information):
+A. Joseph
+blisslife360@gmail.com
+
+
 _______________________________________________________________________________________________________________________
 Keystone Game Blocks(KGB) is a 3D Game Framework written in C#.  The primary goal was to make a 3D game framework that met the following criteria:
 

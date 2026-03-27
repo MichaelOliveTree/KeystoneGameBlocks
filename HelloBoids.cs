@@ -2294,6 +2294,7 @@ namespace HelloBoids
             System.Threading.Tasks.Parallel.For(0, count, i => 		
 			{
 				string errorReason;
+				// TODO: timerID must consistantly use same LivingEntityID or something else
 				string timerID = allWeapons.Span[(int)i].Index.ToString();
 				bool canFire = false;
 				
@@ -2366,6 +2367,7 @@ namespace HelloBoids
 	
             for (int i = 0; i < memSpan.Length; i++)
 			{
+				// NOTE: this timerID is taken from the LivingEntity struct's spanIndex
 				string timerID = i.ToString(); // TODO:  memSpan[i].SpanIndex.ToString();
 				
 				bool spawnReady = mIntervalTimers.IsReady(timerID, "droid_spawn");
@@ -2739,30 +2741,22 @@ namespace HelloBoids
 
 			string entityKey = "boid_" + arrayIndex.ToString(); // prefix with "boid_" to not duplicate with "sensor_"
             Boid b = new Boid(entityKey, arrayIndex, posX, posY, posZ, vX, vY);
-			int currentInternalIndex = b.GetUserStructIndex(typeof(Transform.Transform_Struct));
+			
 			// TODO: finish creating the optical sensors for our Droids
 			// TODO: I think we need to remove all struct creation from within Boid or EntityNode because we are unable
 			//       to manage the Index values properly that way.
 
-//			EntityNode eyes = CreateOpticalSensor(arrayIndex);
+			EntityNode eyes = CreateOpticalSensor(arrayIndex);
 			//Console.WriteLine("eyes NOT null? == " + (eyes != null).ToString());
-//			Sensors[arrayIndex] = eyes; // NOTE: Sensors is already preallocated so that we can do a direct assignment to the subscript 'index' which IS threadsafe
+			Sensors[arrayIndex] = eyes; // NOTE: Sensors is already preallocated so that we can do a direct assignment to the subscript 'index' which IS threadsafe
 			//b.Add(eyes); // we dont technically have to use nested Entities at the moment because this Droid simulation is 'relatively' very simple still
+			Console.WriteLine("Eyes added to slot " + arrayIndex.ToString());
 			
 			//Console.WriteLine("Spawn() - array index == " + arrayIndex.ToString() + " INTERNAL = " + currentInternalIndex.ToString());
 			
-			// TODO: i need to ensure that the SpanIndex and Index are consistantly used across Memory<T>
-			//       SpanIndex can change as Memory<T> records are added/removed when Entities are added/removed from the Scene.
-			//       The "index" however in KGB is actually an _id GUID and is a string.
-			//       Here "index" only refers to where this Droid exists within the List<>
-			string id = currentInternalIndex.ToString();
+			
 	
-			// TIMERS
-			////////////////////////
-			mIntervalTimers.Register(id, "droid_spawn", 0.14d);
-			mIntervalTimers.Register(id, "droid_canfire", 0.04d);
-			mIntervalTimers.Register(id, "droid_isfiring", 0.06d);
-			////////////////////////
+			
 			
 			
 			// todo: generate Droids with some variance for age, size, and speed
@@ -2770,17 +2764,31 @@ namespace HelloBoids
 		
 			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
 			ComponentStore<LivingEntity> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-            int checkOutIndex = -1;
+            int livingEntityID = -1
+				
 			// NOTE: this second call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
-            Memory<LivingEntity> memLivingEnt = storeLivingEntity.CheckOut(out checkOutIndex);
+            Memory<LivingEntity> memLivingEnt = storeLivingEntity.CheckOut(out livingEntityID);
 			memLivingEnt.Span[0].Age = 1;
 			memLivingEnt.Span[0].Hitpoints = 20;
-			b.AddUserStruct(typeof(LivingEntity), memLivingEnt, checkOutIndex);
+			b.AddUserStruct(typeof(LivingEntity), memLivingEnt, livingEntityID);
 		
+			// TIMERS
+			////////////////////////
+			// TODO: i need to ensure that the SpanIndex and Index are consistantly used across Memory<T>
+			//       SpanIndex can change as Memory<T> records are added/removed when Entities are added/removed from the Scene.
+			//       The "index" however in KGB is actually an _id GUID and is a string.
+			//       Here "index" only refers to where this Droid exists within the List<>
+			string timerID = memLivingEnt.ToString();
+			
+			mIntervalTimers.Register(timerID, "droid_spawn", 0.14d);
+			mIntervalTimers.Register(timerID, "droid_canfire", 0.04d);
+			mIntervalTimers.Register(timerID, "droid_isfiring", 0.06d);
+			////////////////////////
+			
 			
 			
 			ComponentStore<TacticalStation> storeTacticalStation = EntryClass.mCStoreCol.CheckOut<TacticalStation>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-            checkOutIndex = -1;
+            int checkOutIndex = -1;
 			// NOTE: this second call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
             Memory<TacticalStation> memTact = storeTacticalStation.CheckOut(out checkOutIndex);
 			b.AddUserStruct(typeof(TacticalStation), memTact, checkOutIndex);

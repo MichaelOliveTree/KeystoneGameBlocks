@@ -1491,8 +1491,7 @@ namespace HelloBoids
         private void ProcessOpticalSensors(ComponentStore<Transform.Transform_Struct> store, object[] parameters, int seed, GameTime gt)
         {
             mNeighbors.Clear();
-			int length = store.Span.Length;
-			
+						
             OctreeOctant root = this.Octree;
 
 			//Console.WriteLine("parameters count == " + parameters.Length.ToString());
@@ -1519,26 +1518,33 @@ namespace HelloBoids
             double largestDistanceSquared = largestDistance * largestDistance;
 			double searchRadius = largestDistance * 0.5d;
 			
-			
+			int length = (int)store.Count;
             System.Threading.Tasks.Parallel.For(0, length, i =>
 			//for (int i = 0; i < memSpan.Length; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
             {
 				// NOTE: inside of the Parallel.For(), Span<T> cannot be passed in
 				//      because the code inside the Paralle.For() is treated as a Lambda
 				Span<Transform.Transform_Struct> memSpan = store.Span;
-				EntityNode currentBoid = Boids[(int)i];
+
+				//EntityNode currentBoid = ; // Boids[(int)i];
+				int arrayIndex = memSpan[i].EntityArrayIndex;
 				
-				int currentInternalIndex = currentBoid.GetUserStructIndex(typeof(Transform.Transform_Struct));
+		//		int currentInternalIndex = currentBoid.GetUserStructIndex(typeof(Transform.Transform_Struct));
+		//		arrayIndex = memSpan[currentInternalIndex];
+				
+		//		System.Diagnostics.Debug.Assert (arrayIndex == currentInternalIndex);
 				
 				// add a List<Tuple> to our mNeighbors Dictionary<> that will hold any adjacents for this current Droid
-				mNeighbors.TryAdd(currentInternalIndex, new List<Tuple<int, double>>(4));
+		
+				mNeighbors.TryAdd(arrayIndex, new List<Tuple<int, double>>(4));
+
 				
 		#if SPATIAL_SEARCH == false
 
 			   if (i > Boids.Count - 1)
-				   Console.WriteLine("ProcessOpticalScanners() - Out of range i == " + i.ToString() + " but count == " + Boids.Count.ToString());
+				   Console.WriteLine("ProcessOpticalScanners() - Out of range 'arrayIndex' == " + arrayIndex.ToString() + " but count == " + Boids.Count.ToString());
 
-				mNeighbors[currentBoid.SpanIndex] =   GetNeighbors(Boids[i], largestDistance, largestDistanceSquared);
+				mNeighbors[arrayIndex] =   GetNeighbors(Boids[arrayIndex], largestDistance, largestDistanceSquared);
 		#endif
 				
 			
@@ -1589,6 +1595,7 @@ namespace HelloBoids
 								{
 									EntityNode potentialNeighbor = ents[j];
 									int potentialInternalIndex = potentialNeighbor.GetUserStructIndex(typeof(Transform.Transform_Struct));
+									int potentialArrayIndex = memSpan[potentialInternalIndex].EntityArrayIndex;
 									
 									if (currentOctant.MaxRadius * 2d <= largestDistance)
 									{
@@ -1596,7 +1603,7 @@ namespace HelloBoids
 										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
 										distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[potentialInternalIndex].Translation, memSpan[(int)i].Translation);
 										
-							 			mNeighbors[currentInternalIndex].Add(new Tuple<int, double> (potentialInternalIndex, distanceToNeighboringBoidSquared));
+							 			mNeighbors[arrayIndex].Add(new Tuple<int, double> (potentialArrayIndex, distanceToNeighboringBoidSquared));
                          			}   
                          			else
 									{   
@@ -1617,7 +1624,7 @@ namespace HelloBoids
 										//System.Diagnostics.Debug.WriteLine("Calculated distanceSquared to neighboring boid = " + distanceToNeighboringBoidSquared.ToString());
 										if (distanceToNeighboringBoidSquared <= largestDistanceSquared)
 
-											mNeighbors[currentInternalIndex].Add(new Tuple<int, double>(potentialInternalIndex, distanceToNeighboringBoidSquared));
+											mNeighbors[arrayIndex].Add(new Tuple<int, double>(potentialArrayIndex, distanceToNeighboringBoidSquared));
      								}       
              					}  // end for ents[]        
 							}
@@ -2003,42 +2010,34 @@ namespace HelloBoids
             System.Threading.Tasks.Parallel.For(0, count, i => 		
 			{
 				Boid current = Boids[i];
-				int currentInternalIndex = current.GetUserStructIndex(typeof(Transform.Transform_Struct));
-				
+				int arrayIndex = current.EntityArrayIndex; //  current.GetUserStructIndex(typeof(Transform.Transform_Struct));
+				System.Diagnostics.Debug.Assert( (int)i == arrayIndex, "DoContactListSorting() - array index does not match...");
 				// the adjacnets that are stored in neighbors from the overall mNeighbors is very much stores Area of Interest for each Droid
 				// but we will only send them things that their sensors can detect (and "eyes" are treated as optical sensors)
 				EntityNode[] sensors = current.GetSensors(); // todo: we currently do  not have EntityNode allowing adding of child nodes.  This is needed next.
-				
-				Console.WriteLine("-1");
 				if (sensors == null) return; 
-				Console.WriteLine("0");
 				
 				// grab the neighbors/adjacents for this Droid.  The returned parameter List<Tuple<int, double>> tells us which Droid (int) index was detected and the (double) distance to it  
 				List<Tuple<int, double>> neighbors = null;
-				bool success = mNeighbors.TryGetValue(currentInternalIndex, out neighbors);
+				bool success = mNeighbors.TryGetValue(arrayIndex, out neighbors);
 					
-				Console.WriteLine("1");
+				Console.WriteLine("1 - ArrayIndex = " + arrayIndex.ToString() + " " + success.ToString());
+				
 				if (success)
 				{
 					List<SensorContact> contacts = new List<SensorContact>();
 					for (int j = 0; j < neighbors.Count; j++)
 					{			
-						
-						Console.WriteLine("2");
 						double distance = neighbors[(int)j].Item2;
 						int contactArrayIndex = neighbors[(int)j].Item1; 
 						
-						Console.WriteLine("3");
 						for (int k = 0; k < sensors.Length; k++)
 						{
-							Console.WriteLine("4");
 							int structIndex = -1;
-							Sensor sensorStruct = (Sensor)EntryClass.bSim.Sensors[k].GetUserStruct(typeof(Sensor), out structIndex);
+							Memory<Sensor> sensorStruct = (Memory<Sensor>)EntryClass.bSim.Sensors[k].GetUserStruct(typeof(Sensor), out structIndex);
 							
-							Console.WriteLine("5");
-							if (sensorStruct.Range >= distance)
+							if (sensorStruct.Span[0].Range >= distance)
 							{
-							
 								SensorContact c;
 									
 								Predicate<SensorContact> contactExists = contact => contact.ContactEntityArrayIndex == contactArrayIndex;
@@ -2048,8 +2047,12 @@ namespace HelloBoids
 								if (c.Name != null)
 								{
 									// add to the contact information, this sensor which has detected it
-									if (c.SensorsIndices == null) c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices, k);
-									c.SensorsIndices.Append(k);
+									if (c.SensorsIndices == null) 
+										c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices, k);
+									else
+										c.SensorsIndices.Append(k);
+									
+									Console.WriteLine("appending " + k.ToString());
 								}
 								else // contact does not already exist
 								{
@@ -2060,11 +2063,21 @@ namespace HelloBoids
 									c.ContactEntityArrayIndex = contactArrayIndex; // index within the Boid[] array of the detected Droid
 									c.Index = (int)i;
 
-									Boid b =  this.Boids[c.ContactEntityArrayIndex];
-								
-									int sensorContactInternalIndex = b.GetUserStructIndex(typeof(Transform.Transform_Struct));
+									Boid bb = null;
+									try 
+									{
+										bb =  this.Boids[c.ContactEntityArrayIndex];
+									}
+									catch (Exception ex)
+									{
+										Console.WriteLine("ERROR: contact index == " + c.ContactEntityArrayIndex.ToString());
+									}
+									
+									Console.WriteLine("7");
+									
+									int sensorContactInternalIndex = bb.GetUserStructIndex(typeof(Transform.Transform_Struct));
 									// contact details are needed to find the correct SensorContact to potentially merge with an existing SensorContact for this detected Entity
-									c.Name =  "Droid_" + sensorContactInternalIndex.ToString(); // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
+									c.Name =  "boid_" + contactArrayIndex.ToString(); // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
 									c.RegistryNumber = c.Name;
 									c.Type = SensorContact.TYPE.Drone;
 									c.ContactStatus = Target.STATUS.Unknown;
@@ -2072,17 +2085,19 @@ namespace HelloBoids
 
 									// telemetry
 									SensorContact.ContactTelemetry t;
-									t.Radius = (float)b.BoundingBox.Radius;    // how might size be spoofed?
-									t.Position = b.Translation;
-									t.Velocity = b.Velocity;
+									t.Radius = (float)bb.BoundingBox.Radius;    // how might size be spoofed?
+									t.Position = bb.Translation;
+									t.Velocity = bb.Velocity;
 									t.Distance = distance;
 									t.Heading = 0;
 									t.TimeAcquired = Utils.NowTicks(); // todo: this needs to eventually just be gt.Ticks <-- which must come from 'gametime fixedstep' and not 'real-time'
 									t.TimeLast = t.TimeAcquired;
 
 									c.Add(t);
+									Console.WriteLine("8");
 								}
 								contacts.Add(c);
+								Console.WriteLine("9");
 							}
 						}
 					}
@@ -2470,10 +2485,12 @@ namespace HelloBoids
 				// NOTE: inside of the Parallel.For(), Span<T> cannot be passed in
 				//      because the code inside the Paralle.For() is treated as a Lambda
 				Span<Transform.Transform_Struct> memSpan = store.Span;
-				EntityNode currentBoid = Boids[(int)i];
+				
+				int currentBoidArrayIndex = memSpan[(int)i].EntityArrayIndex;
+				EntityNode currentBoid = Boids[currentBoidArrayIndex];
 				int currentInternalIndex = currentBoid.GetUserStructIndex(typeof(Transform.Transform_Struct));
 				List<Tuple<int, double>>neighbors;
-				bool r = mNeighbors.TryGetValue(currentInternalIndex, out neighbors); 
+				bool r = mNeighbors.TryGetValue(currentBoidArrayIndex, out neighbors); 
 				
 				if (neighbors == null || neighbors.Count == 0) return;
                 int nCount = neighbors.Count;
@@ -2753,7 +2770,7 @@ namespace HelloBoids
 			//Console.WriteLine("eyes NOT null? == " + (eyes != null).ToString());
 			Sensors[arrayIndex] = eyes; // NOTE: Sensors is already preallocated so that we can do a direct assignment to the subscript 'index' which IS threadsafe
 			//b.Add(eyes); // we dont technically have to use nested Entities at the moment because this Droid simulation is 'relatively' very simple still
-			Console.WriteLine("Eyes added to slot " + arrayIndex.ToString());
+			//Console.WriteLine("Eyes added to slot " + arrayIndex.ToString());
 			
 			//Console.WriteLine("Spawn() - array index == " + arrayIndex.ToString() + " INTERNAL = " + currentInternalIndex.ToString());
 			
@@ -3773,7 +3790,7 @@ namespace HelloBoids
 			{
 				if ( EntryClass.bSim.Sensors[i] == null) continue; // <-- Sensors[] is preallocated but the slots may not be instanced as CreateOpticalSensor() is causing dotnetfiddle.net to not complete it seems
 				
-				Console.WriteLine("Sensor Key  == " + EntryClass.bSim.Sensors[i].EntityKey);
+				//Console.WriteLine("Sensor Key  == " + EntryClass.bSim.Sensors[i].EntityKey);
 				
 				if (EntryClass.bSim.Sensors[i].EntityKey == sensorKeyForThisBoid)
 					found.Add(EntryClass.bSim.Sensors[i]);
@@ -4574,7 +4591,7 @@ return (0,0);
 		protected int mUserTypeID;   // can be defined by game##.dll or by an enum that is generated into a compiled binary at runtime
 		
         public EntityNode(string entityID, int arrayIndex, double x, double y, double z, double xV, double yV) 
-			: base (x, y, z, xV, yV)
+			: base (arrayIndex, x, y, z, xV, yV)
         {
             mArrayIndex = arrayIndex;
 			mUserTypeID = -1;
@@ -4689,7 +4706,8 @@ return (0,0);
         //[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
         public struct Transform_Struct
         {
-			
+			public int EntityArrayIndex;
+				
             //public string EntityID;
             public Vector3d Velocity;            // 24 bytes
 
@@ -4768,14 +4786,15 @@ return (0,0);
             //Shareable = false; // Transform nodes and derived can never be shared.
         }
 				
-		protected Transform (double x, double y, double z, double xV, double yV) : this()
+		protected Transform (int arrayIndex, double x, double y, double z, double xV, double yV) : this()
 		{
 			#if USE_MEMORY_T
 				Vector3d translation = new Vector3d(x, y, z);
 				mMemStore_Transform.Span[0].Velocity = new Vector3d(xV, yV, 0d);
 				mSpanAccessTest = translation;
 				mMemStore_Transform.Span[0].Translation = mSpanAccessTest;// translation;
-
+				mMemStore_Transform.Span[0].EntityArrayIndex = arrayIndex;
+			
 			#else
 				mMatrix = Matrix.Identity();
 				mScale.x = 1;
@@ -13953,7 +13972,8 @@ if (mEntityNodesCollection == null) return null;
 				int seed = 0;
 			
                 object[] args = GetParameters(key);
-	
+				Console.WriteLine("Processor.Update() - Key == " + key);
+				
 				// cast processors of type 'object' to the appropriate type we need for this processor (based on the name of it's key)
 				// note: we could probably check it's GetType() instead... but not necessary for now
 				switch (key)
@@ -14875,7 +14895,7 @@ if (mEntityNodesCollection == null) return null;
 
         public ComponentStore(uint size)
         {
-            STARTING_SIZE = 768 * 2; //size;
+            STARTING_SIZE = size;
             mSync = new object();
 						
 			mAvailableForCheckOut = new Stack<int>();
@@ -14904,15 +14924,14 @@ if (mEntityNodesCollection == null) return null;
 		public uint Count { 
 			get 
 			{ 
-				Console.WriteLine("testing");
 					
 				int availableCount = 0;
 				if (mAvailableForCheckOut != null)
 					availableCount = mAvailableForCheckOut.Count;
 				
 				int  tmp = (int)Capacity - availableCount;
-				Console.WriteLine("ComponentStore.Count - Capcity (" + Capacity.ToString() + ") - Available(" + availableCount.ToString() + ") == " + tmp.ToString());
-				Console.WriteLine("ComponentStore.Count - RecordCount == " + mRecordCount.ToString());
+				//Console.WriteLine("ComponentStore.Count - Capcity (" + Capacity.ToString() + ") - Available(" + availableCount.ToString() + ") == " + tmp.ToString());
+				//Console.WriteLine("ComponentStore.Count - RecordCount == " + mRecordCount.ToString());
 				
 				
 				System.Diagnostics.Debug.Assert (mRecordCount == Capacity - availableCount);
@@ -15006,7 +15025,32 @@ if (mEntityNodesCollection == null) return null;
 
 						// if still here, we need to expand first
 						Expand();
-						return CheckOut(out index);
+						if (mAvailableForCheckOut.Count > 0)
+						{
+							mRecordCount++;
+							int i = mAvailableForCheckOut.Pop();
+							
+							uint tmp = Count;
+							Console.WriteLine("CheckOut() - " + tmp.ToString());
+							try
+							{
+								InUse[i] = true;
+							}
+							catch (Exception ex)
+							{
+								//Console.WriteLine("ComponentStore.CheckOut() - i == " + i + " InUse[i] == " + InUse[i] + " - " + ex.Message);
+							}
+							
+							index = i;
+							return Components.Slice(index, HOW_MANY);
+						}
+						else 
+						{
+							Console.WriteLine("CheckOut() - THIS SHOULD NOT HAPPEN.");
+						}
+						return null;
+						
+						//return CheckOut(out index);
 					}
 					catch (Exception ex)
 					{
@@ -15123,7 +15167,7 @@ if (mEntityNodesCollection == null) return null;
         private void Expand()
         {
 			Console.WriteLine("ComponentStore.Expand() - Current Capacity == " + Capacity.ToString() + " for type '" + Components.GetType().Name + "'" );
-            if (mAvailableForCheckOut == null)
+            if (InUse == null)
             {
                 Components = new T[STARTING_SIZE];
                 InUse = new bool[STARTING_SIZE];
@@ -15142,7 +15186,7 @@ if (mEntityNodesCollection == null) return null;
             }
 
             int newSize = (int)(Capacity + EXPAND_INCREMENT);
-            if (EXPAND_INCREMENT == 0)
+            //if (EXPAND_INCREMENT == 0)
                 newSize = (int)Capacity * 2;
 
             T[] data = new T[newSize];
@@ -15157,7 +15201,7 @@ if (mEntityNodesCollection == null) return null;
 
             Components = new Memory<T>(data);
 
-			Console.WriteLine("ComponentStore.Expand() - New Capacity == " + Capacity.ToString() + " for type '" + Components.GetType().Name + "'" );
+			//Console.WriteLine("ComponentStore.Expand() - New Capacity == " + Capacity.ToString() + " for type '" + Components.GetType().Name + "'" );
 			
             bool[] newInUse = new bool[newSize];
             InUse.CopyTo(newInUse, 0);
@@ -15169,12 +15213,14 @@ if (mEntityNodesCollection == null) return null;
 			// and the large indices at the bottom (first)
             Stack<int> tmpStack = new Stack<int>(newSize);
             for (int i = (int)newSize - 1; i >= 0; i--)
-	        	if (!InUse[i])
-					mAvailableForCheckOut.Push(i);
-
-            mAvailableForCheckOut = tmpStack;
+			{
+	        	System.Diagnostics.Debug.Assert (InUse.Length == newSize, "InUse Length == " + InUse.Length.ToString() + " newSize == " + newSize.ToString());
+				if (!InUse[i])
+					tmpStack.Push(i);
+			}
 			
-            //ExpandViews(newSize);
+            mAvailableForCheckOut = tmpStack;
+            ExpandViews(newSize);
         }
 
         private void ExpandViews(int newSize)

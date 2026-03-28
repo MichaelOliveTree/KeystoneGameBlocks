@@ -14878,21 +14878,18 @@ if (mEntityNodesCollection == null) return null;
             STARTING_SIZE = 768 * 2; //size;
             mSync = new object();
 						
+			mAvailableForCheckOut = new Stack<int>();
 			
-            mAvailableForCheckOut = new Stack<int>();
-
-            for (int i = (int)STARTING_SIZE; i >= 0; i--)
-                mAvailableForCheckOut.Push(i);
-
-            Components = new T[STARTING_SIZE];
-            InUse = new bool[STARTING_SIZE];
-						
+			Expand();
+            
 			//long totalAllocated = Utils.GetTotalAllocatedBytes(false);
 			//Console.WriteLine("ComponentStore.ctor() - " + totalAllocated.ToString() + " allocated.");
 			
 			long totalUsed = Utils.GetUsedMemory(false);
 			//Console.WriteLine("ComponentStore.ctor() - " + Utils.SizeSuffix(totalUsed) + " used.");
+
 			Console.WriteLine( "ComponentStore.ctor() - Type == '" + (typeof(T)).ToString() + " Starting capacity == " + Capacity.ToString());
+			
         }
 
 		/// <summary>
@@ -14907,12 +14904,18 @@ if (mEntityNodesCollection == null) return null;
 		public uint Count { 
 			get 
 			{ 
-				int  tmp = (int)Capacity - mAvailableForCheckOut.Count;
-				Console.WriteLine("ComponentStore.Count - Capcity (" + Capacity.ToString() + ") - Available(" + mAvailableForCheckOut.Count.ToString() + ") == " + tmp.ToString());
+				Console.WriteLine("testing");
+					
+				int availableCount = 0;
+				if (mAvailableForCheckOut != null)
+					availableCount = mAvailableForCheckOut.Count;
+				
+				int  tmp = (int)Capacity - availableCount;
+				Console.WriteLine("ComponentStore.Count - Capcity (" + Capacity.ToString() + ") - Available(" + availableCount.ToString() + ") == " + tmp.ToString());
 				Console.WriteLine("ComponentStore.Count - RecordCount == " + mRecordCount.ToString());
 				
 				
-				System.Diagnostics.Debug.Assert (mRecordCount == Capacity - mAvailableForCheckOut.Count);
+				System.Diagnostics.Debug.Assert (mRecordCount == Capacity - availableCount);
 				return mRecordCount;
 			}
 		}
@@ -15120,7 +15123,7 @@ if (mEntityNodesCollection == null) return null;
         private void Expand()
         {
 			Console.WriteLine("ComponentStore.Expand() - Current Capacity == " + Capacity.ToString() + " for type '" + Components.GetType().Name + "'" );
-            if (Components.Equals(default(T)))
+            if (mAvailableForCheckOut == null)
             {
                 Components = new T[STARTING_SIZE];
                 InUse = new bool[STARTING_SIZE];

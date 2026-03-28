@@ -1347,11 +1347,13 @@ namespace HelloBoids
             // Life Cycle
             //////////////////////////////////////////////////////////////////
 			/*
-            bool spawnReady = mIntervalTimers.IsReady(i, "droid_spawn");
+			sting entityKey = currentBoid.EntityKey;
+            bool spawnReady = mIntervalTimers.IsReady(entityKey, "droid_spawn");
             if (spawnReady)
             {
+				
                 //Console.WriteLine("Spawn Ready == " + spawnReady.ToString());
-                mIntervalTimers.Reset(i, "droid_spawn");
+                mIntervalTimers.Reset(entityKey, "droid_spawn");
             }
 			*/
 			
@@ -1822,7 +1824,7 @@ namespace HelloBoids
 				// NOTE: The issue here is sometimes we iterate through List<Boids> and other times
 				//       by mem.Span.Length.  So to be consistant, we try to keep the Span indices matching
 				//       
-				string timerID = currentInternalIndex.ToString();
+				string entityKey = currentBoid.EntityKey;
 				bool canFire = false;
 				
 				// NOTE: above we check if each individual weapon can fire... we do not care
@@ -1831,7 +1833,7 @@ namespace HelloBoids
 				try
 				{
 					//Console.WriteLine("7");
-					canFire = mIntervalTimers.IsReady(timerID, "droid_canfire");
+					canFire = mIntervalTimers.IsReady(entityKey, "droid_canfire");
 				}
 				catch (Exception ex)
 				{
@@ -1938,10 +1940,10 @@ namespace HelloBoids
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 				
 			// TODO: Do these .Is****  functions need to be setting mRuntimeFlags?
-			int count = (int)allTacticalStations.Size;
+			int count = (int)allTacticalStations.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 		
 			{
-				Boid droid = EntryClass.bSim.Boids[allComponents.Span[(int)i].EntityID];
+				Boid droid = EntryClass.bSim.Boids[allComponents.Span[(int)i].EntityArrayIndex];
 				
 				string errorReason;
 				if (allComponents.Span[(int)i].DoIsOperatorStatusCheckOK(out errorReason))
@@ -1965,7 +1967,7 @@ namespace HelloBoids
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 			
-			int count = (int)allTacticalStations.Size;
+			int count = (int)allTacticalStations.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 		
 			{
 				string errorReason;
@@ -2290,12 +2292,12 @@ namespace HelloBoids
 			// NOTE: we really want to avoid having to reference a Droid from the array as it 
 			//       impacts our cache coherency
 			//EntityNode ent = (EntityNode)EntryClass.bSim.Boids[droidIndex];
-			int count = (int)allWeapons.Size;
+			int count = (int)allWeapons.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 		
 			{
 				string errorReason;
 				// TODO: timerID must consistantly use same LivingEntityID or something else
-				string timerID = allWeapons.Span[(int)i].Index.ToString();
+				string entityKey = Boids[allLivingEntities.Span[(int)i].EntityArrayIndex].EntityKey;
 				bool canFire = false;
 				
 				uint USER_RUNTIME_FLAG_1 = 1 << 0;
@@ -2326,13 +2328,13 @@ namespace HelloBoids
 				try
 				{
 					// todo: is it better to use mIntervalTimers here than to implement checks elsewhere?
-					canFire = mIntervalTimers.IsReady(timerID, "droid_canfire");
+					canFire = mIntervalTimers.IsReady(entityKey, "droid_canfire");
 					// Console.WriteLine("DoWeaponsCanFire() - Droid " + timerID + " Can Fire = " + canFire.ToString());
 					if (canFire)
 					{	
 						// set the runtime flag
 						bool suspend = true;  // we do not want this timer to start over until we start it again
-                		mIntervalTimers.Reset(timerID, "droid_canfire", suspend);
+                		mIntervalTimers.Reset(entityKey, "droid_canfire", suspend);
 					}
 					
 					// set the GAME SPECIFIC runtime flag
@@ -2343,7 +2345,7 @@ namespace HelloBoids
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine("DoWeaponsCanFire() - droid_canfire " + timerID + " key does not exist");
+					Console.WriteLine("DoWeaponsCanFire() - droid_canfire " + entityKey + " key does not exist");
 				}
 				
 				// TODO: Do these .Is****  functions need to be setting mRuntimeFlags?
@@ -2368,13 +2370,14 @@ namespace HelloBoids
             for (int i = 0; i < memSpan.Length; i++)
 			{
 				// NOTE: this timerID is taken from the LivingEntity struct's spanIndex
-				string timerID = i.ToString(); // TODO:  memSpan[i].SpanIndex.ToString();
+				int index = memSpan[i].EntityArrayIndex;
+				string entityKey = Boids[index].EntityKey; 
 				
-				bool spawnReady = mIntervalTimers.IsReady(timerID, "droid_spawn");
+				bool spawnReady = mIntervalTimers.IsReady(entityKey, "droid_spawn");
             	if (spawnReady)
             	{
                		// Console.WriteLine("Spawn Ready == " + spawnReady.ToString());
-                	mIntervalTimers.Reset(timerID, "droid_spawn");
+                	mIntervalTimers.Reset(entityKey, "droid_spawn");
             	}
 				
 				// todo: i think we need to check to see if this record is for
@@ -2754,7 +2757,10 @@ namespace HelloBoids
 			
 			//Console.WriteLine("Spawn() - array index == " + arrayIndex.ToString() + " INTERNAL = " + currentInternalIndex.ToString());
 			
-			
+			// TODO: i need to ensure that the SpanIndex and Index are consistantly used across Memory<T>
+			//       SpanIndex can change as Memory<T> records are added/removed when Entities are added/removed from the Scene.
+			//       The "index" however in KGB is actually an _id GUID and is a string.
+			//       Here "index" only refers to where this Droid exists within the List<>
 	
 			
 			
@@ -2764,7 +2770,7 @@ namespace HelloBoids
 		
 			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
 			ComponentStore<LivingEntity> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-            int livingEntityID = -1
+            int livingEntityID = -1;
 				
 			// NOTE: this second call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
             Memory<LivingEntity> memLivingEnt = storeLivingEntity.CheckOut(out livingEntityID);
@@ -2774,15 +2780,10 @@ namespace HelloBoids
 		
 			// TIMERS
 			////////////////////////
-			// TODO: i need to ensure that the SpanIndex and Index are consistantly used across Memory<T>
-			//       SpanIndex can change as Memory<T> records are added/removed when Entities are added/removed from the Scene.
-			//       The "index" however in KGB is actually an _id GUID and is a string.
-			//       Here "index" only refers to where this Droid exists within the List<>
-			string timerID = memLivingEnt.ToString();
-			
-			mIntervalTimers.Register(timerID, "droid_spawn", 0.14d);
-			mIntervalTimers.Register(timerID, "droid_canfire", 0.04d);
-			mIntervalTimers.Register(timerID, "droid_isfiring", 0.06d);
+
+			mIntervalTimers.Register(entityKey, "droid_spawn", 0.14d);
+			mIntervalTimers.Register(entityKey, "droid_canfire", 0.04d);
+			mIntervalTimers.Register(entityKey, "droid_isfiring", 0.06d);
 			////////////////////////
 			
 			
@@ -2853,7 +2854,7 @@ namespace HelloBoids
 			
 			// add the modifier(s) to this skill.  Recall that modifiers behave just like any other type of PRODUCTION and must be registered as PRODUCTION 
 			// at the appropriate time (eg On USE of the Skill, or on EQUIP of an Item, etc.)
-			v.AddProduction(currentInternalIndex, PRODUCTS.TargetingSkillModifier, 1, true, -1);
+			v.AddProduction(livingEntityID, PRODUCTS.TargetingSkillModifier, 1, true, -1);
 
 			
 			// add the skill to the DROID as if it was being added to an OPERATOR for a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
@@ -2866,7 +2867,7 @@ namespace HelloBoids
 			//v.Modifiers = null;
 			v.BaseValue = 2;
 			v.EffectiveValue = 0; // todo: this should be a Getter perhaps and not a public variable
-			v.AddProduction(currentInternalIndex, PRODUCTS.TargetingSkillModifier, 1, true, -1);
+			v.AddProduction(livingEntityID, PRODUCTS.TargetingSkillModifier, 1, true, -1);
 			
 			// add the skill to the DROID as if it was being added to a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
 			b.TacticalStationSkills.Add(v.SkillType, v);
@@ -2884,7 +2885,7 @@ namespace HelloBoids
 			// each Droid can Produce a TargetingSkillModifier as if it had an "OPERATOR"
 			Production p;
 			p.ProducerEntityArrayIndex = b.EntityArrayIndex;
-			p.ProducerEntityInternalIndex = currentInternalIndex;
+			p.ProducerEntityInternalIndex = livingEntityID;
 			p.ProductID = 	(uint)v.Production[0].Product;
 			p.Location = Vector3d.Zero();
 			p.Enabled = true;
@@ -2893,13 +2894,13 @@ namespace HelloBoids
 			p.NumUses = -1;
 			p.CooldownBetweenUses = 0;
 			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
-			p.DistributionList = new int[] {currentInternalIndex};
+			p.DistributionList = new int[] {livingEntityID};
 			p.SearchPrimitive  = null;
 	
 			// each Droid can Consume a TargetingSkillModifier as if it had a TACTICAL CREW STATION
 			Consumption c;
 			c.ConsumerEntityArrayIndex = b.EntityArrayIndex;
-			c.ConsumerInternalIndex = currentInternalIndex;
+			c.ConsumerInternalIndex = livingEntityID;
 			c.ProducerInternalIndex = p.ProducerEntityInternalIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
 			c.ProductID = p.ProductID;
 			c.Value =  null;
@@ -6398,6 +6399,7 @@ return (0,0);
 	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
 	public struct LivingEntity
 	{
+		public int EntityArrayIndex;   // this is the bSim.Boids[] element index and NOT the Memory<T> Index of this Component.  in KGB this will be the Guid.NewGuid().ToString() results in a 36 character string.
 		public string FullName;
 		
 		// These will serve as Station Operators for now
@@ -6415,6 +6417,7 @@ return (0,0);
 		// - this could conceivably change in the future if for instance a Cyborg or Robot was also a "Character" that was needed the LivingEntity struct.
 		public uint mRuntimeFlags;
 
+	
 		public double GetAge(double currentTime)
 		{
 			return currentTime - CreationDateTime;
@@ -6441,7 +6444,7 @@ return (0,0);
 		//public Consumption[] Consumption; // eg. all components can consume damage.  
 	public struct Component  // aka: "Useable Component"
     {
-		public int EntityID; //  this is the bSim.Boids[] element index and NOT the Memory<T> Index of this Component.  in KGB this will be the Guid.NewGuid().ToString() results in a 36 character string.
+		public int EntityArrayIndex; //  this is the bSim.Boids[] element index and NOT the Memory<T> Index of this Component.  in KGB this will be the Guid.NewGuid().ToString() results in a 36 character string.
         public string FullName;
 		
 		public int Level; // technological level. 
@@ -6874,7 +6877,7 @@ return (0,0);
 		#if DEBUG
 			int componentIndex;
 			Memory<Component> cmp = (Memory<Component>) station.GetUserStruct(typeof(Component), out componentIndex); //"HelloBoids.Component"); // );
-			System.Diagnostics.Debug.Assert (station.EntityArrayIndex == cmp.Span[0].EntityID);
+			System.Diagnostics.Debug.Assert (station.EntityArrayIndex == cmp.Span[0].EntityArrayIndex);
 		#endif
 				
 				
@@ -14808,7 +14811,7 @@ if (mEntityNodesCollection == null) return null;
     {
         private uint STARTING_SIZE = 64;
         private const uint MIN_SIZE = 64;
-        private const uint MAX_SIZE = 1024;
+        private const uint MAX_SIZE = 768 * 2;
         private uint EXPAND_INCREMENT = MIN_SIZE; // expand by this amount when needed.  if 0, it will double the size of Components
         private uint mRecordCount = 0;  // should equal (Size - mAvailableForCheckOut.Count)
 		
@@ -14872,7 +14875,7 @@ if (mEntityNodesCollection == null) return null;
 
         public ComponentStore(uint size)
         {
-            STARTING_SIZE = size;
+            STARTING_SIZE = 768 * 2; //size;
             mSync = new object();
 						
 			
@@ -14889,13 +14892,13 @@ if (mEntityNodesCollection == null) return null;
 			
 			long totalUsed = Utils.GetUsedMemory(false);
 			//Console.WriteLine("ComponentStore.ctor() - " + Utils.SizeSuffix(totalUsed) + " used.");
-			Console.WriteLine( "ComponentStore.ctor() - Type == '" + (typeof(T)).ToString() + " Starting size == " + size.ToString());
+			Console.WriteLine( "ComponentStore.ctor() - Type == '" + (typeof(T)).ToString() + " Starting capacity == " + Capacity.ToString());
         }
 
 		/// <summary>
 		/// The maximum number of records this Store can hold before it needs to be expanded.
 		/// </summary>
-        public uint Size { get { return (uint)Components.Length; } }
+        public uint Capacity { get { return (uint)Components.Length; } }
 
 		/// <summary>
 		/// The currrent number of records this Store is holding.  This number
@@ -14904,7 +14907,12 @@ if (mEntityNodesCollection == null) return null;
 		public uint Count { 
 			get 
 			{ 
-				System.Diagnostics.Debug.Assert (mRecordCount == Size - mAvailableForCheckOut.Count);
+				int  tmp = (int)Capacity - mAvailableForCheckOut.Count;
+				Console.WriteLine("ComponentStore.Count - Capcity - Available == " + tmp.ToString());
+				Console.WriteLine("ComponentStore.Count - RecordCount == " + mRecordCount.ToString());
+				
+				
+				System.Diagnostics.Debug.Assert (mRecordCount == Capacity - mAvailableForCheckOut.Count);
 				return mRecordCount;
 			}
 		}
@@ -14935,8 +14943,6 @@ if (mEntityNodesCollection == null) return null;
 		/// </summary>
         public Memory<T> CheckOut(out int index) // aka: MemoryPool<T>.Rent() 
         {
-			
-			
 			
             //lock (mSync)
 			try
@@ -15110,6 +15116,7 @@ if (mEntityNodesCollection == null) return null;
         //       script destructors need to checkin / dispose all array arrayElements
         private void Expand()
         {
+			Console.WriteLine("ComponentStore.Expand() - Current Capacity == " + Capacity.ToString() + " for type '" + Components.GetType().Name + "'" );
             if (Components.Equals(default(T)))
             {
                 Components = new T[STARTING_SIZE];
@@ -15117,15 +15124,18 @@ if (mEntityNodesCollection == null) return null;
                 mAvailableForCheckOut = new Stack<int>();
 				mRecordCount = 0;
 				
+				// this is a stack which is Last In, First Out so we want to
+				// have the lowest indices at the top of the stack (last)
+				// and the large indices at the bottom (first)
                 for (int i = (int)STARTING_SIZE; i >= 0; i--)
 	                mAvailableForCheckOut.Push(i);
 
                 return;
             }
 
-            int newSize = (int)(Components.Length + EXPAND_INCREMENT);
-            if (EXPAND_INCREMENT == 0)
-                newSize = Components.Length * 2;
+            int newSize = (int)(Capacity + EXPAND_INCREMENT);
+            //if (EXPAND_INCREMENT == 0)
+                newSize = (int)Capacity * 2;
 
             T[] data = new T[newSize];
             //Components.Span[0].CopyTo(data.AsSpan());
@@ -15139,20 +15149,24 @@ if (mEntityNodesCollection == null) return null;
 
             Components = new Memory<T>(data);
 
+			Console.WriteLine("ComponentStore.Expand() - New Capacity == " + Capacity.ToString() + " for type '" + Components.GetType().Name + "'" );
+			
             bool[] newInUse = new bool[newSize];
             InUse.CopyTo(newInUse, 0);
             InUse = newInUse;
 
             // create a new mAvailableForCheckOut stack using the new InUse[] array
+			//recall: this is a stack which is Last In, First Out so we want to
+			// have the lowest indices at the top of the stack (last)
+			// and the large indices at the bottom (first)
             Stack<int> tmpStack = new Stack<int>(newSize);
-            for (int i = (int)STARTING_SIZE; i >= 0; i--)
-                if (!InUse[i])
-                    tmpStack.Push(i);
+            for (int i = (int)newSize; i >= 0; i--)
+	        	if (!InUse[i])
+					mAvailableForCheckOut.Push(i);
 
             mAvailableForCheckOut = tmpStack;
 			
-			
-            ExpandViews(newSize);
+            //ExpandViews(newSize);
         }
 
         private void ExpandViews(int newSize)

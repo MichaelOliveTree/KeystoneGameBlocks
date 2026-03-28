@@ -1,0 +1,85 @@
+blackboard data uses Key Value Pairs...   so the "key" can be whatever we want it to be and it gives us the value... the 
+"value" then I suppose can just be a string also and can be evaluated at runtime against the expression?
+
+where in a dictionary, we find "DoNotFireOnFreighters" and it houses the value "true" that is read from a Memory<T> somehow...
+
+
+Flee - Fast Lightweight Expression Evaluator
+https://github.com/mparlak/Flee?tab=readme-ov-file
+https://github.com/mparlak/Flee/wiki/Examples
+
+http://riptutorial.com/flee/learn/100003/variables
+
+
+e.g.   Say we have a 
+
+class Policy
+{
+	Rule[] Rules;
+
+
+	// let's say one rule is,  cannot "FIRE" upon any FREIGHTER ship, unless that particular ship has first fired upon our ship
+
+	// so we'd have a Target[] targets;  
+	// each bool target.IsCombatant 
+	// So, if "target[index]" "isCombatant", 
+	
+	// A Memory<T> SLICE of the overall blackboard memory can be retrieved
+	// for use by just a specific POLICY, using in the below example
+	
+	Memory<byte> roeData = BlackboardManager.GetMemoryBlock(length, out start);
+	ROEPolicy roePolicy = new ROEPolicy(roeData);
+	
+
+	tacticalStation.AddPolicy(roePolicy);
+ 
+	// the tactical station can now define the offsets to the data
+	// in the roeData held by roePolicy instance and this data will 
+	// always be up to date in the BlackboardManager context.
+
+
+	
+
+	// normally "isCombatant" might be stored for each Target struct in a 
+	// TacticalStation's struct...
+	bool result = bbManager.ReadData("isCombatant[index]", NUM_SHIPS * 1);
+}
+
+
+Memory<T> as blackboard data
+
+// Example using Memory<T> for shared data in a blackboard scenario
+// NOTE: Here, instead of using string "key" values and a dictionary, we use
+// explicit offsets into the byte[] array to read the data types we want to read.
+// This data then needs to be cast to the appropriate Type.
+// Storing "objects" is really not an ideal use case here...  but for "Policies"
+// like Directives, RulesOfEngagement, it can be a very good idea.
+// If we wanted to, we could use a Dictionary to store the offsets for every
+// bit of data we wanted to access...  We would also know the type of data
+// but if not, for an array for instance, we could store a length as well.
+
+public class BlackboardManager
+{
+    // The shared memory area
+    private Memory<byte> _sharedMemory;
+
+    public BlackboardManager(int size)
+    {
+        // Allocate shared memory
+        _sharedMemory = new byte[size].AsMemory();
+    }
+
+    // Agent reads data
+    public ReadOnlySpan<byte> ReadData(int start, int length)
+    {
+        return _sharedMemory.Slice(start, length).Span;
+    }
+
+    // Agent updates data
+    public void WriteData(int start, byte[] data)
+    {
+        data.CopyTo(_sharedMemory.Slice(start, data.Length).Span);
+    }
+}
+
+

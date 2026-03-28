@@ -14902,13 +14902,13 @@ if (mEntityNodesCollection == null) return null;
 
 		/// <summary>
 		/// The currrent number of records this Store is holding.  This number
-		/// cannot exceed the 'Size' value.
+		/// cannot exceed the 'Capacity' value.
 		/// </summary>
 		public uint Count { 
 			get 
 			{ 
 				int  tmp = (int)Capacity - mAvailableForCheckOut.Count;
-				Console.WriteLine("ComponentStore.Count - Capcity - Available == " + tmp.ToString());
+				Console.WriteLine("ComponentStore.Count - Capcity (" + Capacity.ToString() + ") - Available(" + mAvailableForCheckOut.Count.ToString() + ") == " + tmp.ToString());
 				Console.WriteLine("ComponentStore.Count - RecordCount == " + mRecordCount.ToString());
 				
 				
@@ -14969,6 +14969,9 @@ if (mEntityNodesCollection == null) return null;
 						{
 							mRecordCount++;
 							int i = mAvailableForCheckOut.Pop();
+							
+							uint tmp = Count;
+							
 							try
 							{
 								InUse[i] = true;
@@ -15127,14 +15130,16 @@ if (mEntityNodesCollection == null) return null;
 				// this is a stack which is Last In, First Out so we want to
 				// have the lowest indices at the top of the stack (last)
 				// and the large indices at the bottom (first)
-                for (int i = (int)STARTING_SIZE; i >= 0; i--)
+                for (int i = (int)STARTING_SIZE - 1; i >= 0; i--)
 	                mAvailableForCheckOut.Push(i);
 
+				uint abc = Count;
+				Console.WriteLine("Expand() - " + abc.ToString());
                 return;
             }
 
             int newSize = (int)(Capacity + EXPAND_INCREMENT);
-            //if (EXPAND_INCREMENT == 0)
+            if (EXPAND_INCREMENT == 0)
                 newSize = (int)Capacity * 2;
 
             T[] data = new T[newSize];
@@ -15160,7 +15165,7 @@ if (mEntityNodesCollection == null) return null;
 			// have the lowest indices at the top of the stack (last)
 			// and the large indices at the bottom (first)
             Stack<int> tmpStack = new Stack<int>(newSize);
-            for (int i = (int)newSize; i >= 0; i--)
+            for (int i = (int)newSize - 1; i >= 0; i--)
 	        	if (!InUse[i])
 					mAvailableForCheckOut.Push(i);
 

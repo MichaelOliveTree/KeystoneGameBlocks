@@ -1488,10 +1488,15 @@ namespace HelloBoids
 		/// apart of DoFlocking().  We moved it out seperately because we need the adjacency info for doing Combat logic such as which Droid a particular
 		/// Droid can "see" and thus target with a laser.  
 		///</summary>
-        private void ProcessOpticalSensors(ComponentStore<Transform.Transform_Struct> store, object[] parameters, int seed, GameTime gt)
+        private void ProcessOpticalSensors(ComponentStore<Transform.Transform_Struct> transformStructStore, object[] parameters, int seed, GameTime gt)
         {
             mNeighbors.Clear();
-						
+			
+			// Spawn() is not generating opticalsensors.  We currently have an issue with Transform_Struct containing both OpticalSensors and Boids.
+			// We need to know which type is which... so that we can skip iterating over certain ones.  Or we always need to be able to get
+			// the EntityArrayIndex and from that we can get Boid to then check the entity.UserTypeID perhaps...
+			if (Sensors[0] == null) return;
+			
             OctreeOctant root = this.Octree;
 
 			//Console.WriteLine("parameters count == " + parameters.Length.ToString());
@@ -1518,14 +1523,16 @@ namespace HelloBoids
             double largestDistanceSquared = largestDistance * largestDistance;
 			double searchRadius = largestDistance * 0.5d;
 			
-			int length = (int)store.Count;
+			int length = (int)transformStructStore.Count;
             System.Threading.Tasks.Parallel.For(0, length, i =>
 			//for (int i = 0; i < memSpan.Length; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
             {
 				// NOTE: inside of the Parallel.For(), Span<T> cannot be passed in
 				//      because the code inside the Paralle.For() is treated as a Lambda
-				Span<Transform.Transform_Struct> memSpan = store.Span;
+				Span<Transform.Transform_Struct> memSpan = transformStructStore.Span;
 
+				// TODO: problem here is, we only want to iterate Droids, not OpticalSensors and TacticalStations which all exist in this Transform_Struct
+				
 				//EntityNode currentBoid = ; // Boids[(int)i];
 				int arrayIndex = memSpan[i].EntityArrayIndex;
 				
@@ -1756,23 +1763,23 @@ namespace HelloBoids
 			
 			
 			
-			Console.WriteLine("Do_Droid_Logic() - DoTargetPrioritization()");
+			//Console.WriteLine("Do_Droid_Logic() - DoTargetPrioritization()");
 			DoTargetPrioritization();
 			
 			
 			// todo: if we had a list of all weapons for every ship to pass all at once
 			//       as well as all targets for each ship to pass all at once, we could run this
 			//       processor in a single call from here...
-			Console.WriteLine("Do_Droid_Logic() - DoWeaponFitnessScores()");
+			//Console.WriteLine("Do_Droid_Logic() - DoWeaponFitnessScores()");
 			DoWeaponFitnessScores(null, null);
 			
 			
 			
-			Console.WriteLine("Do_Droid_Logic() - DoWeaponsCanFire()");
+			//Console.WriteLine("Do_Droid_Logic() - DoWeaponsCanFire()");
 			DoWeaponsCanFire();
 			
 
-			Console.WriteLine("Do_Droid_Logic() - preparing for loop()");
+			//Console.WriteLine("Do_Droid_Logic() - preparing for loop()");
 			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
@@ -1783,43 +1790,26 @@ namespace HelloBoids
 			//for (int i = 0; i < Boids.Count; i++)
             {
 				Boid currentBoid = Boids[i];
+				// NOTE: Transform_Struct will  host indices for Boids, OpticalSensors and TacticalStations
 				int currentInternalIndex = currentBoid.GetUserStructIndex(typeof(Transform.Transform_Struct));
 				int currentArrayIndex = currentBoid.EntityArrayIndex;
-				//Console.WriteLine("2");
+				System.Diagnostics.Debug.Assert (currentArrayIndex == i, "Do_Droid_Logic() - i and currentArrayIndex do not match.");
 				
-				List<Tuple<int, double>> neighbors = null;
-				
-				try
-				{
-					//Console.WriteLine("3");
-					bool success = mNeighbors.TryGetValue(currentArrayIndex, out neighbors);
-				}
-				catch (Exception ex)
-				{
-					Console.WriteLine("Do_Droid_Logic() -  internal index '" + currentInternalIndex.ToString() + "' does not exist. " + ex.Message);
-				}
-				
-				Console.WriteLine("4");
 				int componentIndex;
 				Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component), out componentIndex);
-				int livingEntityIndex;
-				Memory<LivingEntity> stationOperator = (Memory<LivingEntity>) currentBoid.GetUserStruct(typeof(LivingEntity), out livingEntityIndex);
+				//int livingEntityIndex;
+				//Memory<LivingEntity> stationOperator = (Memory<LivingEntity>) currentBoid.GetUserStruct(typeof(LivingEntity), out livingEntityIndex);
 				int tacticalIndex;
 				Memory<TacticalStation> tacticalStation = (Memory<TacticalStation>) currentBoid.GetUserStruct(typeof(TacticalStation), out tacticalIndex);
 				int wepIndex;
     		    Memory<Weapon> wep = (Memory<Weapon>) currentBoid.GetUserStruct(typeof(Weapon), out wepIndex);
 				//Memory<Laser_Struct> laser = (Memory<Laser_Struct>)currentBoid.GetUserStruct(typeof(Laser_Struct)); //  Laser_Struct laser = (Laser_Struct)currentBoid.mMemStore_Laser.Span[0];
 				
-				// todo: we need to be able to get the indices we want
-				//       based on the typeof(UserStruct) we want
-				// eg: int tacticalStationStructIndex = currentBoid.GetStructIndexWithinMemoryT(typeof(TacticalStation));
-				
 				int operatorIndex = currentBoid.EntityArrayIndex; // we pass Index and NOT SpanIndex because we want to find the Boid in the EntryClass.bSim.Boids[] List
 				int stationIndex = currentBoid.EntityArrayIndex;  // for now, our Boid hosts both the TacticalStation and the Operator
 
-				Console.WriteLine("5 - ComponentIndex = " + componentIndex.ToString());
 				if (!allComponents.Span[componentIndex].CanAct) return;
-				Console.WriteLine("Do_Droid_Logic() - Component CanAct() == TRUE");		
+				//Console.WriteLine("Do_Droid_Logic() - Component CanAct() == TRUE");		
 				
 				// NOTE: The EXE will render Sensor Contact info as necessary.
 				//       The client EXE will have access to those types and the UI elements using them and can update
@@ -1842,39 +1832,60 @@ namespace HelloBoids
 				//       can fire, both can be used independantly.
 				try
 				{
-					//Console.WriteLine("7");
 					canFire = mIntervalTimers.IsReady(entityKey, "droid_canfire");
+					//Console.WriteLine("Do_Droid_Logic() - droid_canfire = " + entityKey + " = " + canFire.ToString());
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine("Do_Droid_Logic() - droid_canfire " + currentInternalIndex.ToString() + " key does not exist");
+					Console.WriteLine("Do_Droid_Logic() - droid_canfire " + entityKey + " key does not exist");
 				}
 				
 				if (canFire) // TODO: Establish CANFIRE PER WEAPON
            	 	{  
-					//Console.WriteLine("Do_Droid_Logic() - CanFire == TRUE");
+					bool suspend = false;
+					mIntervalTimers.Reset(entityKey, "droid_canfire", suspend);
+					
 					List<Boid> targets = null;
-					double[] distances = null;
+					double[] distances = null;				
+					List<Tuple<int, double>> neighbors = null;
+
+					try
+					{
+						bool success = mNeighbors.TryGetValue(currentArrayIndex, out neighbors);
+						if (!success) 
+						{
+							System.Diagnostics.Debug.Assert(mNeighbors.Count > 0, "Do_Droig_Logic() - ASSERTION FAILED - Check that optical Sensors[] list is being filled via Spawn().");
+							Console.WriteLine("Do_Droid_Logic() -  No neighbors found for Droid with EntityArrayIndex '" + currentArrayIndex.ToString());
+							return;
+						}
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine("Do_Droid_Logic() -  Droid Array Index '" + currentArrayIndex.ToString() + "' does not exist. " + ex.Message);
+					}
+				
+					
 					//List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE); // TODO: Hopefully this FindNearestTarget() can be optimized.... spatial searches even with Octree is slow.
 					
 					// use the existing neigbors from "Eyes" (optical scanner) to find the single closest but valid target available to the current droid
 					// This overloaded version of FindNearestTarget() returns the sorted list of neighbors from closest to furthest along with their distances to the current droid
 					List<EntityNode> tmp = FindNearestTarget(currentBoid, neighbors, out distances);
 					
-					Console.WriteLine("8.5 - CanFire");
+					//Console.WriteLine("Do_Droid_Logic() - Number of Targets Found = " + tmp.Count.ToString());
 					
 					if (tmp == null || tmp.Count == 0)
 						return;     // NOTE: for parallel.For we use "return"
 						// continue; // NOTE: for regular for() loop we use "continue"
 					
-					Console.WriteLine("9 - Some targets found..." + tmp.Count.ToString());
+					
 					targets = tmp.OfType<Boid>().ToList();
 					
-					Console.WriteLine("Do_Droid_Logic() - Droid " + currentInternalIndex.ToString() + " Has Found Target == " + (targets != null).ToString());
+					//Console.WriteLine("Do_Droid_Logic() - Droid Array Index '" + curentArrayIndex.ToString() + "' Converted " + targets.Count.ToString());
 					
 					
 					try
 					{
+						// todo: fix.  for now we wont iterate all targets, just the most near one
 						Boid currentTarget = targets[0];
 						double distanceToTargetSquared = distances[0];
 						
@@ -2030,7 +2041,7 @@ namespace HelloBoids
 				List<Tuple<int, double>> neighbors = null;
 				bool success = mNeighbors.TryGetValue(currentArrayIndex, out neighbors);
 					
-				//Console.WriteLine("1 - currentArrayIndex = " + currentArrayIndex.ToString() + " " + success.ToString());
+				//Console.WriteLine("DoContactListSorting() - 1 - currentArrayIndex = " + currentArrayIndex.ToString() + " " + success.ToString());
 				
 				if (success)
 				{
@@ -2054,7 +2065,7 @@ namespace HelloBoids
 								Predicate<SensorContact> contactExists = contact => contact.ContactEntityArrayIndex == contactsEntityArrayIndex;
 								c = contacts.Find(contactExists);
 							
-								//Console.WriteLine("6");
+								//Console.WriteLine("DoContactListSorting() - 6");
 								if (c.Name != null)
 								{
 									// add to the contact information, this sensor which has detected it
@@ -2084,7 +2095,7 @@ namespace HelloBoids
 										Console.WriteLine("DoContactListSorting() - ERROR: contact at Array Index == " + c.ContactEntityArrayIndex.ToString() + " not found.");
 									}
 									
-									Console.WriteLine("7");
+									Console.WriteLine("DoContactListSorting() - 7");
 									
 									int sensorContactInternalTransformIndex = bb.GetUserStructIndex(typeof(Transform.Transform_Struct));
 									// contact details are needed to find the correct SensorContact to potentially merge with an existing SensorContact for this detected Entity
@@ -2105,10 +2116,10 @@ namespace HelloBoids
 									t.TimeLast = t.TimeAcquired;
 
 									c.Add(t);
-									Console.WriteLine("8");
+									Console.WriteLine("DoContactListSorting() - 8");
 								}
 								contacts.Add(c);
-								Console.WriteLine("9");
+								Console.WriteLine("DoContactListSorting() - 9");
 							}
 						}
 					}
@@ -2119,7 +2130,7 @@ namespace HelloBoids
 					current.Add(contacts);
 				}	 
 			});
-			Console.WriteLine("Do_Droid_Logic() - Completed Sequence.");
+			//Console.WriteLine("DoContactListSorting() - Completed Sequence.");
 		}
 		
 		/// <summary>
@@ -2788,9 +2799,9 @@ namespace HelloBoids
 			// TODO: I think we need to remove all struct creation from within Boid or EntityNode because we are unable
 			//       to manage the Index values properly that way.
 
-			EntityNode eyes = CreateOpticalSensor(arrayIndex);
-			//Console.WriteLine("eyes NOT null? == " + (eyes != null).ToString());
-			Sensors[arrayIndex] = eyes; // NOTE: Sensors is already preallocated so that we can do a direct assignment to the subscript 'index' which IS threadsafe
+//			EntityNode eyes = CreateOpticalSensor(arrayIndex);
+//			Sensors[arrayIndex] = eyes; // NOTE: Sensors is already preallocated so that we can do a direct assignment to the subscript 'index' which IS threadsafe
+			// Console.WriteLine("eyes NOT null? == " + (eyes != null).ToString());
 			//b.Add(eyes); // we dont technically have to use nested Entities at the moment because this Droid simulation is 'relatively' very simple still
 			//Console.WriteLine("Eyes added to slot " + arrayIndex.ToString());
 			
@@ -2826,7 +2837,7 @@ namespace HelloBoids
 			////////////////////////
 
 			mIntervalTimers.Register(entityKey, "droid_spawn", 0.14d);
-			mIntervalTimers.Register(entityKey, "droid_canfire", 0.04d);
+			mIntervalTimers.Register(entityKey, "droid_canfire", 0.00d);
 			mIntervalTimers.Register(entityKey, "droid_isfiring", 0.06d);
 			////////////////////////
 			
@@ -14006,7 +14017,7 @@ if (mEntityNodesCollection == null) return null;
 				int seed = 0;
 			
                 object[] args = GetParameters(key);
-				Console.WriteLine("Processor.Update() - Key == " + key);
+				//Console.WriteLine("Processor.Update() - Key == " + key);
 				
 				// cast processors of type 'object' to the appropriate type we need for this processor (based on the name of it's key)
 				// note: we could probably check it's GetType() instead... but not necessary for now
@@ -15543,7 +15554,7 @@ if (mEntityNodesCollection == null) return null;
             // TODO: remove this period from the dictionary
             if (mKeyedTimePeriods == null)
             {
-                System.Diagnostics.Debug.WriteLine("GameTime.UnRegister() - " + nodeID + " using name " + name + " does not exist.");
+                Console.WriteLine("IntervalTimers.UnRegister() - " + nodeID + " using name " + name + " does not exist.");
             }
             string key = GetKey(nodeID, name);
             TimePeriod tp;
@@ -15552,7 +15563,7 @@ if (mEntityNodesCollection == null) return null;
             if (success)
                 mKeyedTimePeriods.Remove(key);
             else
-                System.Diagnostics.Debug.WriteLine("GameTime.UnRegister() - " + nodeID + " using name " + name + " does not exist.");
+                Console.WriteLine("IntervalTimers.UnRegister() - " + nodeID + " using name " + name + " does not exist.");
 
         }
 
@@ -15586,7 +15597,7 @@ if (mEntityNodesCollection == null) return null;
 	
             if (mKeyedTimePeriods == null)
             {
-                System.Diagnostics.Debug.WriteLine("GameTime.Reset() - " + nodeID + " using name " + name + " does not exist.");
+                Console.WriteLine("IntervalTimers.Reset() - " + nodeID + " using name " + name + " does not exist.");
             }
             string key = GetKey(nodeID, name);
             TimePeriod tp;
@@ -15595,7 +15606,7 @@ if (mEntityNodesCollection == null) return null;
             if (success)
                 tp.Elapsed = 0d;
             else
-                System.Diagnostics.Debug.WriteLine("GameTime.Reset() - " + nodeID + " using name " + name + " does not exist.");
+                Console.WriteLine("IntervalTimers.Reset() - " + nodeID + " using name " + name + " does not exist.");
 #endif
         
 			tp.IsPaused = suspend;	
@@ -15608,6 +15619,8 @@ if (mEntityNodesCollection == null) return null;
             TimePeriod tp;
 			
 			bool success = mIntervals.TryGetValue(key, out tp);
+			
+			//Console.WriteLine("IntervalTimers.Success = " + key + " = " + success.ToString() + " TP.Duration " + tp.Duration.ToString());
 	#else
             if (mKeyedTimePeriods == null)
             {
@@ -15621,9 +15634,9 @@ if (mEntityNodesCollection == null) return null;
 	#endif
             if (success)
             {
-                bool result = !tp.IsPaused && tp.IsActive && tp.Elapsed >= tp.Duration;
+                bool result = !tp.IsPaused == tp.IsActive == (tp.Elapsed >= tp.Duration);
 
-                //Console.WriteLine("GameTime.IsReady() - " + nodeID + " using name ''" + name + "'' isReady = " + result.ToString());
+                //Console.WriteLine("IntervalTimers.IsReady() - " + nodeID + " using name '" + name + "' isReady = " + result.ToString());
                 return result;
             }
             return false;
@@ -15643,13 +15656,15 @@ if (mEntityNodesCollection == null) return null;
 		
             if (mKeyedTimePeriods == null)
             {
-                System.Diagnostics.Debug.WriteLine("GameTime.IsActive() - " + nodeID + " using name " + name + " does not exist.");
+                //Console.WriteLine("IntervalTimers.IsActive() - " + nodeID + " using interval named '" + name + "', does not exist.");
                 //using HelloBoids.Transform;
                 return false;
             }
             string key = GetKey(nodeID, name);
             TimePeriod tp;
             bool success = mKeyedTimePeriods.TryGetValue(key, out tp);
+			//Console.WriteLine("IntervalTimers.IsActive() - " + success.ToString()  + " " + tp.Elapsed.ToString() + " " + nodeID + " using interval named '" + name + "', does not exist.");
+			
 	#endif
 		
             if (success) return tp.IsActive;
@@ -15678,7 +15693,8 @@ if (mEntityNodesCollection == null) return null;
             {
                 if (!period.IsActive || period.IsPaused) continue;
                 period.Elapsed += elapsedSeconds;
-
+				//Console.WriteLine("IntervalTimers.IsReady() - " + period.OwnerID + " using name '" + period.Name + "' Elapsed = " + period.Elapsed.ToString());
+				
                 if (period.Elapsed >= period.Duration)
                 {
                     period.IntervalCompletedCB?.Invoke(period.OwnerID, period.Name);

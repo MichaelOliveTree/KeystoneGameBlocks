@@ -1736,14 +1736,14 @@ namespace HelloBoids
              //    - storing data on interior Walls and Floors and Ceilings "damage"
 
 
-        	//Console.WriteLine("DoDeviceReadyStatus()");
+        	//Console.WriteLine("Do_Droid_Logic() - DoDeviceReadyStatus()");
 			DoDeviceReadyStatus();
 			
 			
 			
-			//Console.WriteLine("DoStationCanActStatus()");
+			//Console.WriteLine("Do_Droid_Logic() - DoStationCanActStatus()");
 			DoStationCanActStatus();
-			//Console.WriteLine("continuing Do_Droid_Logic()");
+			//Console.WriteLine("Do_Droid_Logic() - continuing Do_Droid_Logic()");
 			
 			
 			
@@ -1751,28 +1751,28 @@ namespace HelloBoids
 			
 			
 			
-			//Console.WriteLine("DoContactListSorting()");
+			//Console.WriteLine("Do_Droid_Logic() - DoContactListSorting()");
 			DoContactListSorting(); // based on policies
 			
 			
 			
-			//Console.WriteLine("DoTargetPrioritization()");
+			Console.WriteLine("Do_Droid_Logic() - DoTargetPrioritization()");
 			DoTargetPrioritization();
 			
 			
 			// todo: if we had a list of all weapons for every ship to pass all at once
 			//       as well as all targets for each ship to pass all at once, we could run this
 			//       processor in a single call from here...
-			//Console.WriteLine("DoWeaponFitnessScores()");
+			Console.WriteLine("Do_Droid_Logic() - DoWeaponFitnessScores()");
 			DoWeaponFitnessScores(null, null);
 			
 			
 			
-			//Console.WriteLine("DoWeaponsCanFire()");
+			Console.WriteLine("Do_Droid_Logic() - DoWeaponsCanFire()");
 			DoWeaponsCanFire();
 			
 
-			//Console.WriteLine("preparing for loop()");
+			Console.WriteLine("Do_Droid_Logic() - preparing for loop()");
 			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
@@ -1799,7 +1799,7 @@ namespace HelloBoids
 					Console.WriteLine("Do_Droid_Logic() -  internal index '" + currentInternalIndex.ToString() + "' does not exist. " + ex.Message);
 				}
 				
-				//Console.WriteLine("4");
+				Console.WriteLine("4");
 				int componentIndex;
 				Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component), out componentIndex);
 				int livingEntityIndex;
@@ -1817,9 +1817,9 @@ namespace HelloBoids
 				int operatorIndex = currentBoid.EntityArrayIndex; // we pass Index and NOT SpanIndex because we want to find the Boid in the EntryClass.bSim.Boids[] List
 				int stationIndex = currentBoid.EntityArrayIndex;  // for now, our Boid hosts both the TacticalStation and the Operator
 
-				//Console.WriteLine("5 - ComponentIndex = " + componentIndex.ToString());
-//				if (!allComponents.Span[componentIndex].CanAct) return;
-				//Console.WriteLine("6");		
+				Console.WriteLine("5 - ComponentIndex = " + componentIndex.ToString());
+				if (!allComponents.Span[componentIndex].CanAct) return;
+				Console.WriteLine("Do_Droid_Logic() - Component CanAct() == TRUE");		
 				
 				// NOTE: The EXE will render Sensor Contact info as necessary.
 				//       The client EXE will have access to those types and the UI elements using them and can update
@@ -1842,7 +1842,7 @@ namespace HelloBoids
 				//       can fire, both can be used independantly.
 				try
 				{
-					//Console.WriteLine("7");
+					Console.WriteLine("7");
 					canFire = mIntervalTimers.IsReady(entityKey, "droid_canfire");
 				}
 				catch (Exception ex)
@@ -1852,7 +1852,7 @@ namespace HelloBoids
 				
 				if (canFire) // TODO: Establish CANFIRE PER WEAPON
            	 	{  
-					//Console.WriteLine("8 - CanFire");
+					Console.WriteLine("Do_Droid_Logic() - CanFire == TRUE");
 					List<Boid> targets = null;
 					double[] distances = null;
 					//List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE); // TODO: Hopefully this FindNearestTarget() can be optimized.... spatial searches even with Octree is slow.
@@ -1861,16 +1861,16 @@ namespace HelloBoids
 					// This overloaded version of FindNearestTarget() returns the sorted list of neighbors from closest to furthest along with their distances to the current droid
 					List<EntityNode> tmp = FindNearestTarget(currentBoid, neighbors, out distances);
 					
-					//Console.WriteLine("8.5 - CanFire");
+					Console.WriteLine("8.5 - CanFire");
 					
 					if (tmp == null || tmp.Count == 0)
 						return;     // NOTE: for parallel.For we use "return"
 						// continue; // NOTE: for regular for() loop we use "continue"
 					
-					//Console.WriteLine("9 - Some targets found..." + tmp.Count.ToString());
+					Console.WriteLine("9 - Some targets found..." + tmp.Count.ToString());
 					targets = tmp.OfType<Boid>().ToList();
 					
-					//Console.WriteLine("Do_Droid_Logic() - Droid " + currentInternalIndex.ToString() + " Has Found Target == " + (targets != null).ToString());
+					Console.WriteLine("Do_Droid_Logic() - Droid " + currentInternalIndex.ToString() + " Has Found Target == " + (targets != null).ToString());
 					
 					
 					try
@@ -2008,10 +2008,12 @@ namespace HelloBoids
 		/// </summary>
 		private void DoContactListSorting()
 		{
-			Console.WriteLine("DoContactListSorting");
+			//Console.WriteLine("DoContactListSorting");
 			int count = Boids.Count;
 			
 			ComponentStore<Transform.Transform_Struct> allTransforms  = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
+			// NOTE: The following Assert will NOT match because allTransforms also includes OpticalSensor EntityNodes and TacticalStation nodes, and NOT just Droids.
+			//System.Diagnostics.Debug.Assert (allTransforms.Count == count, "DoContactListSorting() - Span Count " + allTransforms.Count.ToString() + " and Boids Array Length " + count.ToString() + " do not match.");
 			
             System.Threading.Tasks.Parallel.For(0, count, i => 		
 			{
@@ -2020,7 +2022,7 @@ namespace HelloBoids
 				//System.Diagnostics.Debug.Assert( (int)i == currentArrayIndex, "DoContactListSorting() - array index does not match...");
 				// the adjacnets that are stored in neighbors from the overall mNeighbors is very much stores Area of Interest for each Droid
 				// but we will only send them things that their sensors can detect (and "eyes" are treated as optical sensors)
-				Boid current = Boids[i]; // <-- if we can get the Sensors without having to get the current Boid... hmm...
+				Boid current = Boids[currentArrayIndex]; // <-- if we can get the Sensors without having to get the current Boid... hmm...
 				EntityNode[] sensors = current.GetSensors(); // todo: we currently do  not have EntityNode allowing adding of child nodes.  This is needed next.
 				if (sensors == null) return; 
 				
@@ -2052,7 +2054,7 @@ namespace HelloBoids
 								Predicate<SensorContact> contactExists = contact => contact.ContactEntityArrayIndex == contactsEntityArrayIndex;
 								c = contacts.Find(contactExists);
 							
-								Console.WriteLine("6");
+								//Console.WriteLine("6");
 								if (c.Name != null)
 								{
 									// add to the contact information, this sensor which has detected it
@@ -2061,7 +2063,7 @@ namespace HelloBoids
 									else
 										c.SensorsIndices.Append(k);
 									
-									Console.WriteLine("appending " + k.ToString());
+									Console.WriteLine("DoContactListSorting() - Appending sensor at index " + k.ToString());
 								}
 								else // contact does not already exist
 								{
@@ -2079,7 +2081,7 @@ namespace HelloBoids
 									}
 									catch (Exception ex)
 									{
-										Console.WriteLine("ERROR: contact index == " + c.ContactEntityArrayIndex.ToString());
+										Console.WriteLine("DoContactListSorting() - ERROR: contact at Array Index == " + c.ContactEntityArrayIndex.ToString() + " not found.");
 									}
 									
 									Console.WriteLine("7");
@@ -2117,6 +2119,7 @@ namespace HelloBoids
 					current.Add(contacts);
 				}	 
 			});
+			Console.WriteLine("Do_Droid_Logic() - Completed Sequence.");
 		}
 		
 		/// <summary>
@@ -2124,7 +2127,7 @@ namespace HelloBoids
 		/// </summary>
 		private void DoTargetPrioritization()
 		{
-			Console.WriteLine("DoTargetPrioritization");
+			//Console.WriteLine("DoTargetPrioritization");
 			int count = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 		
 			{
@@ -2215,6 +2218,7 @@ namespace HelloBoids
 			// - sparring
 			// - theater (performances, orchestras, bands, etc)
 			// - nap/sleep
+			//Console.WriteLine("End target prioritization...");
 		}
 		
 		private string IsCombatant(object[] args)
@@ -2458,7 +2462,9 @@ namespace HelloBoids
         private void DoFlocking(ComponentStore<Transform.Transform_Struct> store, object[] parameters, int seed, GameTime gt)
         {
 			double elapsedSeconds = gt.ElapsedSeconds;
-			int length = store.Span.Length;
+			
+			// NOTE: store MUST be of the type Transform_Struct as the neighbor's tuples use .Item1 to hold that InternalTransformIndex and NOT the EntityArrayIndex
+			int count = (int)store.Count;
 
 			//Console.WriteLine ("Span and Store Size Agree == " + (store.Span.Length == store.Size).ToString());
 			
@@ -2489,7 +2495,7 @@ namespace HelloBoids
             double cohesionDistanceSquared = cohesionDistance * cohesionDistance;
 
 			
-			System.Threading.Tasks.Parallel.For(0, length, i =>
+			System.Threading.Tasks.Parallel.For(0, count, i =>
 			//for (int i = 0; i < memSpan.Length; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
             {
 				// NOTE: inside of the Parallel.For(), Span<T> cannot be passed in
@@ -2505,10 +2511,13 @@ namespace HelloBoids
 				if (neighbors == null || neighbors.Count == 0) return;
                 int nCount = neighbors.Count;
 				
-				// DEBUG TEST
+				//Console.WriteLine("DoFlocking() - Neighbors count == " + nCount.ToString());
+				
+								  
+				// DEBUG TEST - note: Item1 refers to the InternalTransformIndex for the transform_Struct so it needs to be in range of THAT specific struct
 				for (int z = 0; z < nCount; z++)
-					if (neighbors[z].Item1 > length  - 1)
-						Console.WriteLine("Neighbor value is OUT OF RANGE " + neighbors[z].ToString());
+					if (neighbors[z].Item1 > count  - 1)
+						Console.WriteLine("DoFlocking() - Neighbor value is OUT OF RANGE " + neighbors[z].ToString());
 				
 				// END TEST
 				
@@ -2626,12 +2635,12 @@ namespace HelloBoids
                 } // end profiler FlockingRules
 
 				
-				//Console.WriteLine($"DoFlocking() - OnEntityNode_Moved()");
+				//Console.WriteLine("DoFlocking() - OnEntityNode_Moved()");
 		#if SPATIAL_MOVE_UPDATES // this define needs to remain FALSE because currently Octree is NOT THREAD SAFE
 //              // making this thread safe is going to be a problem if we also want to maintain performance
 				// i could maybe only add locks to depth = 1 and not any further.
 				currentBoid.SpatialNode.OnEntityNode_Moved(currentBoid);
-				//Console.WriteLine($"DoFlocking() - Moved Completed...");
+				//Console.WriteLine("DoFlocking() - Moved Completed...");
 		#endif	
                 // Apply boundary rules (wrap around)
                 // (You'd need to define boundary dimensions here)
@@ -2662,11 +2671,14 @@ namespace HelloBoids
 			
 			EntityNode[] tmp = new EntityNode[neighbors.Count];
 			distances = new double[neighbors.Count];
-						
+					
+			ComponentStore<Transform.Transform_Struct> allTransforms = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
+	
 			for (int i = 0; i < neighbors.Count; i++)
 			{
-				Boid currentTarget = Boids[neighbors[i].Item1];
-				distances[i] = Vector3d.GetDistance3dSquared(currentBoid.Translation, currentTarget.Translation);
+				int arrayIndex = allTransforms.Span[neighbors[i].Item1].EntityArrayIndex;
+				Boid currentTarget = Boids[arrayIndex];
+				distances[i] = Vector3d.GetDistance3dSquared(currentBoid.Translation, currentTarget.Translation); // allTransforms.Span[neighbors[i].Item1].Translation);
 				tmp[i] = currentTarget;
 			}
 
@@ -3135,7 +3147,7 @@ namespace HelloBoids
 			//       of the Memory<T> store to previousCount - 1;
 			// TODO: we need to release all Memory<T> used by Transform_Struct and Living_Entity structs.
 		#if MEMORY_T
-			this.Boids[entity.Index].Dispose(); // 	<-- store.CheckIn(Boids[i].mMemStore_LivingEntity); occurs here correct?
+			this.Boids[entity.EntityArayIndex].Dispose(); // 	<-- store.CheckIn(Boids[i].mMemStore_LivingEntity); occurs here correct?
 		#endif
 			this.Boids[entity.EntityArrayIndex] = null;
 			this.Boids[entity.EntityArrayIndex] = this.Boids[lastIndex];
@@ -6698,7 +6710,7 @@ return (0,0);
 		
 		public bool CanAct 
 		{
-			get {return (mUserRuntimeFlags & (uint)USER_RUNTIME_FLAGS.CanAct) == (uint)USER_RUNTIME_FLAGS.CanAct;}
+			get {return true;} // {return (mUserRuntimeFlags & (uint)USER_RUNTIME_FLAGS.CanAct) == (uint)USER_RUNTIME_FLAGS.CanAct;}
 			set 
 			{
 				if (value)

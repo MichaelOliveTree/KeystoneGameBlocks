@@ -1784,7 +1784,7 @@ namespace HelloBoids
             {
 				Boid currentBoid = Boids[i];
 				int currentInternalIndex = currentBoid.GetUserStructIndex(typeof(Transform.Transform_Struct));
-				
+				int currentArrayIndex = currentBoid.EntityArrayIndex;
 				//Console.WriteLine("2");
 				
 				List<Tuple<int, double>> neighbors = null;
@@ -1792,7 +1792,7 @@ namespace HelloBoids
 				try
 				{
 					//Console.WriteLine("3");
-					bool success = mNeighbors.TryGetValue(currentInternalIndex, out neighbors);
+					bool success = mNeighbors.TryGetValue(currentArrayIndex, out neighbors);
 				}
 				catch (Exception ex)
 				{
@@ -1842,7 +1842,7 @@ namespace HelloBoids
 				//       can fire, both can be used independantly.
 				try
 				{
-					Console.WriteLine("7");
+					//Console.WriteLine("7");
 					canFire = mIntervalTimers.IsReady(entityKey, "droid_canfire");
 				}
 				catch (Exception ex)
@@ -1852,7 +1852,7 @@ namespace HelloBoids
 				
 				if (canFire) // TODO: Establish CANFIRE PER WEAPON
            	 	{  
-					Console.WriteLine("Do_Droid_Logic() - CanFire == TRUE");
+					//Console.WriteLine("Do_Droid_Logic() - CanFire == TRUE");
 					List<Boid> targets = null;
 					double[] distances = null;
 					//List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE); // TODO: Hopefully this FindNearestTarget() can be optimized.... spatial searches even with Octree is slow.

@@ -34,123 +34,121 @@ using System.IO;
 
 
 
-// @LT Gaming
-// @ObsidianAnt
-// @EnterElysium
-// 
-// The Art of Moebius (French artist with amazing scifi landscapes
-// re: proc-gen of Moons in Elite Dangerous, "the composition of the regolith and atmosphere tends to match that of the host planet they orbit, just as our moon is similar to Earth)
+			// @LT Gaming
+			// @ObsidianAnt
+			// @EnterElysium
+			// 
+			// The Art of Moebius (French artist with amazing scifi landscapes
+			// re: proc-gen of Moons in Elite Dangerous, "the composition of the regolith and atmosphere tends to match that of the host planet they orbit, just as our moon is similar to Earth)
 
-// "Starship EVO"           <-- like the simple geometry, materials with no textures
-// "Fallen Frontier"
-// "C-Beams"
-// "D.O.R.F RTS"
-// "SAD:Frontier"           <-- newtonian
-// "Children of Dead Earth" <-- newtonian + n-body gravitation, ship building, space combat
+			// "Starship EVO"           <-- like the simple geometry, materials with no textures
+			// "Fallen Frontier"
+			// "C-Beams"
+			// "D.O.R.F RTS"
+			// "SAD:Frontier"           <-- newtonian
+			// "Children of Dead Earth" <-- newtonian + n-body gravitation, ship building, space combat
+			
 
+			// NOTES: On Indices and GUIDS
+			//   
+			//       that also contained UserTypeID
+			//       Actually, we can store the UserInterfaceStruct flags in a uint bitflag, we just
+			//       use that to determine  if we should call GetUserStruct<> for the various structs.
+			//       Enum.HasFlag() used to be slow in older versions of .net, but direct bitwise
+			//       operations has always been very fast so we should use them so we know whether
+			//       a specific type of user struct exists before calling GetUseStruct(type);
 
-// NOTES: On Indices and GUIDS
-//   
-//       that also contained UserTypeID
-//       Actually, we can store the UserInterfaceStruct flags in a uint bitflag, we just
-//       use that to determine  if we should call GetUserStruct<> for the various structs.
-//       Enum.HasFlag() used to be slow in older versions of .net, but direct bitwise
-//       operations has always been very fast so we should use them so we know whether
-//       a specific type of user struct exists before calling GetUseStruct(type);
+			// Entity.mUserTypeID is required. mUserTypeID does NOT belong in Component or LivingEntity
+			// 
+			// KGB DOES need a GUID primarily because of saved prefabs that can be created by and shared amongst all players.
+			// 
+			// TODO: the problem with KGB is GUID needs to be kept in the saved XML, but index refers to where its
+			//       stored in these ComponentStore<T>   so what do we do here?  I dont think we can guarantee
+			//       the order of Entities within these arrays across server and clients.  These
+			//       structs must always be local machine ONLY.  
 
-// Entity.mUserTypeID is required. mUserTypeID does NOT belong in Component or LivingEntity
-// 
-// KGB DOES need a GUID primarily because of saved prefabs that can be created by and shared amongst all players.
-// 
-// TODO: the problem with KGB is GUID needs to be kept in the saved XML, but index refers to where its
-//       stored in these ComponentStore<T>   so what do we do here?  I dont think we can guarantee
-//       the order of Entities within these arrays across server and clients.  These
-//       structs must always be local machine ONLY.  
+			// A HASH of EntityIDs could yeild an Integer that we can use for sorting them within a List<>
+			// This then needs to constantly update whenever Entities are Added/Removed from the Scene...
+			// Also for MMO, this needs to be managed for each "ZONE" 
+			// https://discussions.unity.com/t/staticentityidrange-for-simple-fast-scene-loading-and-external-entity-refs/725631/7
 
-// A HASH of EntityIDs could yeild an Integer that we can use for sorting them within a List<>
-// This then needs to constantly update whenever Entities are Added/Removed from the Scene...
-// Also for MMO, this needs to be managed for each "ZONE" 
-// https://discussions.unity.com/t/staticentityidrange-for-simple-fast-scene-loading-and-external-entity-refs/725631/7
+			// if we use an unsigned long for our entity IDs that gives us 18446744073709551615 
+			// if we allow up to max uint for number of Entities in a given game that is 4,294,967,295
+			// that allows for 4,294,967,295 unique games containing 4,294,967,295 unique Entities.
+			// or more games if the max number of Entities in any is less.
+			// For reference, Counterstrike is said to have total number of matches in the TENS of BILLIONS
+			// since 1999 to 2026
+			// BUT THERE IS A MAJOR PROBLEM WITH THESE ENTITY RANGES FOR A GAME LIKE SCIFICOMMAND where 
+			// anyone can create prefabs.... they would always need to grab an unique INT from a SERVER
+			// to ensure uniqueness across the prefabs of all other creators, including those assets made for the official released version of ScifiCommand.
+			// So, GUID is  better...  
+			// We probably must HASH the GUID and use that as a way to sort Entities in our List<EntityNode>
 
-// if we use an unsigned long for our entity IDs that gives us 18446744073709551615 
-// if we allow up to max uint for number of Entities in a given game that is 4,294,967,295
-// that allows for 4,294,967,295 unique games containing 4,294,967,295 unique Entities.
-// or more games if the max number of Entities in any is less.
-// For reference, Counterstrike is said to have total number of matches in the TENS of BILLIONS
-// since 1999 to 2026
-// BUT THERE IS A MAJOR PROBLEM WITH THESE ENTITY RANGES FOR A GAME LIKE SCIFICOMMAND where 
-// anyone can create prefabs.... they would always need to grab an unique INT from a SERVER
-// to ensure uniqueness across the prefabs of all other creators, including those assets made for the official released version of ScifiCommand.
-// So, GUID is  better...  
-// We probably must HASH the GUID and use that as a way to sort Entities in our List<EntityNode>
+					
+	    	//
+			// // https://erikmcclure.com/blog/multithreading-problems-in-game-design/
+			/*
+			Updating game entities in parallel while maintaining determinism requires strict control over update ordering and data access, typically achieved using an Entity-Component-System (ECS) architecture with a job system or double-buffering. Determinism ensures that given the same initial state and inputs, the simulation produces identical results every time, regardless of the machine or number of CPU cores used.Reddit
+			ReddiHere are the key approaches to achieve parallel, deterministic updates:
 
-        
-//
-// // https://erikmcclure.com/blog/multithreading-problems-in-game-design/
-/*
-Updating game entities in parallel while maintaining determinism requires strict control over update ordering and data access, typically achieved using an Entity-Component-System (ECS) architecture with a job system or double-buffering. Determinism ensures that given the same initial state and inputs, the simulation produces identical results every time, regardless of the machine or number of CPU cores used.Reddit
-ReddiHere are the key approaches to achieve parallel, deterministic updates:
+			1. Structured Parallel ECS (Job System)
+			Modern ECS frameworks (like Unity DOTS) allow running systems in parallel while maintaining order through dependency tracking. 
 
-1. Structured Parallel ECS (Job System)
-Modern ECS frameworks (like Unity DOTS) allow running systems in parallel while maintaining order through dependency tracking. 
+			System Dependencies: Use [UpdateBefore] and [UpdateAfter] attributes to define a strict order of execution for systems.
+			Job Scheduling: Use ScheduleParallel() for systems that do not conflict, which automatically splits work across cores while maintaining deterministic ordering of data processing.
+			Avoid Non-Determinism: Do not use Run() in a way that allows arbitrary thread scheduling. Ensure that if systems depend on each other, they are synchronized using Dependency.Complete(). 
 
-System Dependencies: Use [UpdateBefore] and [UpdateAfter] attributes to define a strict order of execution for systems.
-Job Scheduling: Use ScheduleParallel() for systems that do not conflict, which automatically splits work across cores while maintaining deterministic ordering of data processing.
-Avoid Non-Determinism: Do not use Run() in a way that allows arbitrary thread scheduling. Ensure that if systems depend on each other, they are synchronized using Dependency.Complete(). 
+			2. Double-Buffering (Read-Only Input, Write-Only Output)
+			To avoid race conditions, systems should read from the current state and write changes to a "next state" buffer. 
 
-2. Double-Buffering (Read-Only Input, Write-Only Output)
-To avoid race conditions, systems should read from the current state and write changes to a "next state" buffer. 
+			Process: Par	allelize reading entity data (Component A, B) to calculate results.
+			Deferred Mutation: Write new component data (Component C) to a separate buffer.
+			Swap: After all systems finish, swap the read and write buffers.
+			Result: All entities update based on the same snapshot of the previous frame, eliminating dependency on thread execution order. 
 
-Process: Parallelize reading entity data (Component A, B) to calculate results.
-Deferred Mutation: Write new component data (Component C) to a separate buffer.
-Swap: After all systems finish, swap the read and write buffers.
-Result: All entities update based on the same snapshot of the previous frame, eliminating dependency on thread execution order. 
+			3. Deterministic Ordering and Sorting
+			If entities are updated in parallel, the order of modification must not matter, or it must be explicitly enforced. 
 
-3. Deterministic Ordering and Sorting
-If entities are updated in parallel, the order of modification must not matter, or it must be explicitly enforced. 
+			Sort Entities: If the outcome depends on which entity updates first, sort entities by a fixed ID before processing.
+			Avoid Hash Maps: Avoid data structures where iteration order changes, as this can break determinism between different machine architectures. 
 
-Sort Entities: If the outcome depends on which entity updates first, sort entities by a fixed ID before processing.
-Avoid Hash Maps: Avoid data structures where iteration order changes, as this can break determinism between different machine architectures. 
-(note: MichaelOliveTree March.29.2026 - this is not about for example, visible item set buckets when culling, this is about our List<> of Entity when processing data. )
+			4. Deterministic Simulation Techniques
+			Fixed Timestep: Run the simulation logic on a fixed cadence (FixedUpdate in Unity, for example), separate from the rendering framerate.
+				Floating Point Constraints: Ensure that floating-point calculations are identical across platforms (e.g., using fixed point math or forcing strict IEEE 754 compliance).
+			Deterministic RNG: Use a seeded random number generator. Ensure it is called in the same order every frame. 
 
+			Key Considerations for Parallelism
+			Data Layout: Use contiguous memory (Arrays/NativeContainers) for component data to allow parallel access without locking.
+			Job System Hazards: Ensure that parallel jobs do not write to the same memory location. Use NativeParallelHashMap or NativeArray with strict index management to ensure safe parallel writes. 
+			*/
 
-4. Deterministic Simulation Techniques
-Fixed Timestep: Run the simulation logic on a fixed cadence (FixedUpdate in Unity, for example), separate from the rendering framerate.
-    Floating Point Constraints: Ensure that floating-point calculations are identical across platforms (e.g., using fixed point math or forcing strict IEEE 754 compliance).
-Deterministic RNG: Use a seeded random number generator. Ensure it is called in the same order every frame. 
+            // By the way, this is what Media Molecule does in Dreams. The Trackmania racing games do this as well, to verify runs and make sure people aren’t cheating. Even their 3d physics engine is fully deterministic! very cool stuff.
 
-Key Considerations for Parallelism
-Data Layout: Use contiguous memory (Arrays/NativeContainers) for component data to allow parallel access without locking.
-Job System Hazards: Ensure that parallel jobs do not write to the same memory location. Use NativeParallelHashMap or NativeArray with strict index management to ensure safe parallel writes. 
-*/
+            //	Notes:
 
-// By the way, this is what Media Molecule does in Dreams. The Trackmania racing games do this as well, to verify runs and make sure people aren’t cheating. Even their 3d physics engine is fully deterministic! very cool stuff.
+            //  You need to make sure entities are always updated in the same order. This means deterministic O(1) datastructures like pools are your friend.
+            // If you use random numbers then you need to make sure the seeds match at the start of every tick as well. You can probably get by storing only one seed along with the first
+            // The stored replay gets invalidated once you change your gameplay logic, so this method is generally useful for debugging only.
 
-//	Notes:
+            //https://jakubtomsu.github.io/posts/fixed_timestep_without_interpolation/ < -- i cant easily do a memcpy to copy the gamestate like this.... storing animation states for us is much more difficult.
+            //                                                                              well, perhaps we only just need to copy the previous animation's "weight"
+            // https://www.rfleury.com/p/main-loops-refresh-rates-and-determinism
+            // 1 - simulaton thread - outputs state
+            // 2 - user thread (drawing here including animation updating)
+            // 3 - input gathering thread
 
-//  You need to make sure entities are always updated in the same order. This means deterministic O(1) datastructures like pools are your friend.
-// If you use random numbers then you need to make sure the seeds match at the start of every tick as well. You can probably get by storing only one seed along with the first
-// The stored replay gets invalidated once you change your gameplay logic, so this method is generally useful for debugging only.
+            // https://www.youtube.com/watch?v=fdAOPHgW7qM <-- frame rate independance for animation... render tick method?
 
-//https://jakubtomsu.github.io/posts/fixed_timestep_without_interpolation/ < -- i cant easily do a memcpy to copy the gamestate like this.... storing animation states for us is much more difficult.
-//                                                                              well, perhaps we only just need to copy the previous animation's "weight"
-// https://www.rfleury.com/p/main-loops-refresh-rates-and-determinism
-// 1 - simulaton thread - outputs state
-// 2 - user thread (drawing here including animation updating)
-// 3 - input gathering thread
-
-// https://www.youtube.com/watch?v=fdAOPHgW7qM <-- frame rate independance for animation... render tick method?
-
-// https://www.youtube.com/watch?v=72y2EC5fkcE
-// TODO: deterministic
-//       fixed step
-//       - track each frame 'long currentFrame'
-//       
-//       ability to "step" play backwards and forwards
-//       animation state decoupling for interpolation
-//  ___________________________________________________
-//  TODO: Procedural Generation Focus
-//        - seeds and determinism and such
+            // https://www.youtube.com/watch?v=72y2EC5fkcE
+            // TODO: deterministic
+            //       fixed step
+            //       - track each frame 'long currentFrame'
+            //       
+            //       ability to "step" play backwards and forwards
+            //       animation state decoupling for interpolation
+            //  ___________________________________________________
+            //  TODO: Procedural Generation Focus
+            //        - seeds and determinism and such
 
 
 // 2 - Test determinism of spawning with a parallel.For() loop and using the ThreadedRandom.cs
@@ -190,17 +188,6 @@ Job System Hazards: Ensure that parallel jobs do not write to the same memory lo
 //   - Added destructor and IDisposable Dispose() to ComponentStoreCollection.cs and ComponentStore.cs and BoidSimulation.cs
 //   - Added destructor to Transform.cs for freeing up the memory of Memory<T>... i think this still needs work to keep the Memory<T> blocks packed correctly.
 //   - Fixed Semaphore.Wait(-1) which means wait indefinetely for ComponentStoreCollection.CheckOut() and ComponentStore.CheckOut()
-// FIXES March.29.2026 
-//    - Added Triangle, Plane, Line3d, ConvexHull, PlanedFrustum, OcclusionFrustum
-//    - fixed bugs with indices but still need to resolve having seperate strucs for Transform_Struct depending on if the
-//      userTypeID is a Vehicle vs a Sensor or other type of Component on a ship that never moves. One way
-//      might be to wrap Memory<T> within ComponentStore<> such that we have a userTypeID added to it that can then be used
-//      to create seperate Transform_Struct versions of Memory<T> for Droid vs Sensor for example.
-//      eg.   class TypedMemory<T> 
-//            {   public int UserTypeID {get ;}  public Memory<T> Memory {get; } 
-//                public TypedMemory(int userTypeID, Memory<T> mem) 
-//                { UserTypeID = userTypeID; Memory = mem;}
-//            }
 
 	
 // TODO: THE SAMPLE FROM GITHUB https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
@@ -8695,7 +8682,7 @@ return (0,0);
             mUserComponentsCollection = new System.Collections.Concurrent.ConcurrentDictionary<Type, object>();
         }
 		
-		
+		// todo: i would need to pass in a userTypeID and perhaps classification, category, and configuration
         public ComponentStore<T> CheckOut<T>(uint size = 64)
         {
 			try 

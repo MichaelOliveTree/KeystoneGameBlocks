@@ -1116,7 +1116,10 @@ namespace HelloBoids
 			// null items so we can use direct assignment (eg Boids[i] = b;  rather than Boids.Add(b); when spawning them
 			// NOTE: either of the below two lines of code will work to fill the list to the desired amount with nulls
 			const int OPTICAL_SENSOR_MULTIPLIER = 2;
-			Boids = new List<EntityNode>(new EntityNode[numBoids * OPTICAL_SENSOR_MULTIPLIER]);
+			int numElements = numBoids * OPTICAL_SENSOR_MULTIPLIER;
+			Console.WriteLine ("num elements == " + numElements.ToString());
+			
+			Boids = new List<EntityNode>(new EntityNode[numElements]);
 			//Boids = Enumerable.Repeat<EntityNode>(null, numBoids).ToList();
 			
 			
@@ -1133,11 +1136,16 @@ namespace HelloBoids
      			if(EntryClass.NUM_TO_PIN > 0)
                     MemoryFragmenter.Fragment(EntryClass.NUM_TO_PIN, 512, EntryClass.NUM_TO_PIN / 2, 128);
 
+				Console.WriteLine("111");
 				// spawn will add to the Octree 
 				Tuple<Boid, EntityNode> result = Spawn(mTHRandom, i * 2, width, height, depth);
+				Console.WriteLine("222");
 				
+				Console.WriteLine("abc");
                 Boids[i * 2] = result.Item1; // NOTE: must use direct assignment after having pre-initialize List<> since List<> is not threadsafe
-                Boids[i * 2 + 1] = result.Item2;
+                Console.WriteLine("defc");
+				Boids[i * 2 + 1] = result.Item2;
+				Console.WriteLine("ghi");
 				
 				//Boids.Add(b); // <-- will not work here as List<> is not threadsafe
 				//Console.WriteLine("i == " + i.ToString()); 
@@ -2766,6 +2774,8 @@ namespace HelloBoids
 		
 		public Tuple<Boid, EntityNode> Spawn(ThreadedRandom rand, int arrayIndex, double width, double height, double depth)
 		{
+			Console.WriteLine ("Spawn() - Boid Spawn BEGIN at array index == " + arrayIndex.ToString());
+			
 			Tuple<Boid, EntityNode> result;
 			
 			double posX = rand.NextDouble() * width;
@@ -2786,28 +2796,35 @@ namespace HelloBoids
 			
 			result = new Tuple<Boid, EntityNode>(b, eyes);
 			
-			 // NOTE: Sensors is already preallocated so that we can do a direct assignment to the subscript 'index' which IS threadsafe
-			// Console.WriteLine("eyes NOT null? == " + (eyes != null).ToString());
-			//b.Add(eyes); // we dont technically have to use nested Entities at the moment because this Droid simulation is 'relatively' very simple still
-			//Console.WriteLine("Eyes added to slot " + arrayIndex.ToString());
 			
-			//Console.WriteLine("Spawn() - array index == " + arrayIndex.ToString() + " INTERNAL = " + currentInternalIndex.ToString());
+			// TIMERS
+			////////////////////////
+
+			mIntervalTimers.Register(entityKey, "droid_spawn", 0.14d);
+			mIntervalTimers.Register(entityKey, "droid_canfire", 0.00d);
+			mIntervalTimers.Register(entityKey, "droid_isfiring", 0.06d);
+			////////////////////////
 			
-			// TODO: i need to ensure that the SpanIndex and Index are consistantly used across Memory<T>
-			//       SpanIndex can change as Memory<T> records are added/removed when Entities are added/removed from the Scene.
-			//       The "index" however in KGB is actually an _id GUID and is a string.
-			//       Here "index" only refers to where this Droid exists within the List<>
-	
 			
 			
 			
 			// todo: generate Droids with some variance for age, size, and speed
-		
-		
-			ComponentStore<Transform.Transform_Struct> storeTransform = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(EntryClass.NUM_ENTRIES); 
-            int transformIndex = -1;
-			Memory<Transform.Transform_Struct> memTransform = storeTransform.CheckOut(out transformIndex);
-			memTransform.Span[transformIndex].Configuration = BoidConfiguration;
+
+			// private const CONFIGURATION BoidConfiguration = CONFIGURATION.Transform | CONFIGURATION.RigidBody | CONFIGURATION.Sentient | CONFIGURATION.SelfPropelled;
+			
+			// NOTE: Do NOT use the allTransforms method below
+			//ComponentStore<Transform.Transform_Struct> storeTransform = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(EntryClass.NUM_ENTRIES); 
+            //int transformIndex = -1;
+			//Memory<Transform.Transform_Struct> memAllTransforms = storeTransform.CheckOut(out transformIndex);
+			//memAllTransforms.Span[transformIndex].Configuration = BoidConfiguration;
+			// b.AddUserStruct(typeof(Transform.Transform_Struct), memAllTransforms, transformIndex);
+			
+			// NOTE: For Transform_Struct, we do NOT first get the "allTransforms" Memory<T> because class Transform{} has already created and added the Transform_Struct 
+			//       during it's ctor() and has already called b.AddUserStruct() internally for it... so we just need to call b.GetUserStruct() instead to access it.
+			int transformIndex;
+			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)b.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
+			transform.Span[0].Configuration = OpticalSensorConfiguration;
+			
 			
 			// NOTE: this first call retrieves an entire ComponentStore for this type of struct
 			ComponentStore<LivingEntity> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
@@ -2821,15 +2838,6 @@ namespace HelloBoids
 			
 			b.AddUserStruct(typeof(LivingEntity), memLivingEnt, livingEntityID);
 		
-			// TIMERS
-			////////////////////////
-
-			mIntervalTimers.Register(entityKey, "droid_spawn", 0.14d);
-			mIntervalTimers.Register(entityKey, "droid_canfire", 0.00d);
-			mIntervalTimers.Register(entityKey, "droid_isfiring", 0.06d);
-			////////////////////////
-			
-			
 			
 			ComponentStore<TacticalStation> storeTacticalStation = EntryClass.mCStoreCol.CheckOut<TacticalStation>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
             int checkOutIndex = -1;
@@ -2908,7 +2916,6 @@ namespace HelloBoids
 			b.AddUserStruct(typeof(Armor), memArmor, checkOutIndex);
 			
 
-
 			// NOTE: since each Droid will have an "Operator" and "TacticalStation" merged into it's blackboarddata,
 			//       all we really need to do is stick to a naming convention like "operator_#####"  and "tactical_#####" 
 			//       when adding those Keys.
@@ -2919,7 +2926,6 @@ namespace HelloBoids
 
 			//EntryClass.mCStoreUserData[entityKey].SetString("faction", factionColor);
 			System.Diagnostics.Debug.Assert(b.BlackBoardData == EntryClass.mCStoreUserData[entityKey], "Spawn() -- UserData objects do not match.");
-			
 			
 			
 			// SKILLS
@@ -2936,10 +2942,12 @@ namespace HelloBoids
 			// at the appropriate time (eg On USE of the Skill, or on EQUIP of an Item, etc.)
 			v.AddProduction(livingEntityID, PRODUCTS.TargetingSkillModifier, 1, true, -1);
 
+			//Console.WriteLine("abc");
 			
 			// add the skill to the DROID as if it was being added to an OPERATOR for a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
 			b.OperatorSkills.Add(v.SkillType, v);
 			
+			//Console.WriteLine("def");
 			// add the same skill to the tactical station
 			v.SkillType = SKILLS.Targeting;
 			v.Level = 2;     			// the level of this skill
@@ -2949,6 +2957,7 @@ namespace HelloBoids
 			v.EffectiveValue = 0; // todo: this should be a Getter perhaps and not a public variable
 			v.AddProduction(livingEntityID, PRODUCTS.TargetingSkillModifier, 1, true, -1);
 			
+			//Console.WriteLine("ghi");
 			// add the skill to the DROID as if it was being added to a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
 			b.TacticalStationSkills.Add(v.SkillType, v);
 			////////////////////////
@@ -2987,7 +2996,9 @@ namespace HelloBoids
 			c.Amount = 1;
 			c.Operations = null;
 			
+			//Console.WriteLine("jkl");
 			RegisterProduction(b, p);
+			Console.WriteLine("abc");
 			RegisterConsumption(b, c);
 	
 	
@@ -3005,7 +3016,7 @@ namespace HelloBoids
 			Memory<Weapon> weapon = (Memory<Weapon>)b.GetUserStruct(typeof(Weapon), out wepIndex); 
 			int laserIndex;
 			Memory<Laser_Struct> laser = (Memory<Laser_Struct>)b.GetUserStruct(typeof(Laser_Struct), out laserIndex); 
-			
+			Console.WriteLine("def");
 
 			// beam specific
 			laser.Span[0].Type = 1;     
@@ -3051,13 +3062,13 @@ namespace HelloBoids
 //			public double VacuumMaxRange;
 //			public double VacuumMaxRange2;
     
-  
+
 		    if (this.Octree != null)
             {
            		Octree.Add((EntityNode)b);
             }
 
-			//Console.WriteLine ("Spawn() - Boid created at array index == " + arrayIndex.ToString());
+			Console.WriteLine ("Spawn() - Boid created at array index == " + arrayIndex.ToString());
 			return result;
 		}
 		
@@ -3070,28 +3081,47 @@ namespace HelloBoids
 			//       do not correspond index wise necessarily to their transform struct's spanIndex 
 			// SO we need a more robust solution to handling these indices and for finding these index
 			// values
-						
+			Console.WriteLine("CreateOpticalSensor() - ArrayIndex == " + arrayIndex.ToString());
 			//index += (int)EntryClass.NUM_ENTRIES;
 			string entityKey = "sensor_" + arrayIndex.ToString(); // prefix with "sensor_" to not duplicate with "boid_"
 			EntityNode opticalSensor = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); // OpticalSensor is the Droid's 'eyes'
-						
+			Console.WriteLine("CreateOpticalSensor() - Optical Sensor EntityNode Instanced == " + arrayIndex.ToString());
+			
+			
+			//CONFIGURATION OpticalSensorConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.Sensor;
+		
 			int transformIndex;
 			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)opticalSensor.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
+			Console.WriteLine("CreateOpticalSensor() - Transform Struct referenced at internal index == " + transformIndex.ToString());
 			transform.Span[0].Configuration = OpticalSensorConfiguration;
+			Console.WriteLine("CreateOpticalSensor() - Transform Struct configuration set at internal index == " + transformIndex.ToString());
+			
+			
+			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+            int compInternalIndex = -1;
+            Memory<Component> memComp = storeComp.CheckOut(out compInternalIndex);
+			Console.WriteLine("CreateOpticalSensor() - Component Struct created at internal index == " + compInternalIndex.ToString());
+			memComp.Span[compInternalIndex].Configuration = OpticalSensorConfiguration;
+			memComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
+			opticalSensor.AddUserStruct(typeof(Component), memComp, compInternalIndex);
+			Console.WriteLine("CreateOpticalSensor() - Component Struct added at internal index == " + compInternalIndex.ToString());
+			
+			// todo: power using as well
 			
 			
 			ComponentStore<Sensor> storeSensor = EntryClass.mCStoreCol.CheckOut<Sensor>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
             int sensorInternalIndex = -1;
 			// NOTE: this second call returns just ONE record from the overall ComponentStore for this type of struct and outputs the index within the overall store
             Memory<Sensor> memSensor = storeSensor.CheckOut(out sensorInternalIndex);
+			Console.WriteLine("CreateOpticalSensor() - Sensor Struct created at internal index == " + sensorInternalIndex.ToString());
+	
 			memSensor.Span[sensorInternalIndex].Configuration = OpticalSensorConfiguration;
 			memSensor.Span[sensorInternalIndex].EntityArrayIndex = arrayIndex;
 			//memSensor.Span[sensorInternalIndex].InternalComponentIndex = -1; // TODO:  this should be from "Component" struct not sensorInternalIndex;
 			memSensor.Span[sensorInternalIndex].Range = 100;
 			//memSensor.Span[sensorInternalIndex].ScanRating = 2000; // <-- this is a computed stat based on TL and Power, that generally ranges from 10 - 40+  (google "gurps vehicles 2nd edition radar scan rating")
-						
 			opticalSensor.AddUserStruct(typeof(Sensor), memSensor, sensorInternalIndex);
-			
+			Console.WriteLine("CreateOpticalSensor() - Sensor Struct added at internal index == " + sensorInternalIndex.ToString());
 				
 
 			// each Droid can Produce a 'PRODUCT.OpticalReflection' 
@@ -3126,6 +3156,8 @@ namespace HelloBoids
 			RegisterProduction(opticalSensor, p);
 			RegisterConsumption(opticalSensor, c);
 			
+			Console.WriteLine("CreateOpticalSensor() - Optical Sensor returning");
+				
 			return opticalSensor;
 		}
 		
@@ -4624,13 +4656,13 @@ return (0,0);
 		protected UserData mUserData;
 		protected int mUserTypeID;   // can be defined by game##.dll or by an enum that is generated into a compiled binary at runtime
 		
-        public EntityNode(string entityID, int arrayIndex, double x, double y, double z, double xV, double yV) 
+        public EntityNode(string entityKey, int arrayIndex, double x, double y, double z, double xV, double yV) 
 			: base (arrayIndex, x, y, z, xV, yV)
         {
             mArrayIndex = arrayIndex;
 			mUserTypeID = -1;
 				
-			mID = entityID;
+			mID = entityKey;
 			mUserData = EntryClass.mCStoreUserData.CheckOut(mID);
 				
         }
@@ -9149,7 +9181,7 @@ return (0,0);
         //       script destructors need to checkin / dispose all array arrayElements
         private void Expand()
         {
-			Console.WriteLine("ComponentStore.Expand() - Current Capacity == " + Capacity.ToString() + " for type '" + Components.GetType().Name + "'" );
+			Console.WriteLine("ComponentStore.Expand() - Current Capacity == " + Capacity.ToString() + " for type '" + typeof(T).Name + "'" );
             if (InUse == null)
             {
                 Components = new T[STARTING_SIZE];
@@ -9163,8 +9195,8 @@ return (0,0);
                 for (int i = (int)STARTING_SIZE - 1; i >= 0; i--)
 	                mAvailableForCheckOut.Push(i);
 
-				uint abc = Count;
-				Console.WriteLine("Expand() - " + abc.ToString());
+				uint abc = STARTING_SIZE;
+				Console.WriteLine("Expand() - " + typeof(T).Name + " " +  abc.ToString());
                 return;
             }
 

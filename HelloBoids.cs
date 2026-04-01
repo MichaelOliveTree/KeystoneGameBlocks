@@ -1139,8 +1139,14 @@ namespace HelloBoids
 
 				// spawn will add to the Octree 
 				Tuple<Boid, EntityNode> result = Spawn(mTHRandom, i * 2, width, height, depth);
-                Boids[i * 2] = result.Item1; // NOTE: must use direct assignment after having pre-initialize List<> since List<> is not threadsafe
-				Boids[i * 2 + 1] = result.Item2;
+				int arrayIndex = i * 2;
+                Boids[arrayIndex] = result.Item1; // NOTE: must use direct assignment after having pre-initialize List<> since List<> is not threadsafe
+				Boids[arrayIndex + 1] = result.Item2;
+				//Console.WriteLine ("Spawn() - Boid           created with EntityKey == " + Boids[arrayIndex].EntityKey);
+				//Console.WriteLine ("Spawn() - Optical Sensor created with EntityKey == " + Boids[arrayIndex + 1].EntityKey);
+				//int numPartOfKeyBOID = int.Parse(Boids[arrayIndex].EntityKey.Split("_")[1]);
+				//int numPartOfKeyEYES = int.Parse(Boids[arrayIndex + 1].EntityKey.Split("_")[1]);
+				//System.Diagnostics.Debug.Assert (numPartOfKeyBOID == numPartOfKeyEYES - 1, "Spawn() - Numeric Part of Keys Match"); 
 				
 				//Boids.Add(b); // <-- will not work here as List<> is not threadsafe
 				//Console.WriteLine("i == " + i.ToString()); 
@@ -1820,6 +1826,8 @@ namespace HelloBoids
 			
 		}
 		
+		private static System.Threading.SemaphoreSlim mSort = new System.Threading.SemaphoreSlim(1);
+		
 		/// <summary>
 		/// This is mostly just creating 'SensorContact' from "neighbors" .... based on policies
 		/// </summary>
@@ -1827,6 +1835,7 @@ namespace HelloBoids
 		{
 			//Console.WriteLine("DoContactListSorting");
 			
+			if (mNeighbors.Count == 0) return;
 			
 			ComponentStore<Transform.Transform_Struct> allTransforms  = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
 			int recordCount = (int)allTransforms.Count;
@@ -1835,8 +1844,11 @@ namespace HelloBoids
 			
             System.Threading.Tasks.Parallel.For(0, recordCount, i => 		
 			{
-				if ((allTransforms.Span[(int)i].Configuration & BoidConfiguration) != BoidConfiguration) return;
-								
+				if ((allTransforms.Span[(int)i].Configuration & BoidConfiguration) != BoidConfiguration)
+				{
+					Console.WriteLine("configuration = " + allTransforms.Span[(int)i].Configuration.ToString());
+					return;
+				}				
 				int currentArrayIndex = allTransforms.Span[(int)i].EntityArrayIndex; // current.EntityArrayIndex; //  current.GetUserStructIndex(typeof(Transform.Transform_Struct));
 				//System.Diagnostics.Debug.Assert( (int)i == currentArrayIndex, "DoContactListSorting() - array index does not match...");
 				// the adjacnets that are stored in neighbors from the overall mNeighbors is very much stores Area of Interest for each Droid
@@ -1846,100 +1858,107 @@ namespace HelloBoids
 				
 				int sensorsCount = 0;
 				if (sensors != null) sensorsCount = sensors.Length;
-				Console.WriteLine("DoContactListSorting() - Sensor Count == " + sensorsCount);
+				//Console.WriteLine("DoContactListSorting() - Sensor Count == " + sensorsCount);
 				if (sensors == null) return; 
 				
 				// grab the neighbors/adjacents for this Droid.  The returned parameter List<Tuple<int, double>> tells us which Droid (int) index was detected and the (double) distance to it  
 				List<Tuple<int, double>> neighbors = null;
+				
+				//Console.WriteLine("DoContactListSorting() - Looking for Neighbors at Array Index  == " + currentArrayIndex.ToString());
+				//foreach (int key in mNeighbors.Keys)
+				//	Console.WriteLine ("Key == " + key.ToString());
+				
 				bool success = mNeighbors.TryGetValue(currentArrayIndex, out neighbors);
-								
-				if (success)
-				{
-					Console.WriteLine("DoContactListSorting() - Found Adjacents for Droid @ Array Index == '" + currentArrayIndex.ToString() + "' ");
-					List<SensorContact> contacts = new List<SensorContact>();
-					for (int j = 0; j < neighbors.Count; j++)
-					{			
-						double distance = neighbors[(int)j].Item2;
-						int contactsInternalTransformIndex = neighbors[(int)j].Item1; 
-						int contactsEntityArrayIndex = allTransforms.Span[contactsInternalTransformIndex].EntityArrayIndex;
-							
-							
-						for (int k = 0; k < sensors.Length; k++)
+				
+				Console.WriteLine("DoContactListSorting() - Found '" + neighbors.Count.ToString() + "' Adjacents for Droid @ Array Index == '" + currentArrayIndex.ToString() + "' ");
+				List<SensorContact> contacts = new List<SensorContact>();
+				
+				for (int j = 0; j < neighbors.Count; j++)
+				{			
+					double distanceSquared = neighbors[(int)j].Item2;
+					int contactsInternalTransformIndex = neighbors[(int)j].Item1; 
+					int contactsEntityArrayIndex = allTransforms.Span[contactsInternalTransformIndex].EntityArrayIndex;
+			  
+					for (int k = 0; k < sensors.Length; k++)
+					{
+						int structIndex = -1;
+						Memory<Sensor> sensorStruct = (Memory<Sensor>)sensors[k].GetUserStruct(typeof(Sensor), out structIndex);
+
+						
+						double sensorRangeSquared = sensorStruct.Span[0].RangeSquared;
+						Console.WriteLine("DoContactListSorting() - Range = " +  sensorRangeSquared.ToString() + " Distance to Contact ==  " + distanceSquared.ToString());
+						if (sensorRangeSquared >= distanceSquared)
 						{
-							int structIndex = -1;
-							Memory<Sensor> sensorStruct = (Memory<Sensor>)sensors[k].GetUserStruct(typeof(Sensor), out structIndex);
 							
-							if (sensorStruct.Span[0].Range >= distance)
+							SensorContact c;
+
+							Predicate<SensorContact> contactExists = contact => contact.ContactEntityArrayIndex == contactsEntityArrayIndex;
+							c = contacts.Find(contactExists);
+
+							//Console.WriteLine("DoContactListSorting() - 6");
+							if (c.Name != null)
 							{
-								SensorContact c;
-									
-								Predicate<SensorContact> contactExists = contact => contact.ContactEntityArrayIndex == contactsEntityArrayIndex;
-								c = contacts.Find(contactExists);
-							
-								//Console.WriteLine("DoContactListSorting() - 6");
-								if (c.Name != null)
-								{
-									// add to the contact information, this sensor which has detected it
-									if (c.SensorsIndices == null) 
-										c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices, k);
-									else
-										c.SensorsIndices.Append(k);
-									
-									Console.WriteLine("DoContactListSorting() - Appending sensor at index " + k.ToString());
-								}
-								else // contact does not already exist
-								{
-									c = new SensorContact ();
+								// add to the contact information, this sensor which has detected it
+								if (c.SensorsIndices == null) 
+									c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices, k);
+								else
+									c.SensorsIndices.Append(k);
 
-									// NOTE: Here we will only have one set of SensorContacts and never any duplicates
-									//       because each Droid only has one Sensor ('Optical Sensor' == eyes)
-									c.ContactEntityArrayIndex = contactsEntityArrayIndex; // index within the Boid[] array of the detected Droid
-									c.Index = (int)i;
-
-									Boid bb = null;
-									try 
-									{
-										bb =  (Boid)this.Boids[c.ContactEntityArrayIndex];
-									}
-									catch (Exception ex)
-									{
-										Console.WriteLine("DoContactListSorting() - ERROR: contact at Array Index == " + c.ContactEntityArrayIndex.ToString() + " not found.");
-									}
-									
-									Console.WriteLine("DoContactListSorting() - 7");
-									
-									int sensorContactInternalTransformIndex = bb.GetUserStructIndex(typeof(Transform.Transform_Struct));
-									// contact details are needed to find the correct SensorContact to potentially merge with an existing SensorContact for this detected Entity
-									c.Name =  "boid_" + contactsEntityArrayIndex.ToString(); // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
-									c.RegistryNumber = c.Name;
-									c.Type = SensorContact.TYPE.Drone;
-									c.ContactStatus = Target.STATUS.Unknown;
-									c.FriendOrFoe = SensorContact.FoF.Unknown;
-
-									// telemetry
-									SensorContact.ContactTelemetry t;
-									t.Radius = (float)bb.BoundingBox.Radius;    // how might size be spoofed?
-									t.Position = bb.Translation;
-									t.Velocity = bb.Velocity;
-									t.Distance = distance;
-									t.Heading = 0;
-									t.TimeAcquired = Utils.NowTicks(); // todo: this needs to eventually just be gt.Ticks <-- which must come from 'gametime fixedstep' and not 'real-time'
-									t.TimeLast = t.TimeAcquired;
-
-									c.Add(t);
-									Console.WriteLine("DoContactListSorting() - 8");
-								}
-								contacts.Add(c);
-								Console.WriteLine("DoContactListSorting() - 9");
+								Console.WriteLine("DoContactListSorting() - Appending SensorContact at index " + k.ToString());
 							}
+							else // contact does not already exist
+							{
+								Console.WriteLine("DoContactListSorting() - Adding new SensorContact at index " + k.ToString());
+								c = new SensorContact ();
+
+								// NOTE: Here we will only have one set of SensorContacts and never any duplicates
+								//       because each Droid only has one Sensor ('Optical Sensor' == eyes)
+								c.ContactEntityArrayIndex = contactsEntityArrayIndex; // index within the Boid[] array of the detected Droid
+								c.Index = (int)i;
+
+								Boid bb = null;
+								try 
+								{
+									bb =  (Boid)this.Boids[c.ContactEntityArrayIndex];
+								}
+								catch (Exception ex)
+								{
+									Console.WriteLine("DoContactListSorting() - ERROR: contact at Array Index == " + c.ContactEntityArrayIndex.ToString() + " not found.");
+								}
+
+								Console.WriteLine("DoContactListSorting() - 7");
+
+								int sensorContactInternalTransformIndex = bb.GetUserStructIndex(typeof(Transform.Transform_Struct));
+								// contact details are needed to find the correct SensorContact to potentially merge with an existing SensorContact for this detected Entity
+								c.Name =  "boid_" + contactsEntityArrayIndex.ToString(); // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
+								c.RegistryNumber = c.Name;
+								c.Type = SensorContact.TYPE.Drone;
+								c.ContactStatus = Target.STATUS.Unknown;
+								c.FriendOrFoe = SensorContact.FoF.Unknown;
+
+								// telemetry
+								SensorContact.ContactTelemetry t;
+								t.Radius = (float)bb.BoundingBox.Radius;    // how might size be spoofed?
+								t.Position = bb.Translation;
+								t.Velocity = bb.Velocity;
+								t.DistanceSquared = distanceSquared;
+								t.Heading = 0;
+								t.TimeAcquired = Utils.NowTicks(); // todo: this needs to eventually just be gt.Ticks <-- which must come from 'gametime fixedstep' and not 'real-time'
+								t.TimeLast = t.TimeAcquired;
+
+								c.Add(t);
+								Console.WriteLine("DoContactListSorting() - 8");
+							}
+							contacts.Add(c);
+							Console.WriteLine("DoContactListSorting() - 9");
 						}
 					}
-					// add all of the SensorContacts to the current Droid.  In KGB
-					// this will be the TacticalStation instead, and it will be responsible for
-					// properly merging these SensorContacts with existing ones so as to maintain
-					// proper SensorContact histories for all detected Entities.
-					current.Add(contacts);
-				}	 
+				}
+				// add all of the SensorContacts to the current Droid.  In KGB
+				// this will be the TacticalStation instead, and it will be responsible for
+				// properly merging these SensorContacts with existing ones so as to maintain
+				// proper SensorContact histories for all detected Entities.
+				current.Add(contacts); 
 			});
 			//Console.WriteLine("DoContactListSorting() - Completed Sequence.");
 		}
@@ -2319,13 +2338,12 @@ namespace HelloBoids
 				//      because the code inside the Paralle.For() is treated as a Lambda
 				Span<Transform.Transform_Struct> memSpan = transformStructStore.Span;
 
-				if ((memSpan[(int)i].Configuration & OpticalSensorConfiguration) != OpticalSensorConfiguration) 
+				// NOTE: we iterate through those the Boid's (Enitites.Configuraton == BoidConfiguration) because we are interested in THEIR location  not those of the Sensors carried by each one.
+				if ((memSpan[(int)i].Configuration & BoidConfiguration) != BoidConfiguration) 
 				{
 					//Console.WriteLine("Transform_Struct.Configuration == " + memSpan[(int)i].Configuration.ToString());
 					return;
 				}
-				
-				//Console.WriteLine("Transform_Struct.Configuration == " + memSpan[(int)i].Configuration.ToString());
 				
 				//EntityNode currentBoid = ; // Boids[(int)i];
 				int currentEntityArrayIndex = memSpan[(int)i].EntityArrayIndex;
@@ -2340,6 +2358,8 @@ namespace HelloBoids
 				
 				// add a List<Tuple> to our mNeighbors Dictionary<> that will hold any adjacents for this current Droid
 		
+				// NOTE: we currently use the entityArrayIndex as key into mNeighbors but the Tuples<> use <int == internalIndex> for referencing the adjacent/neighbor
+				//       We might want to just use the internalIndex for the main mNeighbors dictionary key too.
 				mNeighbors.TryAdd(currentEntityArrayIndex, new List<Tuple<int, double>>(4));
 
 				
@@ -2348,7 +2368,7 @@ namespace HelloBoids
 			   if (i > Boids.Count - 1)
 				   Console.WriteLine("ProcessOpticalScanners() - Out of range 'arrayIndex' == " + currentEntityArrayIndex.ToString() + " but count == " + Boids.Count.ToString());
 
-				mNeighbors[currentEntityArrayIndex] =   GetNeighbors(Boids[arrayIndex], largestDistance, largestDistanceSquared);
+				mNeighbors[currentEntityArrayIndex] =   GetNeighbors(Boids[currentEntityArrayIndex], largestDistance, largestDistanceSquared);
 		#endif
 				
 			
@@ -2518,6 +2538,8 @@ namespace HelloBoids
 				List<Tuple<int, double>>neighbors;
 				bool r = mNeighbors.TryGetValue(currentBoidArrayIndex, out neighbors); 
 				
+				// NOTE: the bool result of TryGetValue() will be false if .TryGetValue() call is not synchronized.
+				//       Checking value and count of neighbors is more reliable.
 				if (neighbors == null || neighbors.Count == 0) return;
                 int nCount = neighbors.Count;
 				
@@ -2801,7 +2823,8 @@ namespace HelloBoids
 			// TRANSFORM STRUCT - NOTE: We do not need to b.AddUserStruct() because the Transform_Struct is added by default by 'class Transform'
 			int transformIndex;
 			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)b.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
-			transform.Span[0].Configuration = BoidConfiguration;
+			transform.Span[0].Configuration = BoidConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
+			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
 			
 			// LIVING ENTITY
 			ComponentStore<LivingEntity> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
@@ -3026,7 +3049,7 @@ namespace HelloBoids
 			// values
 			string exLine = null;
 			//index += (int)EntryClass.NUM_ENTRIES;
-			string entityKey = "sensor_" + arrayIndex.ToString(); // prefix with "sensor_" to not duplicate with "boid_"
+			string entityKey = "sensor_" + arrayIndex.ToString(); // prefix with "sensor_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!
 			EntityNode opticalSensor = null;
 			
 			exLine = "CreateOpticalSensor 1";
@@ -3046,7 +3069,9 @@ namespace HelloBoids
 			{
 				int transformIndex;
 				Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)opticalSensor.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
-				transform.Span[0].Configuration = OpticalSensorConfiguration;
+				transform.Span[0].Configuration = OpticalSensorConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
+				transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
+				
 			}
 			catch (Exception ex)
 			{
@@ -3083,7 +3108,7 @@ namespace HelloBoids
 				storeSensor.Span[sensorInternalIndex].Configuration = OpticalSensorConfiguration;
 				storeSensor.Span[sensorInternalIndex].EntityArrayIndex = arrayIndex;
 				//storeSensor.Span[sensorInternalIndex].InternalComponentIndex = -1; // TODO:  this should be from "Component" struct not sensorInternalIndex;
-				storeSensor.Span[sensorInternalIndex].Range = 100;
+				storeSensor.Span[sensorInternalIndex].RangeSquared = EntryClass.MAX_SEARCH_DISTANCE * EntryClass.MAX_SEARCH_DISTANCE;
 				//storeSensor.Span[sensorInternalIndex].ScanRating = 2000; // <-- this is a computed stat based on TL and Power, that generally ranges from 10 - 40+  (google "gurps vehicles 2nd edition radar scan rating")
 			}
 			catch (Exception ex)
@@ -3867,18 +3892,34 @@ namespace HelloBoids
 		{
 			if (EntryClass.bSim.Boids == null) return null;
 			
-			List<EntityNode> found = new List<EntityNode>();
-			string sensorKeyForThisBoid =  "sensor_" + int.Parse(this.mID.Split("_")[1]).ToString();
-			Console.WriteLine("sensor key == " + sensorKeyForThisBoid);
+			int arrayIndex = this.EntityArrayIndex;
 			
+			//int numPartOfKeyBOID = int.Parse(EntryClass.bSim.Boids[arrayIndex].EntityKey.Split("_")[1]);
+			int numPartOfKeyEYES =  arrayIndex + 1; // int.Parse(EntryClass.bSim.Boids[arrayIndex + 1].EntityKey.Split("_")[1]);
+			
+			string sensorKeyForThisBoid = "sensor_" + numPartOfKeyEYES.ToString();
+
+			System.Diagnostics.Debug.Assert(sensorKeyForThisBoid == EntryClass.bSim.Boids[numPartOfKeyEYES].EntityKey);
+			return new EntityNode[] {EntryClass.bSim.Boids[numPartOfKeyEYES]};
+			
+			// NOTE: the below isn't necessary.  
+			// NOTE: previously when this loop was failing it was because the Key I was searching for "sensor_###" 
+			//       could NEVER possibly exist because the arrayIndex for the associated sensor to a given boid is
+			//       always arrayIndex + 1.  There is a sensor_111 for example, but never a sensor_110 that is just 1 less.
+			//       They always are in increments of 2, same with the boid's indexArrays too.
+			List<EntityNode> found = new List<EntityNode>();
 			for (int i = 0; i < EntryClass.bSim.Boids.Count; i++)
 			{
 				if (EntryClass.bSim.Boids[i] == null) continue; 
+				Console.WriteLine("looping -- sensor key == " + EntryClass.bSim.Boids[i].EntityKey);
 				if (EntryClass.bSim.Boids[i].EntityKey == sensorKeyForThisBoid)
+				{
 					found.Add(EntryClass.bSim.Boids[i]);
+					System.Diagnostics.Debug.Assert (EntryClass.bSim.Boids[i] == EntryClass.bSim.Boids[numPartOfKeyEYES]);
+				}
 			}
 			
-			Console.WriteLine("Sensors found == " + found.Count.ToString());
+			Console.WriteLine("GetSensors() - Call Complete.  # of Sensors found == " + found.Count.ToString());
 			if (found.Count == 0) return null;
 			
 			return found.ToArray();
@@ -6360,7 +6401,7 @@ return (0,0);
 			public float Radius;             
 			public Vector3d Position;
 			public Vector3d Velocity;
-			public double Distance;     // range to target
+			public double DistanceSquared;     // range to target
 			public float Heading;       // NOTE: Bearing is the direction to fly to get somewhere specific see Google AI Overview notes below
 		
 
@@ -7109,7 +7150,7 @@ return (0,0);
 			public bool NoTargeting;
 			public string SearchOption;
 			public bool FTL;   // if FTL, range is in light-seconds
-			public int Range;
+			public double RangeSquared;
 			public int ScanRating;  // <-- this is a computed stat based on TL and Power, that generally ranges from 10 - 40+  (google "gurps vehicles 2nd edition radar scan rating")
 		
 			// types using Radar and Ladar
@@ -7178,7 +7219,7 @@ return (0,0);
         // stats
         public int RoF;
         
-        public float Range;
+        public double RangeSquared;
         public float Accuracy;
 		public int SnapShot;
         //public float Malfunction; // 0.0 - 1.0f coefficient for tendancy to malfunction. MaterialQuality and Craftsmanship have impact

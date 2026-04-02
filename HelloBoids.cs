@@ -739,10 +739,15 @@ namespace HelloBoids
 		private const CONFIGURATION WingsConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing;
 		private const CONFIGURATION LaserConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.Weapon | CONFIGURATION.Laser;
 		private const CONFIGURATION TacticalStationConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.TacticalStation;
-		private const CONFIGURATION BatteryConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerProducer;
+		private const CONFIGURATION BatteryConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerProducing;
 			
 			
 		
+		public const int OPTICAL_SENSOR_OFFSET = 1;
+		public const int WINGS_OFFSET = 2;
+		public const int LASER_OFFSET = 3;
+		public const int TACTICAL_STATION_OFFSET = 4;
+		public const int BATTERY_OFFSET = 5;
 		
 		public struct SkillSystem
 		{
@@ -1146,18 +1151,12 @@ namespace HelloBoids
 				Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> result = Spawn(mTHRandom, i * ENTITIES_PER_DROID, width, height, depth);
 				int arrayIndex = i * ENTITIES_PER_DROID;
                 
-				Boids[arrayIndex] = result.Item1; // NOTE: must use direct assignment after having pre-initialize List<> since List<> is not threadsafe
-				Boids[arrayIndex + 1] = result.Item2;
-				Boids[arrayIndex + 2] = result.Item3;
-				Boids[arrayIndex + 3] = result.Item4;
-				Boids[arrayIndex + 4] = result.Item5;
-				Boids[arrayIndex + 5] = result.Item6;
-				
-				//Console.WriteLine ("Spawn() - Boid           created with EntityKey == " + Boids[arrayIndex].EntityKey);
-				//Console.WriteLine ("Spawn() - Optical Sensor created with EntityKey == " + Boids[arrayIndex + 1].EntityKey);
-				//int numPartOfKeyBOID = int.Parse(Boids[arrayIndex].EntityKey.Split("_")[1]);
-				//int numPartOfKeyEYES = int.Parse(Boids[arrayIndex + 1].EntityKey.Split("_")[1]);
-				//System.Diagnostics.Debug.Assert (numPartOfKeyBOID == numPartOfKeyEYES - 1, "Spawn() - Numeric Part of Keys Match"); 
+				Boids[arrayIndex]                           = result.Item1; // NOTE: must use direct assignment after having pre-initialize List<> since List<> is not threadsafe
+				Boids[arrayIndex + OPTICAL_SENSOR_OFFSET]   = result.Item2;
+				Boids[arrayIndex + WINGS_OFFSET]            = result.Item3;
+				Boids[arrayIndex + LASER_OFFSET]            = result.Item4;
+				Boids[arrayIndex + TACTICAL_STATION_OFFSET] = result.Item5;
+				Boids[arrayIndex + BATTERY_OFFSET]          = result.Item6;
 				
 				//Boids.Add(b); // <-- will not work here as List<> is not threadsafe
 				//Console.WriteLine("i == " + i.ToString()); 
@@ -1615,17 +1614,7 @@ namespace HelloBoids
 				
 				int componentIndex;
 				Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component), out componentIndex);
-				//int livingEntityIndex;
-				//Memory<LivingEntity> stationOperator = (Memory<LivingEntity>) currentBoid.GetUserStruct(typeof(LivingEntity), out livingEntityIndex);
-				int tacticalIndex;
-				Memory<TacticalStation> tacticalStation = (Memory<TacticalStation>) currentBoid.GetUserStruct(typeof(TacticalStation), out tacticalIndex);
-				int wepIndex;
-    		    Memory<Weapon> wep = (Memory<Weapon>) currentBoid.GetUserStruct(typeof(Weapon), out wepIndex);
-				//Memory<Laser_Struct> laser = (Memory<Laser_Struct>)currentBoid.GetUserStruct(typeof(Laser_Struct)); //  Laser_Struct laser = (Laser_Struct)currentBoid.mMemStore_Laser.Span[0];
 				
-				int operatorIndex = currentBoid.EntityArrayIndex; // we pass Index and NOT SpanIndex because we want to find the Boid in the EntryClass.bSim.Boids[] List
-				int stationIndex = currentBoid.EntityArrayIndex;  // for now, our Boid hosts both the TacticalStation and the Operator
-
 				if (!allComponents.Span[componentIndex].CanAct) return;
 				//Console.WriteLine("Do_Droid_Logic() - Component CanAct() == TRUE");		
 				
@@ -1701,7 +1690,24 @@ namespace HelloBoids
 						Boid currentTarget = targets[0];
 						double distanceToTargetSquared = distances[0];
 						
-						if (tacticalStation.Span[0].CanHit(currentTarget))
+						Console.WriteLine("Do_Droid_Logic() - 555");
+						EntityNode[] tsEnt = currentBoid.GetTacticalStations();
+						if (tsEnt == null || tsEnt.Length == 0) return;
+						
+						int stationArrayIndex = tsEnt[0].EntityArrayIndex;  
+						int tacticalIndex;
+						Memory<TacticalStation> tacticalStationStruct = (Memory<TacticalStation>) tsEnt[0].GetUserStruct(typeof(TacticalStation), out tacticalIndex);
+						
+						Console.WriteLine("Do_Droid_Logic() - abc");
+						EntityNode[] weaponEnt = currentBoid.GetWeapons();
+						if (weaponEnt == null || weaponEnt.Length == 0) return;
+						
+						int weaponArrayIndex = weaponEnt[0].EntityArrayIndex;  
+						int weaponInternalIndex = -1;
+						Memory<Weapon> weaponStruct = (Memory<Weapon>) weaponEnt[0].GetUserStruct(typeof(Weapon), out weaponInternalIndex);
+						
+						Console.WriteLine("Do_Droid_Logic() - 777");
+						if (tacticalStationStruct.Span[0].CanHit(currentTarget))
 						{
 							currentBoid.ShotsFired++;
 							
@@ -1714,7 +1720,7 @@ namespace HelloBoids
 							try 
 							{
 								// todo: change parameter currentBoid to tacticalStation?
-								damages = CalculateDamage(currentBoid, wep, currentTarget); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
+								damages = CalculateDamage(currentBoid, weaponStruct, currentTarget); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
 								int dCount = 0;
 								if (damages != null)
 									dCount = damages.Length;
@@ -2858,14 +2864,13 @@ namespace HelloBoids
 			b.AddUserStruct(typeof(Armor), memArmor, checkOutIndex);
 			
 			
-			
 			////////////////////////////////////////////////////////////////////////////////////////////////////
 			// EYES
 			exLine = "Spawn() - CreateOpticalSensors 1";
 			EntityNode eyes = null;
 			try
 			{
-				eyes = CreateOpticalSensor(arrayIndex + 1);
+				eyes = CreateOpticalSensor(arrayIndex + OPTICAL_SENSOR_OFFSET);
 			}
 			catch (Exception ex)
 			{
@@ -2874,18 +2879,17 @@ namespace HelloBoids
 						
 			////////////////////////////////////////////////////////////////////////////////////////////////////
 			// WINGS need power to fly
-			EntityNode wings = CreateWings(arrayIndex  + 2);
+			EntityNode wings = CreateWings(arrayIndex  + WINGS_OFFSET);
 			
 			// ////////////////////////////////////////////////////////////////////////////////////////////////////
 			// Laser
-			EntityNode laser = CreateLaser(arrayIndex + 3);
+			EntityNode laser = CreateLaser(arrayIndex + LASER_OFFSET);
 			
 			
 			////////////////////////////////////////////////////////////////////////////////////////////////////
 			// TACTICAL STATION
-			EntityNode tacticalStation = CreateTacticalStation(arrayIndex + 4);
+			EntityNode tacticalStation = CreateTacticalStation(arrayIndex + TACTICAL_STATION_OFFSET);
 						
-
 			
 
 			// Operator
@@ -2961,10 +2965,9 @@ namespace HelloBoids
 			
 			////////////////////////////////////////////////////////////////////////////////////////////////////
 			// BATTERY to power Eyes, Wings, Laser and TacticalStation
-			EntityNode battery = CreateBattery(arrayIndex + 5);
+			EntityNode battery = CreateBattery(arrayIndex + BATTERY_OFFSET);
 			
-			
-			
+					
 			
 			
 		    if (this.Octree != null)
@@ -3070,11 +3073,11 @@ namespace HelloBoids
 			
 			EntityNode wings = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
 			
-			//CONFIGURATION WingsConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing;
+			//CONFIGURATION WingsConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing; // <- CONFIGURATION.Propulsion
 			
 			// transform struct
 			int transformIndex;
-			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)opticalSensor.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
+			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)wings.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
 			transform.Span[0].Configuration = WingsConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
 			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
 
@@ -3083,7 +3086,7 @@ namespace HelloBoids
 			int compInternalIndex = -1;
 			Memory<Component> memComp = storeComp.CheckOut(out compInternalIndex);
 			wings.AddUserStruct(typeof(Component), memComp, compInternalIndex);
-			storeComp.Span[compInternalIndex].Configuration = OpticalSensorConfiguration;
+			storeComp.Span[compInternalIndex].Configuration = WingsConfiguration;
 			storeComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
 
 			// powerconsumer struct
@@ -3091,8 +3094,8 @@ namespace HelloBoids
 			int powerConsumerInternalIndex = -1;
 			Memory<PowerConsumer> memWings = storeWings.CheckOut(out powerConsumerInternalIndex);
 			wings.AddUserStruct(typeof(PowerConsumer), memWings, powerConsumerInternalIndex);
-			storeWings.Span[compInternalIndex].Configuration = WingsConfiguration;
-			storeWings.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
+			storeWings.Span[powerConsumerInternalIndex].Configuration = WingsConfiguration;
+			storeWings.Span[powerConsumerInternalIndex].EntityArrayIndex = arrayIndex;
 			
 			
 			return wings;
@@ -3110,7 +3113,7 @@ namespace HelloBoids
 			
 			// transform struct
 			int transformIndex;
-			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)opticalSensor.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
+			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)laser.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
 			transform.Span[0].Configuration = LaserConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
 			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
 			
@@ -3119,7 +3122,7 @@ namespace HelloBoids
             int checkOutIndex = -1;
             Memory<Component> memCmp = storeComp.CheckOut(out checkOutIndex);
 			laser.AddUserStruct(typeof(Component), memCmp, checkOutIndex);
-			storeComp.Span[checkOutIndex].Configuration = BoidConfiguration;
+			storeComp.Span[checkOutIndex].Configuration = LaserConfiguration;
 			storeComp.Span[checkOutIndex].EntityArrayIndex = laser.EntityArrayIndex;
 			storeComp.Span[checkOutIndex].Level = 1;
 			//storeComp.Span[checkOutIndex].Quality = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
@@ -3135,7 +3138,8 @@ namespace HelloBoids
 			ComponentStore<Weapon> storeWeapon = EntryClass.mCStoreCol.CheckOut<Weapon>(EntryClass.NUM_ENTRIES);
             checkOutIndex = -1;
             Memory<Weapon> memWep = storeWeapon.CheckOut(out checkOutIndex);
-			laser.AddUserStruct(typeof(Weapon), memWep, checkOutIndex);		
+			laser.AddUserStruct(typeof(Weapon), memWep, checkOutIndex);	
+			storeWeapon.Span[checkOutIndex].Configuration = LaserConfiguration;
 			storeWeapon.Span[checkOutIndex].Reliable = true;
 			storeWeapon.Span[checkOutIndex].Compact = true;
 			storeWeapon.Span[checkOutIndex].Accuracy = 10;
@@ -3178,6 +3182,7 @@ namespace HelloBoids
             checkOutIndex = -1;
             Memory<Laser_Struct>memLaser = storeLasers.CheckOut(out checkOutIndex);
             laser.AddUserStruct(typeof(Laser_Struct), memLaser, checkOutIndex);
+			storeLasers.Span[checkOutIndex].Configuration = LaserConfiguration;
 			storeLasers.Span[checkOutIndex].Type = 1;     
 			storeLasers.Span[checkOutIndex].EnergyDrill = false;
 			storeLasers.Span[checkOutIndex].FTL = true;
@@ -3199,7 +3204,7 @@ namespace HelloBoids
 
 			// transform struct
 			int transformIndex;
-			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)opticalSensor.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
+			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)station.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
 			transform.Span[0].Configuration = TacticalStationConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
 			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
 
@@ -3212,12 +3217,12 @@ namespace HelloBoids
 			storeComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
 
 			// powerconsumer struct
-			ComponentStore<PowerConsumer> storeWings = EntryClass.mCStoreCol.CheckOut<PowerConsumer>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+			ComponentStore<PowerConsumer> storePowerConsumer = EntryClass.mCStoreCol.CheckOut<PowerConsumer>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
 			int powerConsumerInternalIndex = -1;
-			Memory<PowerConsumer> memWings = storeWings.CheckOut(out powerConsumerInternalIndex);
+			Memory<PowerConsumer> memWings = storePowerConsumer.CheckOut(out powerConsumerInternalIndex);
 			station.AddUserStruct(typeof(PowerConsumer), memWings, powerConsumerInternalIndex);
-			storeWings.Span[compInternalIndex].Configuration = TacticalStationConfiguration;
-			storeWings.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
+			storePowerConsumer.Span[powerConsumerInternalIndex].Configuration = TacticalStationConfiguration;
+			storePowerConsumer.Span[powerConsumerInternalIndex].EntityArrayIndex = arrayIndex;
 			
 			// tactical station
 			ComponentStore<TacticalStation> storeTacticalStation = EntryClass.mCStoreCol.CheckOut<TacticalStation>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
@@ -3250,7 +3255,7 @@ namespace HelloBoids
 			
 			// transform struct
 			int transformIndex;
-			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)opticalSensor.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
+			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)battery.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
 			transform.Span[0].Configuration = BatteryConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
 			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
 
@@ -3261,34 +3266,29 @@ namespace HelloBoids
 			battery.AddUserStruct(typeof(Component), memComp, compInternalIndex);
 			storeComp.Span[compInternalIndex].Configuration = BatteryConfiguration;
 			storeComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
-			//ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-            //int checkOutIndex = -1;
-            //Memory<Component> memCmp = storeComp.CheckOut(out checkOutIndex);
-			battery.AddUserStruct(typeof(Component), memCmp, checkOutIndex);
 
-			storeComp.Span[checkOutIndex].Configuration = BatteryConfiguration;
-			storeComp.Span[checkOutIndex].EntityArrayIndex = battery.EntityArrayIndex;
-			storeComp.Span[checkOutIndex].Level = 1;
-			//storeComp.Span[checkOutIndex].Quality = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
-			storeComp.Span[checkOutIndex].Ruggedized = true;
-			//storeComp.Span[checkOutIndex].HitPoints = 100;
-			//storeComp.Span[checkOutIndex].DR = 20;  // todo: if we use complex armor, is DR (damage resistance) used?
-			//storeComp.Span[checkOutIndex].Cost = 10d;
-			//storeComp.Span[checkOutIndex].Weight = 2.5d;
-			//storeComp.Span[checkOutIndex].SurfaceArea = 1d;
-			//storeComp.Span[checkOutIndex].Volume = 0.2d;
+			storeComp.Span[compInternalIndex].Configuration = BatteryConfiguration;
+			storeComp.Span[compInternalIndex].EntityArrayIndex = battery.EntityArrayIndex;
+			storeComp.Span[compInternalIndex].Level = 1;
+			//storeComp.Span[compInternalIndex].Quality = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
+			storeComp.Span[compInternalIndex].Ruggedized = true;
+			//storeComp.Span[compInternalIndex].HitPoints = 100;
+			//storeComp.Span[compInternalIndex].DR = 20;  // todo: if we use complex armor, is DR (damage resistance) used?
+			//storeComp.Span[compInternalIndex].Cost = 10d;
+			//storeComp.Span[compInternalIndex].Weight = 2.5d;
+			//storeComp.Span[compInternalIndex].SurfaceArea = 1d;
+			//storeComp.Span[compInternalIndex].Volume = 0.2d;
 
 			
 			
-			// powerconsumer struct
-			ComponentStore<PowerConsumer> storePowerProducers = EntryClass.mCStoreCol.CheckOut<PowerConsumer>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-			int powerConsumerInternalIndex = -1;
-			Memory<PowerConsumer> memWings = storePowerProducers.CheckOut(out powerConsumerInternalIndex);
-			battery.AddUserStruct(typeof(PowerConsumer), memWings, powerConsumerInternalIndex);
-			storePowerProducers.Span[compInternalIndex].Configuration = BatteryConfiguration;
-			storePowerProducers.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
-			
-			
+			// powerProducer struct
+			ComponentStore<PowerProducer> storePowerProducers = EntryClass.mCStoreCol.CheckOut<PowerProducer>(EntryClass.NUM_ENTRIES); 
+			int powerProducerInternalIndex = -1;
+			Memory<PowerProducer> memPowerProducer = storePowerProducers.CheckOut(out powerProducerInternalIndex);
+			battery.AddUserStruct(typeof(PowerProducer), memPowerProducer, powerProducerInternalIndex);
+			storePowerProducers.Span[powerProducerInternalIndex].Configuration = BatteryConfiguration;
+			storePowerProducers.Span[powerProducerInternalIndex].EntityArrayIndex = arrayIndex;
+					
 						
 			return battery;
 		}
@@ -3996,12 +3996,10 @@ namespace HelloBoids
         private const double BOID_WIDTH = 2.0d;
         public uint ShotsFired = 0; // todo: belongs in TacticalStation 
 		
-		
 		public Dictionary<SKILLS, Skill> TacticalStationSkills;
 		public Dictionary<SKILLS, Skill> OperatorSkills;
 		
 
-		
         public Boid(string entityID, int index, double x, double y, double z,  double xV, double yV)
             : base(entityID, index, x, y, z, xV, yV)
         {
@@ -4022,7 +4020,6 @@ namespace HelloBoids
 				
 			OperatorSkills = new Dictionary<SKILLS, Skill>();
 			TacticalStationSkills = new Dictionary<SKILLS, Skill>();
-				
         }
 		
 		
@@ -4037,7 +4034,7 @@ namespace HelloBoids
 			int arrayIndex = this.EntityArrayIndex;
 			
 			//int numPartOfKeyBOID = int.Parse(EntryClass.bSim.Boids[arrayIndex].EntityKey.Split("_")[1]);
-			int numPartOfKeyEYES =  arrayIndex + 1; // int.Parse(EntryClass.bSim.Boids[arrayIndex + 1].EntityKey.Split("_")[1]);
+			int numPartOfKeyEYES =  arrayIndex + BoidSimulation.OPTICAL_SENSOR_OFFSET; // int.Parse(EntryClass.bSim.Boids[arrayIndex + 1].EntityKey.Split("_")[1]);
 			
 			string sensorKeyForThisBoid = "sensor_" + numPartOfKeyEYES.ToString();
 
@@ -4067,6 +4064,53 @@ namespace HelloBoids
 			return found.ToArray();
 		}
 		
+		public EntityNode[] GetWeapons()
+		{
+			if (EntryClass.bSim.Boids == null) return null;
+			
+			int arrayIndex = this.EntityArrayIndex;
+			
+			int numPartOfKey =  arrayIndex + BoidSimulation.LASER_OFFSET; 
+			string keyForThisBoid = "laser_" + numPartOfKey.ToString();
+
+			System.Diagnostics.Debug.Assert(keyForThisBoid == EntryClass.bSim.Boids[numPartOfKey].EntityKey);
+			return new EntityNode[] {EntryClass.bSim.Boids[numPartOfKey]};
+		}
+		
+		public EntityNode[] GetTacticalStations()
+		{
+			if (EntryClass.bSim.Boids == null) return null;
+			
+			int arrayIndex = this.EntityArrayIndex;
+			
+			int numPartOfKey =  arrayIndex + BoidSimulation.TACTICAL_STATION_OFFSET; 
+			string keyForThisBoid = "tacticalstation_" + numPartOfKey.ToString();
+
+			System.Diagnostics.Debug.Assert(keyForThisBoid == EntryClass.bSim.Boids[numPartOfKey].EntityKey);
+			return new EntityNode[] {EntryClass.bSim.Boids[numPartOfKey]};
+			
+			// NOTE: the below isn't necessary.  
+			// NOTE: previously when this loop was failing it was because the Key I was searching for "sensor_###" 
+			//       could NEVER possibly exist because the arrayIndex for the associated sensor to a given boid is
+			//       always arrayIndex + 1.  There is a sensor_111 for example, but never a sensor_110 that is just 1 less.
+			//       They always are in increments of 2, same with the boid's indexArrays too.
+			List<EntityNode> found = new List<EntityNode>();
+			for (int i = 0; i < EntryClass.bSim.Boids.Count; i++)
+			{
+				if (EntryClass.bSim.Boids[i] == null) continue; 
+				Console.WriteLine("looping -- tactical station key == " + EntryClass.bSim.Boids[i].EntityKey);
+				if (EntryClass.bSim.Boids[i].EntityKey == keyForThisBoid)
+				{
+					found.Add(EntryClass.bSim.Boids[i]);
+					System.Diagnostics.Debug.Assert (EntryClass.bSim.Boids[i] == EntryClass.bSim.Boids[numPartOfKey]);
+				}
+			}
+			
+			Console.WriteLine("GetTacticalStations() - Call Complete.  # of Tactical Stations found == " + found.Count.ToString());
+			if (found.Count == 0) return null;
+			
+			return found.ToArray();
+		}
 		
 		private List<Target> mTargets;
 		public List<Target> GetTargets()
@@ -6703,11 +6747,15 @@ return (0,0);
 			// Useable
 			Sensor         = 1 << 9,     // 
 			Station        = 1 << 10,     // a type of Component that allows commands to be issued to various Crew and Components
-			PowerProducer  = 1 << 11,
-			PowerUsing     = 1 << 12,
-			FuelGenerator  = 1 << 13,
-			FuelUsing      = 1 << 14,
-			Weapon         = 1 << 15
+			HelmStation    = 1 << 11,
+			TacticalStation  = 1 << 12,
+			EngineeringStation = 1 << 13,
+			PowerProducing  = 1 << 14,
+			PowerUsing     = 1 << 15,
+			FuelGenerator  = 1 << 16,
+			FuelUsing      = 1 << 17,
+			Weapon         = 1 << 18,
+			Laser          = 1 << 19
 	}
 	
 	

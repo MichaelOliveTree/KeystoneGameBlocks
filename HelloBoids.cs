@@ -1565,12 +1565,12 @@ namespace HelloBoids
              //    - storing data on interior Walls and Floors and Ceilings "damage"
 
 
-        	Console.WriteLine("Do_Droid_Logic() - DoDeviceReadyStatus()");
+        	//Console.WriteLine("Do_Droid_Logic() - DoDeviceReadyStatus()");
 			DoDeviceReadyStatus();
 			
 			
 			
-			Console.WriteLine("Do_Droid_Logic() - DoStationCanActStatus()");
+			//Console.WriteLine("Do_Droid_Logic() - DoStationCanActStatus()");
 			DoStationCanActStatus();
 			//Console.WriteLine("Do_Droid_Logic() - continuing Do_Droid_Logic()");
 			
@@ -1580,31 +1580,31 @@ namespace HelloBoids
 			
 			
 			
-			Console.WriteLine("Do_Droid_Logic() - DoContactListSorting()");
+			//Console.WriteLine("Do_Droid_Logic() - DoContactListSorting()");
 			DoContactListSorting(); // based on policies
 			
 			
 			
-			Console.WriteLine("Do_Droid_Logic() - DoTargetPrioritization()");
+			//Console.WriteLine("Do_Droid_Logic() - DoTargetPrioritization()");
 			DoTargetPrioritization();
 			
 			
 			// todo: if we had a list of all weapons for every ship to pass all at once
 			//       as well as all targets for each ship to pass all at once, we could run this
 			//       processor in a single call from here...
-			Console.WriteLine("Do_Droid_Logic() - DoWeaponFitnessScores()");
+			//Console.WriteLine("Do_Droid_Logic() - DoWeaponFitnessScores()");
 			DoWeaponFitnessScores(null, null);
 			
 			
 			
-			Console.WriteLine("Do_Droid_Logic() - DoWeaponsCanFire()");
+			//Console.WriteLine("Do_Droid_Logic() - DoWeaponsCanFire()");
 			DoWeaponsCanFire();
 			
 			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 						
-			Console.WriteLine("Do_Droid_Logic() - preparing for loop()");
+			//Console.WriteLine("Do_Droid_Logic() - preparing for loop()");
 			int recordCount = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, recordCount, i => 				
 			//for (int i = 0; i < Boids.Count; i++)
@@ -1686,7 +1686,7 @@ namespace HelloBoids
 						// continue; // NOTE: for regular for() loop we use "continue"
 
 					targets = tmp.OfType<Boid>().ToList();
-					Console.WriteLine("Do_Droid_Logic() - Droid @ Array Index '" + currentArrayIndex.ToString() + "' Found " + targets.Count.ToString() + " targets.");
+					//Console.WriteLine("Do_Droid_Logic() - Droid @ Array Index '" + currentArrayIndex.ToString() + "' Found " + targets.Count.ToString() + " targets.");
 					
 					try
 					{
@@ -1698,7 +1698,7 @@ namespace HelloBoids
 						{
 							currentBoid.ShotsFired++;
 							
-							Console.WriteLine("Do_Droid_Logic() - Droid @ Array Index '" + currentArrayIndex.ToString() + "' firing shot # " + currentBoid.ShotsFired.ToString() + " on Droid @ Array Index '" + currentTarget.EntityArrayIndex.ToString() + "'");
+							//Console.WriteLine("Do_Droid_Logic() - Droid @ Array Index '" + currentArrayIndex.ToString() + "' firing shot # " + currentBoid.ShotsFired.ToString() + " on Droid @ Array Index '" + currentTarget.EntityArrayIndex.ToString() + "'");
 
 							// NOTE: here we assume the Fire() occurs immediately using a lightspeed laser and the damage is instantaneous 
 							//       and does not need any travel time to reach the currentTarget
@@ -1712,7 +1712,7 @@ namespace HelloBoids
 								if (damages != null)
 									dCount = damages.Length;
 								
-								Console.WriteLine("Do_Droid_Logic() - Damages Produced = " + dCount.ToString());
+								//Console.WriteLine("Do_Droid_Logic() - Damages Produced = " + dCount.ToString());
 
 							}
 							catch(Exception ex)
@@ -1837,6 +1837,7 @@ namespace HelloBoids
 		private void DoContactListSorting()
 		{
 			if (mNeighbors.Count == 0) return;
+			Console.WriteLine("DoContactListSorting() - STARTING");
 			
 			ComponentStore<Transform.Transform_Struct> allTransforms  = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
 			int recordCount = (int)allTransforms.Count;
@@ -1845,19 +1846,23 @@ namespace HelloBoids
 			
             System.Threading.Tasks.Parallel.For(0, recordCount, i => 		
 			{
-				// TODO: problem with this Configuration test is, we want to test for this configuration and ONLY this configuration
-				//       and not another Configuration such as HumanOperatorConfiguration which is BoidConfiguration | Sentient added to it so 
-				//       it WILL pass this test and be incorrec.t
-				if ((allTransforms.Span[(int)i].Configuration & BoidConfiguration) != BoidConfiguration)
+				// NOTE: problem with the BOOLEAN version of this Configuration test is, we want to test for Boid configuration and ONLY Boid configuration
+				//       and not another Configuration such as HumanOperatorConfiguration which CONTAINS all of BoidConfiguration  but LOGICALLY OR's "|" CONFIGURATION.Sentient as well 
+				//       and so it WILL pass the BOOLEAN version of this test.  Thus solution is a DIRECT == compare.  Duh!
+				if (allTransforms.Span[(int)i].Configuration != BoidConfiguration)
+				//if ((allTransforms.Span[(int)i].Configuration & BoidConfiguration) != BoidConfiguration)
 				{
-					Console.WriteLine("configuration = " + allTransforms.Span[(int)i].Configuration.ToString());
+					//Console.WriteLine("configuration = " + allTransforms.Span[(int)i].Configuration.ToString());
 					return;
 				}				
 				int currentArrayIndex = allTransforms.Span[(int)i].EntityArrayIndex; // current.EntityArrayIndex; //  current.GetUserStructIndex(typeof(Transform.Transform_Struct));
 				//System.Diagnostics.Debug.Assert( (int)i == currentArrayIndex, "DoContactListSorting() - array index does not match...");
 				// the adjacnets that are stored in neighbors from the overall mNeighbors is very much stores Area of Interest for each Droid
 				// but we will only send them things that their sensors can detect (and "eyes" are treated as optical sensors)
-				Console.WriteLine ("DoContactListSorting() - Key for current == " + Boids[currentArrayIndex].EntityKey);
+				//Console.WriteLine ("DoContactListSorting() - Key for current == " + Boids[currentArrayIndex].EntityKey);
+				
+				// TODO: Should we be iterating over the 'TacticalStation' struct's and NOT the Boids array? and then getting the SensorContacts from it?
+				//       we could skip any TacticalStation that is not designated as PRIMARY TacticalStation
 				
 				Boid currentBoid = (Boid)Boids[currentArrayIndex]; // <-- if we can get the Sensors without having to get the current Boid... hmm...
 				EntityNode[] sensorEntities = currentBoid.GetSensors(); // todo: we currently do  not have EntityNode allowing adding of child nodes.  This is needed next.
@@ -1909,7 +1914,7 @@ namespace HelloBoids
 								else
 									c.SensorsIndices.Append(k);
 
-								Console.WriteLine("DoContactListSorting() - Appending SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
+								//Console.WriteLine("DoContactListSorting() - Appending SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
 							}
 							else // contact does not already exist
 							{
@@ -1961,7 +1966,8 @@ namespace HelloBoids
 				// proper SensorContact histories for all detected Entities.
 				currentBoid.Add(contacts); 
 			});
-			//Console.WriteLine("DoContactListSorting() - Completed Sequence.");
+			
+			Console.WriteLine("DoContactListSorting() - COMPLETED.");
 		}
 		
 		/// <summary>
@@ -2065,6 +2071,9 @@ namespace HelloBoids
 			//Console.WriteLine("End target prioritization...");
 		}
 		
+		/// <summary>
+		/// A callback function for a Rule 'Condition' to find the LeftOperand
+		/// </summary>
 		private string IsCombatant(object[] args)
 		{
 			// todo: we need both the key of the tacticalstation (currently just the current Droid)
@@ -2251,7 +2260,7 @@ namespace HelloBoids
 			// TODO: until both paths use DoLifeCycle(), this will throw off deterministism for Memory<T> path
     		return;
     
-			Span<LivingEntity> memSpan = store.Span;
+			Span<LivingEntity> livingEntitySpan = store.Span;
 	
 			int recordCount = (int)store.Count;
 			
@@ -2263,7 +2272,7 @@ namespace HelloBoids
             for (int i = 0; i < recordCount; i++)
 			{
 				// NOTE: this timerID is taken from the LivingEntity struct's spanIndex
-				int index = memSpan[i].EntityArrayIndex;
+				int index = livingEntitySpan[i].EntityArrayIndex;
 				string entityKey = Boids[index].EntityKey; 
 				
 				bool spawnReady = mIntervalTimers.IsReady(entityKey, "droid_spawn");
@@ -2277,8 +2286,8 @@ namespace HelloBoids
 				//       an Entity that is enabled
 				// todo: i think this needs to use a GameTime not a Tick() because if the simulation pauses
 				//       this result wont be a correct value
-				long age = gt.Ticks - memSpan[i].CreationDateTime;// Utils.GetAge(memSpan[i].CreationDateTime);
-				memSpan[i].Age = age;
+				long age = gt.Ticks - livingEntitySpan[i].CreationDateTime;// Utils.GetAge(memSpan[i].CreationDateTime);
+				livingEntitySpan[i].Age = age;
 				if (age >= maxAge)
 				{
 					// TODO: there is a bug here in CheckIn and Destroy()... we are not managing the entity.Index and entity.SpanIndex properly
@@ -2300,7 +2309,7 @@ namespace HelloBoids
 			{
 				// todo: i think we need to check to see if this record is for
 				//       an Entity that is enabled
-				double age = gt.TotalElapsedSeconds - memSpan[i].CreationDateTime;
+				double age = gt.TotalElapsedSeconds - livingEntitySpan[i].CreationDateTime;
 				Spawn(this.mTHRandom, i, width, height, depth);
 			}
         }
@@ -2358,17 +2367,21 @@ namespace HelloBoids
             {
 				// NOTE: inside of the Parallel.For(), Span<T> cannot be passed in
 				//      because the code inside the Paralle.For() is treated as a Lambda
-				Span<Transform.Transform_Struct> memSpan = transformStructStore.Span;
+				Span<Transform.Transform_Struct> allTransforms = transformStructStore.Span;
 
-				// NOTE: we iterate through those the Boid's (Enitites.Configuraton == BoidConfiguration) because we are interested in THEIR location  not those of the Sensors carried by each one.
-				if ((memSpan[(int)i].Configuration & BoidConfiguration) != BoidConfiguration) 
+				// NOTE: we iterate through Boid's ONLY (Enitites.Configuraton == BoidConfiguration) because we are interested in THEIR location not those of any other Entity configurations.
+				// NOTE: problem with the BOOLEAN version of this Configuration test is, we want to test for Boid configuration and ONLY Boid configuration
+				//       and not another Configuration such as HumanOperatorConfiguration which CONTAINS all of BoidConfiguration  but LOGICALLY OR's "|" CONFIGURATION.Sentient as well 
+				//       and so it WILL pass the BOOLEAN version of this test.  Thus solution is a DIRECT == compare.  Duh!
+				if (allTransforms[(int)i].Configuration != BoidConfiguration)
+				//if ((allTransforms[(int)i].Configuration & BoidConfiguration) != BoidConfiguration) 
 				{
 					//Console.WriteLine("Transform_Struct.Configuration == " + memSpan[(int)i].Configuration.ToString());
 					return;
 				}
 				
 				//EntityNode currentBoid = ; // Boids[(int)i];
-				int currentEntityArrayIndex = memSpan[(int)i].EntityArrayIndex;
+				int currentEntityArrayIndex = allTransforms[(int)i].EntityArrayIndex;
 				
 				//int currentInternalTransformIndex = memSpan[i].InternalTransformIndex; // currentBoid.GetUserStructIndex(typeof(Transform.Transform_Struct));
 				//System.Diagnostics.Debug.Assert (i == currentInternalTransformIndex, "ProcessOpticalSensors() - These indices should match now but wont once we destroy/spawn new Droids. ");
@@ -2415,7 +2428,7 @@ namespace HelloBoids
 				{
 					BoundingBox searchArea;
 					//using (EntryClass.CodeProfiler.HookUp("GetSearchArea"))
-                    	searchArea = new BoundingBox(memSpan[(int)i].Translation, searchRadius);
+                    	searchArea = new BoundingBox(allTransforms[(int)i].Translation, searchRadius);
 					//BoundingBox searchArea = new BoundingBox(currentBoidTranslation, radius);
 			//		System.Console.WriteLine("Translation MEMORY<T> = " + memSpan[i].Translation.ToString());
                     
@@ -2443,13 +2456,13 @@ namespace HelloBoids
 									if (Boids[currentEntityArrayIndex] == potentialNeighbor) continue;
 									
 									int potentialInternalTransformIndex = potentialNeighbor.GetUserStructIndex(typeof(Transform.Transform_Struct));
-									int potentialArrayIndex = memSpan[potentialInternalTransformIndex].EntityArrayIndex;
+									int potentialArrayIndex = allTransforms[potentialInternalTransformIndex].EntityArrayIndex;
 									
 									if (currentOctant.MaxRadius * 2d <= largestDistance)
 									{
 										double distanceToNeighboringBoidSquared;
 										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
-										distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[potentialInternalTransformIndex].Translation, memSpan[(int)i].Translation);
+										distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(allTransforms[potentialInternalTransformIndex].Translation, allTransforms[(int)i].Translation);
 										
 							 			mNeighbors[currentEntityArrayIndex].Add(new Tuple<int, double> (potentialInternalTransformIndex, distanceToNeighboringBoidSquared));
                          			}   
@@ -2463,8 +2476,8 @@ namespace HelloBoids
 										double distanceToNeighboringBoidSquared;
 										// TODO: if i stored the SpanIndex in the Octree instead of the EntityNode perhaps that would help?
 										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
-											distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[potentialInternalTransformIndex].Translation, memSpan[(int)i].Translation);
-											//distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(memSpan[potentialNeighbor.SpanIndex].Translation, currentBoidTranslation);
+											distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(allTransforms[potentialInternalTransformIndex].Translation, allTransforms[(int)i].Translation);
+											//distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(allTransforms[potentialNeighbor.SpanIndex].Translation, currentBoidTranslation);
 
 										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
 										//   distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(currentOctant.EntityNodes[j].Translation, currentBoid.Translation);

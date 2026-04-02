@@ -34,121 +34,122 @@ using System.IO;
 
 
 
-			// @LT Gaming
-			// @ObsidianAnt
-			// @EnterElysium
-			// 
-			// The Art of Moebius (French artist with amazing scifi landscapes
-			// re: proc-gen of Moons in Elite Dangerous, "the composition of the regolith and atmosphere tends to match that of the host planet they orbit, just as our moon is similar to Earth)
+// @LT Gaming
+// @ObsidianAnt
+// @EnterElysium
+// 
+// The Art of Moebius (French artist with amazing scifi landscapes
+// re: proc-gen of Moons in Elite Dangerous, "the composition of the regolith and atmosphere tends to match that of the host planet they orbit, just as our moon is similar to Earth)
 
-			// "Starship EVO"           <-- like the simple geometry, materials with no textures
-			// "Fallen Frontier"
-			// "C-Beams"
-			// "D.O.R.F RTS"
-			// "SAD:Frontier"           <-- newtonian
-			// "Children of Dead Earth" <-- newtonian + n-body gravitation, ship building, space combat
-			
+// "Starship EVO"           <-- like the simple geometry, materials with no textures
+// "Fallen Frontier"
+// "C-Beams"
+// "D.O.R.F RTS"
+// "SAD:Frontier"           <-- newtonian
+// "Children of Dead Earth" <-- newtonian + n-body gravitation, ship building, space combat
 
-			// NOTES: On Indices and GUIDS
-			//   
-			//       that also contained UserTypeID
-			//       Actually, we can store the UserInterfaceStruct flags in a uint bitflag, we just
-			//       use that to determine  if we should call GetUserStruct<> for the various structs.
-			//       Enum.HasFlag() used to be slow in older versions of .net, but direct bitwise
-			//       operations has always been very fast so we should use them so we know whether
-			//       a specific type of user struct exists before calling GetUseStruct(type);
 
-			// Entity.mUserTypeID is required. mUserTypeID does NOT belong in Component or LivingEntity
-			// 
-			// KGB DOES need a GUID primarily because of saved prefabs that can be created by and shared amongst all players.
-			// 
-			// TODO: the problem with KGB is GUID needs to be kept in the saved XML, but index refers to where its
-			//       stored in these ComponentStore<T>   so what do we do here?  I dont think we can guarantee
-			//       the order of Entities within these arrays across server and clients.  These
-			//       structs must always be local machine ONLY.  
+// NOTES: On Indices and GUIDS
+//   
+//       that also contained UserTypeID
+//       Actually, we can store the UserInterfaceStruct flags in a uint bitflag, we just
+//       use that to determine  if we should call GetUserStruct<> for the various structs.
+//       Enum.HasFlag() used to be slow in older versions of .net, but direct bitwise
+//       operations has always been very fast so we should use them so we know whether
+//       a specific type of user struct exists before calling GetUseStruct(type);
 
-			// A HASH of EntityIDs could yeild an Integer that we can use for sorting them within a List<>
-			// This then needs to constantly update whenever Entities are Added/Removed from the Scene...
-			// Also for MMO, this needs to be managed for each "ZONE" 
-			// https://discussions.unity.com/t/staticentityidrange-for-simple-fast-scene-loading-and-external-entity-refs/725631/7
+// Entity.mUserTypeID is required. mUserTypeID does NOT belong in Component or LivingEntity
+// 
+// KGB DOES need a GUID primarily because of saved prefabs that can be created by and shared amongst all players.
+// 
+// TODO: the problem with KGB is GUID needs to be kept in the saved XML, but index refers to where its
+//       stored in these ComponentStore<T>   so what do we do here?  I dont think we can guarantee
+//       the order of Entities within these arrays across server and clients.  These
+//       structs must always be local machine ONLY.  
 
-			// if we use an unsigned long for our entity IDs that gives us 18446744073709551615 
-			// if we allow up to max uint for number of Entities in a given game that is 4,294,967,295
-			// that allows for 4,294,967,295 unique games containing 4,294,967,295 unique Entities.
-			// or more games if the max number of Entities in any is less.
-			// For reference, Counterstrike is said to have total number of matches in the TENS of BILLIONS
-			// since 1999 to 2026
-			// BUT THERE IS A MAJOR PROBLEM WITH THESE ENTITY RANGES FOR A GAME LIKE SCIFICOMMAND where 
-			// anyone can create prefabs.... they would always need to grab an unique INT from a SERVER
-			// to ensure uniqueness across the prefabs of all other creators, including those assets made for the official released version of ScifiCommand.
-			// So, GUID is  better...  
-			// We probably must HASH the GUID and use that as a way to sort Entities in our List<EntityNode>
+// A HASH of EntityIDs could yeild an Integer that we can use for sorting them within a List<>
+// This then needs to constantly update whenever Entities are Added/Removed from the Scene...
+// Also for MMO, this needs to be managed for each "ZONE" 
+// https://discussions.unity.com/t/staticentityidrange-for-simple-fast-scene-loading-and-external-entity-refs/725631/7
 
-					
-	    	//
-			// // https://erikmcclure.com/blog/multithreading-problems-in-game-design/
-			/*
-			Updating game entities in parallel while maintaining determinism requires strict control over update ordering and data access, typically achieved using an Entity-Component-System (ECS) architecture with a job system or double-buffering. Determinism ensures that given the same initial state and inputs, the simulation produces identical results every time, regardless of the machine or number of CPU cores used.Reddit
-			ReddiHere are the key approaches to achieve parallel, deterministic updates:
+// if we use an unsigned long for our entity IDs that gives us 18446744073709551615 
+// if we allow up to max uint for number of Entities in a given game that is 4,294,967,295
+// that allows for 4,294,967,295 unique games containing 4,294,967,295 unique Entities.
+// or more games if the max number of Entities in any is less.
+// For reference, Counterstrike is said to have total number of matches in the TENS of BILLIONS
+// since 1999 to 2026
+// BUT THERE IS A MAJOR PROBLEM WITH THESE ENTITY RANGES FOR A GAME LIKE SCIFICOMMAND where 
+// anyone can create prefabs.... they would always need to grab an unique INT from a SERVER
+// to ensure uniqueness across the prefabs of all other creators, including those assets made for the official released version of ScifiCommand.
+// So, GUID is  better...  
+// We probably must HASH the GUID and use that as a way to sort Entities in our List<EntityNode>
 
-			1. Structured Parallel ECS (Job System)
-			Modern ECS frameworks (like Unity DOTS) allow running systems in parallel while maintaining order through dependency tracking. 
 
-			System Dependencies: Use [UpdateBefore] and [UpdateAfter] attributes to define a strict order of execution for systems.
-			Job Scheduling: Use ScheduleParallel() for systems that do not conflict, which automatically splits work across cores while maintaining deterministic ordering of data processing.
-			Avoid Non-Determinism: Do not use Run() in a way that allows arbitrary thread scheduling. Ensure that if systems depend on each other, they are synchronized using Dependency.Complete(). 
+//
+// // https://erikmcclure.com/blog/multithreading-problems-in-game-design/
 
-			2. Double-Buffering (Read-Only Input, Write-Only Output)
-			To avoid race conditions, systems should read from the current state and write changes to a "next state" buffer. 
+	/*
+	Updating game entities in parallel while maintaining determinism requires strict control over update ordering and data access, typically achieved using an Entity-Component-System (ECS) architecture with a job system or double-buffering. Determinism ensures that given the same initial state and inputs, the simulation produces identical results every time, regardless of the machine or number of CPU cores used.Reddit
+	ReddiHere are the key approaches to achieve parallel, deterministic updates:
 
-			Process: Par	allelize reading entity data (Component A, B) to calculate results.
-			Deferred Mutation: Write new component data (Component C) to a separate buffer.
-			Swap: After all systems finish, swap the read and write buffers.
-			Result: All entities update based on the same snapshot of the previous frame, eliminating dependency on thread execution order. 
+	1. Structured Parallel ECS (Job System)
+	Modern ECS frameworks (like Unity DOTS) allow running systems in parallel while maintaining order through dependency tracking. 
 
-			3. Deterministic Ordering and Sorting
-			If entities are updated in parallel, the order of modification must not matter, or it must be explicitly enforced. 
+	System Dependencies: Use [UpdateBefore] and [UpdateAfter] attributes to define a strict order of execution for systems.
+	Job Scheduling: Use ScheduleParallel() for systems that do not conflict, which automatically splits work across cores while maintaining deterministic ordering of data processing.
+	Avoid Non-Determinism: Do not use Run() in a way that allows arbitrary thread scheduling. Ensure that if systems depend on each other, they are synchronized using Dependency.Complete(). 
 
-			Sort Entities: If the outcome depends on which entity updates first, sort entities by a fixed ID before processing.
-			Avoid Hash Maps: Avoid data structures where iteration order changes, as this can break determinism between different machine architectures. 
+	2. Double-Buffering (Read-Only Input, Write-Only Output)
+	To avoid race conditions, systems should read from the current state and write changes to a "next state" buffer. 
 
-			4. Deterministic Simulation Techniques
-			Fixed Timestep: Run the simulation logic on a fixed cadence (FixedUpdate in Unity, for example), separate from the rendering framerate.
-				Floating Point Constraints: Ensure that floating-point calculations are identical across platforms (e.g., using fixed point math or forcing strict IEEE 754 compliance).
-			Deterministic RNG: Use a seeded random number generator. Ensure it is called in the same order every frame. 
+	Process: Par	allelize reading entity data (Component A, B) to calculate results.
+	Deferred Mutation: Write new component data (Component C) to a separate buffer.
+	Swap: After all systems finish, swap the read and write buffers.
+	Result: All entities update based on the same snapshot of the previous frame, eliminating dependency on thread execution order. 
 
-			Key Considerations for Parallelism
-			Data Layout: Use contiguous memory (Arrays/NativeContainers) for component data to allow parallel access without locking.
-			Job System Hazards: Ensure that parallel jobs do not write to the same memory location. Use NativeParallelHashMap or NativeArray with strict index management to ensure safe parallel writes. 
-			*/
+	3. Deterministic Ordering and Sorting
+	If entities are updated in parallel, the order of modification must not matter, or it must be explicitly enforced. 
 
-            // By the way, this is what Media Molecule does in Dreams. The Trackmania racing games do this as well, to verify runs and make sure people aren’t cheating. Even their 3d physics engine is fully deterministic! very cool stuff.
+	Sort Entities: If the outcome depends on which entity updates first, sort entities by a fixed ID before processing.
+	Avoid Hash Maps: Avoid data structures where iteration order changes, as this can break determinism between different machine architectures. 
 
-            //	Notes:
+	4. Deterministic Simulation Techniques
+	Fixed Timestep: Run the simulation logic on a fixed cadence (FixedUpdate in Unity, for example), separate from the rendering framerate.
+		Floating Point Constraints: Ensure that floating-point calculations are identical across platforms (e.g., using fixed point math or forcing strict IEEE 754 compliance).
+	Deterministic RNG: Use a seeded random number generator. Ensure it is called in the same order every frame. 
 
-            //  You need to make sure entities are always updated in the same order. This means deterministic O(1) datastructures like pools are your friend.
-            // If you use random numbers then you need to make sure the seeds match at the start of every tick as well. You can probably get by storing only one seed along with the first
-            // The stored replay gets invalidated once you change your gameplay logic, so this method is generally useful for debugging only.
+	Key Considerations for Parallelism
+	Data Layout: Use contiguous memory (Arrays/NativeContainers) for component data to allow parallel access without locking.
+	Job System Hazards: Ensure that parallel jobs do not write to the same memory location. Use NativeParallelHashMap or NativeArray with strict index management to ensure safe parallel writes. 
+	*/	
 
-            //https://jakubtomsu.github.io/posts/fixed_timestep_without_interpolation/ < -- i cant easily do a memcpy to copy the gamestate like this.... storing animation states for us is much more difficult.
-            //                                                                              well, perhaps we only just need to copy the previous animation's "weight"
-            // https://www.rfleury.com/p/main-loops-refresh-rates-and-determinism
-            // 1 - simulaton thread - outputs state
-            // 2 - user thread (drawing here including animation updating)
-            // 3 - input gathering thread
+// By the way, this is what Media Molecule does in Dreams. The Trackmania racing games do this as well, to verify runs and make sure people aren’t cheating. Even their 3d physics engine is fully deterministic! very cool stuff.
 
-            // https://www.youtube.com/watch?v=fdAOPHgW7qM <-- frame rate independance for animation... render tick method?
+//	Notes:
 
-            // https://www.youtube.com/watch?v=72y2EC5fkcE
-            // TODO: deterministic
-            //       fixed step
-            //       - track each frame 'long currentFrame'
-            //       
-            //       ability to "step" play backwards and forwards
-            //       animation state decoupling for interpolation
-            //  ___________________________________________________
-            //  TODO: Procedural Generation Focus
-            //        - seeds and determinism and such
+//  You need to make sure entities are always updated in the same order. This means deterministic O(1) datastructures like pools are your friend.
+// If you use random numbers then you need to make sure the seeds match at the start of every tick as well. You can probably get by storing only one seed along with the first
+// The stored replay gets invalidated once you change your gameplay logic, so this method is generally useful for debugging only.
+
+//https://jakubtomsu.github.io/posts/fixed_timestep_without_interpolation/ < -- i cant easily do a memcpy to copy the gamestate like this.... storing animation states for us is much more difficult.
+//                                                                              well, perhaps we only just need to copy the previous animation's "weight"
+// https://www.rfleury.com/p/main-loops-refresh-rates-and-determinism
+// 1 - simulaton thread - outputs state
+// 2 - user thread (drawing here including animation updating)
+// 3 - input gathering thread
+
+// https://www.youtube.com/watch?v=fdAOPHgW7qM <-- frame rate independance for animation... render tick method?
+
+// https://www.youtube.com/watch?v=72y2EC5fkcE
+// TODO: deterministic
+//       fixed step
+//       - track each frame 'long currentFrame'
+//       
+//       ability to "step" play backwards and forwards
+//       animation state decoupling for interpolation
+//  ___________________________________________________
+//  TODO: Procedural Generation Focus
+//        - seeds and determinism and such
 
 
 // 2 - Test determinism of spawning with a parallel.For() loop and using the ThreadedRandom.cs
@@ -734,6 +735,7 @@ namespace HelloBoids
 		public static SkillModificationSystem mSkillModificationSystem = new SkillModificationSystem();
 		public static SkillSystem mSkillSystem = new SkillSystem();
 		
+		private const CONFIGURATION HumanOperatorConfiguration = CONFIGURATION.Transform | CONFIGURATION.RigidBody | CONFIGURATION.Sentient | CONFIGURATION.Intelligent | CONFIGURATION.SelfPropelled;
 		private const CONFIGURATION BoidConfiguration = CONFIGURATION.Transform | CONFIGURATION.RigidBody | CONFIGURATION.Sentient | CONFIGURATION.SelfPropelled;
 		private const CONFIGURATION OpticalSensorConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.Sensor;
 		private const CONFIGURATION WingsConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing;
@@ -748,6 +750,7 @@ namespace HelloBoids
 		public const int LASER_OFFSET = 3;
 		public const int TACTICAL_STATION_OFFSET = 4;
 		public const int BATTERY_OFFSET = 5;
+		public const int HUMAN_OPERATOR_OFFSET = 6;
 		
 		public struct SkillSystem
 		{
@@ -1127,7 +1130,7 @@ namespace HelloBoids
 			//NOTE: List<> (which stores our Boids and EntityNode) is not threadsafe and so for .Add() we must prefill it with 
 			// null items so we can use direct assignment (eg Boids[i] = b;  rather than Boids.Add(b); when spawning them
 			// NOTE: either of the below two lines of code will work to fill the list to the desired amount with nulls
-			const int ENTITIES_PER_DROID = 6;
+			const int ENTITIES_PER_DROID = 7;
 			int numElements = numBoids * ENTITIES_PER_DROID;
 
 			Boids = new List<EntityNode>(new EntityNode[numElements]);
@@ -1148,8 +1151,8 @@ namespace HelloBoids
                     MemoryFragmenter.Fragment(EntryClass.NUM_TO_PIN, 512, EntryClass.NUM_TO_PIN / 2, 128);
 
 				// spawn will add to the Octree 
-				Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> result = Spawn(mTHRandom, i * ENTITIES_PER_DROID, width, height, depth);
-				int arrayIndex = i * ENTITIES_PER_DROID;
+				Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> result = Spawn(mTHRandom, (int)i * ENTITIES_PER_DROID, width, height, depth);
+				int arrayIndex = (int)i * ENTITIES_PER_DROID;
                 
 				Boids[arrayIndex]                           = result.Item1; // NOTE: must use direct assignment after having pre-initialize List<> since List<> is not threadsafe
 				Boids[arrayIndex + OPTICAL_SENSOR_OFFSET]   = result.Item2;
@@ -1157,6 +1160,8 @@ namespace HelloBoids
 				Boids[arrayIndex + LASER_OFFSET]            = result.Item4;
 				Boids[arrayIndex + TACTICAL_STATION_OFFSET] = result.Item5;
 				Boids[arrayIndex + BATTERY_OFFSET]          = result.Item6;
+				Boids[arrayIndex + HUMAN_OPERATOR_OFFSET]   = result.Item7;
+				
 				
 				//Boids.Add(b); // <-- will not work here as List<> is not threadsafe
 				//Console.WriteLine("i == " + i.ToString()); 
@@ -1580,31 +1585,34 @@ namespace HelloBoids
 			
 			
 			
-			Console.WriteLine("Do_Droid_Logic() - DoTargetPrioritization()");
+			//Console.WriteLine("Do_Droid_Logic() - DoTargetPrioritization()");
 			DoTargetPrioritization();
 			
 			
 			// todo: if we had a list of all weapons for every ship to pass all at once
 			//       as well as all targets for each ship to pass all at once, we could run this
 			//       processor in a single call from here...
-			Console.WriteLine("Do_Droid_Logic() - DoWeaponFitnessScores()");
+			//Console.WriteLine("Do_Droid_Logic() - DoWeaponFitnessScores()");
 			DoWeaponFitnessScores(null, null);
 			
 			
 			
-			Console.WriteLine("Do_Droid_Logic() - DoWeaponsCanFire()");
+			//Console.WriteLine("Do_Droid_Logic() - DoWeaponsCanFire()");
 			DoWeaponsCanFire();
 			
 			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 						
-			Console.WriteLine("Do_Droid_Logic() - preparing for loop()");
+			//Console.WriteLine("Do_Droid_Logic() - preparing for loop()");
 			int recordCount = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, recordCount, i => 				
 			//for (int i = 0; i < Boids.Count; i++)
             {
 				if (Boids[(int)i] is Boid == false) return;
+				
+				
+			
 				
 				Boid currentBoid = (Boid)Boids[(int)i];
 				// NOTE: Transform_Struct will  host indices for Boids, OpticalSensors and TacticalStations
@@ -1614,13 +1622,13 @@ namespace HelloBoids
 				
 				
 				// get a reference to the Station and determine if it "CanAct()"
-				EntityNode[] tsEnt = currentBoid.GetTacticalStations();
-				if (tsEnt == null || tsEnt.Length == 0) return;
+				EntityNode[] tacticalStationEnts = currentBoid.GetTacticalStations();
+				if (tacticalStationEnts == null || tacticalStationEnts.Length == 0) return;
 
-				int stationArrayIndex = tsEnt[0].EntityArrayIndex;  
+				int stationArrayIndex = tacticalStationEnts[0].EntityArrayIndex;  
 				int tacticalIndex;
-				Memory<TacticalStation> tacticalStationStruct = (Memory<TacticalStation>) tsEnt[0].GetUserStruct(typeof(TacticalStation), out tacticalIndex);
-
+				Memory<TacticalStation> tacticalStationStruct = (Memory<TacticalStation>) tacticalStationEnts[0].GetUserStruct(typeof(TacticalStation), out tacticalIndex);
+				
 				string errorReason = null;
 				if (tacticalStationStruct.Span[0].CanAct(out errorReason)) return;
 				//Console.WriteLine("Do_Droid_Logic() - Station CanAct() == TRUE");		
@@ -1638,16 +1646,16 @@ namespace HelloBoids
 				// NOTE: The issue here is sometimes we iterate through List<Boids> and other times
 				//       by mem.Span.Length.  So to be consistant, we try to keep the Span indices matching
 				//       
-				EntityNode[] weapons = currentBoid.GetWeapons();
-				string weaponKey = weapons[0].EntityKey;
+				EntityNode[] weapons = currentBoid.GetWeapons();				
 				int weaponIndex;
-				Memory<Weapon>weaponStruct = (Memory<Weapon>) tsEnt[0].GetUserStruct(typeof(Weapon), out weaponIndex);
+				Memory<Weapon>weaponStruct = (Memory<Weapon>) weapons[0].GetUserStruct(typeof(Weapon), out weaponIndex);
 				
-				bool canFire = weaponStruct.Span[0].CanFire;
+				bool canFire = weaponStruct.Span[0].CanFire(out errorReason);
 				
-
+				//Console.WriteLine("Do_Droid_Logic() - Weapon CanFire() == " + canFire.ToString());		
 				if (canFire) // TODO: Establish CANFIRE PER WEAPON
            	 	{  
+					string weaponKey = weapons[0].EntityKey;
 					bool suspend = false;
 					mIntervalTimers.Reset(weaponKey, "droid_canfire", suspend);
 					
@@ -1689,21 +1697,11 @@ namespace HelloBoids
 						Boid currentTarget = targets[0];
 						double distanceToTargetSquared = distances[0];
 						
-						
-						Console.WriteLine("Do_Droid_Logic() - abc");
-						EntityNode[] weaponEnt = currentBoid.GetWeapons();
-						if (weaponEnt == null || weaponEnt.Length == 0) return;
-						
-						int weaponArrayIndex = weaponEnt[0].EntityArrayIndex;  
-						int weaponInternalIndex = -1;
-						Memory<Weapon> weaponStruct = (Memory<Weapon>) weaponEnt[0].GetUserStruct(typeof(Weapon), out weaponInternalIndex);
-						
-						Console.WriteLine("Do_Droid_Logic() - 777");
 						if (tacticalStationStruct.Span[0].CanHit(currentTarget))
 						{
 							currentBoid.ShotsFired++;
 							
-							//Console.WriteLine("Do_Droid_Logic() - Droid @ Array Index '" + currentArrayIndex.ToString() + "' firing shot # " + currentBoid.ShotsFired.ToString() + " on Droid @ Array Index '" + currentTarget.EntityArrayIndex.ToString() + "'");
+							Console.WriteLine("Do_Droid_Logic() - Droid @ Array Index '" + currentArrayIndex.ToString() + "' firing shot # " + currentBoid.ShotsFired.ToString() + " on Droid @ Array Index '" + currentTarget.EntityArrayIndex.ToString() + "'");
 
 							// NOTE: here we assume the Fire() occurs immediately using a lightspeed laser and the damage is instantaneous 
 							//       and does not need any travel time to reach the currentTarget
@@ -1717,7 +1715,7 @@ namespace HelloBoids
 								if (damages != null)
 									dCount = damages.Length;
 								
-								//Console.WriteLine("Do_Droid_Logic() - Damages Produced = " + dCount.ToString());
+								Console.WriteLine("Do_Droid_Logic() - Damages Produced = " + dCount.ToString());
 
 							}
 							catch(Exception ex)
@@ -1841,8 +1839,6 @@ namespace HelloBoids
 		/// </summary>
 		private void DoContactListSorting()
 		{
-			//Console.WriteLine("DoContactListSorting");
-			
 			if (mNeighbors.Count == 0) return;
 			
 			ComponentStore<Transform.Transform_Struct> allTransforms  = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
@@ -1861,8 +1857,8 @@ namespace HelloBoids
 				//System.Diagnostics.Debug.Assert( (int)i == currentArrayIndex, "DoContactListSorting() - array index does not match...");
 				// the adjacnets that are stored in neighbors from the overall mNeighbors is very much stores Area of Interest for each Droid
 				// but we will only send them things that their sensors can detect (and "eyes" are treated as optical sensors)
-				Boid current = (Boid)Boids[currentArrayIndex]; // <-- if we can get the Sensors without having to get the current Boid... hmm...
-				EntityNode[] sensorEntities = current.GetSensors(); // todo: we currently do  not have EntityNode allowing adding of child nodes.  This is needed next.
+				Boid currentBoid = (Boid)Boids[currentArrayIndex]; // <-- if we can get the Sensors without having to get the current Boid... hmm...
+				EntityNode[] sensorEntities = currentBoid.GetSensors(); // todo: we currently do  not have EntityNode allowing adding of child nodes.  This is needed next.
 				
 				int sensorsCount = 0;
 				if (sensorEntities != null) sensorsCount = sensorEntities.Length;
@@ -1951,7 +1947,7 @@ namespace HelloBoids
 
 								c.Add(t);			
 								contacts.Add(c);
-								Console.WriteLine("DoContactListSorting() - Added NEW SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
+								//Console.WriteLine("DoContactListSorting() - Added NEW SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
 							}
 						} // end sensor range check
 					} // end for SensorsCount
@@ -1961,7 +1957,7 @@ namespace HelloBoids
 				// this will be the TacticalStation instead, and it will be responsible for
 				// properly merging these SensorContacts with existing ones so as to maintain
 				// proper SensorContact histories for all detected Entities.
-				current.Add(contacts); 
+				currentBoid.Add(contacts); 
 			});
 			//Console.WriteLine("DoContactListSorting() - Completed Sequence.");
 		}
@@ -2105,6 +2101,7 @@ namespace HelloBoids
 		/// </summary>	
 		private double[] DoWeaponFitnessScores(EntityNode ship, EntityNode target)
 		{
+			//Console.WriteLine("DoWeaponFitnessScores()");
 			// NOTE: weapon fitness scores of friendlies can be combined into one table to 
 			// determine how to coordinate firepower on various ships during combat
 			
@@ -2200,12 +2197,19 @@ namespace HelloBoids
 				bool flagValue = canFire;
 				
 				int componentIndex;
-				Memory<Weapon> weaponStruct = (Memory<Weapon>)weapon.GetUserStruct(typeof(Weapon), out componentIndex);
+				Memory<Component> compStruct = (Memory<Component>)weapon.GetUserStruct(typeof(Component), out componentIndex);
+				compStruct.Span[0].SetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
+				bool hasStruct = compStruct.Span[0].GetUserStructFlag(USER_STRUCT_FLAG_1);
+				compStruct.Span[0].SetUserRuntimeFlag(USER_RUNTIME_FLAG_1, flagValue);
+				bool hasRuntimeFlag = compStruct.Span[0].GetUserRuntimeFlag(USER_RUNTIME_FLAG_1);
 				
-				weaponStruct.Span[0].SetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
-				bool hasStruct = weaponStruct.Span[0].GetUserStructFlag(USER_STRUCT_FLAG_1);
-				weaponStruct.Span[0].SetUserRuntimeFlag(USER_RUNTIME_FLAG_1, flagValue);
-				bool hasRuntimeFlag = weaponStruct.Span[0].GetUserRuntimeFlag(USER_RUNTIME_FLAG_1);
+				int weaponIndex;
+				Memory<Weapon> weaponStruct = (Memory<Weapon>)weapon.GetUserStruct(typeof(Weapon), out weaponIndex);
+				
+				//weaponStruct.Span[0].SetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
+				//bool hasStruct = weaponStruct.Span[0].GetUserStructFlag(USER_STRUCT_FLAG_1);
+				//weaponStruct.Span[0].SetUserRuntimeFlag(USER_RUNTIME_FLAG_1, flagValue);
+				//bool hasRuntimeFlag = weaponStruct.Span[0].GetUserRuntimeFlag(USER_RUNTIME_FLAG_1);
 				
 				try
 				{
@@ -2214,10 +2218,11 @@ namespace HelloBoids
 					//Console.WriteLine("DoWeaponsCanFire() - Droid " + weaponKey + " Can Fire = " + canFire.ToString());
 					if (canFire)
 					{	
-						Console.WriteLine("DoWeaponsCanFire() - Droid " + weaponKey + " FIRING!!!");
+						//Console.WriteLine("DoWeaponsCanFire() - Droid " + weaponKey + " FIRING!!!");
 						// set the runtime flag
-						bool suspend = true;  // we do not want this timer to start over until we start it again
-                		mIntervalTimers.Reset(weaponKey, "droid_canfire", suspend);
+						//bool suspend = true;  // we do not want this timer to start over until we start it again. <-- Wait, why?  Is this not just a cooldown?
+                		//mIntervalTimers.Reset(weaponKey, "droid_canfire", suspend);
+						mIntervalTimers.Reset(weaponKey, "droid_canfire");
 					}
 					
 					// set the GAME SPECIFIC runtime flag
@@ -2342,6 +2347,7 @@ namespace HelloBoids
 			
 			
 			int recordCount = (int)transformStructStore.Count;
+			Console.WriteLine("Transform_Struct.Configuration == RecordCount == " + recordCount.ToString());
             System.Threading.Tasks.Parallel.For(0, recordCount, i =>
 			//for (int i = 0; i < memSpan.Length; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
             {
@@ -2352,7 +2358,7 @@ namespace HelloBoids
 				// NOTE: we iterate through those the Boid's (Enitites.Configuraton == BoidConfiguration) because we are interested in THEIR location  not those of the Sensors carried by each one.
 				if ((memSpan[(int)i].Configuration & BoidConfiguration) != BoidConfiguration) 
 				{
-					//Console.WriteLine("Transform_Struct.Configuration == " + memSpan[(int)i].Configuration.ToString());
+					Console.WriteLine("Transform_Struct.Configuration == " + memSpan[(int)i].Configuration.ToString());
 					return;
 				}
 				
@@ -2386,7 +2392,6 @@ namespace HelloBoids
 		#if SPATIAL_SEARCH
 				Stack<OctreeOctant> stack = new Stack<OctreeOctant>(32);
             	
-				
 				// INLINING of "GetNeighbors" in order to avoid have to load the memSpan onto the stack for each iteration
 				
 				// Vector3d currentBoidTranslation = memSpan[i].Translation;
@@ -2535,7 +2540,6 @@ namespace HelloBoids
             double alignmentDistanceSquared = alignmentDistance * alignmentDistance;
             double cohesionDistanceSquared = cohesionDistance * cohesionDistance;
 
-			
 			System.Threading.Tasks.Parallel.For(0, recordCount, i =>
 			//for (int i = 0; i < memSpan.Length; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
             {
@@ -2561,7 +2565,6 @@ namespace HelloBoids
 				for (int z = 0; z < nCount; z++)
 					if (neighbors[z].Item1 > recordCount  - 1)
 						Console.WriteLine("DoFlocking() - Neighbor value is OUT OF RANGE " + neighbors[z].ToString());
-				
 				// END TEST
 				
 				 //if (i == 8)
@@ -2764,7 +2767,7 @@ namespace HelloBoids
         }
 
 		
-		public Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> Spawn(ThreadedRandom rand, int arrayIndex, double width, double height, double depth)
+		public Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> Spawn(ThreadedRandom rand, int arrayIndex, double width, double height, double depth)
 		{
 			//Console.WriteLine ("Spawn() - Boid Spawn BEGIN at array index == " + arrayIndex.ToString());
 			string exLine = "Spawn 0";
@@ -2888,68 +2891,6 @@ namespace HelloBoids
 			// TACTICAL STATION
 			EntityNode tacticalStation = CreateTacticalStation(arrayIndex + TACTICAL_STATION_OFFSET);
 						
-			
-
-			// Operator
-			// SKILLS
-			////////////////////////
-			Skill v;
-			v.SkillType = SKILLS.Targeting;
-			v.Level = 1;     			// the level of this skill
-			v.Production = null;
-			//v.Modifiers = null;
-			v.BaseValue = 1;
-			v.EffectiveValue = 0;
-			
-			// add the modifier(s) to this skill.  Recall that modifiers behave just like any other type of PRODUCTION and must be registered as PRODUCTION 
-			// at the appropriate time (eg On USE of the Skill, or on EQUIP of an Item, etc.)
-			v.AddProduction(livingEntityID, PRODUCTS.TargetingSkillModifier, 1, true, -1);
-
-
-			// add the skill to the DROID as if it was being added to an OPERATOR for a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
-			b.OperatorSkills.Add(v.SkillType, v);
-			
-			// add the same skill to the tactical station
-			v.SkillType = SKILLS.Targeting;
-			v.Level = 2;     			// the level of this skill
-			v.Production = null;
-			//v.Modifiers = null;
-			v.BaseValue = 2;
-			v.EffectiveValue = 0; // todo: this should be a Getter perhaps and not a public variable
-			v.AddProduction(livingEntityID, PRODUCTS.TargetingSkillModifier, 1, true, -1);
-			
-			// add the skill to the DROID as if it was being added to a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
-			b.TacticalStationSkills.Add(v.SkillType, v);
-			////////////////////////
-
-			// each Droid can Produce a TargetingSkillModifier as if it had an "OPERATOR"
-			Production p;
-			p.ProducerEntityArrayIndex = b.EntityArrayIndex;
-			p.ProducerEntityInternalIndex = livingEntityID;
-			p.ProductID = 	(uint)v.Production[0].Product;  // TargetingSkillModifier
-			p.Location = Vector3d.Zero();
-			p.Enabled = true;
-			p.Value = v.Production[0];
-			p.Amount = v.Production[0].Amount; // this will use the 
-			p.NumUses = -1;
-			p.CooldownBetweenUses = 0;
-			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
-			p.DistributionList = new int[] {livingEntityID};
-			p.SearchPrimitive  = null;
-	
-			// each Droid can Consume a TargetingSkillModifier as if it had a TACTICAL CREW STATION
-			Consumption c;
-			c.ConsumerEntityArrayIndex = b.EntityArrayIndex;
-			c.ConsumerInternalIndex = livingEntityID;
-			c.ProducerInternalIndex = p.ProducerEntityInternalIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
-			c.ProductID = p.ProductID;
-			c.Value =  null;
-			c.Amount = 1;
-			c.Operations = null;
-			
-			RegisterProduction(b, p);
-			RegisterConsumption(b, c);
-	
 	
 			//			AddProduction(e)
 			//	        AddConsumption(e);
@@ -2965,6 +2906,8 @@ namespace HelloBoids
 			// BATTERY to power Eyes, Wings, Laser and TacticalStation
 			EntityNode battery = CreateBattery(arrayIndex + BATTERY_OFFSET);
 			
+			// HUMAN OPERATOR for the tactical station
+			EntityNode humanOperator = CreateHumanOperator(arrayIndex + HUMAN_OPERATOR_OFFSET);
 					
 			
 			
@@ -2973,7 +2916,8 @@ namespace HelloBoids
            		Octree.Add((EntityNode)b);
             }
 
-			Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> result = new Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode>(b, eyes, wings, laser, tacticalStation, battery);
+			Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> result = 
+					new Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode>(b, eyes, wings, laser, tacticalStation, battery, humanOperator);
 			return result;
 		}
 		
@@ -3245,6 +3189,40 @@ namespace HelloBoids
 			storeTacticalStation.Span[checkOutIndex].ContactsHistory = null;
 			storeTacticalStation.Span[checkOutIndex].Targets = null;
 			
+						
+			// add a targetingSkill requirement to this TacticalStation
+			Skill targetingSkill;
+			targetingSkill.SkillType = SKILLS.Targeting;
+			targetingSkill.Level = 2;     			// the level of this skill
+			targetingSkill.Production = null;
+			//targetingSkill.Modifiers = null;
+			targetingSkill.BaseValue = 2;
+			targetingSkill.EffectiveValue = 0; // todo: this should be a Getter perhaps and not a public variable
+			// add the modifier(s) to this skill.  Recall that modifiers behave just like any other type of PRODUCTION and must be registered as PRODUCTION 
+			// at the appropriate time (eg On USE of the Skill, or on EQUIP of an Item, etc.)
+			
+			// NOTE: This station will be CONSUMING TargetingSkilLModifer and NOT producing any.  The operator will be PRODUCING
+			//targetingSkill.AddProduction(livingEntityID, PRODUCTS.TargetingSkillModifier, 1, true, -1);
+			
+			//Console.WriteLine("CreateTacticalStation - 1");
+			// TODO: This MUST go to the TacticalStation, NOT HERE
+			// add the skill to the DROID as if it was being added to a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
+			station.Skills.Add(targetingSkill.SkillType, targetingSkill);
+			//Console.WriteLine("CreateTacticalStation - 2");
+			
+			// each Station can Consume a TargetingSkillModifier as if it had a TACTICAL CREW STATION from an Operator
+			Consumption c;
+			c.ConsumerEntityArrayIndex = station.EntityArrayIndex;
+			c.ConsumerInternalIndex = transformIndex;
+			c.ProducerInternalIndex = -1; //p.ProducerEntityInternalIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
+			c.ProductID = (uint)PRODUCTS.TargetingSkillModifier;
+			c.Value =  null;
+			c.Amount = 1;
+			c.Operations = null;
+			
+			//Console.WriteLine("CreateTacticalStation - 3");
+			RegisterConsumption(station, c);
+			
 			return station;
 		}
 		
@@ -3297,6 +3275,68 @@ namespace HelloBoids
 			return battery;
 		}
 		
+		private EntityNode CreateHumanOperator(int arrayIndex)
+		{
+			string exLine = "CreateHumanOperator 1";
+			string entityKey = "human_operator_" + arrayIndex.ToString(); // prefix with "laser_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!			
+			
+			EntityNode humanOperator = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
+
+			int transformIndex;
+			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)humanOperator.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
+			transform.Span[0].Configuration = HumanOperatorConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
+			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
+		
+			// LIVING ENTITY
+			ComponentStore<LivingEntity> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+            int livingEntityID = -1;
+            Memory<LivingEntity> memLivingEnt = storeLivingEntity.CheckOut(out livingEntityID);
+			humanOperator.AddUserStruct(typeof(LivingEntity), memLivingEnt, livingEntityID);
+			
+			storeLivingEntity.Span[livingEntityID].Age = 1;
+			storeLivingEntity.Span[livingEntityID].Hitpoints = 20;
+			storeLivingEntity.Span[livingEntityID].Configuration = HumanOperatorConfiguration;
+			
+			
+			
+			Skill targetingSkill;
+			targetingSkill.SkillType = SKILLS.Targeting;
+			targetingSkill.Level = 3;     			// the level of this skill
+			targetingSkill.Production = null;
+			//targetingSkill.Modifiers = null;
+			targetingSkill.BaseValue = 1;
+			targetingSkill.EffectiveValue = 0;
+			
+			// add the modifier(s) to this skill.  Recall that modifiers behave just like any other type of PRODUCTION and must be registered as PRODUCTION 
+			// at the appropriate time (eg On USE of the Skill, or on EQUIP of an Item, etc.)
+			targetingSkill.AddProduction(livingEntityID, PRODUCTS.TargetingSkillModifier, 1, true, -1);
+
+
+			// add the skill to the DROID as if it was being added to an OPERATOR for a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
+			humanOperator.Skills.Add(targetingSkill.SkillType, targetingSkill);
+			
+			// each Operator can Produce a TargetingSkillModifier
+			Production p;
+			p.ProducerEntityArrayIndex = humanOperator.EntityArrayIndex;
+			p.ProducerEntityInternalIndex = livingEntityID;
+			p.ProductID = 	(uint)targetingSkill.Production[0].Product;  // TargetingSkillModifier
+			p.Location = Vector3d.Zero();
+			p.Enabled = true;
+			p.Value = targetingSkill.Production[0];
+			p.Amount = targetingSkill.Production[0].Amount; // this will use the 
+			p.NumUses = -1;
+			p.CooldownBetweenUses = 0;
+			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
+			
+			int stationArrayIndex = -1;
+			p.DistributionList = new int[] {stationArrayIndex};
+			p.SearchPrimitive  = null;
+				
+			
+			RegisterProduction(humanOperator, p);
+					
+			return humanOperator;
+		}
 		
 		private void Destroy(EntityNode entity)
 		{
@@ -3998,12 +4038,7 @@ namespace HelloBoids
     public class Boid : EntityNode
     {
         private const double BOID_WIDTH = 2.0d;
-        public uint ShotsFired = 0; // todo: belongs in TacticalStation 
-		
-		public Dictionary<SKILLS, Skill> TacticalStationSkills;
-		public Dictionary<SKILLS, Skill> OperatorSkills;
-		
-
+        
         public Boid(string entityID, int index, double x, double y, double z,  double xV, double yV)
             : base(entityID, index, x, y, z, xV, yV)
         {
@@ -4021,9 +4056,6 @@ namespace HelloBoids
 
 			// bounding box in World Space which is probably not what we want for KGB Entity but only for KGB EntityNode (which is derived from SceneNode and used for hierarchical bbox structure)
             _box = new BoundingBox(Translation,  BOID_WIDTH);
-				
-			OperatorSkills = new Dictionary<SKILLS, Skill>();
-			TacticalStationSkills = new Dictionary<SKILLS, Skill>();
         }
 		
 		
@@ -4179,6 +4211,8 @@ namespace HelloBoids
 				mSensorContacts.Add (c);
 			else 
 				mSensorContacts[found].Add(c.Telemetry);
+			
+			Console.WriteLine("Boid.Add(SensorContact) - SensorContact added.");
 		}
 		
 		public void Add (List<SensorContact> contacts)
@@ -4902,6 +4936,10 @@ return (0,0);
 		protected UserData mUserData;
 		protected int mUserTypeID;   // can be defined by game##.dll or by an enum that is generated into a compiled binary at runtime
 		
+		public uint ShotsFired = 0; // todo: belongs in TacticalStation 
+		public Dictionary<SKILLS, Skill> Skills;
+		
+		
         public EntityNode(string entityKey, int arrayIndex, double x, double y, double z, double xV, double yV) 
 			: base (arrayIndex, x, y, z, xV, yV)
         {
@@ -4911,6 +4949,7 @@ return (0,0);
 			mID = entityKey;
 			mUserData = EntryClass.mCStoreUserData.CheckOut(mID);
 				
+			Skills = new Dictionary<SKILLS, Skill>();		
         }
 		
 		public string EntityKey { get {return mID;}}
@@ -6802,9 +6841,10 @@ return (0,0);
 		OperatorHasSkills =  1 << 2, 
 		IsOperatorStatusOK = 1 << 3,
 		IsInUse =            1 << 4,  // aka isFiring for weapons)
-		CanAct =             1 << 5,  // (for tacticalStations),
-		IsReloading =        1 << 6, 
-		IsUnJamming =        1 << 7 // denotes a quick fix in the field requiring less than 1 minute to resolve (isFixingMinorMalfunction), 
+		CanAct =             1 << 5,  // (for Stations, can an additional Action be performed at this Station... depends on TL of the Station),
+		CanUse =             1 << 6,  // for Weapons this can be thought of as CanFire
+		IsReloading =        1 << 7, 
+		IsUnJamming =        1 << 8 // denotes a quick fix in the field requiring less than 1 minute to resolve (isFixingMinorMalfunction), 
 	}
 			
 		
@@ -7033,6 +7073,18 @@ return (0,0);
                 	mUserRuntimeFlags |= (uint)USER_RUNTIME_FLAGS.CanAct;
                 else
                     mUserRuntimeFlags &= ~(uint)USER_RUNTIME_FLAGS.CanAct;
+			}
+		}
+		
+		public bool CanUse
+		{
+			get {return (mUserRuntimeFlags & (uint)USER_RUNTIME_FLAGS.CanUse) == (uint)USER_RUNTIME_FLAGS.CanUse;}
+			set 
+			{
+				if (value)
+                	mUserRuntimeFlags |= (uint)USER_RUNTIME_FLAGS.CanUse;
+                else
+                    mUserRuntimeFlags &= ~(uint)USER_RUNTIME_FLAGS.CanUse;
 			}
 		}
 		
@@ -7489,6 +7541,16 @@ return (0,0);
         
         // nested weapon.  
         //public Weapon SecondaryWeapon;
+		
+		
+		public bool CanFire(out string errorReason)
+		{
+			EntityNode weapoon = EntryClass.bSim.Boids[this.EntityArrayIndex]; // an actual Boid but for now, we think of it as dedicated Station Component Entity
+			errorReason = null;
+			bool result = true;
+
+			return true;
+		}
     }
 	
 	/*
@@ -17604,7 +17666,7 @@ public abstract class PlanedFrustum
 
             string key = GetKey(nodeID, name);
 	
-			Console.WriteLine ("Register " + key + " IS PAUSED == " + tp.IsPaused.ToString());
+			//Console.WriteLine ("Register " + key + " IS PAUSED == " + tp.IsPaused.ToString());
 			
 #if CONCURRENT_TIMERS
 			if (!mIntervals.TryAdd(key, tp))
@@ -17676,7 +17738,7 @@ public abstract class PlanedFrustum
 #endif
         
 			tp.IsPaused = suspend;
-			Console.WriteLine ("Reset " + key + " IS PAUSED == " + tp.IsPaused.ToString());
+			//Console.WriteLine ("Reset " + key + " IS PAUSED == " + tp.IsPaused.ToString());
 		}
 
         public bool IsReady(string nodeID, string name)
@@ -17687,7 +17749,7 @@ public abstract class PlanedFrustum
 			
 			bool success = mIntervals.TryGetValue(key, out tp);
 			
-			Console.WriteLine("IntervalTimers.Success = " + key + " = " + success.ToString() + " TP.Duration " + tp.Duration.ToString());
+			//Console.WriteLine("IntervalTimers.Success = " + key + " = " + success.ToString() + " TP.Duration " + tp.Duration.ToString());
 	#else
             if (mKeyedTimePeriods == null)
             {
@@ -17702,8 +17764,8 @@ public abstract class PlanedFrustum
             if (success)
             {
                 bool result = tp.IsPaused == false && tp.IsActive && (tp.Elapsed >= tp.Duration);
-				Console.WriteLine ("IntervalTimers. IS PAUSED == " + tp.IsPaused.ToString());
-                Console.WriteLine("IntervalTimers.IsReady() - " +  key + "RESULT == " + result.ToString() + " --> NOT PAUSED == " + (!tp.IsPaused).ToString() + " ACTIVE == " + tp.IsActive.ToString() + " COOLDOWN OVER == " + (tp.Elapsed >= tp.Duration).ToString());
+				//Console.WriteLine ("IntervalTimers. IS PAUSED == " + tp.IsPaused.ToString());
+                //Console.WriteLine("IntervalTimers.IsReady() - " +  key + "RESULT == " + result.ToString() + " --> NOT PAUSED == " + (!tp.IsPaused).ToString() + " ACTIVE == " + tp.IsActive.ToString() + " COOLDOWN OVER == " + (tp.Elapsed >= tp.Duration).ToString());
                 return result;
             }
             return false;

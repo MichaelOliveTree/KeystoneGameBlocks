@@ -1621,12 +1621,9 @@ namespace HelloBoids
 				int tacticalIndex;
 				Memory<TacticalStation> tacticalStationStruct = (Memory<TacticalStation>) tsEnt[0].GetUserStruct(typeof(TacticalStation), out tacticalIndex);
 
-
-				//int componentIndex;
-				//Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component), out componentIndex);
-				
-				if (tacticalStationStruct.Span[0].CanAct) return;
-				Console.WriteLine("Do_Droid_Logic() - Component CanAct() == TRUE");		
+				string errorReason = null;
+				if (tacticalStationStruct.Span[0].CanAct(out errorReason)) return;
+				//Console.WriteLine("Do_Droid_Logic() - Station CanAct() == TRUE");		
 				
 				// NOTE: The EXE will render Sensor Contact info as necessary.
 				//       The client EXE will have access to those types and the UI elements using them and can update
@@ -1643,22 +1640,12 @@ namespace HelloBoids
 				//       
 				EntityNode[] weapons = currentBoid.GetWeapons();
 				string weaponKey = weapons[0].EntityKey;
-				bool canFire = false;
+				int weaponIndex;
+				Memory<Weapon>weaponStruct = (Memory<Weapon>) tsEnt[0].GetUserStruct(typeof(Weapon), out weaponIndex);
 				
-				// NOTE: above we check if each individual weapon can fire... we do not care
-				//       about whether one particular Droid has multiple lasers on it... if any one or both
-				//       can fire, both can be used independantly.
-				try
-				{
-					canFire = mIntervalTimers.IsReady(weaponKey, "droid_canfire");
-					//Console.WriteLine("Do_Droid_Logic() - droid_canfire = " + entityKey + " = " + canFire.ToString());
-				}
-				catch (Exception ex)
-				{
-					Console.WriteLine("Do_Droid_Logic() - droid_canfire " + weaponKey + " key does not exist");
-				}
+				bool canFire = weaponStruct.Span[0].CanFire;
 				
-				Console.WriteLine("Do_Droid_Logic() - canfire...");
+
 				if (canFire) // TODO: Establish CANFIRE PER WEAPON
            	 	{  
 					bool suspend = false;
@@ -1702,7 +1689,6 @@ namespace HelloBoids
 						Boid currentTarget = targets[0];
 						double distanceToTargetSquared = distances[0];
 						
-						Console.WriteLine("Do_Droid_Logic() - 555");
 						
 						Console.WriteLine("Do_Droid_Logic() - abc");
 						EntityNode[] weaponEnt = currentBoid.GetWeapons();
@@ -2214,12 +2200,12 @@ namespace HelloBoids
 				bool flagValue = canFire;
 				
 				int componentIndex;
-				Memory<Component> component = (Memory<Component>)weapon.GetUserStruct(typeof(Component), out componentIndex);
+				Memory<Weapon> weaponStruct = (Memory<Weapon>)weapon.GetUserStruct(typeof(Weapon), out componentIndex);
 				
-				component.Span[0].SetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
-				bool hasStruct = component.Span[0].GetUserStructFlag(USER_STRUCT_FLAG_1);
-				component.Span[0].SetUserRuntimeFlag(USER_RUNTIME_FLAG_1, flagValue);
-				bool hasRuntimeFlag = component.Span[0].GetUserRuntimeFlag(USER_RUNTIME_FLAG_1);
+				weaponStruct.Span[0].SetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
+				bool hasStruct = weaponStruct.Span[0].GetUserStructFlag(USER_STRUCT_FLAG_1);
+				weaponStruct.Span[0].SetUserRuntimeFlag(USER_RUNTIME_FLAG_1, flagValue);
+				bool hasRuntimeFlag = weaponStruct.Span[0].GetUserRuntimeFlag(USER_RUNTIME_FLAG_1);
 				
 				try
 				{
@@ -17618,9 +17604,11 @@ public abstract class PlanedFrustum
 
             string key = GetKey(nodeID, name);
 	
+			Console.WriteLine ("Register " + key + " IS PAUSED == " + tp.IsPaused.ToString());
+			
 #if CONCURRENT_TIMERS
 			if (!mIntervals.TryAdd(key, tp))
-				throw new Exception();
+				throw new Exception("IntervalTimers.Register() - FAILED" );
 #else
             if (mKeyedTimePeriods == null) mKeyedTimePeriods = new Dictionary<string, TimePeriod>();
             mKeyedTimePeriods.Add(key, tp);
@@ -17687,7 +17675,8 @@ public abstract class PlanedFrustum
                 Console.WriteLine("IntervalTimers.Reset() - " + nodeID + " using name " + name + " does not exist.");
 #endif
         
-			tp.IsPaused = suspend;	
+			tp.IsPaused = suspend;
+			Console.WriteLine ("Reset " + key + " IS PAUSED == " + tp.IsPaused.ToString());
 		}
 
         public bool IsReady(string nodeID, string name)
@@ -17698,7 +17687,7 @@ public abstract class PlanedFrustum
 			
 			bool success = mIntervals.TryGetValue(key, out tp);
 			
-			//Console.WriteLine("IntervalTimers.Success = " + key + " = " + success.ToString() + " TP.Duration " + tp.Duration.ToString());
+			Console.WriteLine("IntervalTimers.Success = " + key + " = " + success.ToString() + " TP.Duration " + tp.Duration.ToString());
 	#else
             if (mKeyedTimePeriods == null)
             {
@@ -17712,9 +17701,9 @@ public abstract class PlanedFrustum
 	#endif
             if (success)
             {
-                bool result = !tp.IsPaused == tp.IsActive == (tp.Elapsed >= tp.Duration);
-
-                //Console.WriteLine("IntervalTimers.IsReady() - " + nodeID + " using name '" + name + "' isReady = " + result.ToString());
+                bool result = tp.IsPaused == false && tp.IsActive && (tp.Elapsed >= tp.Duration);
+				Console.WriteLine ("IntervalTimers. IS PAUSED == " + tp.IsPaused.ToString());
+                Console.WriteLine("IntervalTimers.IsReady() - " +  key + "RESULT == " + result.ToString() + " --> NOT PAUSED == " + (!tp.IsPaused).ToString() + " ACTIVE == " + tp.IsActive.ToString() + " COOLDOWN OVER == " + (tp.Elapsed >= tp.Duration).ToString());
                 return result;
             }
             return false;
@@ -17790,7 +17779,7 @@ public abstract class PlanedFrustum
 
                     // deactivate or remove this TimePeriod 
                     if (period.DeActivateAfterCompleted)
-                        period.IsActive = true;
+                        period.IsActive = false;
                     //else
                     //    todo: cant unregister it before caller can
                     //     check if IsReady== true !!

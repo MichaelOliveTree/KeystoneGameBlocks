@@ -1565,12 +1565,12 @@ namespace HelloBoids
              //    - storing data on interior Walls and Floors and Ceilings "damage"
 
 
-        	//Console.WriteLine("Do_Droid_Logic() - DoDeviceReadyStatus()");
+        	Console.WriteLine("Do_Droid_Logic() - DoDeviceReadyStatus()");
 			DoDeviceReadyStatus();
 			
 			
 			
-			//Console.WriteLine("Do_Droid_Logic() - DoStationCanActStatus()");
+			Console.WriteLine("Do_Droid_Logic() - DoStationCanActStatus()");
 			DoStationCanActStatus();
 			//Console.WriteLine("Do_Droid_Logic() - continuing Do_Droid_Logic()");
 			
@@ -1580,39 +1580,36 @@ namespace HelloBoids
 			
 			
 			
-			//Console.WriteLine("Do_Droid_Logic() - DoContactListSorting()");
+			Console.WriteLine("Do_Droid_Logic() - DoContactListSorting()");
 			DoContactListSorting(); // based on policies
 			
 			
 			
-			//Console.WriteLine("Do_Droid_Logic() - DoTargetPrioritization()");
+			Console.WriteLine("Do_Droid_Logic() - DoTargetPrioritization()");
 			DoTargetPrioritization();
 			
 			
 			// todo: if we had a list of all weapons for every ship to pass all at once
 			//       as well as all targets for each ship to pass all at once, we could run this
 			//       processor in a single call from here...
-			//Console.WriteLine("Do_Droid_Logic() - DoWeaponFitnessScores()");
+			Console.WriteLine("Do_Droid_Logic() - DoWeaponFitnessScores()");
 			DoWeaponFitnessScores(null, null);
 			
 			
 			
-			//Console.WriteLine("Do_Droid_Logic() - DoWeaponsCanFire()");
+			Console.WriteLine("Do_Droid_Logic() - DoWeaponsCanFire()");
 			DoWeaponsCanFire();
 			
 			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 						
-			//Console.WriteLine("Do_Droid_Logic() - preparing for loop()");
+			Console.WriteLine("Do_Droid_Logic() - preparing for loop()");
 			int recordCount = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, recordCount, i => 				
 			//for (int i = 0; i < Boids.Count; i++)
             {
 				if (Boids[(int)i] is Boid == false) return;
-				
-				
-			
 				
 				Boid currentBoid = (Boid)Boids[(int)i];
 				// NOTE: Transform_Struct will  host indices for Boids, OpticalSensors and TacticalStations
@@ -1628,7 +1625,7 @@ namespace HelloBoids
 				int stationArrayIndex = tacticalStationEnts[0].EntityArrayIndex;  
 				int tacticalIndex;
 				Memory<TacticalStation> tacticalStationStruct = (Memory<TacticalStation>) tacticalStationEnts[0].GetUserStruct(typeof(TacticalStation), out tacticalIndex);
-				
+
 				string errorReason = null;
 				if (tacticalStationStruct.Span[0].CanAct(out errorReason)) return;
 				//Console.WriteLine("Do_Droid_Logic() - Station CanAct() == TRUE");		
@@ -1848,15 +1845,20 @@ namespace HelloBoids
 			
             System.Threading.Tasks.Parallel.For(0, recordCount, i => 		
 			{
+				// TODO: problem with this Configuration test is, we want to test for this configuration and ONLY this configuration
+				//       and not another Configuration such as HumanOperatorConfiguration which is BoidConfiguration | Sentient added to it so 
+				//       it WILL pass this test and be incorrec.t
 				if ((allTransforms.Span[(int)i].Configuration & BoidConfiguration) != BoidConfiguration)
 				{
-					//Console.WriteLine("configuration = " + allTransforms.Span[(int)i].Configuration.ToString());
+					Console.WriteLine("configuration = " + allTransforms.Span[(int)i].Configuration.ToString());
 					return;
 				}				
 				int currentArrayIndex = allTransforms.Span[(int)i].EntityArrayIndex; // current.EntityArrayIndex; //  current.GetUserStructIndex(typeof(Transform.Transform_Struct));
 				//System.Diagnostics.Debug.Assert( (int)i == currentArrayIndex, "DoContactListSorting() - array index does not match...");
 				// the adjacnets that are stored in neighbors from the overall mNeighbors is very much stores Area of Interest for each Droid
 				// but we will only send them things that their sensors can detect (and "eyes" are treated as optical sensors)
+				Console.WriteLine ("DoContactListSorting() - Key for current == " + Boids[currentArrayIndex].EntityKey);
+				
 				Boid currentBoid = (Boid)Boids[currentArrayIndex]; // <-- if we can get the Sensors without having to get the current Boid... hmm...
 				EntityNode[] sensorEntities = currentBoid.GetSensors(); // todo: we currently do  not have EntityNode allowing adding of child nodes.  This is needed next.
 				
@@ -2319,7 +2321,8 @@ namespace HelloBoids
 
             OctreeOctant root = this.Octree;
 
-			//Console.WriteLine("parameters count == " + parameters.Length.ToString());
+			//Console.WriteLine("ProcessOpticalSensors() - parameters count == " + parameters.Length.ToString());
+			
 			// NOTE: these values derived from passed in parameters
 			double separationDistance = (double)parameters[0];
 			double alignmentDistance = (double)parameters[1];
@@ -2347,9 +2350,11 @@ namespace HelloBoids
 			
 			
 			int recordCount = (int)transformStructStore.Count;
-			Console.WriteLine("Transform_Struct.Configuration == RecordCount == " + recordCount.ToString());
+			
+			//Console.WriteLine("ProcessOpticalSensors() - TransformStore's Record count == " + recordCount.ToString());
+			
             System.Threading.Tasks.Parallel.For(0, recordCount, i =>
-			//for (int i = 0; i < memSpan.Length; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
+			//for (int i = 0; i < recordCount; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
             {
 				// NOTE: inside of the Parallel.For(), Span<T> cannot be passed in
 				//      because the code inside the Paralle.For() is treated as a Lambda
@@ -2358,7 +2363,7 @@ namespace HelloBoids
 				// NOTE: we iterate through those the Boid's (Enitites.Configuraton == BoidConfiguration) because we are interested in THEIR location  not those of the Sensors carried by each one.
 				if ((memSpan[(int)i].Configuration & BoidConfiguration) != BoidConfiguration) 
 				{
-					Console.WriteLine("Transform_Struct.Configuration == " + memSpan[(int)i].Configuration.ToString());
+					//Console.WriteLine("Transform_Struct.Configuration == " + memSpan[(int)i].Configuration.ToString());
 					return;
 				}
 				
@@ -2392,6 +2397,7 @@ namespace HelloBoids
 		#if SPATIAL_SEARCH
 				Stack<OctreeOctant> stack = new Stack<OctreeOctant>(32);
             	
+				
 				// INLINING of "GetNeighbors" in order to avoid have to load the memSpan onto the stack for each iteration
 				
 				// Vector3d currentBoidTranslation = memSpan[i].Translation;
@@ -2540,6 +2546,7 @@ namespace HelloBoids
             double alignmentDistanceSquared = alignmentDistance * alignmentDistance;
             double cohesionDistanceSquared = cohesionDistance * cohesionDistance;
 
+			
 			System.Threading.Tasks.Parallel.For(0, recordCount, i =>
 			//for (int i = 0; i < memSpan.Length; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
             {
@@ -2565,6 +2572,7 @@ namespace HelloBoids
 				for (int z = 0; z < nCount; z++)
 					if (neighbors[z].Item1 > recordCount  - 1)
 						Console.WriteLine("DoFlocking() - Neighbor value is OUT OF RANGE " + neighbors[z].ToString());
+				
 				// END TEST
 				
 				 //if (i == 8)
@@ -3146,8 +3154,7 @@ namespace HelloBoids
 			string entityKey = "tacticalstation_" + arrayIndex.ToString(); // prefix with "laser_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!			
 			
 			EntityNode station = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
-				
-					
+							
 			//CONFIGURATION TacticalStationConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.TacticalStation;
 
 			// transform struct
@@ -3155,7 +3162,7 @@ namespace HelloBoids
 			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)station.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
 			transform.Span[0].Configuration = TacticalStationConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
 			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
-
+			
 			// component struct
 			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
 			int compInternalIndex = -1;
@@ -3164,6 +3171,7 @@ namespace HelloBoids
 			storeComp.Span[compInternalIndex].Configuration = TacticalStationConfiguration;
 			storeComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
 
+		
 			// powerconsumer struct
 			ComponentStore<PowerConsumer> storePowerConsumer = EntryClass.mCStoreCol.CheckOut<PowerConsumer>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
 			int powerConsumerInternalIndex = -1;
@@ -3172,6 +3180,7 @@ namespace HelloBoids
 			storePowerConsumer.Span[powerConsumerInternalIndex].Configuration = TacticalStationConfiguration;
 			storePowerConsumer.Span[powerConsumerInternalIndex].EntityArrayIndex = arrayIndex;
 			
+			
 			// tactical station
 			ComponentStore<TacticalStation> storeTacticalStation = EntryClass.mCStoreCol.CheckOut<TacticalStation>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
             int checkOutIndex = -1;
@@ -3179,7 +3188,7 @@ namespace HelloBoids
 			station.AddUserStruct(typeof(TacticalStation), memTact, checkOutIndex);
 
 			storeTacticalStation.Span[checkOutIndex].Configuration = TacticalStationConfiguration;
-			storeTacticalStation.Span[checkOutIndex].EntityArrayIndex = station.EntityArrayIndex; // we use EntityArrayIndex and not SpanIndex because we want to use it to find the Boid element in the EntryClass.bSim.Boids[index] List
+			storeTacticalStation.Span[checkOutIndex].EntityArrayIndex = arrayIndex; // we use EntityArrayIndex and not SpanIndex because we want to use it to find the Boid element in the EntryClass.bSim.Boids[index] List
 			storeTacticalStation.Span[checkOutIndex].HistoryCount = 1;
 			storeTacticalStation.Span[checkOutIndex].CooldownBetweenActions = 3.0f;
 			storeTacticalStation.Span[checkOutIndex].MaxActions = 2;
@@ -3188,8 +3197,7 @@ namespace HelloBoids
 			storeTacticalStation.Span[checkOutIndex].Contacts = null;
 			storeTacticalStation.Span[checkOutIndex].ContactsHistory = null;
 			storeTacticalStation.Span[checkOutIndex].Targets = null;
-			
-						
+
 			// add a targetingSkill requirement to this TacticalStation
 			Skill targetingSkill;
 			targetingSkill.SkillType = SKILLS.Targeting;
@@ -3203,12 +3211,10 @@ namespace HelloBoids
 			
 			// NOTE: This station will be CONSUMING TargetingSkilLModifer and NOT producing any.  The operator will be PRODUCING
 			//targetingSkill.AddProduction(livingEntityID, PRODUCTS.TargetingSkillModifier, 1, true, -1);
-			
-			//Console.WriteLine("CreateTacticalStation - 1");
+
 			// TODO: This MUST go to the TacticalStation, NOT HERE
 			// add the skill to the DROID as if it was being added to a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
 			station.Skills.Add(targetingSkill.SkillType, targetingSkill);
-			//Console.WriteLine("CreateTacticalStation - 2");
 			
 			// each Station can Consume a TargetingSkillModifier as if it had a TACTICAL CREW STATION from an Operator
 			Consumption c;
@@ -3219,8 +3225,8 @@ namespace HelloBoids
 			c.Value =  null;
 			c.Amount = 1;
 			c.Operations = null;
+
 			
-			//Console.WriteLine("CreateTacticalStation - 3");
 			RegisterConsumption(station, c);
 			
 			return station;
@@ -3297,7 +3303,7 @@ namespace HelloBoids
 			storeLivingEntity.Span[livingEntityID].Hitpoints = 20;
 			storeLivingEntity.Span[livingEntityID].Configuration = HumanOperatorConfiguration;
 			
-			
+						
 			
 			Skill targetingSkill;
 			targetingSkill.SkillType = SKILLS.Targeting;
@@ -4949,7 +4955,9 @@ return (0,0);
 			mID = entityKey;
 			mUserData = EntryClass.mCStoreUserData.CheckOut(mID);
 				
-			Skills = new Dictionary<SKILLS, Skill>();		
+			Skills = new Dictionary<SKILLS, Skill>();	
+			Console.WriteLine ("EntityNode.ctor() - Skills for Entity '" + mID + "' created.");
+				
         }
 		
 		public string EntityKey { get {return mID;}}

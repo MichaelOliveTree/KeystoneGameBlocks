@@ -1580,26 +1580,26 @@ namespace HelloBoids
 			
 			
 			
-			//Console.WriteLine("Do_Droid_Logic() - DoTargetPrioritization()");
+			Console.WriteLine("Do_Droid_Logic() - DoTargetPrioritization()");
 			DoTargetPrioritization();
 			
 			
 			// todo: if we had a list of all weapons for every ship to pass all at once
 			//       as well as all targets for each ship to pass all at once, we could run this
 			//       processor in a single call from here...
-			//Console.WriteLine("Do_Droid_Logic() - DoWeaponFitnessScores()");
+			Console.WriteLine("Do_Droid_Logic() - DoWeaponFitnessScores()");
 			DoWeaponFitnessScores(null, null);
 			
 			
 			
-			//Console.WriteLine("Do_Droid_Logic() - DoWeaponsCanFire()");
+			Console.WriteLine("Do_Droid_Logic() - DoWeaponsCanFire()");
 			DoWeaponsCanFire();
 			
 			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 						
-			//Console.WriteLine("Do_Droid_Logic() - preparing for loop()");
+			Console.WriteLine("Do_Droid_Logic() - preparing for loop()");
 			int recordCount = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, recordCount, i => 				
 			//for (int i = 0; i < Boids.Count; i++)
@@ -1612,11 +1612,21 @@ namespace HelloBoids
 				int currentArrayIndex = currentBoid.EntityArrayIndex;
 				System.Diagnostics.Debug.Assert (currentArrayIndex == i, "Do_Droid_Logic() - i and currentArrayIndex do not match.");
 				
-				int componentIndex;
-				Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component), out componentIndex);
 				
-				if (!allComponents.Span[componentIndex].CanAct) return;
-				//Console.WriteLine("Do_Droid_Logic() - Component CanAct() == TRUE");		
+				// get a reference to the Station and determine if it "CanAct()"
+				EntityNode[] tsEnt = currentBoid.GetTacticalStations();
+				if (tsEnt == null || tsEnt.Length == 0) return;
+
+				int stationArrayIndex = tsEnt[0].EntityArrayIndex;  
+				int tacticalIndex;
+				Memory<TacticalStation> tacticalStationStruct = (Memory<TacticalStation>) tsEnt[0].GetUserStruct(typeof(TacticalStation), out tacticalIndex);
+
+
+				//int componentIndex;
+				//Memory<Component> cmp = (Memory<Component>) currentBoid.GetUserStruct(typeof(Component), out componentIndex);
+				
+				if (tacticalStationStruct.Span[0].CanAct) return;
+				Console.WriteLine("Do_Droid_Logic() - Component CanAct() == TRUE");		
 				
 				// NOTE: The EXE will render Sensor Contact info as necessary.
 				//       The client EXE will have access to those types and the UI elements using them and can update
@@ -1631,7 +1641,8 @@ namespace HelloBoids
 				// NOTE: The issue here is sometimes we iterate through List<Boids> and other times
 				//       by mem.Span.Length.  So to be consistant, we try to keep the Span indices matching
 				//       
-				string entityKey = currentBoid.EntityKey;
+				EntityNode[] weapons = currentBoid.GetWeapons();
+				string weaponKey = weapons[0].EntityKey;
 				bool canFire = false;
 				
 				// NOTE: above we check if each individual weapon can fire... we do not care
@@ -1639,18 +1650,19 @@ namespace HelloBoids
 				//       can fire, both can be used independantly.
 				try
 				{
-					canFire = mIntervalTimers.IsReady(entityKey, "droid_canfire");
+					canFire = mIntervalTimers.IsReady(weaponKey, "droid_canfire");
 					//Console.WriteLine("Do_Droid_Logic() - droid_canfire = " + entityKey + " = " + canFire.ToString());
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine("Do_Droid_Logic() - droid_canfire " + entityKey + " key does not exist");
+					Console.WriteLine("Do_Droid_Logic() - droid_canfire " + weaponKey + " key does not exist");
 				}
 				
+				Console.WriteLine("Do_Droid_Logic() - canfire...");
 				if (canFire) // TODO: Establish CANFIRE PER WEAPON
            	 	{  
 					bool suspend = false;
-					mIntervalTimers.Reset(entityKey, "droid_canfire", suspend);
+					mIntervalTimers.Reset(weaponKey, "droid_canfire", suspend);
 					
 					List<Boid> targets = null;
 					double[] distances = null;				
@@ -1662,7 +1674,7 @@ namespace HelloBoids
 						if (!success) 
 						{
 							//System.Diagnostics.Debug.Assert(mNeighbors.Count > 0, "Do_Droig_Logic() - ASSERTION FAILED - Check that optical Sensors[] list is being filled via Spawn().");
-							//Console.WriteLine("Do_Droid_Logic() -  No neighbors exist in mNeighbors! This usually occurs during the very first frame since Droid Logic occurs before ProcessOpticalSensing()");
+							Console.WriteLine("Do_Droid_Logic() -  No neighbors exist in mNeighbors! This usually occurs during the very first frame since Droid Logic occurs before ProcessOpticalSensing()");
 							return;
 						}
 					}
@@ -1682,7 +1694,7 @@ namespace HelloBoids
 						// continue; // NOTE: for regular for() loop we use "continue"
 
 					targets = tmp.OfType<Boid>().ToList();
-					//Console.WriteLine("Do_Droid_Logic() - Droid @ Array Index '" + currentArrayIndex.ToString() + "' Found " + targets.Count.ToString() + " targets.");
+					Console.WriteLine("Do_Droid_Logic() - Droid @ Array Index '" + currentArrayIndex.ToString() + "' Found " + targets.Count.ToString() + " targets.");
 					
 					try
 					{
@@ -1691,12 +1703,6 @@ namespace HelloBoids
 						double distanceToTargetSquared = distances[0];
 						
 						Console.WriteLine("Do_Droid_Logic() - 555");
-						EntityNode[] tsEnt = currentBoid.GetTacticalStations();
-						if (tsEnt == null || tsEnt.Length == 0) return;
-						
-						int stationArrayIndex = tsEnt[0].EntityArrayIndex;  
-						int tacticalIndex;
-						Memory<TacticalStation> tacticalStationStruct = (Memory<TacticalStation>) tsEnt[0].GetUserStruct(typeof(TacticalStation), out tacticalIndex);
 						
 						Console.WriteLine("Do_Droid_Logic() - abc");
 						EntityNode[] weaponEnt = currentBoid.GetWeapons();
@@ -2168,7 +2174,6 @@ namespace HelloBoids
 		
 		private void DoWeaponsCanFire()
 		{
-			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			ComponentStore<Weapon> allWeapons  = EntryClass.mCStoreCol.CheckOut<Weapon>(0);
 			
@@ -2180,7 +2185,12 @@ namespace HelloBoids
 			{
 				string errorReason;
 				// TODO: timerID must consistantly use same LivingEntityID or something else
-				string entityKey = Boids[allLivingEntities.Span[(int)i].EntityArrayIndex].EntityKey;
+				EntityNode boid = Boids[allWeapons.Span[(int)i].EntityArrayIndex - BoidSimulation.LASER_OFFSET];
+				string entityKey = boid.EntityKey;
+				EntityNode weapon = Boids[allWeapons.Span[(int)i].EntityArrayIndex];
+				string weaponKey = weapon.EntityKey;
+				//Console.WriteLine ("DoWeaponsCanFire() - Weapon Entity Key = " + weaponKey);
+				
 				bool canFire = false;
 				
 				uint USER_RUNTIME_FLAG_1 = 1 << 0;
@@ -2203,21 +2213,25 @@ namespace HelloBoids
 				
 				bool flagValue = canFire;
 				
-				allComponents.Span[(int)i].SetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
-				bool hasStruct = allComponents.Span[(int)i].GetUserStructFlag(USER_STRUCT_FLAG_1);
+				int componentIndex;
+				Memory<Component> component = (Memory<Component>)weapon.GetUserStruct(typeof(Component), out componentIndex);
 				
-				allComponents.Span[(int)i].SetUserRuntimeFlag(USER_RUNTIME_FLAG_1, flagValue);
-				bool hasRuntimeFlag = allComponents.Span[(int)i].GetUserRuntimeFlag(USER_RUNTIME_FLAG_1);
+				component.Span[0].SetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
+				bool hasStruct = component.Span[0].GetUserStructFlag(USER_STRUCT_FLAG_1);
+				component.Span[0].SetUserRuntimeFlag(USER_RUNTIME_FLAG_1, flagValue);
+				bool hasRuntimeFlag = component.Span[0].GetUserRuntimeFlag(USER_RUNTIME_FLAG_1);
+				
 				try
 				{
 					// todo: is it better to use mIntervalTimers here than to implement checks elsewhere?
-					canFire = mIntervalTimers.IsReady(entityKey, "droid_canfire");
-					// Console.WriteLine("DoWeaponsCanFire() - Droid " + timerID + " Can Fire = " + canFire.ToString());
+					canFire = mIntervalTimers.IsReady(weaponKey, "droid_canfire");
+					//Console.WriteLine("DoWeaponsCanFire() - Droid " + weaponKey + " Can Fire = " + canFire.ToString());
 					if (canFire)
 					{	
+						Console.WriteLine("DoWeaponsCanFire() - Droid " + weaponKey + " FIRING!!!");
 						// set the runtime flag
 						bool suspend = true;  // we do not want this timer to start over until we start it again
-                		mIntervalTimers.Reset(entityKey, "droid_canfire", suspend);
+                		mIntervalTimers.Reset(weaponKey, "droid_canfire", suspend);
 					}
 					
 					// set the GAME SPECIFIC runtime flag
@@ -2228,7 +2242,7 @@ namespace HelloBoids
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine("DoWeaponsCanFire() - droid_canfire " + entityKey + " key does not exist");
+					Console.WriteLine("DoWeaponsCanFire() - droid_canfire " + weaponKey + " key does not exist");
 				}
 				
 				// TODO: Do these .Is****  functions need to be setting mRuntimeFlags?
@@ -2819,8 +2833,6 @@ namespace HelloBoids
 			try
 			{
 				mIntervalTimers.Register(entityKey, "droid_spawn", 0.14d);
-				mIntervalTimers.Register(entityKey, "droid_canfire", 0.00d);
-				mIntervalTimers.Register(entityKey, "droid_isfiring", 0.06d);
 			}
 			catch (Exception ex)
 			{
@@ -3109,6 +3121,10 @@ namespace HelloBoids
 			
 			EntityNode laser = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
 					
+			mIntervalTimers.Register(entityKey, "droid_canfire", 0.00d);
+			mIntervalTimers.Register(entityKey, "droid_isfiring", 0.06d);
+			
+			
 			//CONFIGURATION LaserConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.Weapon | CONFIGURATION.Laser;
 			
 			// transform struct
@@ -3139,6 +3155,7 @@ namespace HelloBoids
             checkOutIndex = -1;
             Memory<Weapon> memWep = storeWeapon.CheckOut(out checkOutIndex);
 			laser.AddUserStruct(typeof(Weapon), memWep, checkOutIndex);	
+			storeWeapon.Span[checkOutIndex].EntityArrayIndex = laser.EntityArrayIndex;
 			storeWeapon.Span[checkOutIndex].Configuration = LaserConfiguration;
 			storeWeapon.Span[checkOutIndex].Reliable = true;
 			storeWeapon.Span[checkOutIndex].Compact = true;
@@ -3182,6 +3199,7 @@ namespace HelloBoids
             checkOutIndex = -1;
             Memory<Laser_Struct>memLaser = storeLasers.CheckOut(out checkOutIndex);
             laser.AddUserStruct(typeof(Laser_Struct), memLaser, checkOutIndex);
+			storeLasers.Span[checkOutIndex].EntityArrayIndex = laser.EntityArrayIndex;
 			storeLasers.Span[checkOutIndex].Configuration = LaserConfiguration;
 			storeLasers.Span[checkOutIndex].Type = 1;     
 			storeLasers.Span[checkOutIndex].EnergyDrill = false;

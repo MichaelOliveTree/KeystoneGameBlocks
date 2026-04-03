@@ -752,302 +752,6 @@ namespace HelloBoids
 		public const int BATTERY_OFFSET = 5;
 		public const int HUMAN_OPERATOR_OFFSET = 6;
 		
-		public struct SkillSystem
-		{
-			public struct ModificationResult
-			{
-				public int EntityIndex;
-				public int TargetIndex;
-				public SKILLS SkillType;
-				public int Amount;
-			}
-						
-			public void Apply(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
-			{
-				// NOTE: the store used here must refer to the actual memStore the Droid uses
-				//       to store it's data or else there is no way to update that Droid...Duh!
-				//       This is OK though!  We just need to know that although all the RECORDS
-				//       will be used in List<DamageResult>records, NOT ALL of the SPAN records
-				//       will be used.  No problem.  We just use memSpan[records[i].EntityIndex] 
-				//       to know which ones to use
-				//       
-				if (store == null) return;
-				Span<LivingEntity> memSpan = store.Span;
-				List<ModificationResult> records = (List<ModificationResult>)parameters[0];					
-				
-				if (records != null)
-				{
-					for (int i = 0; i < records.Count; i++)
-					{
-						LivingEntity e = (LivingEntity)memSpan[records[i].TargetIndex]; // todo: this should be the target to which the Modification should be applied
-						// = records[i].Amount;
-						
-						SKILLS s = records[i].SkillType;
-						//e.Skills[s].AddExternalModifier(records[i].Amount);
-						
-												
-						// e.Skills[(int)m.SkillToTarget].Bonuses += m.Bonus;
-						
-					 	// so lets say we have a TargetingSkillModifier every frame so long as an Operator
-						// is using the "Droid/aka TacticalCrewStation."  Or does it get added just 
-						// ONCE until after the Tactical Crew Station is "USED" by the operator and only when
-						// "UN-USED" does the bonuses get cleared.  
-						
-						// This would entail adding the PRODUCTION but NOT Registering() it.
-						
-						
-						
-					}
-				}
-			}
-		}
-		
-		
-		// todo: might exist in Game01.Rules.Processors
-		public struct SkillModificationSystem
-		{
-			List<Consumption> mRecords;
-			List<SkillSystem.ModificationResult> mSkillModResults;
-			
-			public SkillModificationSystem()
-			{
-				mRecords = new List<Consumption>();
-				mSkillModResults = new List<SkillSystem.ModificationResult>();
-			}
-			
-			public void Add (Consumption d)
-			{
-				mRecords.Add (d);
-				//Console.WriteLine ("SkillModificationSystem.Add() - Record count == " + mRecords.Count.ToString());
-			}
-			
-			public void Clear()
-			{
-				mRecords.Clear();
-				mSkillModResults.Clear();
-			}
-					
-			public void Process(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
-			{
-				if (store == null) return;
-				Span<LivingEntity> memSpan = store.Span;
-				
-				Clear();
-				
-				if (mRecords != null)
-				{
-					mSkillModResults.Clear();
-					
-					for (int i = 0; i < mRecords.Count; i++)
-					{
-						int amount = mRecords[i].Amount;
-						mSkillModResults.Add (new SkillSystem.ModificationResult() {EntityIndex = mRecords[i].ProducerInternalIndex, TargetIndex = mRecords[i].ConsumerEntityArrayIndex, Amount = amount});	
-					
-					}
-				
-					// use the same LivingEntityStore as the one passed in, for applying Skill changes to the Droid
-					BoidSimulation.mSkillSystem.Apply(store, new object[] {mSkillModResults}, seed, gt);
-				}
-			}
-		}
-		
-		public struct HealthSystem
-		{
-			public struct DamageResult
-			{
-				public int EntityIndex;
-				public int Amount;
-			}
-			
-
-			public void Apply(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
-			{
-				// NOTE: the store used here must refer to the actual memStore the Droid uses
-				//       to store it's data or else there is no way to update that Droid...Duh!
-				//       This is OK though!  We just need to know that although all the RECORDS
-				//       will be used in List<DamageResult>records, NOT ALL of the SPAN records
-				//       will be used.  No problem.  We just use memSpan[records[i].EntityIndex] 
-				//       to know which ones to use
-				//       
-				if (store == null) return;
-				Span<LivingEntity> memSpan = store.Span;
-				List<DamageResult> records = (List<DamageResult>)parameters[0];					
-				
-				if (records != null)
-				{
-					for (int i = 0; i < records.Count; i++)
-					{
-						LivingEntity e = (LivingEntity)memSpan[records[i].EntityIndex];
-						e.Hitpoints += records[i].Amount;
-					}
-				}
-			}
-		}
-		
-		//see Keystone.Game01.Messages.   public class AttackResults since
-		// we need results going over the network
-		public struct DamageSystem
-		{
-			public struct Damage
-			{
-				public int EntityIndex;
-				public int Amount;
-			}
-			
-			System.Collections.Concurrent.ConcurrentQueue<Damage> mRecords;
-			
-			//List<Damage> mRecords;
-			List<HealthSystem.DamageResult> mDamageResults;
-			
-			public DamageSystem()
-			{
-				mRecords = new System.Collections.Concurrent.ConcurrentQueue<Damage>();
-				//mRecords = new List<Damage>();
-				mDamageResults = new List<HealthSystem.DamageResult>();
-			}
-			
-			public void Add (Damage d)
-			{
-				try
-				{
-					mRecords.Enqueue(d);
-					
-					//mRecords.Add (d);
-				//Console.WriteLine ("DamageSystem.Add() - Record count == " + mRecords.Count.ToString());
-				}
-				catch (Exception ex)
-				{
-					Console.WriteLine("DamageSystem.Add() - Record Count == " + mRecords.Count.ToString());
-				}
-			}
-			
-			public void Clear()
-			{
-				mRecords.Clear();
-				mDamageResults.Clear();
-			}
-					
-			public void Process(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
-			{
-				if (store == null) return;
-				Span<LivingEntity> memSpan = store.Span;
-				
-				Clear();
-				
-				if (mRecords != null)
-				{
-					mDamageResults.Clear();
-					
-					while (mRecords.Count > 0)
-					{
-						Damage d;
-						bool result = mRecords.TryDequeue(out d);
-						
-						int amount = d.Amount;
-						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = d.EntityIndex, Amount = amount});
-						
-					}
-					/*
-					for (int i = 0; i < mRecords.Count; i++)
-					{
-						int amount = mRecords[i].Amount;
-						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = mRecords[i].EntityIndex, Amount = amount});
-					}
-					*/
-					// use the same LivingEntityStore as the one passed in, for applying health changes to the Droid
-					BoidSimulation.mHealthSystem.Apply(store, new object[] {mDamageResults}, seed, gt);
-				}
-			}
-		}
-		
-		//see Keystone.Game01.Messages.   public class AttackResults since
-		// we need results going over the network
-		public struct DamageOverTimeSystem
-		{
-			public struct DamageOverTime
-			{
-				public int EntityIndex;
-				public int Amount;
-				public float Duration;
-			}
-			
-			System.Collections.Concurrent.ConcurrentQueue<DamageOverTime> mRecords;
-			//List<DamageOverTime> mRecords;
-			List<HealthSystem.DamageResult> mDamageResults;
-			
-			
-			public DamageOverTimeSystem()
-			{
-				mRecords = new System.Collections.Concurrent.ConcurrentQueue<DamageOverTime>();
-				//mRecords = new List<DamageOverTime>();
-				mDamageResults = new List<HealthSystem.DamageResult>();
-			}
-			
-			public void Add (DamageOverTime d)
-			{
-				try
-				{
-					mRecords.Enqueue(d);
-					
-					// TODO: mRecords.Add() is not threadsafe!
-					//       This is resulting in errors when adding to the List 
-					
-					//if (mRecords == null) mRecords = new List<DamageOverTime>();
-					//mRecords.Add (d);
-					//Console.WriteLine ("DamageSystem.Add() - Record count == " + mRecords.Count.ToString());
-				}
-				catch (Exception ex)
-				{
-					Console.WriteLine("DamageOverTimeSystem.Add() - Record Count == " + mRecords.Count.ToString() + " " + ex.Message);
-				}
-			}
-					
-			public void Clear()
-			{
-				mRecords.Clear();
-				mDamageResults.Clear();
-			}
-			
-			/// <summary>
-			/// FireDamage for example, can last for several seconds and so any one particular FireDamage record is
-			/// not removed from the ComponentStore<> until it's expired
-			/// </summary>
-			public void Process(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
-			{
-				if (store == null) return;
-				Span<LivingEntity> memSpan = store.Span;
-				
-				Clear();
-				
-				if (mRecords != null)
-				{
-					mDamageResults.Clear();
-					
-					while (mRecords.Count > 0)
-					{
-						DamageOverTime d;
-						bool result = mRecords.TryDequeue(out d);
-						
-						int amount = d.Amount;
-						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = d.EntityIndex, Amount = amount});
-					}
-					
-					/* for (int i = 0; i < mRecords.Count; i++)
-					{
-						int amount = mRecords[i].Amount; // TODO: * gt.ElapsedSeconds;
-						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = mRecords[i].EntityIndex, Amount = amount});
-					}
-					*/
-					
-					// use the same LivingEntityStore as the one passed in, for applying health changes to the Droid
-					BoidSimulation.mHealthSystem.Apply(store, new object[]{ mDamageResults }, seed, gt);
-				}
-			}
-			
-            // NOTE: in KeystoneGameBlocks we would then potentially send the result to the clients if this is processing on the server
-            // FormMainBase.SendNetMessage(msg)
-		}
-		
 		
 		
         public BoidSimulation(int numBoids, double width, double height, double depth, bool useOctree = false)
@@ -1192,7 +896,7 @@ namespace HelloBoids
 			double elapsedSeconds = gt.ElapsedSeconds; 
             mIntervalTimers.Update(elapsedSeconds);
 
-			Console.WriteLine("Update() - ELAPSED SECONDS == " + gt.TotalElapsedSeconds.ToString());
+			//Console.WriteLine("Update() - ELAPSED SECONDS == " + gt.TotalElapsedSeconds.ToString());
 			
 			try
 			{
@@ -1582,8 +1286,8 @@ namespace HelloBoids
 			
 			
 			
-			//Console.WriteLine("Do_Droid_Logic() - DoContactListSorting()");
-			DoContactListSorting(); // based on policies
+			//Console.WriteLine("Do_Droid_Logic() - CreateContactListFromAdjacents()");
+			CreateContactListFromAdjacents(); // based on policies
 			
 			
 			
@@ -1836,7 +1540,7 @@ namespace HelloBoids
 		/// <summary>
 		/// This is mostly just creating 'SensorContact' from "neighbors" .... based on policies
 		/// </summary>
-		private void DoContactListSorting()
+		private void CreateContactListFromAdjacents()
 		{
 			if (mNeighbors.Count == 0) return;
 			//Console.WriteLine("DoContactListSorting() - STARTING");
@@ -1871,7 +1575,7 @@ namespace HelloBoids
 				
 				//Console.WriteLine ("2");
 				EntityNode[] sensorEntities = currentBoid.GetSensors(); // todo: we currently do  not have EntityNode allowing adding of child nodes.  This is needed next.
-				//Console.WriteLine ("3");
+
 				
 				int sensorsCount = 0;
 				if (sensorEntities != null) sensorsCount = sensorEntities.Length;
@@ -1892,42 +1596,48 @@ namespace HelloBoids
 				//Console.WriteLine("DoContactListSorting() - Found '" + neighbors.Count.ToString() + "' Adjacents for Droid @ Array Index == '" + currentArrayIndex.ToString() + "' ");
 				List<SensorContact> contacts = new List<SensorContact>();
 				
+				// iterate through all the potential "contacts"
 				for (int j = 0; j < neighbors.Count; j++)
 				{			
+					contacts.Clear();
 					ComponentStore<Transform.Transform_Struct> allTransforms  = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
 					
 					double distanceSquared = neighbors[(int)j].Item2;
-					int contactsInternalTransformIndex = neighbors[(int)j].Item1; 
-					int contactsEntityArrayIndex = allTransforms.Span[contactsInternalTransformIndex].EntityArrayIndex;
+					int potentialContactsInternalTransformIndex = neighbors[(int)j].Item1; 
+					int potentialContactsEntityArrayIndex = allTransforms.Span[potentialContactsInternalTransformIndex].EntityArrayIndex;
 			  
+					// Iterate through all the Sensors the current Droid is using to see which ones might
+					// detect this potential contact.  This is why a "SensorContact" may already exist
+					// in the List<SensorContact> 'contacts'  because multiple Sensors on _the_same_ship_
+					// might detect this adjacent 'contact.'
 					for (int k = 0; k < sensorEntities.Length; k++)
 					{
-						int structIndex = -1;
-						Memory<Sensor> sensorStruct = (Memory<Sensor>)sensorEntities[k].GetUserStruct(typeof(Sensor), out structIndex);
+						int sensorStructIndex = -1;
+						Memory<Sensor> sensorStruct = (Memory<Sensor>)sensorEntities[k].GetUserStruct(typeof(Sensor), out sensorStructIndex);
 						int sensorArrayIndex = sensorStruct.Span[0].EntityArrayIndex;
 						
-						//Console.WriteLine ("6");
 						double sensorRangeSquared = sensorStruct.Span[0].RangeSquared;
 						//Console.WriteLine("DoContactListSorting() - Range = " +  sensorRangeSquared.ToString() + " Distance to Contact ==  " + distanceSquared.ToString());
 						if (sensorRangeSquared >= distanceSquared)
 						{
 							SensorContact c;
 
-							Predicate<SensorContact> contactExists = contact => contact.ContactEntityArrayIndex == contactsEntityArrayIndex;
+							// if another sensor on this same vehicle has detected this potential contact already, append it's Sensor index
+							// to the list of SensorIndices for this contact so we know all sensors that detected it.
+							Predicate<SensorContact> contactExists = contact => contact.ContactEntityArrayIndex == potentialContactsEntityArrayIndex;
 							c = contacts.Find(contactExists);
 
-							//Console.WriteLine("DoContactListSorting() - 6");
-							if (c.Name != null)
+							if (!c.Equals(default(SensorContact)))
 							{
-								// add to the contact information, this sensor which has detected it
+								Console.WriteLine("DoContactListSorting() - sensor contact name == " + c.Name);
 								if (c.SensorsIndices == null) 
-									c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices, k);
+									c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices,  sensorArrayIndex); // sensorStructIndex);
 								else
-									c.SensorsIndices.Append(k);
+									c.SensorsIndices.Append(sensorArrayIndex); // sensorStructIndex);
 
 								Console.WriteLine("DoContactListSorting() - Appending SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
 							}
-							else // contact does not already exist
+							else // contact has not yet already been detected by another Sensor within this same ship during this loop through all sensors on this same ship
 							{
 								c = new SensorContact();
 
@@ -1935,26 +1645,26 @@ namespace HelloBoids
 								Boid bb = null;
 								try 
 								{
-									bb =  (Boid)this.Boids[contactsEntityArrayIndex];
+									bb =  (Boid)this.Boids[potentialContactsEntityArrayIndex];
 								}
 								catch (Exception ex)
 								{
-									Console.WriteLine("DoContactListSorting() - ERROR: Boid contact at Array Index == " + c.ContactEntityArrayIndex.ToString() + " not found.");
+									Console.WriteLine("DoContactListSorting() - ERROR: Boid contact at Array Index == " + c.ContactEntityArrayIndex.ToString() + " not found. " + ex.Message);
 								}
 
 								//Console.WriteLine ("9");
 								//int sensorContactInternalTransformIndex = bb.GetUserStructIndex(typeof(Transform.Transform_Struct));
 								// contact details are needed to find the correct SensorContact to potentially merge with an existing SensorContact for this detected Entity
-								// NOTE: Here we will only have one set of SensorContacts and never any duplicates
+								// NOTE: HelloBoids should only have one element within its SensorsIndices
 								//       because each Droid only has one Sensor ('Optical Sensor' == eyes)
-								c.ContactEntityArrayIndex = contactsEntityArrayIndex; // index within the Boid[] array of the detected Droid
+								c.ContactEntityArrayIndex = potentialContactsEntityArrayIndex; // index within the Boid[] array of the detected Droid
 								c.Index = (int)i;
-								c.Name =  "boid_" + contactsEntityArrayIndex.ToString(); // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
+								c.Name =  "boid_" + potentialContactsEntityArrayIndex.ToString(); // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
 								c.RegistryNumber = c.Name;
 								c.Type = SensorContact.TYPE.Drone;
 								c.ContactStatus = Target.STATUS.Unknown;
 								c.FriendOrFoe = SensorContact.FoF.Unknown;
-								// c.AddSensorIndices(sensorArrayIndex);   // <-- TODO: so we know which sensor detected this adjacent Entity
+								c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices, sensorArrayIndex); //sensorStructIndex);
 								
 								// telemetry
 								SensorContact.ContactTelemetry t;
@@ -3365,9 +3075,16 @@ namespace HelloBoids
 			p.CooldownBetweenUses = 0;
 			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
 			
-			int stationArrayIndex = -1;
+
 			// Wings, Eyes, Lasers, TacticalStation all CONSUME ElectricalPower
-			p.DistributionList = new int[] {stationArrayIndex};
+			// TODO: these indices should probably be indices into PowerConsumer struct, NOT EntityArrayIndex into List<Boids>
+			int boidArrayIndex = arrayIndex - BATTERY_OFFSET;
+			int wingsIndex = boidArrayIndex + WINGS_OFFSET;
+			int eyesIndex = boidArrayIndex + OPTICAL_SENSOR_OFFSET;
+			int laserIndex = boidArrayIndex + LASER_OFFSET;
+			int tacticalIndex = boidArrayIndex + TACTICAL_STATION_OFFSET;
+			
+			p.DistributionList = new int[] {wingsIndex, eyesIndex, laserIndex, tacticalIndex};
 			p.SearchPrimitive  = null;
 				
 			
@@ -3429,7 +3146,7 @@ namespace HelloBoids
 			p.CooldownBetweenUses = 0;
 			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
 			
-			int stationArrayIndex = -1;
+			int stationArrayIndex = arrayIndex - HUMAN_OPERATOR_OFFSET + TACTICAL_STATION_OFFSET;
 			p.DistributionList = new int[] {stationArrayIndex};
 			p.SearchPrimitive  = null;
 				
@@ -3752,7 +3469,14 @@ namespace HelloBoids
 				{
 	            	List<Production> production = mProduction.GetOrAdd(productID, (key) =>  new List<Production>());
             	
-					mProduction[productID].Add(p);
+					Predicate<Production> productionForThisEntityAndProductAlreadyExists = x => x.ProductID == p.ProductID && x.ProducerEntityArrayIndex != p.ProducerEntityArrayIndex;
+				
+					Production search = production.Find(productionForThisEntityAndProductAlreadyExists);
+					if (search.Equals(default(Production)))
+						production.Add(p);
+					else 
+						Console.WriteLine("RegisterProduction() - Production '" + ((PRODUCTS)p.ProductID).ToString() + " for Entity " + p.ProducerEntityArrayIndex + "' already exists.");
+
 				}
 			}
 			finally
@@ -3771,7 +3495,14 @@ namespace HelloBoids
 				uint productID = c.ProductID;
 				//Console.WriteLine ("RegisterConsumption()  - productID == " + productID.ToString());
             	List<Consumption> consumption = mConsumption.GetOrAdd (productID, (key) =>  new List<Consumption>());
-				mConsumption[productID].Add(c);
+				
+				Predicate<Consumption> consumptionForThisEntityAndProductAlreadyExists = x => x.ProductID == c.ProductID && x.ConsumerEntityArrayIndex != c.ConsumerEntityArrayIndex;
+				
+				Consumption search = consumption.Find(consumptionForThisEntityAndProductAlreadyExists);
+				if (search.Equals(default(Consumption)))
+					consumption.Add(c);
+				else 
+					Console.WriteLine("RegisterConsumption() - Consumption '" + ((PRODUCTS)c.ProductID).ToString() + " for Entity " + c.ConsumerEntityArrayIndex + "' already exists.");
 			}
 			finally
 			{
@@ -3994,6 +3725,7 @@ namespace HelloBoids
 				productID = entry.Key;
 				List<Production> production = entry.Value;
 				
+				Console.WriteLine("UpdateProduction() - Running production for " + ((PRODUCTS)productID).ToString());
 				// March.10.2026 - Production now always occurs automatically without every needing to call Script.OnUpdate()
 				//                 because ALL Production and Consumption must be REGISTERED by the Scripts.  In the future
 				//                 we can always support dynamic insertion of PRODUCTION during a call to Script.OnUpdate() but
@@ -4001,6 +3733,8 @@ namespace HelloBoids
 				//                 be called everyframe since we've switched to using a DATA ORIENTED PROCESSING MODEL.
 				for (int i = 0; i < production.Count; i++)
 				{
+					Production currentProduction = production[i];
+					
 					// 2) Determine consumer distrubtion - find all valid consumers that match the terms of this production result
 					// TODO: FindConsumers is very slow.  I must not run that simulation each period for Zones that are beyond a certain range from player.
 					// TODO:  Verify that we are in fact running Production for entities in every zone we load.  That is a bug.
@@ -4008,85 +3742,107 @@ namespace HelloBoids
 					if (consumers == null) continue;
 
 					// PRODUCTS.TargetingSkillModifier is generated by the OPERATOR (yes, for now still just a Skill assigned to each Droid, but eventually within KGB, it will apply to a crew member assigned to a Tactical Crew Station)
-					int[] distributionList = production[i].DistributionList;
-					if (distributionList ==  null) continue; // return if using parallel.For
+					int[] distributionList = currentProduction.DistributionList;
+					if (distributionList ==  null || distributionList.Length == 0) continue; // return if using parallel.For
 
 					// verify all Entities in the distribution list match an Entity in the registered consumers of this productID.
 					// NOTE: Just because a consumer is consuming the same ProductID, does NOT mean it's consuming the production of 
 					//       the current sourceEntity.  Consider a reactor that produces POWER, it may only power weapons and the engines
 					//       and a second Reactor or Auxillary power source provides energy for things like computers, sensors, etc even 
 					//       though it's the same PRODUCT ID.
+					// NOTE:  THIS DOES MEAN THAT IF AN ENTITY IS A CONSUMER, BUT DOES NOT REGISTER YET IS ADDED SOMEHOW TO A PRODUCERS
+					//        DISTRIBUTIONLIST or USES SOME OTHER DISTRIBUTION METHOD/FILTER, IT _MUST_NOT_GET_PROCESSED 
+					//        because again, there will be no details on how this Consumption should be applied to the Producer.
+					//        e.g do we drain 10kW from the Battery or do we drain 2kW.
 					try
 					{
-						if (distributionList.Length > 0)
+
+						// Parallelizing the INNER LOOP is typically not recommended because
+						// each time the OUTER loop completes, it has to recreate all the threads
+						// for the INNER LOOP.
+						// Maybe this is OK for our use case since we are essentially running different
+						// processing code for different PRODUCTS.  For instance, distributing PRODUCTS.ElectricalPower
+						// is not the same as applying PRODUCTS.Morale or PRODUCTS.FatigueRecovery and so if we
+						// were to parallelize the OUTER loop, those loops might finish in dramatically different
+						// lengths of time because the work can be totally different.
+						for (int j = 0; j < distributionList.Length; j++)
 						{
-							for (int j = 0; j < distributionList.Length; j++)
+
+							// TODO: MAYBE THE DISTRIBUTION LIST POINTS TO AN ENTITYARRAYINDEX THAT WE USE TO FIND
+							// AN INDEX INTO LIST<CONSUMPTION> THAT HAS THE CONSUMPTION STRUCT we need that has
+							// specific details on how to apply Consumption from that Producer to the current Consumer.
+
+							bool found = false;
+							for (int k = 0; k < consumers.Count; k++)
 							{
-								//bool found = false;
-								//for (int k = 0; k < consumers.Count; k++)
-								//{
-									// NOTE: BEWARE  of using confusing mix of EntityIndex (Span[] index, and EntityArrayIndex which is Boids[] index)
-									//       In KGB this shouldn't be a problem since we wont have them both, but for this test harnass we do
-									//if (consumers[k].EntityIndex == distributionList[j])
-									//{
-										//found = true;
+								// NOTE: BEWARE  of using confusing mix of Span[] index, and EntityArrayIndex which is Boids[] index)
+								//       In KGB this shouldn't be a problem since we wont have them both, but for this test harnass we do
+								if (consumers[k].ConsumerEntityArrayIndex == distributionList[j])
+								{
+									found = true;
+									break;
+								}
+							}
+							
+							if (!found)
+							{
+								Console.WriteLine("UpdateProduction() - Consumer '" + distributionList[j] + "'  is not registered.");
+								continue;
+							}
+							
+							try
+							{
+								// A more typical type of PRODUCTION such as PRODUCTS.ElectricalPower or PRODUCTS.OpticalReflection
+								if (currentProduction.Value is SkillModifier == false)
+								{
+									if (distributionList[j] == -1) 
+									{
+										continue;
+										Console.WriteLine("UpdateProduction() - INVALID DistributionList index value '" + distributionList[j].ToString());
 
-										try
-										{
-											// A more typical type of PRODUCTION such as PRODUCTS.ElectricalPower or PRODUCTS.OpticalReflection
-											if (production[i].Value is SkillModifier == false)
-											{
-												if (distributionList[j] == -1) 
-												{
-													continue;
-													Console.WriteLine("UpdateProduction() - INVALID DistributionList index value '" + distributionList[j].ToString());
-												
-												}
-												EntityNode consumerEntity = Boids[distributionList[j]];
-												if (consumerEntity == null) return;
-												
-												int consumerIndex = consumerEntity.EntityArrayIndex;
-												
-												Console.WriteLine("UpdateProduction() - ENTITY '" + Boids[production[i].ProducerEntityArrayIndex].EntityKey + "' PRODUCING -> " + ((PRODUCTS)production[i].ProductID).ToString() + " to '" + consumerEntity.EntityKey + "'");
-												
-											}
-											else 	// A SkillModifier
-											{
-												SkillModifier modifier = (SkillModifier)production[i].Value;
-												if (modifier.Enabled)
-												{
-													if (modifier.NumUses > 0 || modifier.NumUses == -1 )
-													{
-														Consumption[] consumptionResult = new Consumption[distributionList.Length];
-														consumptionResult[j].ConsumerEntityArrayIndex = consumers[j].ConsumerEntityArrayIndex; // the entity that is consuming a product
-														consumptionResult[j].ProducerInternalIndex = production[i].ProducerEntityInternalIndex; // the producer of the product that is being consumed by entity.ID == EntityID.
-														consumptionResult[j].ProductID = productID;          // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer.  Actually, I think we've modified this so that "PRODUCTS.HeatSignature" and "Products.HeatDamage" are two seperate products that may or may not both be consumed by any given Consumer.
-														consumptionResult[j].Value = modifier;
-														consumptionResult[j].Amount = modifier.Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
+									}
+									EntityNode consumerEntity = Boids[distributionList[j]];
+									if (consumerEntity == null) return;
 
-														mSkillModificationSystem.Add (consumptionResult[j]);
-														if (modifier.NumUses > 0)
-															modifier.NumUses--;
-													}
-													else if (modifier.NumUses == 0)
-													{
-														modifier.Enabled = false;
-													}
-												}
-											}
-										}
-										catch (Exception ex)
+									int consumerArrayIndex = consumerEntity.EntityArrayIndex;
+									System.Diagnostics.Debug.Assert (consumerArrayIndex == distributionList[j], "UpdateProduction() - Indices do not match.");
+
+									Console.WriteLine("UpdateProduction() - ENTITY '" + Boids[currentProduction.ProducerEntityArrayIndex].EntityKey + "' PRODUCING -> " + ((PRODUCTS)currentProduction.ProductID).ToString() + " to '" + consumerEntity.EntityKey + "'");
+
+								}
+								else 	// A SkillModifier
+								{
+									SkillModifier modifier = (SkillModifier)currentProduction.Value;
+									if (modifier.Enabled)
+									{
+										if (modifier.NumUses > 0 || modifier.NumUses == -1 )
 										{
-											Console.WriteLine("UpdateProduction() - ERROR: " + ex.Message);
+											Consumption[] consumptionResult = new Consumption[distributionList.Length];
+											consumptionResult[j].ConsumerEntityArrayIndex = consumers[j].ConsumerEntityArrayIndex; // the entity that is consuming a product
+											consumptionResult[j].ProducerInternalIndex = currentProduction.ProducerEntityInternalIndex; // the producer of the product that is being consumed by entity.ID == EntityID.
+											consumptionResult[j].ProductID = productID;          // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer.  Actually, I think we've modified this so that "PRODUCTS.HeatSignature" and "Products.HeatDamage" are two seperate products that may or may not both be consumed by any given Consumer.
+											consumptionResult[j].Value = modifier;
+											consumptionResult[j].Amount = modifier.Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
+
+											mSkillModificationSystem.Add (consumptionResult[j]);
+											if (modifier.NumUses > 0)
+												modifier.NumUses--;
 										}
-										// the Modifier PRODUCTS.TargetingSkillModifier must be applied to the SKILLS.Targeting of the DROID's 'Crew Station'
-										//continue;
-									//}
-								//}
-								//if (!found) throw new ArgumentOutOfRangeException("Consumer is not registered.");
-							} // end for
-						}
-					} 
+										else if (modifier.NumUses == 0)
+										{
+											modifier.Enabled = false;
+										}
+									}
+								}
+							}
+							catch (Exception ex)
+							{
+								Console.WriteLine("UpdateProduction() - ERROR: " + ex.Message);
+							}
+							// the Modifier PRODUCTS.TargetingSkillModifier must be applied to the SKILLS.Targeting of the DROID's 'Crew Station'
+							
+						} // end for
+					}
 					catch (Exception ex)
 					{
 						Console.WriteLine("UpdateProduction() - " + ex.Message);
@@ -4100,6 +3856,7 @@ namespace HelloBoids
 					// Dictionary<> mNeighbors;
 
 				} // end for of current List<production>
+				
 				foreach (Production p in production)
 				{	
 					if (p.NumUses == 0)
@@ -4116,10 +3873,305 @@ namespace HelloBoids
 				if (production.Count == 0)
 					mProduction.TryRemove(entry.Key, out production);
 			}
-			
-			
         }
 
+		public struct SkillSystem
+		{
+			public struct ModificationResult
+			{
+				public int EntityIndex;
+				public int TargetIndex;
+				public SKILLS SkillType;
+				public int Amount;
+			}
+						
+			public void Apply(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
+			{
+				// NOTE: the store used here must refer to the actual memStore the Droid uses
+				//       to store it's data or else there is no way to update that Droid...Duh!
+				//       This is OK though!  We just need to know that although all the RECORDS
+				//       will be used in List<DamageResult>records, NOT ALL of the SPAN records
+				//       will be used.  No problem.  We just use memSpan[records[i].EntityIndex] 
+				//       to know which ones to use
+				//       
+				if (store == null) return;
+				Span<LivingEntity> memSpan = store.Span;
+				List<ModificationResult> records = (List<ModificationResult>)parameters[0];					
+				
+				if (records != null)
+				{
+					for (int i = 0; i < records.Count; i++)
+					{
+						LivingEntity e = (LivingEntity)memSpan[records[i].TargetIndex]; // todo: this should be the target to which the Modification should be applied
+						// = records[i].Amount;
+						
+						SKILLS s = records[i].SkillType;
+						//e.Skills[s].AddExternalModifier(records[i].Amount);
+						
+												
+						// e.Skills[(int)m.SkillToTarget].Bonuses += m.Bonus;
+						
+					 	// so lets say we have a TargetingSkillModifier every frame so long as an Operator
+						// is using the "Droid/aka TacticalCrewStation."  Or does it get added just 
+						// ONCE until after the Tactical Crew Station is "USED" by the operator and only when
+						// "UN-USED" does the bonuses get cleared.  
+						
+						// This would entail adding the PRODUCTION but NOT Registering() it.
+						
+						
+						
+					}
+				}
+			}
+		}
+		
+		
+		// todo: might exist in Game01.Rules.Processors
+		public struct SkillModificationSystem
+		{
+			List<Consumption> mRecords;
+			List<SkillSystem.ModificationResult> mSkillModResults;
+			
+			public SkillModificationSystem()
+			{
+				mRecords = new List<Consumption>();
+				mSkillModResults = new List<SkillSystem.ModificationResult>();
+			}
+			
+			public void Add (Consumption d)
+			{
+				mRecords.Add (d);
+				//Console.WriteLine ("SkillModificationSystem.Add() - Record count == " + mRecords.Count.ToString());
+			}
+			
+			public void Clear()
+			{
+				mRecords.Clear();
+				mSkillModResults.Clear();
+			}
+					
+			public void Process(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
+			{
+				if (store == null) return;
+				Span<LivingEntity> memSpan = store.Span;
+				
+				Clear();
+				
+				if (mRecords != null)
+				{
+					mSkillModResults.Clear();
+					
+					for (int i = 0; i < mRecords.Count; i++)
+					{
+						int amount = mRecords[i].Amount;
+						mSkillModResults.Add (new SkillSystem.ModificationResult() {EntityIndex = mRecords[i].ProducerInternalIndex, TargetIndex = mRecords[i].ConsumerEntityArrayIndex, Amount = amount});	
+					
+					}
+				
+					// use the same LivingEntityStore as the one passed in, for applying Skill changes to the Droid
+					BoidSimulation.mSkillSystem.Apply(store, new object[] {mSkillModResults}, seed, gt);
+				}
+			}
+		}
+		
+		public struct HealthSystem
+		{
+			public struct DamageResult
+			{
+				public int EntityIndex;
+				public int Amount;
+			}
+			
+
+			public void Apply(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
+			{
+				// NOTE: the store used here must refer to the actual memStore the Droid uses
+				//       to store it's data or else there is no way to update that Droid...Duh!
+				//       This is OK though!  We just need to know that although all the RECORDS
+				//       will be used in List<DamageResult>records, NOT ALL of the SPAN records
+				//       will be used.  No problem.  We just use memSpan[records[i].EntityIndex] 
+				//       to know which ones to use
+				//       
+				if (store == null) return;
+				Span<LivingEntity> memSpan = store.Span;
+				List<DamageResult> records = (List<DamageResult>)parameters[0];					
+				
+				if (records != null)
+				{
+					for (int i = 0; i < records.Count; i++)
+					{
+						LivingEntity e = (LivingEntity)memSpan[records[i].EntityIndex];
+						e.Hitpoints += records[i].Amount;
+					}
+				}
+			}
+		}
+		
+		//see Keystone.Game01.Messages.   public class AttackResults since
+		// we need results going over the network
+		public struct DamageSystem
+		{
+			public struct Damage
+			{
+				public int EntityIndex;
+				public int Amount;
+			}
+			
+			System.Collections.Concurrent.ConcurrentQueue<Damage> mRecords;
+			
+			//List<Damage> mRecords;
+			List<HealthSystem.DamageResult> mDamageResults;
+			
+			public DamageSystem()
+			{
+				mRecords = new System.Collections.Concurrent.ConcurrentQueue<Damage>();
+				//mRecords = new List<Damage>();
+				mDamageResults = new List<HealthSystem.DamageResult>();
+			}
+			
+			public void Add (Damage d)
+			{
+				try
+				{
+					mRecords.Enqueue(d);
+					
+					//mRecords.Add (d);
+				//Console.WriteLine ("DamageSystem.Add() - Record count == " + mRecords.Count.ToString());
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("DamageSystem.Add() - Record Count == " + mRecords.Count.ToString());
+				}
+			}
+			
+			public void Clear()
+			{
+				mRecords.Clear();
+				mDamageResults.Clear();
+			}
+					
+			public void Process(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
+			{
+				if (store == null) return;
+				Span<LivingEntity> memSpan = store.Span;
+				
+				Clear();
+				
+				if (mRecords != null)
+				{
+					mDamageResults.Clear();
+					
+					while (mRecords.Count > 0)
+					{
+						Damage d;
+						bool result = mRecords.TryDequeue(out d);
+						
+						int amount = d.Amount;
+						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = d.EntityIndex, Amount = amount});
+						
+					}
+					/*
+					for (int i = 0; i < mRecords.Count; i++)
+					{
+						int amount = mRecords[i].Amount;
+						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = mRecords[i].EntityIndex, Amount = amount});
+					}
+					*/
+					// use the same LivingEntityStore as the one passed in, for applying health changes to the Droid
+					BoidSimulation.mHealthSystem.Apply(store, new object[] {mDamageResults}, seed, gt);
+				}
+			}
+		}
+		
+		//see Keystone.Game01.Messages.   public class AttackResults since
+		// we need results going over the network
+		public struct DamageOverTimeSystem
+		{
+			public struct DamageOverTime
+			{
+				public int EntityIndex;
+				public int Amount;
+				public float Duration;
+			}
+			
+			System.Collections.Concurrent.ConcurrentQueue<DamageOverTime> mRecords;
+			//List<DamageOverTime> mRecords;
+			List<HealthSystem.DamageResult> mDamageResults;
+			
+			
+			public DamageOverTimeSystem()
+			{
+				mRecords = new System.Collections.Concurrent.ConcurrentQueue<DamageOverTime>();
+				//mRecords = new List<DamageOverTime>();
+				mDamageResults = new List<HealthSystem.DamageResult>();
+			}
+			
+			public void Add (DamageOverTime d)
+			{
+				try
+				{
+					mRecords.Enqueue(d);
+					
+					// TODO: mRecords.Add() is not threadsafe!
+					//       This is resulting in errors when adding to the List 
+					
+					//if (mRecords == null) mRecords = new List<DamageOverTime>();
+					//mRecords.Add (d);
+					//Console.WriteLine ("DamageSystem.Add() - Record count == " + mRecords.Count.ToString());
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("DamageOverTimeSystem.Add() - Record Count == " + mRecords.Count.ToString() + " " + ex.Message);
+				}
+			}
+					
+			public void Clear()
+			{
+				mRecords.Clear();
+				mDamageResults.Clear();
+			}
+			
+			/// <summary>
+			/// FireDamage for example, can last for several seconds and so any one particular FireDamage record is
+			/// not removed from the ComponentStore<> until it's expired
+			/// </summary>
+			public void Process(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
+			{
+				if (store == null) return;
+				Span<LivingEntity> memSpan = store.Span;
+				
+				Clear();
+				
+				if (mRecords != null)
+				{
+					mDamageResults.Clear();
+					
+					while (mRecords.Count > 0)
+					{
+						DamageOverTime d;
+						bool result = mRecords.TryDequeue(out d);
+						
+						int amount = d.Amount;
+						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = d.EntityIndex, Amount = amount});
+					}
+					
+					/* for (int i = 0; i < mRecords.Count; i++)
+					{
+						int amount = mRecords[i].Amount; // TODO: * gt.ElapsedSeconds;
+						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = mRecords[i].EntityIndex, Amount = amount});
+					}
+					*/
+					
+					// use the same LivingEntityStore as the one passed in, for applying health changes to the Droid
+					BoidSimulation.mHealthSystem.Apply(store, new object[]{ mDamageResults }, seed, gt);
+				}
+			}
+			
+            // NOTE: in KeystoneGameBlocks we would then potentially send the result to the clients if this is processing on the server
+            // FormMainBase.SendNetMessage(msg)
+		}
+		
+		
 		#endregion
 
 

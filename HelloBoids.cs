@@ -3469,7 +3469,7 @@ namespace HelloBoids
 				{
 	            	List<Production> production = mProduction.GetOrAdd(productID, (key) =>  new List<Production>());
             	
-					Predicate<Production> productionForThisEntityAndProductAlreadyExists = x => x.ProductID == p.ProductID && x.ProducerEntityArrayIndex != p.ProducerEntityArrayIndex;
+					Predicate<Production> productionForThisEntityAndProductAlreadyExists = x => x.ProductID == p.ProductID && x.ProducerEntityArrayIndex == p.ProducerEntityArrayIndex;
 				
 					Production search = production.Find(productionForThisEntityAndProductAlreadyExists);
 					if (search.Equals(default(Production)))
@@ -3496,7 +3496,7 @@ namespace HelloBoids
 				//Console.WriteLine ("RegisterConsumption()  - productID == " + productID.ToString());
             	List<Consumption> consumption = mConsumption.GetOrAdd (productID, (key) =>  new List<Consumption>());
 				
-				Predicate<Consumption> consumptionForThisEntityAndProductAlreadyExists = x => x.ProductID == c.ProductID && x.ConsumerEntityArrayIndex != c.ConsumerEntityArrayIndex;
+				Predicate<Consumption> consumptionForThisEntityAndProductAlreadyExists = x => x.ProductID == c.ProductID && x.ConsumerEntityArrayIndex == c.ConsumerEntityArrayIndex;
 				
 				Consumption search = consumption.Find(consumptionForThisEntityAndProductAlreadyExists);
 				if (search.Equals(default(Consumption)))

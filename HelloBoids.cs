@@ -3040,6 +3040,19 @@ namespace HelloBoids
 			RegisterProduction(opticalSensor, p);
 			RegisterConsumption(opticalSensor, c);
 			
+			
+			// each OpticalSensor CONSUMES PRODUCT.ElectricalPower from our Battery (a Producer)
+			c.ConsumerEntityArrayIndex = opticalSensor.EntityArrayIndex;
+			c.ConsumerInternalIndex = transformIndex;
+			c.ProducerInternalIndex = -1; //p.ProducerEntityInternalIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
+			c.ProductID = (uint)PRODUCTS.ElectricalPower;
+			c.Value =  2;  // 10 kW/h
+			c.Amount = 1;
+			c.Operations = null;
+			
+			RegisterConsumption(opticalSensor, c);
+			
+			
 			return opticalSensor;
 		}
 		
@@ -3074,6 +3087,17 @@ namespace HelloBoids
 			storeWings.Span[powerConsumerInternalIndex].Configuration = WingsConfiguration;
 			storeWings.Span[powerConsumerInternalIndex].EntityArrayIndex = arrayIndex;
 			
+			// each Wing CONSUMES PRODUCT.ElectricalPower from our Battery (a Producer)
+			Consumption c;
+			c.ConsumerEntityArrayIndex = wings.EntityArrayIndex;
+			c.ConsumerInternalIndex = transformIndex;
+			c.ProducerInternalIndex = -1; //p.ProducerEntityInternalIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
+			c.ProductID = (uint)PRODUCTS.ElectricalPower;
+			c.Value =  5;  // 5 kW/h
+			c.Amount = 1;
+			c.Operations = null;
+			
+			RegisterConsumption(wings, c);
 			
 			return wings;
 		}
@@ -3171,7 +3195,19 @@ namespace HelloBoids
 			storeLasers.Span[checkOutIndex].FTL = true;
 			storeLasers.Span[checkOutIndex].BeamOutput = 10f; // kW
 			storeLasers.Span[checkOutIndex].CyclicRate = 1;
-						
+					
+			// each Laser CONSUMES PRODUCT.ElectricalPower from our Battery (a Producer)
+			Consumption c;
+			c.ConsumerEntityArrayIndex = laser.EntityArrayIndex;
+			c.ConsumerInternalIndex = transformIndex;
+			c.ProducerInternalIndex = -1; //p.ProducerEntityInternalIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
+			c.ProductID = (uint)PRODUCTS.ElectricalPower;
+			c.Value =  25;  // 10 kW/h
+			c.Amount = 1;
+			c.Operations = null;
+			
+			RegisterConsumption(laser, c);
+			
 			return laser;
 		}
 		
@@ -3243,8 +3279,20 @@ namespace HelloBoids
 			// add the skill to the DROID as if it was being added to a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
 			station.Skills.Add(targetingSkill.SkillType, targetingSkill);
 			
-			// each Station can Consume a TargetingSkillModifier as if it had a TACTICAL CREW STATION from an Operator
+			// each Station CONSUMES PRODUCT.ElectricalPower from our Batter (a Producer)
 			Consumption c;
+			c.ConsumerEntityArrayIndex = station.EntityArrayIndex;
+			c.ConsumerInternalIndex = transformIndex;
+			c.ProducerInternalIndex = -1; //p.ProducerEntityInternalIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
+			c.ProductID = (uint)PRODUCTS.ElectricalPower;
+			c.Value =  10;  // 10 kW/h
+			c.Amount = 1;
+			c.Operations = null;
+			
+			RegisterConsumption(station, c);
+			
+			
+			// each Station can Consume a TargetingSkillModifier as if it had a TACTICAL CREW STATION from an Operator
 			c.ConsumerEntityArrayIndex = station.EntityArrayIndex;
 			c.ConsumerInternalIndex = transformIndex;
 			c.ProducerInternalIndex = -1; //p.ProducerEntityInternalIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
@@ -3311,9 +3359,9 @@ namespace HelloBoids
 			p.ProductID = 	(uint)PRODUCTS.ElectricalPower;
 			p.Location = Vector3d.Zero();
 			p.Enabled = true;
-			p.Value = 100d;  // the UNIT value... in this case it's a DOUBLE
-			p.Amount = 100d; // number of units produced each UPDATE 
-			p.NumUses = -1; // update every TICK if -1 NumUses
+			p.Value = 1000d;  // the UNIT value... in this case it's a DOUBLE
+			p.Amount = -1; // a Battery can produce as much as is needed to supply all of it's Consumers until it runs out of Energy  
+			p.NumUses = 100; // This Battery can be used 100 times (100 updates or frames) before it runs out.  update every TICK if -1 NumUses
 			p.CooldownBetweenUses = 0;
 			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
 			
@@ -3985,34 +4033,51 @@ namespace HelloBoids
 
 										try
 										{
-											SkillModifier modifier = (SkillModifier)production[i].Value;
-											if (modifier.Enabled)
+											// A more typical type of PRODUCTION such as PRODUCTS.ElectricalPower or PRODUCTS.OpticalReflection
+											if (production[i].Value is SkillModifier == false)
 											{
-												if (modifier.NumUses > 0 || modifier.NumUses == -1 )
+												if (distributionList[j] == -1) 
 												{
-													Consumption[] consumptionResult = new Consumption[distributionList.Length];
-													consumptionResult[j].ConsumerEntityArrayIndex = consumers[j].ConsumerEntityArrayIndex; // the entity that is consuming a product
-													consumptionResult[j].ProducerInternalIndex = production[i].ProducerEntityInternalIndex; // the producer of the product that is being consumed by entity.ID == EntityID.
-													consumptionResult[j].ProductID = productID;          // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer.  Actually, I think we've modified this so that "PRODUCTS.HeatSignature" and "Products.HeatDamage" are two seperate products that may or may not both be consumed by any given Consumer.
-													consumptionResult[j].Value = modifier;
-													consumptionResult[j].Amount = modifier.Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
-
-													mSkillModificationSystem.Add (consumptionResult[j]);
-													if (modifier.NumUses > 0)
-														modifier.NumUses--;
+													continue;
+													Console.WriteLine("UpdateProduction() - INVALID DistributionList index value '" + distributionList[j].ToString());
+												
 												}
-												else if (modifier.NumUses == 0)
+												EntityNode consumerEntity = Boids[distributionList[j]];
+												if (consumerEntity == null) return;
+												
+												int consumerIndex = consumerEntity.EntityArrayIndex;
+												
+												Console.WriteLine("UpdateProduction() - ENTITY '" + Boids[production[i].ProducerEntityArrayIndex].EntityKey + "' PRODUCING -> " + ((PRODUCTS)production[i].ProductID).ToString() + " to '" + consumerEntity.EntityKey + "'");
+												
+											}
+											else 	// A SkillModifier
+											{
+												SkillModifier modifier = (SkillModifier)production[i].Value;
+												if (modifier.Enabled)
 												{
-													modifier.Enabled = false;
+													if (modifier.NumUses > 0 || modifier.NumUses == -1 )
+													{
+														Consumption[] consumptionResult = new Consumption[distributionList.Length];
+														consumptionResult[j].ConsumerEntityArrayIndex = consumers[j].ConsumerEntityArrayIndex; // the entity that is consuming a product
+														consumptionResult[j].ProducerInternalIndex = production[i].ProducerEntityInternalIndex; // the producer of the product that is being consumed by entity.ID == EntityID.
+														consumptionResult[j].ProductID = productID;          // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer.  Actually, I think we've modified this so that "PRODUCTS.HeatSignature" and "Products.HeatDamage" are two seperate products that may or may not both be consumed by any given Consumer.
+														consumptionResult[j].Value = modifier;
+														consumptionResult[j].Amount = modifier.Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
+
+														mSkillModificationSystem.Add (consumptionResult[j]);
+														if (modifier.NumUses > 0)
+															modifier.NumUses--;
+													}
+													else if (modifier.NumUses == 0)
+													{
+														modifier.Enabled = false;
+													}
 												}
 											}
-
-
-
 										}
 										catch (Exception ex)
 										{
-											Console.WriteLine("......");
+											Console.WriteLine("UpdateProduction() - ERROR: " + ex.Message);
 										}
 										// the Modifier PRODUCTS.TargetingSkillModifier must be applied to the SKILLS.Targeting of the DROID's 'Crew Station'
 										//continue;

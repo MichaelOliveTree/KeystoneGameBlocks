@@ -1192,6 +1192,8 @@ namespace HelloBoids
 			double elapsedSeconds = gt.ElapsedSeconds; 
             mIntervalTimers.Update(elapsedSeconds);
 
+			Console.WriteLine("Update() - ELAPSED SECONDS == " + gt.TotalElapsedSeconds.ToString());
+			
 			try
 			{
 				// TODO: I should probably just add a setting for whether we are doing CLASSES or MEMORYT so that
@@ -1666,7 +1668,7 @@ namespace HelloBoids
 						if (!success) 
 						{
 							//System.Diagnostics.Debug.Assert(mNeighbors.Count > 0, "Do_Droig_Logic() - ASSERTION FAILED - Check that optical Sensors[] list is being filled via Spawn().");
-							Console.WriteLine("Do_Droid_Logic() -  No neighbors exist in mNeighbors! This usually occurs during the very first frame since Droid Logic occurs before ProcessOpticalSensing()");
+							//Console.WriteLine("Do_Droid_Logic() -  No neighbors exist in mNeighbors! This usually occurs during the very first frame since Droid Logic occurs before ProcessOpticalSensing()");
 							return;
 						}
 					}
@@ -1837,25 +1839,24 @@ namespace HelloBoids
 		private void DoContactListSorting()
 		{
 			if (mNeighbors.Count == 0) return;
-			Console.WriteLine("DoContactListSorting() - STARTING");
+			//Console.WriteLine("DoContactListSorting() - STARTING");
 			
-			ComponentStore<Transform.Transform_Struct> allTransforms  = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
-			int recordCount = (int)allTransforms.Count;
-			// NOTE: The following Assert will NOT match because allTransforms also includes OpticalSensor EntityNodes and TacticalStation nodes, and NOT just Droids.
-			//System.Diagnostics.Debug.Assert (allTransforms.Count == count, "DoContactListSorting() - Span Count " + allTransforms.Count.ToString() + " and Boids Array Length " + count.ToString() + " do not match.");
-			
+			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
+			int recordCount = (int)allTacticalStations.Count;
+
             System.Threading.Tasks.Parallel.For(0, recordCount, i => 		
 			{
 				// NOTE: problem with the BOOLEAN version of this Configuration test is, we want to test for Boid configuration and ONLY Boid configuration
 				//       and not another Configuration such as HumanOperatorConfiguration which CONTAINS all of BoidConfiguration  but LOGICALLY OR's "|" CONFIGURATION.Sentient as well 
 				//       and so it WILL pass the BOOLEAN version of this test.  Thus solution is a DIRECT == compare.  Duh!
-				if (allTransforms.Span[(int)i].Configuration != BoidConfiguration)
-				//if ((allTransforms.Span[(int)i].Configuration & BoidConfiguration) != BoidConfiguration)
+				if (allTacticalStations.Span[(int)i].Configuration != TacticalStationConfiguration)
+				//if ((allTacticalStations.Span[(int)i].Configuration & BoidConfiguration) != BoidConfiguration)
 				{
 					//Console.WriteLine("configuration = " + allTransforms.Span[(int)i].Configuration.ToString());
 					return;
-				}				
-				int currentArrayIndex = allTransforms.Span[(int)i].EntityArrayIndex; // current.EntityArrayIndex; //  current.GetUserStructIndex(typeof(Transform.Transform_Struct));
+				}	
+				
+				int currentArrayIndex = allTacticalStations.Span[(int)i].EntityArrayIndex; // current.EntityArrayIndex; //  current.GetUserStructIndex(typeof(Transform.Transform_Struct));
 				//System.Diagnostics.Debug.Assert( (int)i == currentArrayIndex, "DoContactListSorting() - array index does not match...");
 				// the adjacnets that are stored in neighbors from the overall mNeighbors is very much stores Area of Interest for each Droid
 				// but we will only send them things that their sensors can detect (and "eyes" are treated as optical sensors)
@@ -1864,13 +1865,20 @@ namespace HelloBoids
 				// TODO: Should we be iterating over the 'TacticalStation' struct's and NOT the Boids array? and then getting the SensorContacts from it?
 				//       we could skip any TacticalStation that is not designated as PRIMARY TacticalStation
 				
-				Boid currentBoid = (Boid)Boids[currentArrayIndex]; // <-- if we can get the Sensors without having to get the current Boid... hmm...
+				EntityNode currentStation = Boids[currentArrayIndex]; // <-- if we can get the Sensors without having to get the current Boid... hmm...
+				int currentBoidArrayIndex = currentStation.EntityArrayIndex - TACTICAL_STATION_OFFSET;
+				Boid currentBoid = (Boid)Boids[currentBoidArrayIndex];
+				
+				//Console.WriteLine ("2");
 				EntityNode[] sensorEntities = currentBoid.GetSensors(); // todo: we currently do  not have EntityNode allowing adding of child nodes.  This is needed next.
+				//Console.WriteLine ("3");
 				
 				int sensorsCount = 0;
 				if (sensorEntities != null) sensorsCount = sensorEntities.Length;
 				//Console.WriteLine("DoContactListSorting() - Sensor Count == " + sensorsCount);
 				if (sensorEntities == null) return; 
+				
+				//Console.WriteLine ("4");
 				
 				// grab the neighbors/adjacents for this Droid.  The returned parameter List<Tuple<int, double>> tells us which Droid (int) index was detected and the (double) distance to it  
 				List<Tuple<int, double>> neighbors = null;
@@ -1879,13 +1887,15 @@ namespace HelloBoids
 				//foreach (int key in mNeighbors.Keys)
 				//	Console.WriteLine ("Key == " + key.ToString());
 				
-				bool success = mNeighbors.TryGetValue(currentArrayIndex, out neighbors);
-				
+				bool success = mNeighbors.TryGetValue(currentBoidArrayIndex, out neighbors);
+								
 				//Console.WriteLine("DoContactListSorting() - Found '" + neighbors.Count.ToString() + "' Adjacents for Droid @ Array Index == '" + currentArrayIndex.ToString() + "' ");
 				List<SensorContact> contacts = new List<SensorContact>();
 				
 				for (int j = 0; j < neighbors.Count; j++)
 				{			
+					ComponentStore<Transform.Transform_Struct> allTransforms  = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
+					
 					double distanceSquared = neighbors[(int)j].Item2;
 					int contactsInternalTransformIndex = neighbors[(int)j].Item1; 
 					int contactsEntityArrayIndex = allTransforms.Span[contactsInternalTransformIndex].EntityArrayIndex;
@@ -1896,6 +1906,7 @@ namespace HelloBoids
 						Memory<Sensor> sensorStruct = (Memory<Sensor>)sensorEntities[k].GetUserStruct(typeof(Sensor), out structIndex);
 						int sensorArrayIndex = sensorStruct.Span[0].EntityArrayIndex;
 						
+						//Console.WriteLine ("6");
 						double sensorRangeSquared = sensorStruct.Span[0].RangeSquared;
 						//Console.WriteLine("DoContactListSorting() - Range = " +  sensorRangeSquared.ToString() + " Distance to Contact ==  " + distanceSquared.ToString());
 						if (sensorRangeSquared >= distanceSquared)
@@ -1914,12 +1925,13 @@ namespace HelloBoids
 								else
 									c.SensorsIndices.Append(k);
 
-								//Console.WriteLine("DoContactListSorting() - Appending SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
+								Console.WriteLine("DoContactListSorting() - Appending SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
 							}
 							else // contact does not already exist
 							{
 								c = new SensorContact();
 
+								//Console.WriteLine("DoContactListSorting() - Creating NEW SensorContact of Droid at Array Index = '" + contactsEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
 								Boid bb = null;
 								try 
 								{
@@ -1930,6 +1942,7 @@ namespace HelloBoids
 									Console.WriteLine("DoContactListSorting() - ERROR: Boid contact at Array Index == " + c.ContactEntityArrayIndex.ToString() + " not found.");
 								}
 
+								//Console.WriteLine ("9");
 								//int sensorContactInternalTransformIndex = bb.GetUserStructIndex(typeof(Transform.Transform_Struct));
 								// contact details are needed to find the correct SensorContact to potentially merge with an existing SensorContact for this detected Entity
 								// NOTE: Here we will only have one set of SensorContacts and never any duplicates
@@ -1941,7 +1954,8 @@ namespace HelloBoids
 								c.Type = SensorContact.TYPE.Drone;
 								c.ContactStatus = Target.STATUS.Unknown;
 								c.FriendOrFoe = SensorContact.FoF.Unknown;
-
+								// c.AddSensorIndices(sensorArrayIndex);   // <-- TODO: so we know which sensor detected this adjacent Entity
+								
 								// telemetry
 								SensorContact.ContactTelemetry t;
 								t.Radius = (float)bb.BoundingBox.Radius;    // how might size be spoofed?
@@ -1964,10 +1978,10 @@ namespace HelloBoids
 				// this will be the TacticalStation instead, and it will be responsible for
 				// properly merging these SensorContacts with existing ones so as to maintain
 				// proper SensorContact histories for all detected Entities.
-				currentBoid.Add(contacts); 
+				currentStation.Add(contacts); 
 			});
 			
-			Console.WriteLine("DoContactListSorting() - COMPLETED.");
+			//Console.WriteLine("DoContactListSorting() - COMPLETED.");
 		}
 		
 		/// <summary>
@@ -3290,6 +3304,26 @@ namespace HelloBoids
 			storePowerProducers.Span[powerProducerInternalIndex].Configuration = BatteryConfiguration;
 			storePowerProducers.Span[powerProducerInternalIndex].EntityArrayIndex = arrayIndex;
 					
+			// each Battery can Produce a PRODUCTS.ElectricalPower
+			Production p;
+			p.ProducerEntityArrayIndex = battery.EntityArrayIndex;
+			p.ProducerEntityInternalIndex = powerProducerInternalIndex;
+			p.ProductID = 	(uint)PRODUCTS.ElectricalPower;
+			p.Location = Vector3d.Zero();
+			p.Enabled = true;
+			p.Value = 100d;  // the UNIT value... in this case it's a DOUBLE
+			p.Amount = 100d; // number of units produced each UPDATE 
+			p.NumUses = -1; // update every TICK if -1 NumUses
+			p.CooldownBetweenUses = 0;
+			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
+			
+			int stationArrayIndex = -1;
+			// Wings, Eyes, Lasers, TacticalStation all CONSUME ElectricalPower
+			p.DistributionList = new int[] {stationArrayIndex};
+			p.SearchPrimitive  = null;
+				
+			
+			RegisterProduction(battery, p);
 						
 			return battery;
 		}
@@ -4167,79 +4201,6 @@ namespace HelloBoids
 			return found.ToArray();
 		}
 		
-		private List<Target> mTargets;
-		public List<Target> GetTargets()
-		{
-			return mTargets;
-		}
-		
-		public void Add (Target t)
-		{
-			if (mTargets == null) mTargets = new List<Target>();
-			
-			// if the target already exists, replace it with current data?
-			int found = -1;
-			for (int i = 0; i < mTargets.Count; i++)
-				if (mTargets[i].EntityArrayIndex == t.EntityArrayIndex)
-				{
-					found = i;
-					break;
-				}
-			
-			if (found == -1)
-				mTargets.Add(t);
-			else
-				mTargets[found] = t;
-			
-		}
-		
-		public void Add (Target[] t)
-		{
-			if (t == null || t.Length == 0) return;
-			
-			for (int i = 0; i < t.Length; i++)
-				Add(t[i]);
-		}
-		
-		public void ClearTargets()
-		{
-			if (mTargets != null)
-				mTargets.Clear();
-		}
-		
-		// TODO: this should normally be in TacticalStation script correct?
-		private List<SensorContact> mSensorContacts;
-		public List<SensorContact> GetSensorContacts()
-		{
-			return mSensorContacts;
-		}
-		
-		public void Add (SensorContact c)
-		{
-			if (mSensorContacts == null) mSensorContacts = new List<SensorContact>();
-			
-			int found = -1;
-			for (int i = 0; i < mSensorContacts.Count; i++)
-				if (mSensorContacts[i].Name == c.Name)
-				{
-					found = i;
-					break;
-				}
-			
-			if (found == -1) 
-				mSensorContacts.Add (c);
-			else 
-				mSensorContacts[found].Add(c.Telemetry);
-			
-			Console.WriteLine("Boid.Add(SensorContact) - SensorContact added.");
-		}
-		
-		public void Add (List<SensorContact> contacts)
-		{
-			if (contacts == null) return;
-			for (int i = 0; i < contacts.Count; i++)
-				Add(contacts[i]);
-		}
 	#endregion
 			
 			
@@ -4968,9 +4929,7 @@ return (0,0);
 			mID = entityKey;
 			mUserData = EntryClass.mCStoreUserData.CheckOut(mID);
 				
-			Skills = new Dictionary<SKILLS, Skill>();	
-			Console.WriteLine ("EntityNode.ctor() - Skills for Entity '" + mID + "' created.");
-				
+			Skills = new Dictionary<SKILLS, Skill>();		
         }
 		
 		public string EntityKey { get {return mID;}}
@@ -4993,6 +4952,91 @@ return (0,0);
             set { _octant = value; }
         }
 
+	
+		
+		
+		
+		
+		private List<Target> mTargets;
+		public List<Target> GetTargets()
+		{
+			return mTargets;
+		}
+		
+		public void Add (Target t)
+		{
+			if (mTargets == null) mTargets = new List<Target>();
+			
+			// if the target already exists, replace it with current data?
+			int found = -1;
+			for (int i = 0; i < mTargets.Count; i++)
+				if (mTargets[i].EntityArrayIndex == t.EntityArrayIndex)
+				{
+					found = i;
+					break;
+				}
+			
+			if (found == -1)
+				mTargets.Add(t);
+			else
+				mTargets[found] = t;
+			
+		}
+		
+		public void Add (Target[] t)
+		{
+			if (t == null || t.Length == 0) return;
+			
+			for (int i = 0; i < t.Length; i++)
+				Add(t[i]);
+		}
+		
+		public void ClearTargets()
+		{
+			if (mTargets != null)
+				mTargets.Clear();
+		}
+		
+		
+		
+		#region PLACE_THIS_CODE_IN_SCRIPT_FOR_TACTICAL_STATION
+		// TODO: this should normally be in TacticalStation script correct?
+		//         
+		private List<SensorContact> mSensorContacts;
+		public List<SensorContact> GetSensorContacts()
+		{
+			return mSensorContacts;
+		}
+		
+		public void Add (SensorContact c)
+		{
+			if (mSensorContacts == null) mSensorContacts = new List<SensorContact>();
+			
+			int found = -1;
+			for (int i = 0; i < mSensorContacts.Count; i++)
+				if (mSensorContacts[i].Name == c.Name)
+				{
+					found = i;
+					break;
+				}
+			
+			if (found == -1) 
+				mSensorContacts.Add (c);
+			else 
+				mSensorContacts[found].Add(c.Telemetry);
+			
+			//Console.WriteLine("EntityNode.Add(SensorContact) - SensorContact added.");
+		}
+		
+		public void Add (List<SensorContact> contacts)
+		{
+			if (contacts == null) return;
+			for (int i = 0; i < contacts.Count; i++)
+				Add(contacts[i]);
+		}
+		#endregion
+		
+		
 		
 		
 		

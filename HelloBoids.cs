@@ -2717,7 +2717,6 @@ namespace HelloBoids
 				Console.WriteLine(exLine + " " + ex.Message);
 			}
 			
-
 			// each Droid can Produce a 'PRODUCT.OpticalReflection' 
 			Production p;
 			p.ProducerEntityArrayIndex = opticalSensor.EntityArrayIndex;
@@ -2741,7 +2740,6 @@ namespace HelloBoids
 			Consumption c;
 			c.ConsumerEntityArrayIndex = opticalSensor.EntityArrayIndex;
 			c.ConsumerInternalIndex = sensorInternalIndex;
-			c.ProducerInternalIndex = p.ProducerEntityArrayIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
 			c.ProductID = (uint)PRODUCTS.OpticalReflection;
 			c.Value =  null;
 			c.Amount = 1;
@@ -2754,14 +2752,12 @@ namespace HelloBoids
 			// each OpticalSensor CONSUMES PRODUCT.ElectricalPower from our Battery (a Producer)
 			c.ConsumerEntityArrayIndex = opticalSensor.EntityArrayIndex;
 			c.ConsumerInternalIndex = transformIndex;
-			c.ProducerInternalIndex = -1; //p.ProducerEntityInternalIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
 			c.ProductID = (uint)PRODUCTS.ElectricalPower;
 			c.Value =  2;  // 10 kW/h
 			c.Amount = 1;
 			c.Operations = null;
 			
 			RegisterConsumption(opticalSensor, c);
-			
 			
 			return opticalSensor;
 		}
@@ -2801,7 +2797,6 @@ namespace HelloBoids
 			Consumption c;
 			c.ConsumerEntityArrayIndex = wings.EntityArrayIndex;
 			c.ConsumerInternalIndex = transformIndex;
-			c.ProducerInternalIndex = -1; //p.ProducerEntityInternalIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
 			c.ProductID = (uint)PRODUCTS.ElectricalPower;
 			c.Value =  5;  // 5 kW/h
 			c.Amount = 1;
@@ -2910,7 +2905,6 @@ namespace HelloBoids
 			Consumption c;
 			c.ConsumerEntityArrayIndex = laser.EntityArrayIndex;
 			c.ConsumerInternalIndex = transformIndex;
-			c.ProducerInternalIndex = -1; //p.ProducerEntityInternalIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
 			c.ProductID = (uint)PRODUCTS.ElectricalPower;
 			c.Value =  25;  // 10 kW/h
 			c.Amount = 1;
@@ -2993,7 +2987,6 @@ namespace HelloBoids
 			Consumption c;
 			c.ConsumerEntityArrayIndex = station.EntityArrayIndex;
 			c.ConsumerInternalIndex = transformIndex;
-			c.ProducerInternalIndex = -1; //p.ProducerEntityInternalIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
 			c.ProductID = (uint)PRODUCTS.ElectricalPower;
 			c.Value =  10;  // 10 kW/h
 			c.Amount = 1;
@@ -3005,7 +2998,6 @@ namespace HelloBoids
 			// each Station can Consume a TargetingSkillModifier as if it had a TACTICAL CREW STATION from an Operator
 			c.ConsumerEntityArrayIndex = station.EntityArrayIndex;
 			c.ConsumerInternalIndex = transformIndex;
-			c.ProducerInternalIndex = -1; //p.ProducerEntityInternalIndex; // TODO: this is the ID as in the difference between the KGB Entity.ID which is a GUID string, and the SpanIndex of within the Memory<T> ComponentStore<>
 			c.ProductID = (uint)PRODUCTS.TargetingSkillModifier;
 			c.Value =  null;
 			c.Amount = 1;
@@ -3725,7 +3717,8 @@ namespace HelloBoids
 				productID = entry.Key;
 				List<Production> production = entry.Value;
 				
-				Console.WriteLine("UpdateProduction() - Running production for " + ((PRODUCTS)productID).ToString());
+				//Console.WriteLine("UpdateProduction() - Running production for " + ((PRODUCTS)productID).ToString());
+				
 				// March.10.2026 - Production now always occurs automatically without every needing to call Script.OnUpdate()
 				//                 because ALL Production and Consumption must be REGISTERED by the Scripts.  In the future
 				//                 we can always support dynamic insertion of PRODUCTION during a call to Script.OnUpdate() but
@@ -3772,19 +3765,21 @@ namespace HelloBoids
 							// AN INDEX INTO LIST<CONSUMPTION> THAT HAS THE CONSUMPTION STRUCT we need that has
 							// specific details on how to apply Consumption from that Producer to the current Consumer.
 
-							bool found = false;
+							bool foundConsumer = false;
+							Consumption currentConsumer = default(Consumption);
 							for (int k = 0; k < consumers.Count; k++)
 							{
 								// NOTE: BEWARE  of using confusing mix of Span[] index, and EntityArrayIndex which is Boids[] index)
 								//       In KGB this shouldn't be a problem since we wont have them both, but for this test harnass we do
 								if (consumers[k].ConsumerEntityArrayIndex == distributionList[j])
 								{
-									found = true;
+									currentConsumer = consumers[k];
+									foundConsumer = true;
 									break;
 								}
 							}
 							
-							if (!found)
+							if (!foundConsumer)
 							{
 								Console.WriteLine("UpdateProduction() - Consumer '" + distributionList[j] + "'  is not registered.");
 								continue;
@@ -3792,23 +3787,22 @@ namespace HelloBoids
 							
 							try
 							{
+								EntityNode consumerEntity =  Boids[distributionList[j]];
+								if (consumerEntity == null) return;
+								
 								// A more typical type of PRODUCTION such as PRODUCTS.ElectricalPower or PRODUCTS.OpticalReflection
 								if (currentProduction.Value is SkillModifier == false)
 								{
 									if (distributionList[j] == -1) 
 									{
-										continue;
 										Console.WriteLine("UpdateProduction() - INVALID DistributionList index value '" + distributionList[j].ToString());
-
+										continue;
 									}
-									EntityNode consumerEntity = Boids[distributionList[j]];
-									if (consumerEntity == null) return;
-
+	
 									int consumerArrayIndex = consumerEntity.EntityArrayIndex;
 									System.Diagnostics.Debug.Assert (consumerArrayIndex == distributionList[j], "UpdateProduction() - Indices do not match.");
 
-									Console.WriteLine("UpdateProduction() - ENTITY '" + Boids[currentProduction.ProducerEntityArrayIndex].EntityKey + "' PRODUCING -> " + ((PRODUCTS)currentProduction.ProductID).ToString() + " to '" + consumerEntity.EntityKey + "'");
-
+									//Console.WriteLine("UpdateProduction() - ENTITY '" + Boids[currentProduction.ProducerEntityArrayIndex].EntityKey + "' PRODUCING -> " + ((PRODUCTS)currentProduction.ProductID).ToString() + " to '" + consumerEntity.EntityKey + "'");
 								}
 								else 	// A SkillModifier
 								{
@@ -3817,14 +3811,23 @@ namespace HelloBoids
 									{
 										if (modifier.NumUses > 0 || modifier.NumUses == -1 )
 										{
-											Consumption[] consumptionResult = new Consumption[distributionList.Length];
-											consumptionResult[j].ConsumerEntityArrayIndex = consumers[j].ConsumerEntityArrayIndex; // the entity that is consuming a product
-											consumptionResult[j].ProducerInternalIndex = currentProduction.ProducerEntityInternalIndex; // the producer of the product that is being consumed by entity.ID == EntityID.
-											consumptionResult[j].ProductID = productID;          // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer.  Actually, I think we've modified this so that "PRODUCTS.HeatSignature" and "Products.HeatDamage" are two seperate products that may or may not both be consumed by any given Consumer.
-											consumptionResult[j].Value = modifier;
-											consumptionResult[j].Amount = modifier.Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
+											System.Diagnostics.Debug.Assert(currentConsumer.ConsumerEntityArrayIndex == distributionList[j]); // the entity that is consuming a product
+											System.Diagnostics.Debug.Assert(currentConsumer.ProductID == productID);          // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer.  Actually, I think we've modified this so that "PRODUCTS.HeatSignature" and "Products.HeatDamage" are two seperate products that may or may not both be consumed by any given Consumer.
+											currentConsumer.Value = modifier;
+											currentConsumer.Amount = modifier.Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
 
-											mSkillModificationSystem.Add (consumptionResult[j]);
+											//Console.WriteLine("UpdateProduction() - ENTITY '" + Boids[currentProduction.ProducerEntityArrayIndex].EntityKey + "' MODIFYING SKILL -> " + ((PRODUCTS)currentProduction.ProductID).ToString() + " to '" + consumerEntity.EntityKey + "'");
+											
+											// TODO: in the loop of all production, there can be multiple Producers modifying this
+											//       currentConsumer.  I think we should be able to track all of them... but that
+											//       could maybe be done in the "ModificationSystem" 
+											
+											// TODO: based on the ProductID, we need to find the correct property to modify
+											// and to also deduct that amount from a Producer if it's production amount is not infinite
+											// TODO: also, when deducting production from a Producer, we need to sychronize thread access to it?
+											//currentConsumer.
+											
+											mSkillModificationSystem.Add (currentConsumer);
 											if (modifier.NumUses > 0)
 												modifier.NumUses--;
 										}
@@ -3964,7 +3967,7 @@ namespace HelloBoids
 					for (int i = 0; i < mRecords.Count; i++)
 					{
 						int amount = mRecords[i].Amount;
-						mSkillModResults.Add (new SkillSystem.ModificationResult() {EntityIndex = mRecords[i].ProducerInternalIndex, TargetIndex = mRecords[i].ConsumerEntityArrayIndex, Amount = amount});	
+						mSkillModResults.Add (new SkillSystem.ModificationResult() {TargetIndex = mRecords[i].ConsumerEntityArrayIndex, Amount = amount});	
 					
 					}
 				
@@ -6592,9 +6595,12 @@ return (0,0);
 			// Consumption here is really PRODUCT CONSUMPTION RESULT struct that gets filled so that
 			// other players in the networked game can receive the "results" of 
 			// having consumed a product
+			// NOTE: There is no reference to which Enity provided the PRODUCTION... is this ok?  If during a Data Oriented Processor
+			//       pass multiple Producers contributed to the Conumption result, then we would need an array of Producers...
+			//       I think it's best to not worry about this yet.  This is NOT really ConsumptionResult, it's Consumption 
+			//       "Value" and "Amount" settings for how much to receive from a Producer, assuming the producer can supply the entire amount.
 			public int ConsumerEntityArrayIndex; // in KGB this would be the Entity.ID or GUID of the Consuming Entity
 			public int ConsumerInternalIndex; // the index into the Memory<T> of the entity that is consuming a product
-			public int ProducerInternalIndex; // the index into the Memory<T> of the producer of the product that is being consumed by entity.ID == EntityID.
 			public uint ProductID;     // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer
 			public object Value;
 			public int Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 

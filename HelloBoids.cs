@@ -701,6 +701,14 @@ namespace HelloBoids
 		// NOTE: mLimitedProduction may not be necessary as we now track the NumUses for any given Production and if
 		//       p.NumUses == 0, then we remove that production at the end of UpdateProduction();
 		// private System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>> mLimitedProduction;
+	
+		// TODO: mProduction and mConsumption should probably be ConcurrentDictionary<int, Memory<Production>> 
+		//                                                       ConcurrentDictionary<int, Memory<Consumption>> 
+		//       NOT List<> like below.
+		//       Then perhaps we can have a method that is called ProcessProduction(production, consumption) or ApplyProduction(production, consumption);
+		//       that will determine which types they are and then choose the correct underlying system
+		//       eg.  PowerConsumptionSystem.Add (production, consumption)
+		//        
 		private System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>> mProduction;
         private System.Collections.Concurrent.ConcurrentDictionary<uint, List<Consumption>> mConsumption;
 		
@@ -888,6 +896,706 @@ namespace HelloBoids
 		}
 		
 		
+		
+		public Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> Spawn(ThreadedRandom rand, int arrayIndex, double width, double height, double depth)
+		{
+			//Console.WriteLine ("Spawn() - Boid Spawn BEGIN at array index == " + arrayIndex.ToString());
+			string exLine = "Spawn 0";
+						
+			double posX = rand.NextDouble() * width;
+            double posY = rand.NextDouble() * height;
+            double posZ= rand.NextDouble() * depth;
+            
+            double vX = (rand.NextDouble() - 0.5d) * 2d;
+            double vY = (rand.NextDouble() - 0.5d) * 2d;
+
+			string entityKey = "boid_" + arrayIndex.ToString(); // prefix with "boid_" to not duplicate with "sensor_"
+			
+            Boid b = null;
+			try
+			{
+				b = new Boid(entityKey, arrayIndex, posX, posY, posZ, vX, vY);
+				// NOTE: since each Droid will have an "Operator" and "TacticalStation" merged into it's blackboarddata,
+				//       all we really need to do is stick to a naming convention like "operator_#####"  and "tactical_#####" 
+				//       when adding those Keys.
+				
+				// todo: generate Droids with some variance for age, size, and speed
+
+				string factionColor = "Red";
+				factionColor = (rand.NextDouble() >= 0.5d) ? "Red" : "Blue";
+				b.BlackBoardData.SetString("faction", factionColor);
+
+				//EntryClass.mCStoreUserData[entityKey].SetString("faction", factionColor);
+				System.Diagnostics.Debug.Assert(b.BlackBoardData == EntryClass.mCStoreUserData[entityKey], "Spawn() -- UserData objects do not match.");
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine (exLine + " " + ex.Message);
+			}
+			
+			
+					
+			// todo: create a "cooldown" interval that is based on the droid's size	
+	
+			// TODO: Add to Spawn()
+			//
+			// OnEntityAttached(EntityNode e)
+			//       {
+			
+			
+			
+			
+			// TIMERS
+			////////////////////////
+
+			exLine = "Spawn 2";
+			try
+			{
+				mIntervalTimers.Register(entityKey, "droid_spawn", 0.14d);
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine(exLine + " " + ex.Message);
+			}
+			
+			
+			
+			// private const CONFIGURATION BoidConfiguration = CONFIGURATION.Transform | CONFIGURATION.RigidBody | CONFIGURATION.Sentient | CONFIGURATION.SelfPropelled;
+			
+			// NOTE: Do NOT use the allTransforms method below
+			//ComponentStore<Transform.Transform_Struct> storeTransform = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(EntryClass.NUM_ENTRIES); 
+            //int transformIndex = -1;
+			//Memory<Transform.Transform_Struct> memAllTransforms = storeTransform.CheckOut(out transformIndex);
+			//memAllTransforms.Span[transformIndex].Configuration = BoidConfiguration;
+			// b.AddUserStruct(typeof(Transform.Transform_Struct), memAllTransforms, transformIndex);
+			
+			////////////////////////////////////////////////////////////////////////////////////////////////////
+			// TRANSFORM STRUCT - NOTE: We do not need to b.AddUserStruct() because the Transform_Struct is added by default by 'class Transform'
+			int transformIndex;
+			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)b.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
+			transform.Span[0].Configuration = BoidConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
+			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
+		
+			// LIVING ENTITY
+			ComponentStore<LivingEntity> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+            int livingEntityID = -1;
+            Memory<LivingEntity> memLivingEnt = storeLivingEntity.CheckOut(out livingEntityID);
+			b.AddUserStruct(typeof(LivingEntity), memLivingEnt, livingEntityID);
+			
+			storeLivingEntity.Span[livingEntityID].Age = 1;
+			storeLivingEntity.Span[livingEntityID].Hitpoints = 20;
+			storeLivingEntity.Span[livingEntityID].Configuration = BoidConfiguration;
+			
+			
+			// ARMOR: this may require an array of checkOutIndices based on how many layers as determined from 
+			//       component.ArmorLayersCount
+			ComponentStore<ArmorLayer> storeArmorLayers = EntryClass.mCStoreCol.CheckOut<ArmorLayer>(EntryClass.NUM_ENTRIES); 
+            int checkOutIndex = -1;
+            Memory<ArmorLayer> memArmor = storeArmorLayers.CheckOut(out checkOutIndex);
+			b.AddUserStruct(typeof(Armor), memArmor, checkOutIndex);
+			
+			
+			////////////////////////////////////////////////////////////////////////////////////////////////////
+			// EYES
+			exLine = "Spawn() - CreateOpticalSensors 1";
+			EntityNode eyes = null;
+			try
+			{
+				eyes = CreateOpticalSensor(arrayIndex + OPTICAL_SENSOR_OFFSET);
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine(exLine + " " + ex.Message);
+			}
+						
+			////////////////////////////////////////////////////////////////////////////////////////////////////
+			// WINGS need power to fly
+			EntityNode wings = CreateWings(arrayIndex  + WINGS_OFFSET);
+			
+			// ////////////////////////////////////////////////////////////////////////////////////////////////////
+			// Laser
+			EntityNode laser = CreateLaser(arrayIndex + LASER_OFFSET);
+			
+			
+			////////////////////////////////////////////////////////////////////////////////////////////////////
+			// TACTICAL STATION
+			EntityNode tacticalStation = CreateTacticalStation(arrayIndex + TACTICAL_STATION_OFFSET);
+						
+	
+			//			AddProduction(e)
+			//	        AddConsumption(e);
+			//       }
+			
+			// TODO: finish creating the optical sensors for our Droids
+			// TODO: I think we need to remove all struct creation from within Boid or EntityNode because we are unable
+			//       to manage the Index values properly that way.
+
+			
+			
+			////////////////////////////////////////////////////////////////////////////////////////////////////
+			// BATTERY to power Eyes, Wings, Laser and TacticalStation
+			EntityNode battery = CreateBattery(arrayIndex + BATTERY_OFFSET);
+			
+			// HUMAN OPERATOR for the tactical station
+			EntityNode humanOperator = CreateHumanOperator(arrayIndex + HUMAN_OPERATOR_OFFSET);
+					
+			
+			
+		    if (this.Octree != null)
+            {
+           		Octree.Add((EntityNode)b);
+            }
+
+			Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> result = 
+					new Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode>(b, eyes, wings, laser, tacticalStation, battery, humanOperator);
+			return result;
+		}
+		
+		// todo: typically creation of structs and production and consumption would be handled in an Entity script - eg eventually for KGB it might be  \\data\\mods\\caesar\\scripts_entities\\sensor_radar.css
+		private EntityNode CreateOpticalSensor(int arrayIndex)
+		{
+			// TODO: the problem we are having with 'index' right now is that every EntityNode
+			//       creates a Transform_Struct which is sized initially to EntryClass.NUM_ENTRIES and I do not think
+			//       it can handle expansions properly OR when Boid's create the various structs it needs (eg LivingEntity) that then
+			//       do not correspond index wise necessarily to their transform struct's spanIndex 
+			// SO we need a more robust solution to handling these indices and for finding these index
+			// values
+			string exLine =  "CreateOpticalSensor 1";
+			string entityKey = "sensor_" + arrayIndex.ToString(); // prefix with "sensor_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!
+			EntityNode opticalSensor = null;
+			
+			opticalSensor = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); // OpticalSensor is the Droid's 'eyes'
+
+			
+			//CONFIGURATION OpticalSensorConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.Sensor;
+	
+			int transformIndex;
+			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)opticalSensor.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
+			transform.Span[0].Configuration = OpticalSensorConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
+			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
+
+			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+			int compInternalIndex = -1;
+			Memory<Component> memComp = storeComp.CheckOut(out compInternalIndex);
+			opticalSensor.AddUserStruct(typeof(Component), memComp, compInternalIndex);
+
+			storeComp.Span[compInternalIndex].Configuration = OpticalSensorConfiguration;
+			storeComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
+
+			// todo: power using as well
+			int sensorInternalIndex = -1;
+			exLine = "CreateOpticalSensor 4";
+			try
+			{
+				ComponentStore<Sensor> storeSensor = EntryClass.mCStoreCol.CheckOut<Sensor>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+				Memory<Sensor> memSensor = storeSensor.CheckOut(out sensorInternalIndex);
+				opticalSensor.AddUserStruct(typeof(Sensor), memSensor, sensorInternalIndex);
+				
+				storeSensor.Span[sensorInternalIndex].Configuration = OpticalSensorConfiguration;
+				storeSensor.Span[sensorInternalIndex].EntityArrayIndex = arrayIndex;
+				//storeSensor.Span[sensorInternalIndex].InternalComponentIndex = -1; // TODO:  this should be from "Component" struct not sensorInternalIndex;
+				storeSensor.Span[sensorInternalIndex].RangeSquared = EntryClass.MAX_SEARCH_DISTANCE * EntryClass.MAX_SEARCH_DISTANCE;
+				//storeSensor.Span[sensorInternalIndex].ScanRating = 2000; // <-- this is a computed stat based on TL and Power, that generally ranges from 10 - 40+  (google "gurps vehicles 2nd edition radar scan rating")
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine(exLine + " " + ex.Message);
+			}
+			
+			// each Droid can Produce a 'PRODUCT.OpticalReflection' 
+			Production p;
+			p.ProducerEntityArrayIndex = opticalSensor.EntityArrayIndex;
+			p.ProducerEntityInternalIndex = opticalSensor.GetUserStructIndex(typeof(Transform.Transform_Struct));
+			p.ProductID = 	(uint)PRODUCTS.OpticalReflection;
+			p.Location = Vector3d.Zero();
+			p.Enabled = true;
+			p.Value = 1;
+			p.Amount = -1; // this should be diminished by the range of the sensor 
+			p.NumUses = -1;
+			p.CooldownBetweenUses = 0;
+			// TODO: the distribution list for PRODUCT.OpticalReflection is ignored for now.  We just use
+			//       adjacents I think to determine who we will distribute too
+			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
+			p.DistributionList = null; //new int[] {checkOutIndex};
+			p.SearchPrimitive  = null;
+	
+			// TODO: the distribution list for PRODUCT.OpticalReflection is ignored for now.  We just use
+			//       adjacents I think to determine who we will distribute too
+			// each Droid can Consume a 'PRODUCT.OpticalReflection' 
+			Consumption c;
+			c.ConsumerEntityArrayIndex = opticalSensor.EntityArrayIndex;
+			c.ConsumerInternalIndex = sensorInternalIndex;
+			c.ProductID = (uint)PRODUCTS.OpticalReflection;
+			c.Value =  null;
+			c.Amount = 1;
+			c.Operations = null;
+			
+			RegisterProduction(opticalSensor, p);
+			RegisterConsumption(opticalSensor, c);
+			
+			
+			// each OpticalSensor CONSUMES PRODUCT.ElectricalPower from our Battery (a Producer)
+			c.ConsumerEntityArrayIndex = opticalSensor.EntityArrayIndex;
+			c.ConsumerInternalIndex = transformIndex;
+			c.ProductID = (uint)PRODUCTS.ElectricalPower;
+			c.Value =  2;  // 10 kW/h
+			c.Amount = 1;
+			c.Operations = null;
+			
+			RegisterConsumption(opticalSensor, c);
+			
+			return opticalSensor;
+		}
+		
+		private EntityNode CreateWings(int arrayIndex)
+		{
+			string exLine = "CreateWings 1";
+			string entityKey = "wings_" + arrayIndex.ToString(); // prefix with "laser_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!			
+			
+			EntityNode wings = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
+			
+			//CONFIGURATION WingsConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing; // <- CONFIGURATION.Propulsion
+			
+			// transform struct
+			int transformIndex;
+			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)wings.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
+			transform.Span[0].Configuration = WingsConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
+			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
+
+			// component struct
+			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+			int compInternalIndex = -1;
+			Memory<Component> memComp = storeComp.CheckOut(out compInternalIndex);
+			wings.AddUserStruct(typeof(Component), memComp, compInternalIndex);
+			storeComp.Span[compInternalIndex].Configuration = WingsConfiguration;
+			storeComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
+
+			// powerconsumer struct
+			ComponentStore<PowerConsumer> storeWings = EntryClass.mCStoreCol.CheckOut<PowerConsumer>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+			int powerConsumerInternalIndex = -1;
+			Memory<PowerConsumer> memWings = storeWings.CheckOut(out powerConsumerInternalIndex);
+			wings.AddUserStruct(typeof(PowerConsumer), memWings, powerConsumerInternalIndex);
+			storeWings.Span[powerConsumerInternalIndex].Configuration = WingsConfiguration;
+			storeWings.Span[powerConsumerInternalIndex].EntityArrayIndex = arrayIndex;
+			
+			// each Wing CONSUMES PRODUCT.ElectricalPower from our Battery (a Producer)
+			Consumption c;
+			c.ConsumerEntityArrayIndex = wings.EntityArrayIndex;
+			c.ConsumerInternalIndex = transformIndex;
+			c.ProductID = (uint)PRODUCTS.ElectricalPower;
+			c.Value =  5;  // 5 kW/h
+			c.Amount = 1;
+			c.Operations = null;
+			
+			RegisterConsumption(wings, c);
+			
+			return wings;
+		}
+		
+		
+		private EntityNode CreateLaser(int arrayIndex)
+		{
+			string exLine = "CreateLaser 1";
+			string entityKey = "laser_" + arrayIndex.ToString(); // prefix with "laser_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!			
+			
+			EntityNode laser = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
+					
+			mIntervalTimers.Register(entityKey, "droid_canfire", 0.00d);
+			mIntervalTimers.Register(entityKey, "droid_isfiring", 0.06d);
+			
+			
+			//CONFIGURATION LaserConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.Weapon | CONFIGURATION.Laser;
+			
+			// transform struct
+			int transformIndex;
+			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)laser.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
+			transform.Span[0].Configuration = LaserConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
+			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
+			
+			// component struct
+			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+            int checkOutIndex = -1;
+            Memory<Component> memCmp = storeComp.CheckOut(out checkOutIndex);
+			laser.AddUserStruct(typeof(Component), memCmp, checkOutIndex);
+			storeComp.Span[checkOutIndex].Configuration = LaserConfiguration;
+			storeComp.Span[checkOutIndex].EntityArrayIndex = laser.EntityArrayIndex;
+			storeComp.Span[checkOutIndex].Level = 1;
+			//storeComp.Span[checkOutIndex].Quality = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
+			storeComp.Span[checkOutIndex].Ruggedized = true;
+			//storeComp.Span[checkOutIndex].HitPoints = 100;
+			//storeComp.Span[checkOutIndex].DR = 20;  // todo: if we use complex armor, is DR (damage resistance) used?
+			//storeComp.Span[checkOutIndex].Cost = 10d;
+			//storeComp.Span[checkOutIndex].Weight = 2.5d;
+			//storeComp.Span[checkOutIndex].SurfaceArea = 1d;
+			//storeComp.Span[checkOutIndex].Volume = 0.2d;
+
+			// weapon struct
+			ComponentStore<Weapon> storeWeapon = EntryClass.mCStoreCol.CheckOut<Weapon>(EntryClass.NUM_ENTRIES);
+            checkOutIndex = -1;
+            Memory<Weapon> memWep = storeWeapon.CheckOut(out checkOutIndex);
+			laser.AddUserStruct(typeof(Weapon), memWep, checkOutIndex);	
+			storeWeapon.Span[checkOutIndex].EntityArrayIndex = laser.EntityArrayIndex;
+			storeWeapon.Span[checkOutIndex].Configuration = LaserConfiguration;
+			storeWeapon.Span[checkOutIndex].Reliable = true;
+			storeWeapon.Span[checkOutIndex].Compact = true;
+			storeWeapon.Span[checkOutIndex].Accuracy = 10;
+			storeWeapon.Span[checkOutIndex].SnapShot = 2;
+			storeWeapon.Span[checkOutIndex].Malfunction_ = 0.2f; // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
+			//public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
+			
+//			public string Shots;
+			
+			storeWeapon.Span[checkOutIndex].CoolDown_ = 0.3f; // this is the cooldown between when this weapon can be fired again.  It is RoF and perhaps CyclicRate too ultimately. Any "ANIMATION" of the weapon firing should last less than the time of this cooldown!
+//			public string RoF;
+			
+//			storeWeapon.Span[checkOutIndex].PowerReqt = 0.0f;
+//			
+//			public string Mount;
+//			public string Direction;
+
+			// TODO: these are like "internal" items and can be used if another power source is no longer connected
+//			public string PowerCellType;  // TOOD: Need an ENUM
+//			public int PowerCellQuantity;
+//			public double PowerCellWeight;
+			
+			// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
+//			storeWeapon.Span[checkOutIndex].TypeDamage = DAMAGE_TYPE.Burning;     // TOOD: Need an ENUM
+			//public string Damage;         // this is dice of damage, but often contains a multiplier like (100) afterwards.  We don't need the multiplier since we just compute a min/max damage range or maybe we compute a single damage that then gets modified based on the target evasive maneuvers and such
+			storeWeapon.Span[checkOutIndex].AverageDamage = 3;       
+//			public double KEDamage = 3.0d;
+//			public double HalfDamage; 
+//			public double VacuumHalfDamage;
+			
+//			public string Range; // string description of range (eg: "very long range")
+			storeWeapon.Span[checkOutIndex].MaxRange = 10;
+//			public double MaxRange2;
+//			public double VacuumMaxRange;
+//			public double VacuumMaxRange2;
+    
+			
+			// Laser struct
+			ComponentStore<Laser_Struct> storeLasers = EntryClass.mCStoreCol.CheckOut<Laser_Struct>(EntryClass.NUM_ENTRIES); 
+            checkOutIndex = -1;
+            Memory<Laser_Struct>memLaser = storeLasers.CheckOut(out checkOutIndex);
+            laser.AddUserStruct(typeof(Laser_Struct), memLaser, checkOutIndex);
+			storeLasers.Span[checkOutIndex].EntityArrayIndex = laser.EntityArrayIndex;
+			storeLasers.Span[checkOutIndex].Configuration = LaserConfiguration;
+			storeLasers.Span[checkOutIndex].Type = 1;     
+			storeLasers.Span[checkOutIndex].EnergyDrill = false;
+			storeLasers.Span[checkOutIndex].FTL = true;
+			storeLasers.Span[checkOutIndex].BeamOutput = 10f; // kW
+			storeLasers.Span[checkOutIndex].CyclicRate = 1;
+					
+			// each Laser CONSUMES PRODUCT.ElectricalPower from our Battery (a Producer)
+			Consumption c;
+			c.ConsumerEntityArrayIndex = laser.EntityArrayIndex;
+			c.ConsumerInternalIndex = transformIndex;
+			c.ProductID = (uint)PRODUCTS.ElectricalPower;
+			c.Value =  25;  // 10 kW/h
+			c.Amount = 1;
+			c.Operations = null;
+			
+			RegisterConsumption(laser, c);
+			
+			return laser;
+		}
+		
+		private EntityNode CreateTacticalStation(int arrayIndex)
+		{
+			string exLine = "CreateStation 1";
+			string entityKey = "tacticalstation_" + arrayIndex.ToString(); // prefix with "laser_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!			
+			
+			EntityNode station = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
+							
+			//CONFIGURATION TacticalStationConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.TacticalStation;
+
+			// transform struct
+			int transformIndex;
+			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)station.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
+			transform.Span[0].Configuration = TacticalStationConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
+			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
+			
+			// component struct
+			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+			int compInternalIndex = -1;
+			Memory<Component> memComp = storeComp.CheckOut(out compInternalIndex);
+			station.AddUserStruct(typeof(Component), memComp, compInternalIndex);
+			storeComp.Span[compInternalIndex].Configuration = TacticalStationConfiguration;
+			storeComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
+
+		
+			// powerconsumer struct
+			ComponentStore<PowerConsumer> storePowerConsumer = EntryClass.mCStoreCol.CheckOut<PowerConsumer>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+			int powerConsumerInternalIndex = -1;
+			Memory<PowerConsumer> memWings = storePowerConsumer.CheckOut(out powerConsumerInternalIndex);
+			station.AddUserStruct(typeof(PowerConsumer), memWings, powerConsumerInternalIndex);
+			storePowerConsumer.Span[powerConsumerInternalIndex].Configuration = TacticalStationConfiguration;
+			storePowerConsumer.Span[powerConsumerInternalIndex].EntityArrayIndex = arrayIndex;
+			
+			
+			// tactical station
+			ComponentStore<TacticalStation> storeTacticalStation = EntryClass.mCStoreCol.CheckOut<TacticalStation>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+            int checkOutIndex = -1;
+            Memory<TacticalStation> memTact = storeTacticalStation.CheckOut(out checkOutIndex);
+			station.AddUserStruct(typeof(TacticalStation), memTact, checkOutIndex);
+
+			storeTacticalStation.Span[checkOutIndex].Configuration = TacticalStationConfiguration;
+			storeTacticalStation.Span[checkOutIndex].EntityArrayIndex = arrayIndex; // we use EntityArrayIndex and not SpanIndex because we want to use it to find the Boid element in the EntryClass.bSim.Boids[index] List
+			storeTacticalStation.Span[checkOutIndex].HistoryCount = 1;
+			storeTacticalStation.Span[checkOutIndex].CooldownBetweenActions = 3.0f;
+			storeTacticalStation.Span[checkOutIndex].MaxActions = 2;
+			storeTacticalStation.Span[checkOutIndex].NumActions = 0;
+			storeTacticalStation.Span[checkOutIndex].Actions = null;
+			storeTacticalStation.Span[checkOutIndex].Contacts = null;
+			storeTacticalStation.Span[checkOutIndex].ContactsHistory = null;
+			storeTacticalStation.Span[checkOutIndex].Targets = null;
+
+			// add a targetingSkill requirement to this TacticalStation
+			Skill targetingSkill;
+			targetingSkill.SkillType = SKILLS.Targeting;
+			targetingSkill.Level = 2;     			// the level of this skill
+			targetingSkill.Production = null;
+			//targetingSkill.Modifiers = null;
+			targetingSkill.BaseValue = 2;
+			targetingSkill.EffectiveValue = 0; // todo: this should be a Getter perhaps and not a public variable
+			// add the modifier(s) to this skill.  Recall that modifiers behave just like any other type of PRODUCTION and must be registered as PRODUCTION 
+			// at the appropriate time (eg On USE of the Skill, or on EQUIP of an Item, etc.)
+			
+			// NOTE: This station will be CONSUMING TargetingSkilLModifer and NOT producing any.  The operator will be PRODUCING
+			//targetingSkill.AddProduction(livingEntityID, PRODUCTS.TargetingSkillModifier, 1, true, -1);
+
+			// TODO: This MUST go to the TacticalStation, NOT HERE
+			// add the skill to the DROID as if it was being added to a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
+			station.Skills.Add(targetingSkill.SkillType, targetingSkill);
+			
+			// each Station CONSUMES PRODUCT.ElectricalPower from our Batter (a Producer)
+			Consumption c;
+			c.ConsumerEntityArrayIndex = station.EntityArrayIndex;
+			c.ConsumerInternalIndex = transformIndex;
+			c.ProductID = (uint)PRODUCTS.ElectricalPower;
+			c.Value =  10;  // 10 kW/h
+			c.Amount = 1;
+			c.Operations = null;
+			
+			RegisterConsumption(station, c);
+			
+			
+			// each Station can Consume a TargetingSkillModifier as if it had a TACTICAL CREW STATION from an Operator
+			c.ConsumerEntityArrayIndex = station.EntityArrayIndex;
+			c.ConsumerInternalIndex = transformIndex;
+			c.ProductID = (uint)PRODUCTS.TargetingSkillModifier;
+			c.Value =  null;
+			c.Amount = 1;
+			c.Operations = null;
+
+			
+			RegisterConsumption(station, c);
+			
+			return station;
+		}
+		
+		private EntityNode CreateBattery (int arrayIndex)
+		{
+			string exLine = "CreateBattery 1";
+			string entityKey = "battery_" + arrayIndex.ToString(); // prefix with "laser_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!			
+			
+			EntityNode battery = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
+					
+			//CONFIGURATION BatteryConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerProducer;
+			
+			// transform struct
+			int transformIndex;
+			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)battery.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
+			transform.Span[0].Configuration = BatteryConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
+			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
+
+			// component struct
+			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+			int compInternalIndex = -1;
+			Memory<Component> memComp = storeComp.CheckOut(out compInternalIndex);
+			battery.AddUserStruct(typeof(Component), memComp, compInternalIndex);
+			storeComp.Span[compInternalIndex].Configuration = BatteryConfiguration;
+			storeComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
+
+			storeComp.Span[compInternalIndex].Configuration = BatteryConfiguration;
+			storeComp.Span[compInternalIndex].EntityArrayIndex = battery.EntityArrayIndex;
+			storeComp.Span[compInternalIndex].Level = 1;
+			//storeComp.Span[compInternalIndex].Quality = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
+			storeComp.Span[compInternalIndex].Ruggedized = true;
+			//storeComp.Span[compInternalIndex].HitPoints = 100;
+			//storeComp.Span[compInternalIndex].DR = 20;  // todo: if we use complex armor, is DR (damage resistance) used?
+			//storeComp.Span[compInternalIndex].Cost = 10d;
+			//storeComp.Span[compInternalIndex].Weight = 2.5d;
+			//storeComp.Span[compInternalIndex].SurfaceArea = 1d;
+			//storeComp.Span[compInternalIndex].Volume = 0.2d;
+
+			
+			
+			// powerProducer struct
+			ComponentStore<PowerProducer> storePowerProducers = EntryClass.mCStoreCol.CheckOut<PowerProducer>(EntryClass.NUM_ENTRIES); 
+			int powerProducerInternalIndex = -1;
+			Memory<PowerProducer> memPowerProducer = storePowerProducers.CheckOut(out powerProducerInternalIndex);
+			battery.AddUserStruct(typeof(PowerProducer), memPowerProducer, powerProducerInternalIndex);
+			storePowerProducers.Span[powerProducerInternalIndex].Configuration = BatteryConfiguration;
+			storePowerProducers.Span[powerProducerInternalIndex].EntityArrayIndex = arrayIndex;
+					
+			// each Battery can Produce a PRODUCTS.ElectricalPower
+			Production p;
+			p.ProducerEntityArrayIndex = battery.EntityArrayIndex;
+			p.ProducerEntityInternalIndex = powerProducerInternalIndex;
+			p.ProductID = 	(uint)PRODUCTS.ElectricalPower;
+			p.Location = Vector3d.Zero();
+			p.Enabled = true;
+			p.Value = 1000d;  // the UNIT value... in this case it's a DOUBLE
+			p.Amount = -1; // a Battery can produce as much as is needed to supply all of it's Consumers until it runs out of Energy  
+			p.NumUses = 100; // This Battery can be used 100 times (100 updates or frames) before it runs out.  update every TICK if -1 NumUses
+			p.CooldownBetweenUses = 0;
+			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
+			
+
+			// Wings, Eyes, Lasers, TacticalStation all CONSUME ElectricalPower
+			// TODO: these indices should probably be indices into PowerConsumer struct, NOT EntityArrayIndex into List<Boids>
+			int boidArrayIndex = arrayIndex - BATTERY_OFFSET;
+			int wingsArrayIndex = boidArrayIndex + WINGS_OFFSET;
+			int eyesArrayIndex = boidArrayIndex + OPTICAL_SENSOR_OFFSET;
+			int laserArrayIndex = boidArrayIndex + LASER_OFFSET;
+			int tacticalArrayIndex = boidArrayIndex + TACTICAL_STATION_OFFSET;
+			
+			int wingsConsumptionListIndex = GetConsumerIndex (p.ProductID, wingsArrayIndex);
+			int eyesConsumptionListIndex = GetConsumerIndex (p.ProductID, eyesArrayIndex);
+			int laserConsumptionListIndex = GetConsumerIndex (p.ProductID, laserArrayIndex);
+			int tacticalConsumptionListIndex = GetConsumerIndex (p.ProductID, tacticalArrayIndex);
+			
+			// NOTE: when Entities are added/removed from the Simulation at runtime, these indices may change IF we try to do any
+			//       type of management that packs the Memory<T> to not have "empty" or "disabled" records strewn throughout 
+			//       and that results in new indices being given to some existing records when those records are moved to fill in
+			//       the spots that have been "removed."  THUS, if we do allow that, these Distribution Lists will constantly need to be
+			//       updated in mProduction.
+			//       There's another problem as well... the ConsumptionListIndex is not easily available during Ship EngineeringStation's manual changing of 
+			//       a distributionList.  The DISPLAY would simply need to do a conversion of the List<Consumption> index to the EntityArrayIndex and vice-versa
+			p.DistributionList = new int[] {wingsConsumptionListIndex, eyesConsumptionListIndex, laserConsumptionListIndex, tacticalConsumptionListIndex};
+			p.SearchPrimitive  = null;
+				
+			
+			RegisterProduction(battery, p);
+						
+			return battery;
+		}
+		
+		private EntityNode CreateHumanOperator(int arrayIndex)
+		{
+			string exLine = "CreateHumanOperator 1";
+			string entityKey = "human_operator_" + arrayIndex.ToString(); // prefix with "laser_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!			
+			
+			EntityNode humanOperator = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
+
+			int transformIndex;
+			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)humanOperator.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
+			transform.Span[0].Configuration = HumanOperatorConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
+			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
+		
+			// LIVING ENTITY
+			ComponentStore<LivingEntity> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+            int livingEntityID = -1;
+            Memory<LivingEntity> memLivingEnt = storeLivingEntity.CheckOut(out livingEntityID);
+			humanOperator.AddUserStruct(typeof(LivingEntity), memLivingEnt, livingEntityID);
+			
+			storeLivingEntity.Span[livingEntityID].Age = 1;
+			storeLivingEntity.Span[livingEntityID].Hitpoints = 20;
+			storeLivingEntity.Span[livingEntityID].Configuration = HumanOperatorConfiguration;
+			
+						
+			
+			Skill targetingSkill;
+			targetingSkill.SkillType = SKILLS.Targeting;
+			targetingSkill.Level = 3;     			// the level of this skill
+			targetingSkill.Production = null;
+			//targetingSkill.Modifiers = null;
+			targetingSkill.BaseValue = 1;
+			targetingSkill.EffectiveValue = 0;
+			
+			// add the modifier(s) to this skill.  Recall that modifiers behave just like any other type of PRODUCTION and must be registered as PRODUCTION 
+			// at the appropriate time (eg On USE of the Skill, or on EQUIP of an Item, etc.)
+			targetingSkill.AddProduction(livingEntityID, PRODUCTS.TargetingSkillModifier, 1, true, -1);
+
+
+			// add the skill to the DROID as if it was being added to an OPERATOR for a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
+			humanOperator.Skills.Add(targetingSkill.SkillType, targetingSkill);
+			
+			// each Operator can Produce a TargetingSkillModifier
+			Production p;
+			p.ProducerEntityArrayIndex = humanOperator.EntityArrayIndex;
+			p.ProducerEntityInternalIndex = livingEntityID;
+			p.ProductID = 	(uint)targetingSkill.Production[0].Product;  // TargetingSkillModifier
+			p.Location = Vector3d.Zero();
+			p.Enabled = true;
+			p.Value = targetingSkill.Production[0];
+			p.Amount = targetingSkill.Production[0].Amount; // this will use the 
+			p.NumUses = -1;
+			p.CooldownBetweenUses = 0;
+			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
+			
+			int stationArrayIndex = arrayIndex - HUMAN_OPERATOR_OFFSET + TACTICAL_STATION_OFFSET;
+			int stationConsumerListIndex = GetConsumerIndex (p.ProductID, stationArrayIndex);
+			
+			p.DistributionList = new int[] {stationConsumerListIndex};
+			p.SearchPrimitive  = null;
+				
+			
+			RegisterProduction(humanOperator, p);
+					
+			return humanOperator;
+		}
+		
+		private int GetConsumerIndex (uint productID, int entityArrayIndex)
+		{
+			List<Consumption> consumption = mConsumption[productID];
+			
+			if (consumption == null || consumption.Count == 0) return -1;
+			
+			for (int i = 0; i < consumption.Count; i++)
+				if (consumption[i].ConsumerEntityArrayIndex == entityArrayIndex)
+					return i;
+			
+			return -1;
+			
+		}
+		
+		private void Destroy(EntityNode entity)
+		{
+			int lastIndex = this.Boids.Count - 1;
+	
+			// TODO:
+			// OnEntityDetached(EntityNode e)
+			//       {
+			//			RemoveProduction(e)
+			//	        RemoveConsumption(e);
+			//       }
+				
+
+			// remove from Octree
+			this.Octree.OnEntityNode_Removed(entity);
+			
+			// remove from Boids[] list
+			// TODO: do we need to update all the indices to keep our Memory<T> packed?
+			//       one method is to always move the last indexed entity into the slot where 
+			//       an Entity was removed, update its entity.Index, and then change the count 
+			//       of the Memory<T> store to previousCount - 1;
+			// TODO: we need to release all Memory<T> used by Transform_Struct and Living_Entity structs.
+		#if MEMORY_T
+			this.Boids[entity.EntityArayIndex].Dispose(); // 	<-- store.CheckIn(Boids[i].mMemStore_LivingEntity); occurs here correct?
+		#endif
+			this.Boids[entity.EntityArrayIndex] = null;
+			this.Boids[entity.EntityArrayIndex] = this.Boids[lastIndex];
+			this.Boids[entity.EntityArrayIndex].EntityArrayIndex = lastIndex;
+	
+			this.Boids.RemoveAt(lastIndex); // todo: this wont result in a List copy to a new List will it?
+
+#if MEMORY_T
+			Console.WriteLine("Destroy() == Completed on index " + entity.SpanIndexLE.ToString());
+#endif
+		}
+
         /// <summary>
         /// Update simulation using either Data Oriented Technique or Object Oriented Technique
 		/// </summary>
@@ -965,7 +1673,7 @@ namespace HelloBoids
 					Console.WriteLine("Update() - Skill Modification System " + ex.Message);
 				}
 				
-				
+				//Console.WriteLine("Update() - Preparing to Update Damage System ");
 				try
 				{
 					mDamageSystem.Process(livingEntityStore, null, Seeds.Master, gt);
@@ -993,6 +1701,12 @@ namespace HelloBoids
 					// OPTICAL_SENSING <- creation of mNeighbors<> adjacency 
 					// FLOCKING
 					mDataProcessor.Update(gt, Boids.ToArray());
+					
+					// mProductionProcessor.Update(gt, Boids.ToArray());
+					// POWER_PRODUCTION
+					// POWER_CONSUMPTION
+					
+					
 				}
 				catch (Exception ex)
 				{
@@ -2512,678 +3226,6 @@ namespace HelloBoids
         }
 
 		
-		public Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> Spawn(ThreadedRandom rand, int arrayIndex, double width, double height, double depth)
-		{
-			//Console.WriteLine ("Spawn() - Boid Spawn BEGIN at array index == " + arrayIndex.ToString());
-			string exLine = "Spawn 0";
-						
-			double posX = rand.NextDouble() * width;
-            double posY = rand.NextDouble() * height;
-            double posZ= rand.NextDouble() * depth;
-            
-            double vX = (rand.NextDouble() - 0.5d) * 2d;
-            double vY = (rand.NextDouble() - 0.5d) * 2d;
-
-			string entityKey = "boid_" + arrayIndex.ToString(); // prefix with "boid_" to not duplicate with "sensor_"
-			
-            Boid b = null;
-			try
-			{
-				b = new Boid(entityKey, arrayIndex, posX, posY, posZ, vX, vY);
-				// NOTE: since each Droid will have an "Operator" and "TacticalStation" merged into it's blackboarddata,
-				//       all we really need to do is stick to a naming convention like "operator_#####"  and "tactical_#####" 
-				//       when adding those Keys.
-				
-				// todo: generate Droids with some variance for age, size, and speed
-
-				string factionColor = "Red";
-				factionColor = (rand.NextDouble() >= 0.5d) ? "Red" : "Blue";
-				b.BlackBoardData.SetString("faction", factionColor);
-
-				//EntryClass.mCStoreUserData[entityKey].SetString("faction", factionColor);
-				System.Diagnostics.Debug.Assert(b.BlackBoardData == EntryClass.mCStoreUserData[entityKey], "Spawn() -- UserData objects do not match.");
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine (exLine + " " + ex.Message);
-			}
-			
-			
-					
-			// todo: create a "cooldown" interval that is based on the droid's size	
-	
-			// TODO: Add to Spawn()
-			//
-			// OnEntityAttached(EntityNode e)
-			//       {
-			
-			
-			
-			
-			// TIMERS
-			////////////////////////
-
-			exLine = "Spawn 2";
-			try
-			{
-				mIntervalTimers.Register(entityKey, "droid_spawn", 0.14d);
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine(exLine + " " + ex.Message);
-			}
-			
-			
-			
-			// private const CONFIGURATION BoidConfiguration = CONFIGURATION.Transform | CONFIGURATION.RigidBody | CONFIGURATION.Sentient | CONFIGURATION.SelfPropelled;
-			
-			// NOTE: Do NOT use the allTransforms method below
-			//ComponentStore<Transform.Transform_Struct> storeTransform = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(EntryClass.NUM_ENTRIES); 
-            //int transformIndex = -1;
-			//Memory<Transform.Transform_Struct> memAllTransforms = storeTransform.CheckOut(out transformIndex);
-			//memAllTransforms.Span[transformIndex].Configuration = BoidConfiguration;
-			// b.AddUserStruct(typeof(Transform.Transform_Struct), memAllTransforms, transformIndex);
-			
-			////////////////////////////////////////////////////////////////////////////////////////////////////
-			// TRANSFORM STRUCT - NOTE: We do not need to b.AddUserStruct() because the Transform_Struct is added by default by 'class Transform'
-			int transformIndex;
-			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)b.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
-			transform.Span[0].Configuration = BoidConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
-			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
-		
-			// LIVING ENTITY
-			ComponentStore<LivingEntity> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-            int livingEntityID = -1;
-            Memory<LivingEntity> memLivingEnt = storeLivingEntity.CheckOut(out livingEntityID);
-			b.AddUserStruct(typeof(LivingEntity), memLivingEnt, livingEntityID);
-			
-			storeLivingEntity.Span[livingEntityID].Age = 1;
-			storeLivingEntity.Span[livingEntityID].Hitpoints = 20;
-			storeLivingEntity.Span[livingEntityID].Configuration = BoidConfiguration;
-			
-			
-			// ARMOR: this may require an array of checkOutIndices based on how many layers as determined from 
-			//       component.ArmorLayersCount
-			ComponentStore<ArmorLayer> storeArmorLayers = EntryClass.mCStoreCol.CheckOut<ArmorLayer>(EntryClass.NUM_ENTRIES); 
-            int checkOutIndex = -1;
-            Memory<ArmorLayer> memArmor = storeArmorLayers.CheckOut(out checkOutIndex);
-			b.AddUserStruct(typeof(Armor), memArmor, checkOutIndex);
-			
-			
-			////////////////////////////////////////////////////////////////////////////////////////////////////
-			// EYES
-			exLine = "Spawn() - CreateOpticalSensors 1";
-			EntityNode eyes = null;
-			try
-			{
-				eyes = CreateOpticalSensor(arrayIndex + OPTICAL_SENSOR_OFFSET);
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine(exLine + " " + ex.Message);
-			}
-						
-			////////////////////////////////////////////////////////////////////////////////////////////////////
-			// WINGS need power to fly
-			EntityNode wings = CreateWings(arrayIndex  + WINGS_OFFSET);
-			
-			// ////////////////////////////////////////////////////////////////////////////////////////////////////
-			// Laser
-			EntityNode laser = CreateLaser(arrayIndex + LASER_OFFSET);
-			
-			
-			////////////////////////////////////////////////////////////////////////////////////////////////////
-			// TACTICAL STATION
-			EntityNode tacticalStation = CreateTacticalStation(arrayIndex + TACTICAL_STATION_OFFSET);
-						
-	
-			//			AddProduction(e)
-			//	        AddConsumption(e);
-			//       }
-			
-			// TODO: finish creating the optical sensors for our Droids
-			// TODO: I think we need to remove all struct creation from within Boid or EntityNode because we are unable
-			//       to manage the Index values properly that way.
-
-			
-			
-			////////////////////////////////////////////////////////////////////////////////////////////////////
-			// BATTERY to power Eyes, Wings, Laser and TacticalStation
-			EntityNode battery = CreateBattery(arrayIndex + BATTERY_OFFSET);
-			
-			// HUMAN OPERATOR for the tactical station
-			EntityNode humanOperator = CreateHumanOperator(arrayIndex + HUMAN_OPERATOR_OFFSET);
-					
-			
-			
-		    if (this.Octree != null)
-            {
-           		Octree.Add((EntityNode)b);
-            }
-
-			Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> result = 
-					new Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode>(b, eyes, wings, laser, tacticalStation, battery, humanOperator);
-			return result;
-		}
-		
-		// todo: typically creation of structs and production and consumption would be handled in an Entity script - eg eventually for KGB it might be  \\data\\mods\\caesar\\scripts_entities\\sensor_radar.css
-		private EntityNode CreateOpticalSensor(int arrayIndex)
-		{
-			// TODO: the problem we are having with 'index' right now is that every EntityNode
-			//       creates a Transform_Struct which is sized initially to EntryClass.NUM_ENTRIES and I do not think
-			//       it can handle expansions properly OR when Boid's create the various structs it needs (eg LivingEntity) that then
-			//       do not correspond index wise necessarily to their transform struct's spanIndex 
-			// SO we need a more robust solution to handling these indices and for finding these index
-			// values
-			string exLine =  "CreateOpticalSensor 1";
-			string entityKey = "sensor_" + arrayIndex.ToString(); // prefix with "sensor_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!
-			EntityNode opticalSensor = null;
-			
-			opticalSensor = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); // OpticalSensor is the Droid's 'eyes'
-
-			
-			//CONFIGURATION OpticalSensorConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.Sensor;
-	
-			int transformIndex;
-			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)opticalSensor.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
-			transform.Span[0].Configuration = OpticalSensorConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
-			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
-
-			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-			int compInternalIndex = -1;
-			Memory<Component> memComp = storeComp.CheckOut(out compInternalIndex);
-			opticalSensor.AddUserStruct(typeof(Component), memComp, compInternalIndex);
-
-			storeComp.Span[compInternalIndex].Configuration = OpticalSensorConfiguration;
-			storeComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
-
-			// todo: power using as well
-			int sensorInternalIndex = -1;
-			exLine = "CreateOpticalSensor 4";
-			try
-			{
-				ComponentStore<Sensor> storeSensor = EntryClass.mCStoreCol.CheckOut<Sensor>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-				Memory<Sensor> memSensor = storeSensor.CheckOut(out sensorInternalIndex);
-				opticalSensor.AddUserStruct(typeof(Sensor), memSensor, sensorInternalIndex);
-				
-				storeSensor.Span[sensorInternalIndex].Configuration = OpticalSensorConfiguration;
-				storeSensor.Span[sensorInternalIndex].EntityArrayIndex = arrayIndex;
-				//storeSensor.Span[sensorInternalIndex].InternalComponentIndex = -1; // TODO:  this should be from "Component" struct not sensorInternalIndex;
-				storeSensor.Span[sensorInternalIndex].RangeSquared = EntryClass.MAX_SEARCH_DISTANCE * EntryClass.MAX_SEARCH_DISTANCE;
-				//storeSensor.Span[sensorInternalIndex].ScanRating = 2000; // <-- this is a computed stat based on TL and Power, that generally ranges from 10 - 40+  (google "gurps vehicles 2nd edition radar scan rating")
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine(exLine + " " + ex.Message);
-			}
-			
-			// each Droid can Produce a 'PRODUCT.OpticalReflection' 
-			Production p;
-			p.ProducerEntityArrayIndex = opticalSensor.EntityArrayIndex;
-			p.ProducerEntityInternalIndex = opticalSensor.GetUserStructIndex(typeof(Transform.Transform_Struct));
-			p.ProductID = 	(uint)PRODUCTS.OpticalReflection;
-			p.Location = Vector3d.Zero();
-			p.Enabled = true;
-			p.Value = 1;
-			p.Amount = -1; // this should be diminished by the range of the sensor 
-			p.NumUses = -1;
-			p.CooldownBetweenUses = 0;
-			// TODO: the distribution list for PRODUCT.OpticalReflection is ignored for now.  We just use
-			//       adjacents I think to determine who we will distribute too
-			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
-			p.DistributionList = null; //new int[] {checkOutIndex};
-			p.SearchPrimitive  = null;
-	
-			// TODO: the distribution list for PRODUCT.OpticalReflection is ignored for now.  We just use
-			//       adjacents I think to determine who we will distribute too
-			// each Droid can Consume a 'PRODUCT.OpticalReflection' 
-			Consumption c;
-			c.ConsumerEntityArrayIndex = opticalSensor.EntityArrayIndex;
-			c.ConsumerInternalIndex = sensorInternalIndex;
-			c.ProductID = (uint)PRODUCTS.OpticalReflection;
-			c.Value =  null;
-			c.Amount = 1;
-			c.Operations = null;
-			
-			RegisterProduction(opticalSensor, p);
-			RegisterConsumption(opticalSensor, c);
-			
-			
-			// each OpticalSensor CONSUMES PRODUCT.ElectricalPower from our Battery (a Producer)
-			c.ConsumerEntityArrayIndex = opticalSensor.EntityArrayIndex;
-			c.ConsumerInternalIndex = transformIndex;
-			c.ProductID = (uint)PRODUCTS.ElectricalPower;
-			c.Value =  2;  // 10 kW/h
-			c.Amount = 1;
-			c.Operations = null;
-			
-			RegisterConsumption(opticalSensor, c);
-			
-			return opticalSensor;
-		}
-		
-		private EntityNode CreateWings(int arrayIndex)
-		{
-			string exLine = "CreateWings 1";
-			string entityKey = "wings_" + arrayIndex.ToString(); // prefix with "laser_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!			
-			
-			EntityNode wings = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
-			
-			//CONFIGURATION WingsConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing; // <- CONFIGURATION.Propulsion
-			
-			// transform struct
-			int transformIndex;
-			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)wings.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
-			transform.Span[0].Configuration = WingsConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
-			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
-
-			// component struct
-			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-			int compInternalIndex = -1;
-			Memory<Component> memComp = storeComp.CheckOut(out compInternalIndex);
-			wings.AddUserStruct(typeof(Component), memComp, compInternalIndex);
-			storeComp.Span[compInternalIndex].Configuration = WingsConfiguration;
-			storeComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
-
-			// powerconsumer struct
-			ComponentStore<PowerConsumer> storeWings = EntryClass.mCStoreCol.CheckOut<PowerConsumer>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-			int powerConsumerInternalIndex = -1;
-			Memory<PowerConsumer> memWings = storeWings.CheckOut(out powerConsumerInternalIndex);
-			wings.AddUserStruct(typeof(PowerConsumer), memWings, powerConsumerInternalIndex);
-			storeWings.Span[powerConsumerInternalIndex].Configuration = WingsConfiguration;
-			storeWings.Span[powerConsumerInternalIndex].EntityArrayIndex = arrayIndex;
-			
-			// each Wing CONSUMES PRODUCT.ElectricalPower from our Battery (a Producer)
-			Consumption c;
-			c.ConsumerEntityArrayIndex = wings.EntityArrayIndex;
-			c.ConsumerInternalIndex = transformIndex;
-			c.ProductID = (uint)PRODUCTS.ElectricalPower;
-			c.Value =  5;  // 5 kW/h
-			c.Amount = 1;
-			c.Operations = null;
-			
-			RegisterConsumption(wings, c);
-			
-			return wings;
-		}
-		
-		
-		private EntityNode CreateLaser(int arrayIndex)
-		{
-			string exLine = "CreateLaser 1";
-			string entityKey = "laser_" + arrayIndex.ToString(); // prefix with "laser_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!			
-			
-			EntityNode laser = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
-					
-			mIntervalTimers.Register(entityKey, "droid_canfire", 0.00d);
-			mIntervalTimers.Register(entityKey, "droid_isfiring", 0.06d);
-			
-			
-			//CONFIGURATION LaserConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.Weapon | CONFIGURATION.Laser;
-			
-			// transform struct
-			int transformIndex;
-			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)laser.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
-			transform.Span[0].Configuration = LaserConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
-			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
-			
-			// component struct
-			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-            int checkOutIndex = -1;
-            Memory<Component> memCmp = storeComp.CheckOut(out checkOutIndex);
-			laser.AddUserStruct(typeof(Component), memCmp, checkOutIndex);
-			storeComp.Span[checkOutIndex].Configuration = LaserConfiguration;
-			storeComp.Span[checkOutIndex].EntityArrayIndex = laser.EntityArrayIndex;
-			storeComp.Span[checkOutIndex].Level = 1;
-			//storeComp.Span[checkOutIndex].Quality = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
-			storeComp.Span[checkOutIndex].Ruggedized = true;
-			//storeComp.Span[checkOutIndex].HitPoints = 100;
-			//storeComp.Span[checkOutIndex].DR = 20;  // todo: if we use complex armor, is DR (damage resistance) used?
-			//storeComp.Span[checkOutIndex].Cost = 10d;
-			//storeComp.Span[checkOutIndex].Weight = 2.5d;
-			//storeComp.Span[checkOutIndex].SurfaceArea = 1d;
-			//storeComp.Span[checkOutIndex].Volume = 0.2d;
-
-			// weapon struct
-			ComponentStore<Weapon> storeWeapon = EntryClass.mCStoreCol.CheckOut<Weapon>(EntryClass.NUM_ENTRIES);
-            checkOutIndex = -1;
-            Memory<Weapon> memWep = storeWeapon.CheckOut(out checkOutIndex);
-			laser.AddUserStruct(typeof(Weapon), memWep, checkOutIndex);	
-			storeWeapon.Span[checkOutIndex].EntityArrayIndex = laser.EntityArrayIndex;
-			storeWeapon.Span[checkOutIndex].Configuration = LaserConfiguration;
-			storeWeapon.Span[checkOutIndex].Reliable = true;
-			storeWeapon.Span[checkOutIndex].Compact = true;
-			storeWeapon.Span[checkOutIndex].Accuracy = 10;
-			storeWeapon.Span[checkOutIndex].SnapShot = 2;
-			storeWeapon.Span[checkOutIndex].Malfunction_ = 0.2f; // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
-			//public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
-			
-//			public string Shots;
-			
-			storeWeapon.Span[checkOutIndex].CoolDown_ = 0.3f; // this is the cooldown between when this weapon can be fired again.  It is RoF and perhaps CyclicRate too ultimately. Any "ANIMATION" of the weapon firing should last less than the time of this cooldown!
-//			public string RoF;
-			
-//			storeWeapon.Span[checkOutIndex].PowerReqt = 0.0f;
-//			
-//			public string Mount;
-//			public string Direction;
-
-			// TODO: these are like "internal" items and can be used if another power source is no longer connected
-//			public string PowerCellType;  // TOOD: Need an ENUM
-//			public int PowerCellQuantity;
-//			public double PowerCellWeight;
-			
-			// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
-//			storeWeapon.Span[checkOutIndex].TypeDamage = DAMAGE_TYPE.Burning;     // TOOD: Need an ENUM
-			//public string Damage;         // this is dice of damage, but often contains a multiplier like (100) afterwards.  We don't need the multiplier since we just compute a min/max damage range or maybe we compute a single damage that then gets modified based on the target evasive maneuvers and such
-			storeWeapon.Span[checkOutIndex].AverageDamage = 3;       
-//			public double KEDamage = 3.0d;
-//			public double HalfDamage; 
-//			public double VacuumHalfDamage;
-			
-//			public string Range; // string description of range (eg: "very long range")
-			storeWeapon.Span[checkOutIndex].MaxRange = 10;
-//			public double MaxRange2;
-//			public double VacuumMaxRange;
-//			public double VacuumMaxRange2;
-    
-			
-			// Laser struct
-			ComponentStore<Laser_Struct> storeLasers = EntryClass.mCStoreCol.CheckOut<Laser_Struct>(EntryClass.NUM_ENTRIES); 
-            checkOutIndex = -1;
-            Memory<Laser_Struct>memLaser = storeLasers.CheckOut(out checkOutIndex);
-            laser.AddUserStruct(typeof(Laser_Struct), memLaser, checkOutIndex);
-			storeLasers.Span[checkOutIndex].EntityArrayIndex = laser.EntityArrayIndex;
-			storeLasers.Span[checkOutIndex].Configuration = LaserConfiguration;
-			storeLasers.Span[checkOutIndex].Type = 1;     
-			storeLasers.Span[checkOutIndex].EnergyDrill = false;
-			storeLasers.Span[checkOutIndex].FTL = true;
-			storeLasers.Span[checkOutIndex].BeamOutput = 10f; // kW
-			storeLasers.Span[checkOutIndex].CyclicRate = 1;
-					
-			// each Laser CONSUMES PRODUCT.ElectricalPower from our Battery (a Producer)
-			Consumption c;
-			c.ConsumerEntityArrayIndex = laser.EntityArrayIndex;
-			c.ConsumerInternalIndex = transformIndex;
-			c.ProductID = (uint)PRODUCTS.ElectricalPower;
-			c.Value =  25;  // 10 kW/h
-			c.Amount = 1;
-			c.Operations = null;
-			
-			RegisterConsumption(laser, c);
-			
-			return laser;
-		}
-		
-		private EntityNode CreateTacticalStation(int arrayIndex)
-		{
-			string exLine = "CreateStation 1";
-			string entityKey = "tacticalstation_" + arrayIndex.ToString(); // prefix with "laser_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!			
-			
-			EntityNode station = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
-							
-			//CONFIGURATION TacticalStationConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.TacticalStation;
-
-			// transform struct
-			int transformIndex;
-			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)station.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
-			transform.Span[0].Configuration = TacticalStationConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
-			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
-			
-			// component struct
-			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-			int compInternalIndex = -1;
-			Memory<Component> memComp = storeComp.CheckOut(out compInternalIndex);
-			station.AddUserStruct(typeof(Component), memComp, compInternalIndex);
-			storeComp.Span[compInternalIndex].Configuration = TacticalStationConfiguration;
-			storeComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
-
-		
-			// powerconsumer struct
-			ComponentStore<PowerConsumer> storePowerConsumer = EntryClass.mCStoreCol.CheckOut<PowerConsumer>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-			int powerConsumerInternalIndex = -1;
-			Memory<PowerConsumer> memWings = storePowerConsumer.CheckOut(out powerConsumerInternalIndex);
-			station.AddUserStruct(typeof(PowerConsumer), memWings, powerConsumerInternalIndex);
-			storePowerConsumer.Span[powerConsumerInternalIndex].Configuration = TacticalStationConfiguration;
-			storePowerConsumer.Span[powerConsumerInternalIndex].EntityArrayIndex = arrayIndex;
-			
-			
-			// tactical station
-			ComponentStore<TacticalStation> storeTacticalStation = EntryClass.mCStoreCol.CheckOut<TacticalStation>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-            int checkOutIndex = -1;
-            Memory<TacticalStation> memTact = storeTacticalStation.CheckOut(out checkOutIndex);
-			station.AddUserStruct(typeof(TacticalStation), memTact, checkOutIndex);
-
-			storeTacticalStation.Span[checkOutIndex].Configuration = TacticalStationConfiguration;
-			storeTacticalStation.Span[checkOutIndex].EntityArrayIndex = arrayIndex; // we use EntityArrayIndex and not SpanIndex because we want to use it to find the Boid element in the EntryClass.bSim.Boids[index] List
-			storeTacticalStation.Span[checkOutIndex].HistoryCount = 1;
-			storeTacticalStation.Span[checkOutIndex].CooldownBetweenActions = 3.0f;
-			storeTacticalStation.Span[checkOutIndex].MaxActions = 2;
-			storeTacticalStation.Span[checkOutIndex].NumActions = 0;
-			storeTacticalStation.Span[checkOutIndex].Actions = null;
-			storeTacticalStation.Span[checkOutIndex].Contacts = null;
-			storeTacticalStation.Span[checkOutIndex].ContactsHistory = null;
-			storeTacticalStation.Span[checkOutIndex].Targets = null;
-
-			// add a targetingSkill requirement to this TacticalStation
-			Skill targetingSkill;
-			targetingSkill.SkillType = SKILLS.Targeting;
-			targetingSkill.Level = 2;     			// the level of this skill
-			targetingSkill.Production = null;
-			//targetingSkill.Modifiers = null;
-			targetingSkill.BaseValue = 2;
-			targetingSkill.EffectiveValue = 0; // todo: this should be a Getter perhaps and not a public variable
-			// add the modifier(s) to this skill.  Recall that modifiers behave just like any other type of PRODUCTION and must be registered as PRODUCTION 
-			// at the appropriate time (eg On USE of the Skill, or on EQUIP of an Item, etc.)
-			
-			// NOTE: This station will be CONSUMING TargetingSkilLModifer and NOT producing any.  The operator will be PRODUCING
-			//targetingSkill.AddProduction(livingEntityID, PRODUCTS.TargetingSkillModifier, 1, true, -1);
-
-			// TODO: This MUST go to the TacticalStation, NOT HERE
-			// add the skill to the DROID as if it was being added to a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
-			station.Skills.Add(targetingSkill.SkillType, targetingSkill);
-			
-			// each Station CONSUMES PRODUCT.ElectricalPower from our Batter (a Producer)
-			Consumption c;
-			c.ConsumerEntityArrayIndex = station.EntityArrayIndex;
-			c.ConsumerInternalIndex = transformIndex;
-			c.ProductID = (uint)PRODUCTS.ElectricalPower;
-			c.Value =  10;  // 10 kW/h
-			c.Amount = 1;
-			c.Operations = null;
-			
-			RegisterConsumption(station, c);
-			
-			
-			// each Station can Consume a TargetingSkillModifier as if it had a TACTICAL CREW STATION from an Operator
-			c.ConsumerEntityArrayIndex = station.EntityArrayIndex;
-			c.ConsumerInternalIndex = transformIndex;
-			c.ProductID = (uint)PRODUCTS.TargetingSkillModifier;
-			c.Value =  null;
-			c.Amount = 1;
-			c.Operations = null;
-
-			
-			RegisterConsumption(station, c);
-			
-			return station;
-		}
-		
-		private EntityNode CreateBattery (int arrayIndex)
-		{
-			string exLine = "CreateBattery 1";
-			string entityKey = "battery_" + arrayIndex.ToString(); // prefix with "laser_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!			
-			
-			EntityNode battery = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
-					
-			//CONFIGURATION BatteryConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerProducer;
-			
-			// transform struct
-			int transformIndex;
-			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)battery.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
-			transform.Span[0].Configuration = BatteryConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
-			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
-
-			// component struct
-			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-			int compInternalIndex = -1;
-			Memory<Component> memComp = storeComp.CheckOut(out compInternalIndex);
-			battery.AddUserStruct(typeof(Component), memComp, compInternalIndex);
-			storeComp.Span[compInternalIndex].Configuration = BatteryConfiguration;
-			storeComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
-
-			storeComp.Span[compInternalIndex].Configuration = BatteryConfiguration;
-			storeComp.Span[compInternalIndex].EntityArrayIndex = battery.EntityArrayIndex;
-			storeComp.Span[compInternalIndex].Level = 1;
-			//storeComp.Span[compInternalIndex].Quality = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
-			storeComp.Span[compInternalIndex].Ruggedized = true;
-			//storeComp.Span[compInternalIndex].HitPoints = 100;
-			//storeComp.Span[compInternalIndex].DR = 20;  // todo: if we use complex armor, is DR (damage resistance) used?
-			//storeComp.Span[compInternalIndex].Cost = 10d;
-			//storeComp.Span[compInternalIndex].Weight = 2.5d;
-			//storeComp.Span[compInternalIndex].SurfaceArea = 1d;
-			//storeComp.Span[compInternalIndex].Volume = 0.2d;
-
-			
-			
-			// powerProducer struct
-			ComponentStore<PowerProducer> storePowerProducers = EntryClass.mCStoreCol.CheckOut<PowerProducer>(EntryClass.NUM_ENTRIES); 
-			int powerProducerInternalIndex = -1;
-			Memory<PowerProducer> memPowerProducer = storePowerProducers.CheckOut(out powerProducerInternalIndex);
-			battery.AddUserStruct(typeof(PowerProducer), memPowerProducer, powerProducerInternalIndex);
-			storePowerProducers.Span[powerProducerInternalIndex].Configuration = BatteryConfiguration;
-			storePowerProducers.Span[powerProducerInternalIndex].EntityArrayIndex = arrayIndex;
-					
-			// each Battery can Produce a PRODUCTS.ElectricalPower
-			Production p;
-			p.ProducerEntityArrayIndex = battery.EntityArrayIndex;
-			p.ProducerEntityInternalIndex = powerProducerInternalIndex;
-			p.ProductID = 	(uint)PRODUCTS.ElectricalPower;
-			p.Location = Vector3d.Zero();
-			p.Enabled = true;
-			p.Value = 1000d;  // the UNIT value... in this case it's a DOUBLE
-			p.Amount = -1; // a Battery can produce as much as is needed to supply all of it's Consumers until it runs out of Energy  
-			p.NumUses = 100; // This Battery can be used 100 times (100 updates or frames) before it runs out.  update every TICK if -1 NumUses
-			p.CooldownBetweenUses = 0;
-			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
-			
-
-			// Wings, Eyes, Lasers, TacticalStation all CONSUME ElectricalPower
-			// TODO: these indices should probably be indices into PowerConsumer struct, NOT EntityArrayIndex into List<Boids>
-			int boidArrayIndex = arrayIndex - BATTERY_OFFSET;
-			int wingsIndex = boidArrayIndex + WINGS_OFFSET;
-			int eyesIndex = boidArrayIndex + OPTICAL_SENSOR_OFFSET;
-			int laserIndex = boidArrayIndex + LASER_OFFSET;
-			int tacticalIndex = boidArrayIndex + TACTICAL_STATION_OFFSET;
-			
-			p.DistributionList = new int[] {wingsIndex, eyesIndex, laserIndex, tacticalIndex};
-			p.SearchPrimitive  = null;
-				
-			
-			RegisterProduction(battery, p);
-						
-			return battery;
-		}
-		
-		private EntityNode CreateHumanOperator(int arrayIndex)
-		{
-			string exLine = "CreateHumanOperator 1";
-			string entityKey = "human_operator_" + arrayIndex.ToString(); // prefix with "laser_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!			
-			
-			EntityNode humanOperator = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
-
-			int transformIndex;
-			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)humanOperator.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
-			transform.Span[0].Configuration = HumanOperatorConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
-			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
-		
-			// LIVING ENTITY
-			ComponentStore<LivingEntity> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-            int livingEntityID = -1;
-            Memory<LivingEntity> memLivingEnt = storeLivingEntity.CheckOut(out livingEntityID);
-			humanOperator.AddUserStruct(typeof(LivingEntity), memLivingEnt, livingEntityID);
-			
-			storeLivingEntity.Span[livingEntityID].Age = 1;
-			storeLivingEntity.Span[livingEntityID].Hitpoints = 20;
-			storeLivingEntity.Span[livingEntityID].Configuration = HumanOperatorConfiguration;
-			
-						
-			
-			Skill targetingSkill;
-			targetingSkill.SkillType = SKILLS.Targeting;
-			targetingSkill.Level = 3;     			// the level of this skill
-			targetingSkill.Production = null;
-			//targetingSkill.Modifiers = null;
-			targetingSkill.BaseValue = 1;
-			targetingSkill.EffectiveValue = 0;
-			
-			// add the modifier(s) to this skill.  Recall that modifiers behave just like any other type of PRODUCTION and must be registered as PRODUCTION 
-			// at the appropriate time (eg On USE of the Skill, or on EQUIP of an Item, etc.)
-			targetingSkill.AddProduction(livingEntityID, PRODUCTS.TargetingSkillModifier, 1, true, -1);
-
-
-			// add the skill to the DROID as if it was being added to an OPERATOR for a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
-			humanOperator.Skills.Add(targetingSkill.SkillType, targetingSkill);
-			
-			// each Operator can Produce a TargetingSkillModifier
-			Production p;
-			p.ProducerEntityArrayIndex = humanOperator.EntityArrayIndex;
-			p.ProducerEntityInternalIndex = livingEntityID;
-			p.ProductID = 	(uint)targetingSkill.Production[0].Product;  // TargetingSkillModifier
-			p.Location = Vector3d.Zero();
-			p.Enabled = true;
-			p.Value = targetingSkill.Production[0];
-			p.Amount = targetingSkill.Production[0].Amount; // this will use the 
-			p.NumUses = -1;
-			p.CooldownBetweenUses = 0;
-			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
-			
-			int stationArrayIndex = arrayIndex - HUMAN_OPERATOR_OFFSET + TACTICAL_STATION_OFFSET;
-			p.DistributionList = new int[] {stationArrayIndex};
-			p.SearchPrimitive  = null;
-				
-			
-			RegisterProduction(humanOperator, p);
-					
-			return humanOperator;
-		}
-		
-		private void Destroy(EntityNode entity)
-		{
-			int lastIndex = this.Boids.Count - 1;
-	
-			// TODO:
-			// OnEntityDetached(EntityNode e)
-			//       {
-			//			RemoveProduction(e)
-			//	        RemoveConsumption(e);
-			//       }
-				
-
-			// remove from Octree
-			this.Octree.OnEntityNode_Removed(entity);
-			
-			// remove from Boids[] list
-			// TODO: do we need to update all the indices to keep our Memory<T> packed?
-			//       one method is to always move the last indexed entity into the slot where 
-			//       an Entity was removed, update its entity.Index, and then change the count 
-			//       of the Memory<T> store to previousCount - 1;
-			// TODO: we need to release all Memory<T> used by Transform_Struct and Living_Entity structs.
-		#if MEMORY_T
-			this.Boids[entity.EntityArayIndex].Dispose(); // 	<-- store.CheckIn(Boids[i].mMemStore_LivingEntity); occurs here correct?
-		#endif
-			this.Boids[entity.EntityArrayIndex] = null;
-			this.Boids[entity.EntityArrayIndex] = this.Boids[lastIndex];
-			this.Boids[entity.EntityArrayIndex].EntityArrayIndex = lastIndex;
-	
-			this.Boids.RemoveAt(lastIndex); // todo: this wont result in a List copy to a new List will it?
-
-#if MEMORY_T
-			Console.WriteLine("Destroy() == Completed on index " + entity.SpanIndexLE.ToString());
-#endif
-		}
-
-		
 		/// <summary>
 		/// Called by UpdateClasses() regardless of whether Octree is used or not.
 		/// Called by Memory<T> ONLY if Octree is NOT used.  Otherwise it uses non-recursive Octree code within the DoFlocking() method.
@@ -3711,7 +3753,8 @@ namespace HelloBoids
 		private void UpdateProduction(GameTime gt)
         {
             uint productID = (uint)PRODUCTS.TargetingSkillModifier;
-		
+
+			
 			foreach (KeyValuePair<uint, List<Production>> entry in mProduction)
 			{	
 				productID = entry.Key;
@@ -3728,28 +3771,14 @@ namespace HelloBoids
 				{
 					Production currentProduction = production[i];
 					
-					// 2) Determine consumer distrubtion - find all valid consumers that match the terms of this production result
-					// TODO: FindConsumers is very slow.  I must not run that simulation each period for Zones that are beyond a certain range from player.
-					// TODO:  Verify that we are in fact running Production for entities in every zone we load.  That is a bug.
 					List<Consumption> consumers = mConsumption[productID];
 					if (consumers == null) continue;
 
-					// PRODUCTS.TargetingSkillModifier is generated by the OPERATOR (yes, for now still just a Skill assigned to each Droid, but eventually within KGB, it will apply to a crew member assigned to a Tactical Crew Station)
 					int[] distributionList = currentProduction.DistributionList;
 					if (distributionList ==  null || distributionList.Length == 0) continue; // return if using parallel.For
 
-					// verify all Entities in the distribution list match an Entity in the registered consumers of this productID.
-					// NOTE: Just because a consumer is consuming the same ProductID, does NOT mean it's consuming the production of 
-					//       the current sourceEntity.  Consider a reactor that produces POWER, it may only power weapons and the engines
-					//       and a second Reactor or Auxillary power source provides energy for things like computers, sensors, etc even 
-					//       though it's the same PRODUCT ID.
-					// NOTE:  THIS DOES MEAN THAT IF AN ENTITY IS A CONSUMER, BUT DOES NOT REGISTER YET IS ADDED SOMEHOW TO A PRODUCERS
-					//        DISTRIBUTIONLIST or USES SOME OTHER DISTRIBUTION METHOD/FILTER, IT _MUST_NOT_GET_PROCESSED 
-					//        because again, there will be no details on how this Consumption should be applied to the Producer.
-					//        e.g do we drain 10kW from the Battery or do we drain 2kW.
 					try
 					{
-
 						// Parallelizing the INNER LOOP is typically not recommended because
 						// each time the OUTER loop completes, it has to recreate all the threads
 						// for the INNER LOOP.
@@ -3760,106 +3789,47 @@ namespace HelloBoids
 						// lengths of time because the work can be totally different.
 						for (int j = 0; j < distributionList.Length; j++)
 						{
-
-							// TODO: MAYBE THE DISTRIBUTION LIST POINTS TO AN ENTITYARRAYINDEX THAT WE USE TO FIND
-							// AN INDEX INTO LIST<CONSUMPTION> THAT HAS THE CONSUMPTION STRUCT we need that has
-							// specific details on how to apply Consumption from that Producer to the current Consumer.
-
-							bool foundConsumer = false;
-							Consumption currentConsumer = default(Consumption);
-							for (int k = 0; k < consumers.Count; k++)
+							// TODO: above we are iterating, but really what we want I think is to 
+							//       have the Memory<Consumption<ProductID>> and the list of which elements are
+							//       Then there is ZERO looping and we simply pass ProcessConsumption (currentProduction, mem);
+							//       Where we have a Dictionary<> of functions that will process that change just like we do
+							//       for things like FLOCKING, OPTICAL_SENSORS, LIFECYCLE
+							//       We do not need all these "DamageSystem" and "HealthSystem" and such that contain a special struct for "records"
+							//       as such... we just need a LIST or ARRAY like our distributinList[] that says which
+							//       Memory<T> records to modify in both the Memory<Production> and Memory<Consumption>
+							//       and we will probably optimize those by having Memory<Production<ProductID>> and Memory<Consumption<ProductID>>
+							//       And again, each of these will contain a functin to use to handle Production and Consumption... just like 
+							//       we do with OPTICAL_SENSORS and LIFECYCLE  so we just do a simple "key"  look up of the Processor function
+							//       based on the ProductID.
+							//       
+							Consumption currentConsumption = consumers[distributionList[j]];
+							if (currentConsumption.Equals(default(Consumption)))
 							{
-								// NOTE: BEWARE  of using confusing mix of Span[] index, and EntityArrayIndex which is Boids[] index)
-								//       In KGB this shouldn't be a problem since we wont have them both, but for this test harnass we do
-								if (consumers[k].ConsumerEntityArrayIndex == distributionList[j])
-								{
-									currentConsumer = consumers[k];
-									foundConsumer = true;
-									break;
-								}
-							}
-							
-							if (!foundConsumer)
-							{
-								Console.WriteLine("UpdateProduction() - Consumer '" + distributionList[j] + "'  is not registered.");
+								Console.WriteLine("UpdateProduction() - Consumption '" + distributionList[j] + "'  is not registered.");
 								continue;
 							}
 							
 							try
-							{
-								EntityNode consumerEntity =  Boids[distributionList[j]];
-								if (consumerEntity == null) return;
+							{							
+								EntityNode consumerEntity =  Boids[currentConsumption.ConsumerEntityArrayIndex];
+								if (consumerEntity == null) continue;
 								
-								// A more typical type of PRODUCTION such as PRODUCTS.ElectricalPower or PRODUCTS.OpticalReflection
-								if (currentProduction.Value is SkillModifier == false)
-								{
-									if (distributionList[j] == -1) 
-									{
-										Console.WriteLine("UpdateProduction() - INVALID DistributionList index value '" + distributionList[j].ToString());
-										continue;
-									}
-	
-									int consumerArrayIndex = consumerEntity.EntityArrayIndex;
-									System.Diagnostics.Debug.Assert (consumerArrayIndex == distributionList[j], "UpdateProduction() - Indices do not match.");
-
-									//Console.WriteLine("UpdateProduction() - ENTITY '" + Boids[currentProduction.ProducerEntityArrayIndex].EntityKey + "' PRODUCING -> " + ((PRODUCTS)currentProduction.ProductID).ToString() + " to '" + consumerEntity.EntityKey + "'");
-								}
-								else 	// A SkillModifier
-								{
-									SkillModifier modifier = (SkillModifier)currentProduction.Value;
-									if (modifier.Enabled)
-									{
-										if (modifier.NumUses > 0 || modifier.NumUses == -1 )
-										{
-											System.Diagnostics.Debug.Assert(currentConsumer.ConsumerEntityArrayIndex == distributionList[j]); // the entity that is consuming a product
-											System.Diagnostics.Debug.Assert(currentConsumer.ProductID == productID);          // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer.  Actually, I think we've modified this so that "PRODUCTS.HeatSignature" and "Products.HeatDamage" are two seperate products that may or may not both be consumed by any given Consumer.
-											currentConsumer.Value = modifier;
-											currentConsumer.Amount = modifier.Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
-
-											//Console.WriteLine("UpdateProduction() - ENTITY '" + Boids[currentProduction.ProducerEntityArrayIndex].EntityKey + "' MODIFYING SKILL -> " + ((PRODUCTS)currentProduction.ProductID).ToString() + " to '" + consumerEntity.EntityKey + "'");
-											
-											// TODO: in the loop of all production, there can be multiple Producers modifying this
-											//       currentConsumer.  I think we should be able to track all of them... but that
-											//       could maybe be done in the "ModificationSystem" 
-											
-											// TODO: based on the ProductID, we need to find the correct property to modify
-											// and to also deduct that amount from a Producer if it's production amount is not infinite
-											// TODO: also, when deducting production from a Producer, we need to sychronize thread access to it?
-											//currentConsumer.
-											
-											mSkillModificationSystem.Add (currentConsumer);
-											if (modifier.NumUses > 0)
-												modifier.NumUses--;
-										}
-										else if (modifier.NumUses == 0)
-										{
-											modifier.Enabled = false;
-										}
-									}
-								}
+								ProcessConsumption(currentProduction, currentConsumption);
 							}
 							catch (Exception ex)
 							{
 								Console.WriteLine("UpdateProduction() - ERROR: " + ex.Message);
 							}
-							// the Modifier PRODUCTS.TargetingSkillModifier must be applied to the SKILLS.Targeting of the DROID's 'Crew Station'
-							
-						} // end for
+						} // end for of consumer distribution list
 					}
 					catch (Exception ex)
 					{
 						Console.WriteLine("UpdateProduction() - " + ex.Message);
 					}
 
-					// CONSIDER ProcessOpticalSensors()... we are essentially initiating the PRODUCTION
-					// of optical emission by taking all of the optical  producers (each Boid inside Boids[] array)
-					// and then doing a spatial search for all other Droids in range of that emission, we 
-					// create a OPTICAL_SIGNATURE that takes the form of a "contact" item and is transmitted
-					// back to the original emitter Droid's "eye" which  is an optical sensor and currently is stored in
-					// Dictionary<> mNeighbors;
-
 				} // end for of current List<production>
 				
+				//Console.WriteLine ("UpdateProduction()  - ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++COMPLETED.");
 				foreach (Production p in production)
 				{	
 					if (p.NumUses == 0)
@@ -3867,17 +3837,104 @@ namespace HelloBoids
 					
 				}
 				
-			} // end foreach
+			} // end foreach of each mProduction<> dictionary
 			
 			foreach (KeyValuePair<uint, List<Production>> entry in mProduction)
 			{	
 				productID = entry.Key;
 				List<Production> production = entry.Value;
-				if (production.Count == 0)
-					mProduction.TryRemove(entry.Key, out production);
+				if (production != null && production.Count == 0)
+			    	mProduction.TryRemove(entry.Key, out production);
 			}
+			
+			//Console.WriteLine ("UpdateProduction()  - ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++COMPLETED.");
         }
 
+		private void ProcessConsumption(Production production, Consumption consumption)
+		{
+			
+			// todo: The distributionList currently contains the index to the List<Consumption> 
+			//       but maybe it should also contain the Index to the EntityArrayIndex?
+			//       in other words,  make distributionList a List<Tuple<uint, uint>>
+
+
+			// verify all Entities in the distribution list match an Entity in the registered consumers of this productID.
+			// NOTE: Just because a consumer is consuming the same ProductID, does NOT mean it's consuming the production of 
+			//       the current sourceEntity.  Consider a reactor that produces POWER, it may only power weapons and the engines
+			//       and a second Reactor or Auxillary power source provides energy for things like computers, sensors, etc even 
+			//       though it's the same PRODUCT ID.
+			// NOTE:  THIS DOES MEAN THAT IF AN ENTITY IS A CONSUMER, BUT DOES NOT REGISTER YET IS ADDED SOMEHOW TO A PRODUCERS
+			//        DISTRIBUTIONLIST or USES SOME OTHER DISTRIBUTION METHOD/FILTER, IT _MUST_NOT_GET_PROCESSED 
+			//        because again, there will be no details on how this Consumption should be applied to the Producer.
+			//        e.g do we drain 10kW from the Battery or do we drain 2kW.
+
+			//currentConsumer.ConsumerEntityArrayIndex = 0;
+			//currentConsumer.ProductID = 0;
+			//currentConsumer.Amount = 0;
+			//currentConsumer.Value = 0;
+			//currentConsumer.ConsumerInternalIndex = 0;
+			//currentConsumer.Operations = null;
+							
+					// CONSIDER ProcessOpticalSensors()... we are essentially initiating the PRODUCTION
+					// of optical emission by taking all of the optical  producers (each Boid inside Boids[] array)
+					// and then doing a spatial search for all other Droids in range of that emission, we 
+					// create a OPTICAL_SIGNATURE that takes the form of a "contact" item and is transmitted
+					// back to the original emitter Droid's "eye" which  is an optical sensor and currently is stored in
+					// Dictionary<> mNeighbors;
+			
+			uint productID = production.ProductID;				
+			switch (productID)
+			{
+				case (int)PRODUCTS.ElectricalPower:
+					//mPowerConsumptionSystem.Add (production, consumption);
+					break;
+				default:
+					break;
+			}
+								
+			// PRODUCTION such as PRODUCTS.ElectricalPower or PRODUCTS.OpticalReflection
+			if (production.Value is SkillModifier == false)
+			{										
+				//Console.WriteLine("UpdateProduction() - ENTITY '" + Boids[production.ProducerEntityArrayIndex].EntityKey + "' PRODUCING -> " + ((PRODUCTS)production.ProductID).ToString() + " to '" + consumerEntity.EntityKey + "'");
+
+
+			}
+			// SKILL MODIFICATION
+			else 
+			{
+				SkillModifier modifier = (SkillModifier)production.Value;
+
+				if (modifier.Enabled)
+				{
+					if (modifier.NumUses > 0 || modifier.NumUses == -1 )
+					{
+						System.Diagnostics.Debug.Assert(consumption.ProductID == productID);          // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer.  Actually, I think we've modified this so that "PRODUCTS.HeatSignature" and "Products.HeatDamage" are two seperate products that may or may not both be consumed by any given Consumer.
+						consumption.Value = modifier;
+						consumption.Amount = modifier.Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
+
+						//Console.WriteLine("UpdateProduction() - ENTITY '" + Boids[producerEntityArrayIndex].EntityKey + "' MODIFYING SKILL -> " + ((PRODUCTS)production.ProductID).ToString() + " to '" + consumerEntity.EntityKey + "'");
+
+						// TODO: in the loop of all production, there can be multiple Producers modifying this
+						//       currentConsumer.  I think we should be able to track all of them... but that
+						//       could maybe be done in the "ModificationSystem" 
+
+						// TODO: based on the ProductID, we need to find the correct property to modify
+						// and to also deduct that amount from a Producer if it's production amount is not infinite
+						// TODO: also, when deducting production from a Producer, we need to sychronize thread access to it?
+						//consumption.
+
+						mSkillModificationSystem.Add (consumption);
+						if (modifier.NumUses > 0)
+							modifier.NumUses--;
+					}
+					else if (modifier.NumUses == 0)
+					{
+						modifier.Enabled = false;
+					}
+				}
+			}
+		}
+		
 		public struct SkillSystem
 		{
 			public struct ModificationResult

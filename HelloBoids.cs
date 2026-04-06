@@ -709,8 +709,11 @@ namespace HelloBoids
 		//       that will determine which types they are and then choose the correct underlying system
 		//       eg.  PowerConsumptionSystem.Add (production, consumption)
 		//        
-		private System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>> mProduction;
-        private System.Collections.Concurrent.ConcurrentDictionary<uint, List<Consumption>> mConsumption;
+		//internal System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>> mProduction;
+        //internal System.Collections.Concurrent.ConcurrentDictionary<uint, List<Consumption>> mConsumption;
+		internal System.Collections.Concurrent.ConcurrentDictionary<uint, ComponentStore<Production>> mProduction;
+        internal System.Collections.Concurrent.ConcurrentDictionary<uint, ComponentStore<Consumption>> mConsumption;
+		
 		
         public List<EntityNode> Boids { get; set; }
 		private System.Collections.Concurrent.ConcurrentDictionary<int, List<Tuple<int, double>>> mNeighbors = new System.Collections.Concurrent.ConcurrentDictionary<int, List<Tuple<int, double>>>();
@@ -780,8 +783,11 @@ namespace HelloBoids
 			// NOTE: mLimitedProduction may not be necessary as we now track the NumUses for any given Production and if
 			//       p.NumUses == 0, then we remove that production at the end of UpdateProduction();
 			//mLimitedProduction = new System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>>();
-			mProduction = new System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>>();
-        	mConsumption  = new System.Collections.Concurrent.ConcurrentDictionary<uint, List<Consumption>>();
+			//mProduction = new System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>>();
+        	//mConsumption  = new System.Collections.Concurrent.ConcurrentDictionary<uint, List<Consumption>>();
+			mProduction = new System.Collections.Concurrent.ConcurrentDictionary<uint, ComponentStore<Production>>();
+        	mConsumption  = new System.Collections.Concurrent.ConcurrentDictionary<uint, ComponentStore<Consumption>>();
+			
 			
 #if USE_MEMORY_T
 
@@ -821,6 +827,8 @@ namespace HelloBoids
             DataProcessorsStore.Processor<Transform.Transform_Struct> flockingBehavior = DoFlocking;
             mDataProcessor.Add("FLOCKING", flockingBehavior);
 	
+			DataProcessorsStore.Processor<Consumption> powerConsumption = ProcessPowerConsumption;
+            mDataProcessor.Add("POWER_CONSUMPTION", powerConsumption);
 			
 			//DataProcessorsStore.Processor<BoidSimulation.ImpalingDamage> lasersBehavior = DoWeaponTest;
             //mDataProcessor.Add("LASERS", lasersBehavior);
@@ -1549,12 +1557,14 @@ namespace HelloBoids
 		
 		private int GetConsumerIndex (uint productID, int entityArrayIndex)
 		{
-			List<Consumption> consumption = mConsumption[productID];
+			//List<Consumption> consumption = mConsumption[productID];
+			ComponentStore<Consumption> consumption = mConsumption[productID];
+			
 			
 			if (consumption == null || consumption.Count == 0) return -1;
 			
 			for (int i = 0; i < consumption.Count; i++)
-				if (consumption[i].ConsumerEntityArrayIndex == entityArrayIndex)
+				if (consumption.Span[i].ConsumerEntityArrayIndex == entityArrayIndex)
 					return i;
 			
 			return -1;
@@ -3501,8 +3511,9 @@ namespace HelloBoids
 				//}
 				//else
 				{
-	            	List<Production> production = mProduction.GetOrAdd(productID, (key) =>  new List<Production>());
-            	
+	            	//List<Production> production = mProduction.GetOrAdd(productID, (key) =>  new List<Production>());
+            		ComponentStore<Production> production = mConsumption.GetOrAdd (productID, (key) =>  EntryClass.mCStoreCol.CheckOut<Production>(EntryClass.NUM_ENTRIES, (int)p.ProductID));
+					
 					Predicate<Production> productionForThisEntityAndProductAlreadyExists = x => x.ProductID == p.ProductID && x.ProducerEntityArrayIndex == p.ProducerEntityArrayIndex;
 				
 					Production search = production.Find(productionForThisEntityAndProductAlreadyExists);
@@ -3528,7 +3539,9 @@ namespace HelloBoids
 				mConsumptionSemaphore.Wait(-1);
 				uint productID = c.ProductID;
 				//Console.WriteLine ("RegisterConsumption()  - productID == " + productID.ToString());
-            	List<Consumption> consumption = mConsumption.GetOrAdd (productID, (key) =>  new List<Consumption>());
+            	//List<Consumption> consumption = mConsumption.GetOrAdd (productID, (key) =>  new List<Consumption>());
+				ComponentStore<Consumption> consumption = mConsumption.GetOrAdd (productID, (key) =>  EntryClass.mCStoreCol.CheckOut<Consumption>(EntryClass.NUM_ENTRIES, (int)c.ProductID));
+				
 				
 				Predicate<Consumption> consumptionForThisEntityAndProductAlreadyExists = x => x.ProductID == c.ProductID && x.ConsumerEntityArrayIndex == c.ConsumerEntityArrayIndex;
 				
@@ -3749,12 +3762,25 @@ namespace HelloBoids
 			}
 		}
 		*/
+		private void ProcessPowerConsumption(ComponentStore<Consumption> store, object[] parameters, int seed, GameTime gt)
+		{
+			Span<Consumption> consumption = store.Span;
+			
+			uint recordCount = store.Count;
+			
+			List<Production> production = (List<Production>)parameters[0];
+			
+			Console.WriteLine("ProcessPowerConsumption() - Production Count == " + production.Count);
+			Console.WriteLine("ProcessPowerConsumption() - Consumption Count == " + recordCount);
+			
+			
+		}
 		
 		private void UpdateProduction(GameTime gt)
         {
             uint productID = (uint)PRODUCTS.TargetingSkillModifier;
 
-			
+			/*
 			foreach (KeyValuePair<uint, List<Production>> entry in mProduction)
 			{	
 				productID = entry.Key;
@@ -3848,6 +3874,8 @@ namespace HelloBoids
 			}
 			
 			//Console.WriteLine ("UpdateProduction()  - ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++COMPLETED.");
+			
+			*/
         }
 
 		private void ProcessConsumption(Production production, Consumption consumption)
@@ -8594,6 +8622,15 @@ return (0,0);
 				   		ComponentStore<Laser_Struct> storeLasers = mComponentStoreCollection.CheckOut<Laser_Struct>(0);
  						lazer.Invoke(storeLasers, args, seed, gt);
 						break;
+					case "POWER_CONSUMPTION": 
+						uint productID = (uint)PRODUCTS.ElectricalPower;
+						Processor<Consumption> powerConsumption = (Processor<Consumption>)func;
+						ComponentStore<Consumption> storePowerConsumption = mComponentStoreCollection.CheckOut<Consumption>(0, productID);
+						powerConsumption.Invoke(storePowerConsumption, args, seed, gt);
+						break;
+
+						
+						
 					//case "LASER_IMPALING_DAMAGE":
 					//	Processor<BoidSimulation.ImpalingDamage> laserImpalingDamage = (Processor<BoidSimulation.ImpalingDamage>)func;
 				    //	ComponentStore<BoidSimulation.ImpalingDamage> storeLaserImpalingDamage = mComponentStoreCollection.CheckOut<BoidSimulation.ImpalingDamage>(0);
@@ -8663,6 +8700,12 @@ return (0,0);
 				case "LASER_IMPALING_DAMAGE":
 					break;
 					
+				case "POWER_CONSUMPTION": 
+					result = new object[1];
+					result[0] = EntryClass.bSim.mProduction[(uint)PRODUCTS.ElectricalPower];  // key returns a List<Production>
+					
+					break;
+					
                 default:
                     throw new NotImplementedException("DataProcessors.GetParameters() - No store for key '" + key + "'");
             }
@@ -8670,133 +8713,583 @@ return (0,0);
             return result;
 
         }
+    } // DataProcessorsStore
 
+	
+    /// <summary>
+    /// ComponentStoreCollection allows for the CheckIn() and CheckOut() of 
+    /// ComponentStore<T> which is a wrapper around the System.Memory.Memory<T> 
+    /// class.  
+    /// This StoreCollection object will host ComponentStores<T> for both 
+    /// Intrinsic and UserComponents
+    /// </summary>
+    public class ComponentStoreCollection : IDisposable
+    {
+        //private System.Collections.Concurrent.ConcurrentDictionary<Type, object> mUserComponentsCollection;
+		
+		private System.Collections.Concurrent.ConcurrentDictionary<int, object> mUserComponentsCollection;
+		private static System.Threading.SemaphoreSlim mSlim = new System.Threading.SemaphoreSlim(1);
+				
+		
+        public ComponentStoreCollection()
+        {
+            //mUserComponentsCollection = new System.Collections.Concurrent.ConcurrentDictionary<Type, object>();
+        	mUserComponentsCollection = new System.Collections.Concurrent.ConcurrentDictionary<int, object>();
+		}
+		
+		// todo: i would need to pass in a userTypeID and perhaps classification, category, and configuration
+        public ComponentStore<T> CheckOut<T>(uint size = 64, int productID = -1)
+        {
+			try 
+			{
+				mSlim.Wait(-1); // wait parameter is in milliseconds to Wait, BUT -1 means wait indefinetely
+				// April.5.2026 - switched to "int" Dictionary<> key, away from 'Type' a a key.
+				// Google AI Overview says that the hashcode calculation for a Type is more expensive than an
+				// integer which is vertually 0 since the returned value is the integer value itself.
+				int hashCode = GetHashCode<T>(productID);
+				
+				ComponentStore<T> store = (ComponentStore<T>) mUserComponentsCollection.GetOrAdd(hashCode, result =>  new ComponentStore<T>(size));
+				
+				// Feb.13.2026 - switched to ConcurrentDictionary<>
+				//ComponentStore<T> store = (ComponentStore<T>) mUserComponentsCollection.GetOrAdd(typeof(T), result =>  new ComponentStore<T>(size));
+								
+				//object value;
+				//bool success = mUserComponentsCollection.TryGetValue(typeof(T), out value);
+				//if (success)
+				//    return (ComponentStore<T>)value; // throw new Exception("ComponentStoreCollection.CheckOut() - Dictionary Key Already Exists.");
 
-        // Action and Action<T>:
-        // For methods that perform an action and do not return a value. Useful for processing data that doesn't require a returned result, like logging or side effects.
+				//mUserComponentsCollection.Add(typeof(T), store);
+				return store;
+			}
+			finally
+			{
+				mSlim.Release();
+				//Console.WriteLine ("ComponentStore.CheckOut() - Completed " + typeof(T).ToString());
+			}
+        }
+				
+        public void CheckIn<T>(object store, int productID = -1)
+        {
+			try 
+			{
+				mSlim.Wait(-1);  // wait parameter is in milliseconds to Wait, BUT -1 means wait indefinetely
+				
+				object existing;
+				
+				int hashCode = GetHashCode<T>(productID);
+				
+				bool result = mUserComponentsCollection.TryRemove(hashCode, out existing);
 
-        // Func<TResult> and Func<T, TResult>:
-        // For methods that perform an operation and return a value. Ideal for data transformations, filtering, and calculations.
+				//System.Diagnotistics.Debug.Assert (result == true && existing == store, "ComponentStoreCollection.CheckIn()  - Dictionary item does not exist.");
 
-        // TInput and TOutput is the same as T1 and T2.  They are both just different Generic types T
-        /* public List<TResult> ProcessData<TInput, TResult>(List<T> data, ProcessItem<TInput, TResult> processor)
-         {
-             List<TResult> processedResults = new List<TResult>();
-             foreach (TInput item in data)
-             {
-                 processedResults.Add(processor(item));
-             }
-             return processedResults;
-         }
+				/*
+				if (store == null) throw new ArgumentOutOfRangeException("ComponentStoreCollection.CheckIn() - Dictionary is NULL.");
 
-         public List<TResult> ProcessData<TInput, TResult>(Memory<T> data, ProcessItem<Memory<T>, TResult> processor)
-         {
-             List<TResult> processedResults = new List<TResult>();
-             foreach (TInput item in data)
-             {
-                 processedResults.Add(processor(item));
-             }
-             return processedResults;
-         }
+				object value;
+				bool success = mUserComponentsCollection.TryGetValue(type.GetType(), out value);
 
-         //TODO: below would be in a Script and the delegate to that function
-         //      would be passed during script.Initialize();
+				if (!success) throw new ArgumentOutOfRangeException("ComponentStoreCollection.CheckIn() - ComponentStore for Type '" + typeof(T).Name + " ' is NULL.");
 
-         // todo: what exactly are we "processing" for this sensor scan?  
-         //       we do know for steering behaviors, eactly what algorithm to use for each crew 
-         //       memory element.
-         // This isn't a big deal. There is no difference iterating over these memory<T> arrayElements
-         // and iterating over Entity except we just need to know what memory<T> to use in order to 
-         // have access to the fields we want.  
-         // For sensors, we may want 
-         private void ProcessSensorScan(Memory<T> memory, SensorScanHandler handler)
-         {
-             handler?.Invoke(memory);
+				mUserComponentsCollection.Remove(type.GetType());
+				//value.Dispose();
+				*/
+			}
+			finally
+			{
+				mSlim.Release();
+			}
+        }
+        
+		private int GetHashCode<T>(int productID = -1)
+		{
+			int hashCode = typeof(T).GetHashCode();
+				
+			if (productID != -1)
+				hashCode = HashCode.Combine(hashCode, productID);  // <-- preferred method it seems...
+			// hashCode = (hashCode, productID).GetHashCode();  // <-- below method supposedly uses no heap allocations
+			
+			return hashCode;
+			
+		}
+		
+        bool mIsDisposed;
+        
+        public void Dispose()
+        {
+            if (!mIsDisposed)
+            {
+                 
+				foreach(object obj in mUserComponentsCollection.Values)
+				{
+					((IDisposable)obj).Dispose();
+				}
 
-             // 1) Iterate over the structs using a for loop
-             System.Diagnostics.Debug.WriteLine("Iterating with for loop:");
-             for (int i = 0; i < memory.Length; i++)
-             {
-                 Transform.Transform_Struct currentStruct = memory.Span[i];
+				mIsDisposed= true;
+				mUserComponentsCollection=null;
+				Console.WriteLine("ComponentStoreCollection.~dtor() - " + this.GetType().ToString() + " Disposed.");
+            }
+            
+        }
+    } // ComponentStoreCollection.cs
 
-                 // what other data might this handler need? it depends on what exactly the SensorScanHandler
-                 // is doing.  Is it mearly checking to see what other emission productions are being detected
-                 // so it can then pass that info over to the contacts list of the sensor
+	
+    ///<summary>
+    /// Components are essentially data stores for Intrinsic or User game objects.
+    /// They are always stored as struct within contiguous Memory<T> for
+    /// fast processing of their data.
+    ///</summary>
+    public class ComponentStore<T> :IDisposable
+    {
+        private uint STARTING_SIZE = 64; // todo: rename _SIZE to _COUNT to make it clear this is number of records not size in bytes
+        private const uint MIN_SIZE = 64;
+        private const uint MAX_SIZE = 4096; // number of Records  (eg records of Transform_Struct), not bytes
+        private uint EXPAND_INCREMENT = MIN_SIZE; // expand by this amount when needed.  if 0, it will double the size of Components
+        
+		private bool mDoubleBufferEnabled = false;
+		
+		private uint mRecordCount = 0;  // should equal (Size - mAvailableForCheckOut.Count)
+		
+		// NOTE: there is no System.Collections.Concurrent.ConcurrentList<>
+		private Memory<T> Components;
+		private Memory<T> DoubleBuffer;
+		
+		private Stack<int> mAvailableForCheckOut;
+		private bool[] InUse;       
 
-                 // TODO: the handler has to have access to the entire span in order to have the actual
-                 //       memory values within the span updated.  Grabbing just the current struct and passing 
-                 //       that to a handler obviously wont work.
-                 handler(currentStruct); // handler(memory.Span[i]);
+        private object mSync;
+		private static System.Threading.SemaphoreSlim mSlim = new System.Threading.SemaphoreSlim(1);
+		
+        private Dictionary<string, bool[]> mViews;
+		
+        /*Span<T> in C# is a value type that provides a safe and efficient way to work with 
+        contiguous regions of memory, whether that memory is managed (like an array on the 
+        heap), unmanaged, or allocated on the stack. Despite being a value type, Span<T> 
+        does not change the underlying memory itself; rather, it provides a view into that 
+        memory, allowing you to read from or write to it directly.
 
-                 System.Diagnostics.Debug.WriteLine($"Value1: {currentStruct.Value1}, Value2: {currentStruct.Value2}");
+        Here's how it works: 
 
+        View, Not Ownership:
 
-                 // THE ABOVE WONT UPDATE THE STRUCT WITHIN THE MEMORY<T> object
-                 // Structs and Value Semantics: Structs in C# are value types. 
-                 // When a struct is accessed from a Span<T> or Memory<T>, a 
-                 // copy of that struct is used, not a reference to the original 
-                 // instance. If the copied struct is modified, the changes won't 
-                 // be reflected in the original Memory<T> unless the modified 
-                 // struct is explicitly assigned back to the Memory<T> at the 
-                 // specific index
+        Span<T> does not own the memory it points to. It's essentially a lightweight 
+        structure containing a reference (or pointer) to the start of a memory region 
+        and a length. When you create a Span<T> from an array, for instance, it 
+        doesn't copy the array data; it simply creates a view that allows you to 
+        access a portion of that existing array.
 
+        Direct Access:
 
-                 // BUT THE BELOW WILL
+        Because Span<T> holds a reference to the underlying memory, any modifications 
+        made through the Span<T> directly affect that original memory. For example, 
+        if you have an array myArray and create a Span<int> mySpan = myArray;, then 
+        mySpan[0] = 10; will change the value of myArray[0] in the original array.
 
-                 int sliceLength = 1;
+        No Memory Allocation (for the data):
 
-                 // a slice will result in a new Memory<Weapon> object with a span of 0 to sliceLength
-                 Memory<Weapon> singleWeapon = Weapons.Slice(i, sliceLength); // A Memory<T> representing the element at index 32
-                 singleWeapon = Weapons.Span[i];
+        When you create a Span<T>, you are not allocating new memory for the data 
+        itself. You are only allocating the Span<T> struct on the stack, which is a 
+        very small and efficient operation. This is a key reason for Span<T>'s 
+        performance benefits, as it avoids heap allocations and associated garbage 
+        collection overhead.
 
+        Immutability of the Span (not the data):
 
-                 // assigning a modified weapon to the singleWeapon.
-                 int damageTaken = 5;
-                 Weapon modifiedWeapon;
-                 modifiedWeapon = singleWeapon.Span[0];
-                 modifiedWeapon.CurrentHP -= damageTaken;
+        While Span<T> allows you to modify the underlying data, the Span<T> itself 
+        is immutable in terms of its range. You cannot change the starting address 
+        or the length of an existing Span<T> instance. If you need a different 
+        view of the same or another memory region, you create a new Span<T> 
+        instance (e.g., through slicing).
 
-                 // two ways to modify the data in the original Memory<Weapons[]>
-                 singleWeapon.Span[0] = modifiedWeapon;        // 1) modifying the shared element
-                 Weapons.Span[i] = modifiedWeapon;  // 2) modifying the struct at the specified index directly
-             }
+        In essence, Span<T> provides a highly efficient and safe mechanism to 
+        interact with existing memory buffers without incurring the costs of copying 
+        data or managing memory ownership. It acts as a direct conduit to the 
+        underlying data, allowing for in-place modifications when desired.
+        */
+        public ComponentStore(bool doubleBufferEnabled = false) : this(64, doubleBufferEnabled)
+        {
+        }
 
-             //System.Diagnostics.Debug.WriteLine("\nIterating with foreach loop (using Span<T>):");
-             // 2) Iterate over the structs using a foreach loop (requires getting Span<T>)
-             //foreach (var currentStruct in memory.Span) 
-             //{
-             //    System.Diagnostics.Debug.WriteLine($"Value1: {currentStruct.Value1}, Value2: {currentStruct.Value2}");
-             //}
+        public ComponentStore(uint size, bool doubleBufferEnabled = false)
+        {
+            STARTING_SIZE = size;
+			mDoubleBufferEnabled = doubleBufferEnabled;
+			
+            mSync = new object();
+						
+			mAvailableForCheckOut = new Stack<int>();
+			
+			Expand();
+            
+			//long totalAllocated = Utils.GetTotalAllocatedBytes(false);
+			//Console.WriteLine("ComponentStore.ctor() - " + totalAllocated.ToString() + " allocated.");
+			
+			long totalUsed = Utils.GetUsedMemory(false);
+			//Console.WriteLine("ComponentStore.ctor() - " + Utils.SizeSuffix(totalUsed) + " used.");
 
-             System.Diagnostics.Debug.WriteLine($"Memory<T> processed");
-         }
+			Console.WriteLine( "ComponentStore.ctor() - Type == '" + (typeof(T)).ToString() + " Starting capacity == " + Capacity.ToString());
+        }
 
-         /// <summary>
-         /// We pass in gameTime so we have access to the realtime elapsed
-         /// as well as the simulated Time elapsed.
-         /// </summar>
-         public void ProcessData<TInput, TResult>(Keystone.Simulation.GameTime gameTime, List<TInput> data, ProcessItem<TInput, TResult> processor)
-         {
+		/// <summary>
+		/// The maximum number of records this Store can hold before it needs to be expanded.
+		/// </summary>
+        public uint Capacity { get { return (uint)Components.Length; } }
 
-             List<TResult> processedResults = new List<TResult>();
-             foreach (TInput item in data)
-             {
-                 processedResults.Add(processor(item));
-             }
-             return processedResults;
+		/// <summary>
+		/// The currrent number of records this Store is holding.  This number
+		/// cannot exceed the 'Capacity' value.
+		/// </summary>
+		public uint Count { 
+			get 
+			{ 
+				int availableCount = 0;
+				if (mAvailableForCheckOut != null)
+					availableCount = mAvailableForCheckOut.Count;
+				
+				int  tmp = (int)Capacity - availableCount;
+				//Console.WriteLine("ComponentStore.Count - Capcity (" + Capacity.ToString() + ") - Available(" + availableCount.ToString() + ") == " + tmp.ToString());
+				//Console.WriteLine("ComponentStore.Count - RecordCount == " + mRecordCount.ToString());
+				
+				
+				System.Diagnostics.Debug.Assert (mRecordCount == Capacity - availableCount);
+				return mRecordCount;
+			}
+		}
+		
+        public Span<T> Span { get { return Components.Span; } }
+        
+		public Span<T> SpanReadWrite {get {return DoubleBuffer.Span;}}
+		
+		public bool DoubleBufferEnabled {get {return mDoubleBufferEnabled;}}
+		
+        public ReadOnlySpan<T> Copy()
+        {
+            lock (mSync)
+            {
+                ReadOnlySpan<T> result = Components.Span;
+                return result;
+            }
+        }
+		
+        // GameAPI will need commands for checking in/out via our Entity script initializations, 
+        // the types made here in our ComponentStore
+        // So for instance, if "EnergyWeapon.cs" on Initialize()
+        // will register "Weapon" and "EnergyWeapon" interfaces.
+        // Recall that Initialize() is only called ONCE PER SCRIPT whereas Initialize_Entity
+        // is called per Entity that is using that script.
+        // Initialize_Entity() will then call CheckOut(typeof(Weapon)) and CheckOut(typeOf(EnergyWeapon))
+        // to get direct memory access to the Memory<T> where variables associated with those interfaces
+        // will get stored.
+		/// <summary>
+		/// This CheckOut() call currently retreives only a single record from the Components Memory<T> 
+		/// and returns it as a new Memory<T> that points to that single record
+		/// </summary>
+        public Memory<T> CheckOut(out int index) // aka: MemoryPool<T>.Rent() 
+        {
+			
+            //lock (mSync)
+			try
+			{
+				mSlim.Wait(-1);  // wait parameter is in milliseconds to Wait, BUT -1 means wait indefinetely
+				{
+					const int HOW_MANY = 1;
+					index = -1;
+					try
+					{
+						try
+						{
+							if (Components.Equals(null))
+								Expand();
+						}
+						catch (Exception ex)
+						{
+							//Console.WriteLine("ComponentStore.CheckOut() - line 1" + ex.Message);
+						}
+						
 
+						// using stack<int> of available indices
+						if (mAvailableForCheckOut.Count > 0)
+						{
+							mRecordCount++;
+							int i = mAvailableForCheckOut.Pop();
+							
+							uint tmp = Count;
+							
+							try
+							{
+								InUse[i] = true;
+							}
+							catch (Exception ex)
+							{
+								//Console.WriteLine("ComponentStore.CheckOut() - i == " + i + " InUse[i] == " + InUse[i] + " - " + ex.Message);
+							}
+							
+							index = i;
+							return Components.Slice(index, HOW_MANY);
+						}
 
-             // Store for position, scale, rotation, matrices, need to be in 
-             // Keystone or KeyCommon
+						// NOTE: we start searching from mLastCheckOutIndex + 1 otherwise
+						//       finding an available slot is very slow.  This works great
+						//       but when we also start to CheckIn() items, we need to maintain
+						//       a list of those as well.  
+						//       In fact, all we need is to initially create a stack<> of available
+						//       generated by adding initially all indices from bottom to top so that
+						//       we grab from the top first.  Then any item's that are "CheckIn" get 
+						//       their indices added back to the stack.
+						//for (int i = mLastCheckOutIndex + 1; i < Components.Length; i++)
+						//    if (!InUse[i])
+						//    {
+						//        InUse[i] = true;
+						//        mLastCheckOutIndex = i;
+						//        return Components.Slice(i, HOW_MANY);    
+						//    }
 
-             // Store for physics state also needs to be in Keystone or KeyCommon.
+						// if still here, we need to expand first
+						Expand();
+						if (mAvailableForCheckOut.Count > 0)
+						{
+							mRecordCount++;
+							int i = mAvailableForCheckOut.Pop();
+							
+							uint tmp = Count;
+							Console.WriteLine("CheckOut() - " + tmp.ToString());
+							try
+							{
+								InUse[i] = true;
+							}
+							catch (Exception ex)
+							{
+								//Console.WriteLine("ComponentStore.CheckOut() - i == " + i + " InUse[i] == " + InUse[i] + " - " + ex.Message);
+							}
+							
+							index = i;
+							return Components.Slice(index, HOW_MANY);
+						}
+						else 
+						{
+							Console.WriteLine("CheckOut() - THIS SHOULD NOT HAPPEN.");
+						}
+						return null;
+						
+						//return CheckOut(out index);
+					}
+					catch (Exception ex)
+					{
+						//Console.WriteLine("ComponentStore.Checkout()" + ex.Message);
+						return null;
+					}
+				}
+			}
+			finally
+			{
+				mSlim.Release();
+			}
+        }
 
+        public void CheckIn(Memory<T> mem)
+        {
+            lock (mSync)
+            {
+                // find the index of this mem being checked In
+                for (int i = 0; i < Components.Length; i++)
+                    if (!InUse[i] && (mem.Equals(this.Components.Slice(i, 1))))
+                    {
+                        InUse[i] = false;
+						
+						//CheckIn(); 
+						
+                        mAvailableForCheckOut.Push(i);
+						mRecordCount--;
+                        return;
 
-             // IEntitySystems.Update()
+                        // todo: Components.Span[i] = default(T);    
+                    }
+            }
+        }
+		
+		public void RemoveView(string viewName)
+        {
+            if (mViews == null) throw new Exception("ComponentStore.RemoveView() - A View with name '" + viewName + "' NOT FOUND.");
+            bool[] view;
+            if (!mViews.TryGetValue(viewName, out view)) throw new Exception("ComponentStore.RemoveView() - A View with name '" + viewName + "' NOT FOUND.");
 
+            mViews.Remove(viewName);
+        }
 
-         } */
-    }
+        public void CreateView(string viewName)
+        {
+            if (mViews == null)
+                mViews = new Dictionary<string, bool[]>();
+
+            bool[] v;
+            if (mViews.TryGetValue(viewName, out v)) throw new Exception("ComponentStore.CreateView() - A View with name '" + viewName + "' already exists.");
+
+            // By default, all indices start off as enabled
+            bool[] indices = new bool[Components.Length];
+            for (int i = 0; i < Components.Length; i++)
+                indices[i] = true;
+
+            mViews.Add(viewName, indices);
+            //mViews[viewName] = indices;
+        }
+
+        public void AddIndicesToView(string viewName, int enabledIndex)
+        {
+            AddIndicesToView(viewName, new int[] { enabledIndex });
+        }
+
+        public void AddIndicesToView(string viewName, int[] enabledIndices)
+        {
+            bool[] v;
+            if (!mViews.TryGetValue(viewName, out v)) throw new Exception("ComponentStore.AddIndicesToView() - A View with name '" + viewName + "' does NOT exist.");
+            bool[] results = mViews[viewName];
+
+            int length = Components.Length;
+
+            // enable all indices specified in the enabledIndices argument
+            for (int i = 0; i < enabledIndices.Length; i++)
+                if (enabledIndices[i] < length)
+                    results[enabledIndices[i]] = true;
+
+            mViews[viewName] = results;
+            //mViews[viewName] = Helpers.ArrayExtensions.ArrayAppendRange(mViews[mViewName], enabledIndices);
+        }
+
+        public void RemoveIndicesFromView(string viewName, int[] disabledIndices)
+        {
+            bool[] v;
+            if (!mViews.TryGetValue(viewName, out v)) throw new Exception("ComponentStore.AddIndicesToView() - A View with name '" + viewName + "' does NOT exist.");
+            bool[] results = mViews[viewName];
+
+            int length = Components.Length;
+
+            // disable all indices not specified in the enabledIndices argument
+            for (int i = 0; i < disabledIndices.Length; i++)
+                if (disabledIndices[i] < length)
+                    results[disabledIndices[i]] = true;
+
+            mViews[viewName] = results;
+        }
+
+        /// <summary>
+        /// Returns a list of indices indicating which elemements in Memory<T> 
+        /// exist in a View with the name "viewName"
+        public bool[] GetView(string viewName)
+        {
+            bool[] results;
+            bool success = mViews.TryGetValue(viewName, out results);
+            if (success) return results;
+
+            throw new Exception("ComponentStore.GetView() - ERROR: View '" + viewName + "' not found.");
+        }
+
+        // TODO: script initialization will grab/checkout the arrayElements it needs
+        //       script destructors need to checkin / dispose all array arrayElements
+        private void Expand()
+        {
+			Console.WriteLine("ComponentStore.Expand() - Current Capacity == " + Capacity.ToString() + " for type '" + typeof(T).Name + "'" );
+            if (InUse == null)
+            {
+                Components = new T[STARTING_SIZE];
+                InUse = new bool[STARTING_SIZE];
+                mAvailableForCheckOut = new Stack<int>();
+				mRecordCount = 0;
+				
+				// this is a stack which is Last In, First Out so we want to
+				// have the lowest indices at the top of the stack (last)
+				// and the large indices at the bottom (first)
+                for (int i = (int)STARTING_SIZE - 1; i >= 0; i--)
+	                mAvailableForCheckOut.Push(i);
+
+				uint abc = STARTING_SIZE;
+				Console.WriteLine("Expand() - " + typeof(T).Name + " " +  abc.ToString());
+                return;
+            }
+
+            int newSize = (int)(Capacity + EXPAND_INCREMENT);
+            //if (EXPAND_INCREMENT == 0)
+                newSize = (int)Capacity * 2;
+
+            T[] data = new T[newSize];
+            //Components.Span[0].CopyTo(data.AsSpan());
+
+            // hack - copy components to temporary array first since i can't get 
+            // MemoryExtensin.CopyTo() working at the moment
+            T[] tmp = Components.ToArray();
+            tmp.CopyTo(data, 0);
+
+            //MemoryExtensions.CopyTo<T>(Components.ToArray(), data);
+
+            Components = new Memory<T>(data);
+
+			//Console.WriteLine("ComponentStore.Expand() - New Capacity == " + Capacity.ToString() + " for type '" + Components.GetType().Name + "'" );
+			
+            bool[] newInUse = new bool[newSize];
+            InUse.CopyTo(newInUse, 0);
+            InUse = newInUse;
+
+            // create a new mAvailableForCheckOut stack using the new InUse[] array
+			//recall: this is a stack which is Last In, First Out so we want to
+			// have the lowest indices at the top of the stack (last)
+			// and the large indices at the bottom (first)
+            Stack<int> tmpStack = new Stack<int>(newSize);
+            for (int i = (int)newSize - 1; i >= 0; i--)
+			{
+	        	System.Diagnostics.Debug.Assert (InUse.Length == newSize, "InUse Length == " + InUse.Length.ToString() + " newSize == " + newSize.ToString());
+				if (!InUse[i])
+					tmpStack.Push(i);
+			}
+			
+            mAvailableForCheckOut = tmpStack;
+            ExpandViews(newSize);
+        }
+
+        private void ExpandViews(int newSize)
+        {
+            if (mViews == null) 
+			{
+				return; // NOTE: most likely this is not an error, we just aren't using any views
+			}
+			
+            foreach (var key in mViews.Keys)
+            {
+                bool[] indices = mViews[key];
+
+                bool[] newInUse = new bool[newSize];
+                indices.CopyTo(newInUse, 0);
+
+                int diff = newSize - indices.Length;
+                // if it's decreased in size no need to assign true or false
+                if (diff <= 0) return;
+
+                for (int i = indices.Length - 1; i < newSize; i++)
+                    indices[i] = true;
+
+                // assign the new expanded view
+                mViews[key] = indices;
+            }
+        }
+        
+        bool mIsDisposed;
+        
+        public void Dispose()
+        {
+            if (!mIsDisposed)
+            {
+				for(int i = 0; i <  Components.Length;i++)
+				{
+					//ComponentStore<T> store = (ComponentStore<T>)
+					CheckIn (Components.Slice(i, 1));
+				}
+
+				mIsDisposed = true;
+				Components = null; 
+				
+				Console.WriteLine("ComponentStore.~dtor() - " + this.GetType().ToString() + " Disposed.");
+            }
+        }
+
+    } // ComponentStore.cs
+
 
 #endif
 
@@ -9322,561 +9815,6 @@ return (0,0);
         #endregion
 	}	
 #endregion // USERDATA STORE and USERDATA 
-
-	
-	
-    /// <summary>
-    /// ComponentStoreCollection allows for the CheckIn() and CheckOut() of 
-    /// ComponentStore<T> which is a wrapper around the System.Memory.Memory<T> 
-    /// class.  
-    /// This StoreCollection object will host ComponentStores<T> for both 
-    /// Intrinsic and UserComponents
-    /// </summary>
-    public class ComponentStoreCollection : IDisposable
-    {
-        private System.Collections.Concurrent.ConcurrentDictionary<Type, object> mUserComponentsCollection;
-		private static System.Threading.SemaphoreSlim mSlim = new System.Threading.SemaphoreSlim(1);
-				
-		
-        public ComponentStoreCollection()
-        {
-            mUserComponentsCollection = new System.Collections.Concurrent.ConcurrentDictionary<Type, object>();
-        }
-		
-		// todo: i would need to pass in a userTypeID and perhaps classification, category, and configuration
-        public ComponentStore<T> CheckOut<T>(uint size = 64)
-        {
-			try 
-			{
-				mSlim.Wait(-1); // wait parameter is in milliseconds to Wait, BUT -1 means wait indefinetely
-				// Feb.13.2026 - switched to ConcurrentDictionary<>
-				ComponentStore<T> store = (ComponentStore<T>) mUserComponentsCollection.GetOrAdd(typeof(T), result =>  new ComponentStore<T>(size));
-								
-				//object value;
-				//bool success = mUserComponentsCollection.TryGetValue(typeof(T), out value);
-				//if (success)
-				//    return (ComponentStore<T>)value; // throw new Exception("ComponentStoreCollection.CheckOut() - Dictionary Key Already Exists.");
-
-				//mUserComponentsCollection.Add(typeof(T), store);
-				return store;
-			}
-			finally
-			{
-				mSlim.Release();
-				//Console.WriteLine ("ComponentStore.CheckOut() - Completed " + typeof(T).ToString());
-			}
-        }
-		
-        public void CheckIn<T>(T type, object store)
-        {
-			try 
-			{
-				mSlim.Wait(-1);  // wait parameter is in milliseconds to Wait, BUT -1 means wait indefinetely
-				
-				object existing;
-				bool result = mUserComponentsCollection.TryRemove(type.GetType(), out existing);
-
-				//System.Diagnotistics.Debug.Assert (result == true && existing == store, "ComponentStoreCollection.CheckIn()  - Dictionary item does not exist.");
-
-				/*
-				if (store == null) throw new ArgumentOutOfRangeException("ComponentStoreCollection.CheckIn() - Dictionary is NULL.");
-
-				object value;
-				bool success = mUserComponentsCollection.TryGetValue(type.GetType(), out value);
-
-				if (!success) throw new ArgumentOutOfRangeException("ComponentStoreCollection.CheckIn() - ComponentStore for Type '" + typeof(T).Name + " ' is NULL.");
-
-				mUserComponentsCollection.Remove(type.GetType());
-				//value.Dispose();
-				*/
-			}
-			finally
-			{
-				mSlim.Release();
-			}
-        }
-        
-        
-        bool mIsDisposed;
-        
-        public void Dispose()
-        {
-            if (!mIsDisposed)
-            {
-                 
-				foreach(object obj in mUserComponentsCollection.Values)
-				{
-					((IDisposable)obj).Dispose();
-				}
-
-				mIsDisposed= true;
-				mUserComponentsCollection=null;
-				Console.WriteLine("ComponentStoreCollection.~dtor() - " + this.GetType().ToString() + " Disposed.");
-            }
-            
-        }
-    } // ComponentStoreCollection.cs
-
-	
-    ///<summary>
-    /// Components are essentially data stores for Intrinsic or User game objects.
-    /// They are always stored as struct within contiguous Memory<T> for
-    /// fast processing of their data.
-    ///</summary>
-    public class ComponentStore<T> :IDisposable
-    {
-        private uint STARTING_SIZE = 64; // todo: rename _SIZE to _COUNT to make it clear this is number of records not size in bytes
-        private const uint MIN_SIZE = 64;
-        private const uint MAX_SIZE = 4096; // number of Records  (eg records of Transform_Struct), not bytes
-        private uint EXPAND_INCREMENT = MIN_SIZE; // expand by this amount when needed.  if 0, it will double the size of Components
-        
-		private bool mDoubleBufferEnabled = false;
-		
-		private uint mRecordCount = 0;  // should equal (Size - mAvailableForCheckOut.Count)
-		
-		// NOTE: there is no System.Collections.Concurrent.ConcurrentList<>
-		private Memory<T> Components;
-		private Memory<T> DoubleBuffer;
-		
-		private Stack<int> mAvailableForCheckOut;
-		private bool[] InUse;       
-
-        private object mSync;
-		private static System.Threading.SemaphoreSlim mSlim = new System.Threading.SemaphoreSlim(1);
-		
-        private Dictionary<string, bool[]> mViews;
-		
-        /*Span<T> in C# is a value type that provides a safe and efficient way to work with 
-        contiguous regions of memory, whether that memory is managed (like an array on the 
-        heap), unmanaged, or allocated on the stack. Despite being a value type, Span<T> 
-        does not change the underlying memory itself; rather, it provides a view into that 
-        memory, allowing you to read from or write to it directly.
-
-        Here's how it works: 
-
-        View, Not Ownership:
-
-        Span<T> does not own the memory it points to. It's essentially a lightweight 
-        structure containing a reference (or pointer) to the start of a memory region 
-        and a length. When you create a Span<T> from an array, for instance, it 
-        doesn't copy the array data; it simply creates a view that allows you to 
-        access a portion of that existing array.
-
-        Direct Access:
-
-        Because Span<T> holds a reference to the underlying memory, any modifications 
-        made through the Span<T> directly affect that original memory. For example, 
-        if you have an array myArray and create a Span<int> mySpan = myArray;, then 
-        mySpan[0] = 10; will change the value of myArray[0] in the original array.
-
-        No Memory Allocation (for the data):
-
-        When you create a Span<T>, you are not allocating new memory for the data 
-        itself. You are only allocating the Span<T> struct on the stack, which is a 
-        very small and efficient operation. This is a key reason for Span<T>'s 
-        performance benefits, as it avoids heap allocations and associated garbage 
-        collection overhead.
-
-        Immutability of the Span (not the data):
-
-        While Span<T> allows you to modify the underlying data, the Span<T> itself 
-        is immutable in terms of its range. You cannot change the starting address 
-        or the length of an existing Span<T> instance. If you need a different 
-        view of the same or another memory region, you create a new Span<T> 
-        instance (e.g., through slicing).
-
-        In essence, Span<T> provides a highly efficient and safe mechanism to 
-        interact with existing memory buffers without incurring the costs of copying 
-        data or managing memory ownership. It acts as a direct conduit to the 
-        underlying data, allowing for in-place modifications when desired.
-        */
-        public ComponentStore(bool doubleBufferEnabled = false) : this(64, doubleBufferEnabled)
-        {
-        }
-
-        public ComponentStore(uint size, bool doubleBufferEnabled = false)
-        {
-            STARTING_SIZE = size;
-			mDoubleBufferEnabled = doubleBufferEnabled;
-			
-            mSync = new object();
-						
-			mAvailableForCheckOut = new Stack<int>();
-			
-			Expand();
-            
-			//long totalAllocated = Utils.GetTotalAllocatedBytes(false);
-			//Console.WriteLine("ComponentStore.ctor() - " + totalAllocated.ToString() + " allocated.");
-			
-			long totalUsed = Utils.GetUsedMemory(false);
-			//Console.WriteLine("ComponentStore.ctor() - " + Utils.SizeSuffix(totalUsed) + " used.");
-
-			Console.WriteLine( "ComponentStore.ctor() - Type == '" + (typeof(T)).ToString() + " Starting capacity == " + Capacity.ToString());
-        }
-
-		/// <summary>
-		/// The maximum number of records this Store can hold before it needs to be expanded.
-		/// </summary>
-        public uint Capacity { get { return (uint)Components.Length; } }
-
-		/// <summary>
-		/// The currrent number of records this Store is holding.  This number
-		/// cannot exceed the 'Capacity' value.
-		/// </summary>
-		public uint Count { 
-			get 
-			{ 
-				int availableCount = 0;
-				if (mAvailableForCheckOut != null)
-					availableCount = mAvailableForCheckOut.Count;
-				
-				int  tmp = (int)Capacity - availableCount;
-				//Console.WriteLine("ComponentStore.Count - Capcity (" + Capacity.ToString() + ") - Available(" + availableCount.ToString() + ") == " + tmp.ToString());
-				//Console.WriteLine("ComponentStore.Count - RecordCount == " + mRecordCount.ToString());
-				
-				
-				System.Diagnostics.Debug.Assert (mRecordCount == Capacity - availableCount);
-				return mRecordCount;
-			}
-		}
-		
-        public Span<T> Span { get { return Components.Span; } }
-        
-		public Span<T> SpanReadWrite {get {return DoubleBuffer.Span;}}
-		
-		public bool DoubleBufferEnabled {get {return mDoubleBufferEnabled;}}
-		
-        public ReadOnlySpan<T> Copy()
-        {
-            lock (mSync)
-            {
-                ReadOnlySpan<T> result = Components.Span;
-                return result;
-            }
-        }
-		
-        // GameAPI will need commands for checking in/out via our Entity script initializations, 
-        // the types made here in our ComponentStore
-        // So for instance, if "EnergyWeapon.cs" on Initialize()
-        // will register "Weapon" and "EnergyWeapon" interfaces.
-        // Recall that Initialize() is only called ONCE PER SCRIPT whereas Initialize_Entity
-        // is called per Entity that is using that script.
-        // Initialize_Entity() will then call CheckOut(typeof(Weapon)) and CheckOut(typeOf(EnergyWeapon))
-        // to get direct memory access to the Memory<T> where variables associated with those interfaces
-        // will get stored.
-		/// <summary>
-		/// This CheckOut() call currently retreives only a single record from the Components Memory<T> 
-		/// and returns it as a new Memory<T> that points to that single record
-		/// </summary>
-        public Memory<T> CheckOut(out int index) // aka: MemoryPool<T>.Rent() 
-        {
-			
-            //lock (mSync)
-			try
-			{
-				mSlim.Wait(-1);  // wait parameter is in milliseconds to Wait, BUT -1 means wait indefinetely
-				{
-					const int HOW_MANY = 1;
-					index = -1;
-					try
-					{
-						try
-						{
-							if (Components.Equals(null))
-								Expand();
-						}
-						catch (Exception ex)
-						{
-							//Console.WriteLine("ComponentStore.CheckOut() - line 1" + ex.Message);
-						}
-						
-
-						// using stack<int> of available indices
-						if (mAvailableForCheckOut.Count > 0)
-						{
-							mRecordCount++;
-							int i = mAvailableForCheckOut.Pop();
-							
-							uint tmp = Count;
-							
-							try
-							{
-								InUse[i] = true;
-							}
-							catch (Exception ex)
-							{
-								//Console.WriteLine("ComponentStore.CheckOut() - i == " + i + " InUse[i] == " + InUse[i] + " - " + ex.Message);
-							}
-							
-							index = i;
-							return Components.Slice(index, HOW_MANY);
-						}
-
-						// NOTE: we start searching from mLastCheckOutIndex + 1 otherwise
-						//       finding an available slot is very slow.  This works great
-						//       but when we also start to CheckIn() items, we need to maintain
-						//       a list of those as well.  
-						//       In fact, all we need is to initially create a stack<> of available
-						//       generated by adding initially all indices from bottom to top so that
-						//       we grab from the top first.  Then any item's that are "CheckIn" get 
-						//       their indices added back to the stack.
-						//for (int i = mLastCheckOutIndex + 1; i < Components.Length; i++)
-						//    if (!InUse[i])
-						//    {
-						//        InUse[i] = true;
-						//        mLastCheckOutIndex = i;
-						//        return Components.Slice(i, HOW_MANY);    
-						//    }
-
-						// if still here, we need to expand first
-						Expand();
-						if (mAvailableForCheckOut.Count > 0)
-						{
-							mRecordCount++;
-							int i = mAvailableForCheckOut.Pop();
-							
-							uint tmp = Count;
-							Console.WriteLine("CheckOut() - " + tmp.ToString());
-							try
-							{
-								InUse[i] = true;
-							}
-							catch (Exception ex)
-							{
-								//Console.WriteLine("ComponentStore.CheckOut() - i == " + i + " InUse[i] == " + InUse[i] + " - " + ex.Message);
-							}
-							
-							index = i;
-							return Components.Slice(index, HOW_MANY);
-						}
-						else 
-						{
-							Console.WriteLine("CheckOut() - THIS SHOULD NOT HAPPEN.");
-						}
-						return null;
-						
-						//return CheckOut(out index);
-					}
-					catch (Exception ex)
-					{
-						//Console.WriteLine("ComponentStore.Checkout()" + ex.Message);
-						return null;
-					}
-				}
-			}
-			finally
-			{
-				mSlim.Release();
-			}
-        }
-
-        public void CheckIn(Memory<T> mem)
-        {
-            lock (mSync)
-            {
-                // find the index of this mem being checked In
-                for (int i = 0; i < Components.Length; i++)
-                    if (!InUse[i] && (mem.Equals(this.Components.Slice(i, 1))))
-                    {
-                        InUse[i] = false;
-						
-						//CheckIn(); 
-						
-                        mAvailableForCheckOut.Push(i);
-						mRecordCount--;
-                        return;
-
-                        // todo: Components.Span[i] = default(T);    
-                    }
-            }
-        }
-		
-		public void RemoveView(string viewName)
-        {
-            if (mViews == null) throw new Exception("ComponentStore.RemoveView() - A View with name '" + viewName + "' NOT FOUND.");
-            bool[] view;
-            if (!mViews.TryGetValue(viewName, out view)) throw new Exception("ComponentStore.RemoveView() - A View with name '" + viewName + "' NOT FOUND.");
-
-            mViews.Remove(viewName);
-        }
-
-        public void CreateView(string viewName)
-        {
-            if (mViews == null)
-                mViews = new Dictionary<string, bool[]>();
-
-            bool[] v;
-            if (mViews.TryGetValue(viewName, out v)) throw new Exception("ComponentStore.CreateView() - A View with name '" + viewName + "' already exists.");
-
-            // By default, all indices start off as enabled
-            bool[] indices = new bool[Components.Length];
-            for (int i = 0; i < Components.Length; i++)
-                indices[i] = true;
-
-            mViews.Add(viewName, indices);
-            //mViews[viewName] = indices;
-        }
-
-        public void AddIndicesToView(string viewName, int enabledIndex)
-        {
-            AddIndicesToView(viewName, new int[] { enabledIndex });
-        }
-
-        public void AddIndicesToView(string viewName, int[] enabledIndices)
-        {
-            bool[] v;
-            if (!mViews.TryGetValue(viewName, out v)) throw new Exception("ComponentStore.AddIndicesToView() - A View with name '" + viewName + "' does NOT exist.");
-            bool[] results = mViews[viewName];
-
-            int length = Components.Length;
-
-            // enable all indices specified in the enabledIndices argument
-            for (int i = 0; i < enabledIndices.Length; i++)
-                if (enabledIndices[i] < length)
-                    results[enabledIndices[i]] = true;
-
-            mViews[viewName] = results;
-            //mViews[viewName] = Helpers.ArrayExtensions.ArrayAppendRange(mViews[mViewName], enabledIndices);
-        }
-
-        public void RemoveIndicesFromView(string viewName, int[] disabledIndices)
-        {
-            bool[] v;
-            if (!mViews.TryGetValue(viewName, out v)) throw new Exception("ComponentStore.AddIndicesToView() - A View with name '" + viewName + "' does NOT exist.");
-            bool[] results = mViews[viewName];
-
-            int length = Components.Length;
-
-            // disable all indices not specified in the enabledIndices argument
-            for (int i = 0; i < disabledIndices.Length; i++)
-                if (disabledIndices[i] < length)
-                    results[disabledIndices[i]] = true;
-
-            mViews[viewName] = results;
-        }
-
-        /// <summary>
-        /// Returns a list of indices indicating which elemements in Memory<T> 
-        /// exist in a View with the name "viewName"
-        public bool[] GetView(string viewName)
-        {
-            bool[] results;
-            bool success = mViews.TryGetValue(viewName, out results);
-            if (success) return results;
-
-            throw new Exception("ComponentStore.GetView() - ERROR: View '" + viewName + "' not found.");
-        }
-
-        // TODO: script initialization will grab/checkout the arrayElements it needs
-        //       script destructors need to checkin / dispose all array arrayElements
-        private void Expand()
-        {
-			Console.WriteLine("ComponentStore.Expand() - Current Capacity == " + Capacity.ToString() + " for type '" + typeof(T).Name + "'" );
-            if (InUse == null)
-            {
-                Components = new T[STARTING_SIZE];
-                InUse = new bool[STARTING_SIZE];
-                mAvailableForCheckOut = new Stack<int>();
-				mRecordCount = 0;
-				
-				// this is a stack which is Last In, First Out so we want to
-				// have the lowest indices at the top of the stack (last)
-				// and the large indices at the bottom (first)
-                for (int i = (int)STARTING_SIZE - 1; i >= 0; i--)
-	                mAvailableForCheckOut.Push(i);
-
-				uint abc = STARTING_SIZE;
-				Console.WriteLine("Expand() - " + typeof(T).Name + " " +  abc.ToString());
-                return;
-            }
-
-            int newSize = (int)(Capacity + EXPAND_INCREMENT);
-            //if (EXPAND_INCREMENT == 0)
-                newSize = (int)Capacity * 2;
-
-            T[] data = new T[newSize];
-            //Components.Span[0].CopyTo(data.AsSpan());
-
-            // hack - copy components to temporary array first since i can't get 
-            // MemoryExtensin.CopyTo() working at the moment
-            T[] tmp = Components.ToArray();
-            tmp.CopyTo(data, 0);
-
-            //MemoryExtensions.CopyTo<T>(Components.ToArray(), data);
-
-            Components = new Memory<T>(data);
-
-			//Console.WriteLine("ComponentStore.Expand() - New Capacity == " + Capacity.ToString() + " for type '" + Components.GetType().Name + "'" );
-			
-            bool[] newInUse = new bool[newSize];
-            InUse.CopyTo(newInUse, 0);
-            InUse = newInUse;
-
-            // create a new mAvailableForCheckOut stack using the new InUse[] array
-			//recall: this is a stack which is Last In, First Out so we want to
-			// have the lowest indices at the top of the stack (last)
-			// and the large indices at the bottom (first)
-            Stack<int> tmpStack = new Stack<int>(newSize);
-            for (int i = (int)newSize - 1; i >= 0; i--)
-			{
-	        	System.Diagnostics.Debug.Assert (InUse.Length == newSize, "InUse Length == " + InUse.Length.ToString() + " newSize == " + newSize.ToString());
-				if (!InUse[i])
-					tmpStack.Push(i);
-			}
-			
-            mAvailableForCheckOut = tmpStack;
-            ExpandViews(newSize);
-        }
-
-        private void ExpandViews(int newSize)
-        {
-            if (mViews == null) 
-			{
-				return; // NOTE: most likely this is not an error, we just aren't using any views
-			}
-			
-            foreach (var key in mViews.Keys)
-            {
-                bool[] indices = mViews[key];
-
-                bool[] newInUse = new bool[newSize];
-                indices.CopyTo(newInUse, 0);
-
-                int diff = newSize - indices.Length;
-                // if it's decreased in size no need to assign true or false
-                if (diff <= 0) return;
-
-                for (int i = indices.Length - 1; i < newSize; i++)
-                    indices[i] = true;
-
-                // assign the new expanded view
-                mViews[key] = indices;
-            }
-        }
-        
-        bool mIsDisposed;
-        
-        public void Dispose()
-        {
-            if (!mIsDisposed)
-            {
-				for(int i = 0; i <  Components.Length;i++)
-				{
-					//ComponentStore<T> store = (ComponentStore<T>)
-					CheckIn (Components.Slice(i, 1));
-				}
-
-				mIsDisposed = true;
-				Components = null; 
-				
-				Console.WriteLine("ComponentStore.~dtor() - " + this.GetType().ToString() + " Disposed.");
-            }
-        }
-
-    } // ComponentStore.cs
-
-
-
 
 
 

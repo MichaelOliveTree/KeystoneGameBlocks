@@ -1407,6 +1407,7 @@ namespace HelloBoids
 			string exLine = "CreateBattery 1";
 			string entityKey = "battery_" + arrayIndex.ToString(); // prefix with "laser_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!			
 			
+
 			EntityNode battery = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
 					
 			//CONFIGURATION BatteryConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerProducer;
@@ -1436,8 +1437,6 @@ namespace HelloBoids
 			//storeComp.Span[compInternalIndex].Weight = 2.5d;
 			//storeComp.Span[compInternalIndex].SurfaceArea = 1d;
 			//storeComp.Span[compInternalIndex].Volume = 0.2d;
-
-			
 			
 			// powerProducer struct
 			ComponentStore<PowerProducer> storePowerProducers = EntryClass.mCStoreCol.CheckOut<PowerProducer>(EntryClass.NUM_ENTRIES); 
@@ -1459,8 +1458,7 @@ namespace HelloBoids
 			p.NumUses = 100; // This Battery can be used 100 times (100 updates or frames) before it runs out.  update every TICK if -1 NumUses
 			p.CooldownBetweenUses = 0;
 			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
-			
-
+				
 			// Wings, Eyes, Lasers, TacticalStation all CONSUME ElectricalPower
 			// TODO: these indices should probably be indices into PowerConsumer struct, NOT EntityArrayIndex into List<Boids>
 			int boidArrayIndex = arrayIndex - BATTERY_OFFSET;
@@ -1484,9 +1482,8 @@ namespace HelloBoids
 			p.DistributionList = new int[] {wingsConsumptionListIndex, eyesConsumptionListIndex, laserConsumptionListIndex, tacticalConsumptionListIndex};
 			p.SearchPrimitive  = null;
 				
-			
 			RegisterProduction(battery, p);
-						
+			
 			return battery;
 		}
 		
@@ -1555,20 +1552,18 @@ namespace HelloBoids
 			return humanOperator;
 		}
 		
+		private object mLock = new object();
+		
 		private int GetConsumerIndex (uint productID, int entityArrayIndex)
 		{
 			//List<Consumption> consumption = mConsumption[productID];
 			ComponentStore<Consumption> consumption = mConsumption[productID];
-			
-			
 			if (consumption == null || consumption.Count == 0) return -1;
+
+			Predicate<Consumption> match = c => c.ConsumerEntityArrayIndex == entityArrayIndex ;
 			
-			for (int i = 0; i < consumption.Count; i++)
-				if (consumption.Span[i].ConsumerEntityArrayIndex == entityArrayIndex)
-					return i;
 			
-			return -1;
-			
+			return consumption.FindIndex(match);
 		}
 		
 		private void Destroy(EntityNode entity)
@@ -3510,19 +3505,22 @@ namespace HelloBoids
 				//	mLimitedProduction[productID].Add(p);
 				//}
 				//else
-				{
+				//{
 	            	//List<Production> production = mProduction.GetOrAdd(productID, (key) =>  new List<Production>());
-            		ComponentStore<Production> production = mConsumption.GetOrAdd (productID, (key) =>  EntryClass.mCStoreCol.CheckOut<Production>(EntryClass.NUM_ENTRIES, (int)p.ProductID));
-					
+            		ComponentStore<Production> production = mProduction.GetOrAdd (productID, (key) =>  EntryClass.mCStoreCol.CheckOut<Production>(EntryClass.NUM_ENTRIES, (int)p.ProductID));
 					Predicate<Production> productionForThisEntityAndProductAlreadyExists = x => x.ProductID == p.ProductID && x.ProducerEntityArrayIndex == p.ProducerEntityArrayIndex;
-				
 					Production search = production.Find(productionForThisEntityAndProductAlreadyExists);
+				
 					if (search.Equals(default(Production)))
-						production.Add(p);
-					else 
-						Console.WriteLine("RegisterProduction() - Production '" + ((PRODUCTS)p.ProductID).ToString() + " for Entity " + p.ProducerEntityArrayIndex + "' already exists.");
-
-				}
+					{
+						int index;
+						Memory<Production> mem = production.CheckOut(out index);
+						mem.Span[0] = p;
+						Console.WriteLine("RegisterProduction() - PRODUCTION '" + ((PRODUCTS)productID).ToString() + "' REGISTERED>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+						
+					}
+				
+				//}	
 			}
 			finally
 			{
@@ -3541,13 +3539,15 @@ namespace HelloBoids
 				//Console.WriteLine ("RegisterConsumption()  - productID == " + productID.ToString());
             	//List<Consumption> consumption = mConsumption.GetOrAdd (productID, (key) =>  new List<Consumption>());
 				ComponentStore<Consumption> consumption = mConsumption.GetOrAdd (productID, (key) =>  EntryClass.mCStoreCol.CheckOut<Consumption>(EntryClass.NUM_ENTRIES, (int)c.ProductID));
-				
-				
 				Predicate<Consumption> consumptionForThisEntityAndProductAlreadyExists = x => x.ProductID == c.ProductID && x.ConsumerEntityArrayIndex == c.ConsumerEntityArrayIndex;
-				
 				Consumption search = consumption.Find(consumptionForThisEntityAndProductAlreadyExists);
+				
 				if (search.Equals(default(Consumption)))
-					consumption.Add(c);
+				{
+					int index;
+					Memory<Consumption> mem = consumption.CheckOut(out index);
+					mem.Span[0] = c;
+				}
 				else 
 					Console.WriteLine("RegisterConsumption() - Consumption '" + ((PRODUCTS)c.ProductID).ToString() + " for Entity " + c.ConsumerEntityArrayIndex + "' already exists.");
 			}
@@ -3561,6 +3561,7 @@ namespace HelloBoids
         
 		public void UnRegisterProduction(uint productID, EntityNode entity)
         {
+			/*
 			int found = -1;
 			for (int i = 0; i < mProduction.Count; i++)
 				if (mProduction[productID][i].ProducerEntityArrayIndex == entity.EntityArrayIndex)
@@ -3570,11 +3571,16 @@ namespace HelloBoids
 				}
 
             mProduction[productID].Remove(mProduction[productID][(int)found]);
+			*/
+			
+			
+			
         }
 
         // TODO: when an Entity is detached from the Scene, it should be removed as a Consumer
         public void UnRegisterConsumption(uint productID, EntityNode entity)
         {
+			/*
 			int found = -1;
 			for (int i = 0; i < mConsumption.Count; i++)
 				if (mConsumption[productID][i].ConsumerEntityArrayIndex == entity.EntityArrayIndex)
@@ -3584,6 +3590,25 @@ namespace HelloBoids
 				}
 
             mConsumption[productID].Remove(mConsumption[productID][(int)found]);
+			
+			
+			
+			ComponentStore<Consumption> consumption;
+			bool foundf = mConsumption.TryGetValue(productID, out consumption);
+			
+			Predicate<Consumption> consumptionForThisEntityAndProductAlreadyExists = x => x.ProductID == c.ProductID && x.ConsumerEntityArrayIndex == c.ConsumerEntityArrayIndex;
+			Consumption search = consumption.Find(consumptionForThisEntityAndProductAlreadyExists);
+
+			if ()
+			{
+				int index;
+				Memory<Consumption> mem = consumption.CheckOut(out index);
+				mem.Span[0] = c;
+			}
+			else 
+				Console.WriteLine("RegisterConsumption() - Consumption '" + ((PRODUCTS)c.ProductID).ToString() + " for Entity " + c.ConsumerEntityArrayIndex + "' already exists.");
+			*/
+			
         }
 
         // TODO: when an Entity is detached from the Scene, it should be removed as a Producer
@@ -3766,14 +3791,88 @@ namespace HelloBoids
 		{
 			Span<Consumption> consumption = store.Span;
 			
-			uint recordCount = store.Count;
-			
-			List<Production> production = (List<Production>)parameters[0];
-			
-			Console.WriteLine("ProcessPowerConsumption() - Production Count == " + production.Count);
-			Console.WriteLine("ProcessPowerConsumption() - Consumption Count == " + recordCount);
+			uint consumptionCount = store.Count;
 			
 			
+			uint productID = (uint)parameters[0];
+			ComponentStore<Production> production = (ComponentStore<Production>)parameters[1];	
+			uint productionCount = production.Count;
+			
+			
+			Console.WriteLine("ProcessPowerConsumption() - Producing ProductID == '" + ((PRODUCTS)productID).ToString() + "  Production Count == " + productionCount + " Consumption Count == " + consumptionCount);
+			
+			for (int i = 0; i < production.Count; i++)
+			{
+				Production currentProduction = production.Span[i];
+
+				Console.WriteLine("ProcessPowerConsumption() - Entity '" + Boids[currentProduction.ProducerEntityArrayIndex].EntityKey + "' Producing '" + ((PRODUCTS)productID).ToString() );
+			
+				
+				//List<Consumption> consumers = mConsumption[productID];
+				//if (consumers == null) continue;
+
+				int[] distributionList = currentProduction.DistributionList;
+				if (distributionList ==  null || distributionList.Length == 0) continue; // return if using parallel.For
+
+				try
+				{
+					// Parallelizing the INNER LOOP is typically not recommended because
+					// each time the OUTER loop completes, it has to recreate all the threads
+					// for the INNER LOOP.
+					// Maybe this is OK for our use case since we are essentially running different
+					// processing code for different PRODUCTS.  For instance, distributing PRODUCTS.ElectricalPower
+					// is not the same as applying PRODUCTS.Morale or PRODUCTS.FatigueRecovery and so if we
+					// were to parallelize the OUTER loop, those loops might finish in dramatically different
+					// lengths of time because the work can be totally different.
+					for (int j = 0; j < distributionList.Length; j++)
+					{
+						// TODO: above we are iterating, but really what we want I think is to 
+						//       have the Memory<Consumption<ProductID>> and the list of which elements are
+						//       Then there is ZERO looping and we simply pass ProcessConsumption (currentProduction, mem);
+						//       Where we have a Dictionary<> of functions that will process that change just like we do
+						//       for things like FLOCKING, OPTICAL_SENSORS, LIFECYCLE
+						//       We do not need all these "DamageSystem" and "HealthSystem" and such that contain a special struct for "records"
+						//       as such... we just need a LIST or ARRAY like our distributinList[] that says which
+						//       Memory<T> records to modify in both the Memory<Production> and Memory<Consumption>
+						//       and we will probably optimize those by having Memory<Production<ProductID>> and Memory<Consumption<ProductID>>
+						//       And again, each of these will contain a functin to use to handle Production and Consumption... just like 
+						//       we do with OPTICAL_SENSORS and LIFECYCLE  so we just do a simple "key"  look up of the Processor function
+						//       based on the ProductID.
+						//       
+						Consumption currentConsumption = consumption[distributionList[j]];
+						if (currentConsumption.Equals(default(Consumption)))
+						{
+							Console.WriteLine("ProcessPowerConsumption() - Consumption '" + distributionList[j] + "'  is not registered.");
+							continue;
+						}
+
+						try
+						{							
+							EntityNode producerEntity =  Boids[currentProduction.ProducerEntityArrayIndex];
+							if (producerEntity == null) continue;
+							
+							int index;
+							Memory<PowerProducer> producer = (Memory<PowerProducer>)producerEntity.GetUserStruct(typeof(PowerProducer), out index);
+							producer.Span[0].Output -= currentConsumption.Amount;
+							
+							
+							Console.WriteLine("ProcessPowerConsumption() - producer.Output == " + producer.Span[0].Output.ToString());
+							continue;
+							
+							
+						}
+						catch (Exception ex)
+						{
+							Console.WriteLine("ProcessPowerConsumption() - ERROR: " + ex.Message);
+						}
+					} // end for of consumer distribution list
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("ProcessPowerConsumption() - " + ex.Message);
+				}
+
+			} // end for of current ComponentStore<Production>
 		}
 		
 		private void UpdateProduction(GameTime gt)
@@ -8625,7 +8724,7 @@ return (0,0);
 					case "POWER_CONSUMPTION": 
 						uint productID = (uint)PRODUCTS.ElectricalPower;
 						Processor<Consumption> powerConsumption = (Processor<Consumption>)func;
-						ComponentStore<Consumption> storePowerConsumption = mComponentStoreCollection.CheckOut<Consumption>(0, productID);
+						ComponentStore<Consumption> storePowerConsumption = mComponentStoreCollection.CheckOut<Consumption>(0, (int)productID);
 						powerConsumption.Invoke(storePowerConsumption, args, seed, gt);
 						break;
 
@@ -8701,8 +8800,9 @@ return (0,0);
 					break;
 					
 				case "POWER_CONSUMPTION": 
-					result = new object[1];
-					result[0] = EntryClass.bSim.mProduction[(uint)PRODUCTS.ElectricalPower];  // key returns a List<Production>
+					result = new object[2];
+					result[0] = (uint)PRODUCTS.ElectricalPower;
+					result[1] = EntryClass.bSim.mProduction[(uint)PRODUCTS.ElectricalPower];  // dictionary key into mProduction[key] returns a ComponentStore<Production>
 					
 					break;
 					
@@ -8929,10 +9029,12 @@ return (0,0);
 			Console.WriteLine( "ComponentStore.ctor() - Type == '" + (typeof(T)).ToString() + " Starting capacity == " + Capacity.ToString());
         }
 
+		private uint mCapacity;
+		
 		/// <summary>
 		/// The maximum number of records this Store can hold before it needs to be expanded.
 		/// </summary>
-        public uint Capacity { get { return (uint)Components.Length; } }
+        public uint Capacity { get { return mCapacity; } }
 
 		/// <summary>
 		/// The currrent number of records this Store is holding.  This number
@@ -8941,17 +9043,26 @@ return (0,0);
 		public uint Count { 
 			get 
 			{ 
-				int availableCount = 0;
-				if (mAvailableForCheckOut != null)
-					availableCount = mAvailableForCheckOut.Count;
-				
-				int  tmp = (int)Capacity - availableCount;
-				//Console.WriteLine("ComponentStore.Count - Capcity (" + Capacity.ToString() + ") - Available(" + availableCount.ToString() + ") == " + tmp.ToString());
-				//Console.WriteLine("ComponentStore.Count - RecordCount == " + mRecordCount.ToString());
-				
-				
-				System.Diagnostics.Debug.Assert (mRecordCount == Capacity - availableCount);
-				return mRecordCount;
+				try
+				{
+					//mSlim.Wait(-1); // NOTE: This needs to be synchronized because if access from outside, for say, determining the number of iterations of a loop
+					                // then this may fail the below Debug.Assert() without sychronization
+					
+					int availableCount = 0;
+					if (mAvailableForCheckOut != null)
+						availableCount = mAvailableForCheckOut.Count;
+
+					int  tmp = (int)mCapacity - availableCount;
+					//Console.WriteLine("ComponentStore.Count - Capcity (" + Capacity.ToString() + ") - Available(" + availableCount.ToString() + ") == " + tmp.ToString());
+					string output = "ComponentStore.Count - RecordCount (" + mRecordCount.ToString() + ") == Capacity (" + mCapacity.ToString() + ") - AvailableCount (" + availableCount.ToString() + ")";
+					//Console.WriteLine(output);
+			//		System.Diagnostics.Debug.Assert (mRecordCount == tmp, output);
+					return mRecordCount;
+				}
+				finally
+				{
+					//mSlim.Release();
+				}
 			}
 		}
 		
@@ -9106,6 +9217,8 @@ return (0,0);
             }
         }
 		
+		
+		
 		public void RemoveView(string viewName)
         {
             if (mViews == null) throw new Exception("ComponentStore.RemoveView() - A View with name '" + viewName + "' NOT FOUND.");
@@ -9115,6 +9228,70 @@ return (0,0);
             mViews.Remove(viewName);
         }
 
+		public int FindIndex (Predicate<T> match)
+		{
+			try 
+			{
+				mSlim.Wait(-1);
+				
+				if (mRecordCount == 0) return -1;
+
+				for (int i = 0; i < mRecordCount; i++)
+					if (match(this.Span[i]))
+						return i;
+
+				return -1;
+			}
+			finally
+			{
+				mSlim.Release();
+			}
+		}
+		
+		public T Find (Predicate<T> match)
+		{
+			try 
+			{
+				mSlim.Wait(-1);
+				
+				T found = default(T);
+				if (mRecordCount == 0) return found;
+
+				for (int i = 0; i < mRecordCount; i++)
+					if (match(this.Span[i]))
+						return this.Span[i];
+								
+				return found;
+				
+			}
+			finally
+			{
+				mSlim.Release();
+			}
+		}
+		
+		public List<T> FindAll (Predicate<T> match)
+		{
+			try 
+			{
+				mSlim.Wait(-1);
+				
+				if (mRecordCount == 0) return null;
+				List<T> found = new List<T>();
+
+				for (int i = 0; i < mRecordCount; i++)
+					if (match(this.Span[i]))
+						found.Add( this.Span[i]);
+
+				return found;
+			}
+			finally
+			{
+				mSlim.Release();
+			}
+		}
+		
+		
         public void CreateView(string viewName)
         {
             if (mViews == null)
@@ -9193,6 +9370,7 @@ return (0,0);
                 InUse = new bool[STARTING_SIZE];
                 mAvailableForCheckOut = new Stack<int>();
 				mRecordCount = 0;
+				mCapacity = (uint)Components.Length;
 				
 				// this is a stack which is Last In, First Out so we want to
 				// have the lowest indices at the top of the stack (last)
@@ -9220,7 +9398,8 @@ return (0,0);
             //MemoryExtensions.CopyTo<T>(Components.ToArray(), data);
 
             Components = new Memory<T>(data);
-
+			mCapacity = (uint)Components.Length;
+			
 			//Console.WriteLine("ComponentStore.Expand() - New Capacity == " + Capacity.ToString() + " for type '" + Components.GetType().Name + "'" );
 			
             bool[] newInUse = new bool[newSize];

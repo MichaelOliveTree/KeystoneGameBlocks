@@ -8193,15 +8193,65 @@ return (0,0);
 		public int UserTypeID {get; set;}
 		
 		private string mBuildScriptRelativeResourcePath;
-		
+		private Dictionary<string, object> mPropertyValues;
+				
 		public object BuildScript {get;}
 		public object ComponetScript {get;}
 		public EntityNode Component {get;}
 		
         public string BuildPersistString {get;}
-        //private bool PropertyChanged {get;}
-        //private bool BuildChanged {get;}
-        //private void Update();
+        private bool mPropertyChanged;
+        private bool mBuildChanged;
+        
+		
+		
+		public void SetProperties(PropertySpec[] properties)
+		{
+			
+			mPropertyChanged = true;
+			mBuildChanged = true;
+		}
+		
+		
+		public PropertySpec[] GetProperties(out object[] values)
+		{
+			PropertySpec[] results = null;
+			
+			//if (BuildScript != null && BuildScript.TVResourceIsLoaded)
+			//	results = BuildScript.GetCustomProperties();
+				
+			// TEMP: These are hard-coded 'build specific' properties for a Battery Power Producer 
+			
+			// Capacity (Watt hours / kJ)
+			// Output (aka Max Discharge Rate)
+			// Duration (max duration in seconds at Max Discharge Rate)
+			// MaxInput (for a Battery, this is maximum Input for recharging purposes)
+			int count = 5;
+			results = new PropertySpec[count];
+			
+			results[0] = new PropertySpec("Level", typeof(uint).Name, "build", 1);
+			results[1] = new PropertySpec("Capacity", typeof(double).Name, "build", 2500d);
+			results[2] = new PropertySpec("Output", typeof(double).Name, "build", 100d);
+			
+			results[3] = new PropertySpec("Duration", typeof(double).Name, "build", 25d);
+			results[4] = new PropertySpec("MaxInput", typeof(double).Name, "build", 33d); // recharging takes significantly longer than discharging at lower technology levels
+			
+			values = mPropertyValues.Values.ToArray();
+			
+			
+			// For NON-battery Power Producers like gas generators, reactors, etc
+			// FuelType
+			// FuelConsumptionRate
+			
+			// the following are PowerProducer runtime STATS that belong in 'struct PowerProducer'
+			// PowerDraw - combined power drawn from all Consumers (cannot exceed Output)
+			// Available = Math.Min(Capacity, Output - PowerDraw);
+			// PowerIn = combined power INPUT from all Producers (cannot exceed MaxInput)
+			
+			
+			return results;
+		}
+		
 
 		public void Build (string clientScript, string buildScriptRelativeResourcePath, string persistString = null)
 		{
@@ -8243,20 +8293,40 @@ return (0,0);
 		}
 
 		
-		public void SetProperties(PropertySpec[] properties)
+		
+		private void Calculate()
 		{
 			
-		}
-		
-		
-		public PropertySpec[] GetProperties()
-		{
-			int count = 0;
-			PropertySpec[] results = new PropertySpec[count];
+			PropertySpec[] calculations = new PropertySpec[count];
 			
-			results = BuildScript.GetCustomProperties();
 			
-			return results;
+			object[] values = mPropertyValues.Values.ToArray();
+			PropertySpec[] buildProperties = GetProperties(out values);
+			
+
+			// retrieve some of the Component's properties such as Level to help compute
+			// the build stats. Or should "level" exist only in the Build stats?
+			//PropertySpec[] componentProperties = Component.GetCustomProperties(true);
+			int level = (int)mPropertyValues["Level"];
+			
+			
+			// compute stats for cost, weight, volume, surface area, 
+			double cost = level * 10d;
+			double weight = level * 1d;
+			double volume = level * 1d;
+			double surfaceArea = level * 0.25d;
+			
+			
+			calculations[0] = new PropertySpec("Cost", typeof(double).Name, "build", cost);
+			calculations[1] = new PropertySpec("Weight", typeof(double).Name, "build", weight);
+			calculations[2] = new PropertySpec("Volume", typeof(double).Name, "build", volume);
+			calculations[3] = new PropertySpec("SurfaceArea", typeof(double).Name, "build", surfaceArea); // recharging takes significantly longer than discharging at lower technology levels
+			
+			// NOTE: this should result in the Memory<T> records being updated for the 'Battery' component
+			//       and specifically it's 'struct PowerProducer' 
+			Component.SetCustomProperties(calculations);
+			
+				
 		}
 		
 		
@@ -8275,11 +8345,13 @@ return (0,0);
 
 			if (Component != null)
 			{
+				// todo: can I return a Tuple<> array that conains the struct and it's Type?
+				//       I should then store them as a Tuple<> as well...
 				object[] structs = Component.GetUserStruct();	
 			}
 			
 			// TODO: the following is actually incorrect, we only need to persist the BUILD properties from THE BUILDSCRIPT
-			PropertySpec[] buildProperties = GetProperties();
+
 			
 			
 			// TODO: next follows a series of parts that join together to create the full persist string

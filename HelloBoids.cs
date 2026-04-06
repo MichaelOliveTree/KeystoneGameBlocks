@@ -8186,97 +8186,34 @@ return (0,0);
 
     #region IBuilder implementation
 	// See KeystoneGameBlocks/Game01/Builders
-	public interface IBuilder
+	public struct IBuilder
     {
+		
 		public CONFIGURATION Configuration {get; set;}
 		public int UserTypeID {get; set;}
 		
-		public object[] Components {get; set;}
+		private string mBuildScriptRelativeResourcePath;
+		
+		public object BuildScript {get;}
+		public object ComponetScript {get;}
+		public EntityNode Component {get;}
 		
         public string BuildPersistString {get;}
-        public bool StatsChanged {get;}
-        public bool BuildChanged {get;}
+        //private bool PropertyChanged {get;}
+        //private bool BuildChanged {get;}
+        //private void Update();
 
-        public void Update();
-
-        public string ToString ();
-        public IBuilder FromString(string persistString);
-    }
-
-	
-	public struct Build_Laser : IBuilder
-	{
-        // build specific LASER properties
-		private string COMPONENT_DELIMETER = "|";
-		public object[] Components {get; set;}
-		
-		public CONFIGURATION Configuration {get; set;}
-		public int UserTypeID {get; set;}
-		
-		public Build_Laser() // parameterless constructors for structs first became available in c# 10
+		public void Build (string clientScript, string buildScriptRelativeResourcePath, string persistString = null)
 		{
-			// struct for component properties and stats
-			Components = new object[3];
 			
-			int componentIndex = 1;
-			Component component = ((ComponentStore<Component>)EntryClass.mCStoreCol.CheckOut<Component>(0)).Span[componentIndex];
-			Components[0] = component;
-						
-			// struct for basic weapons properties
-			int weaponIndex = 0;
-			Weapon weapon = ((ComponentStore<Weapon>)EntryClass.mCStoreCol.CheckOut<Weapon>(0)).Span[weaponIndex];
-			Components[1] = component;
-			
-			// struct for laser specific weapon properties
-			int laserIndex = 2;
-			Laser_Struct laser = ((ComponentStore<Laser_Struct>)EntryClass.mCStoreCol.CheckOut<Laser_Struct>(0)).Span[laserIndex];
-			Components[2] = laser;		
 		}
 		
-		public Build_Laser(string persistString)
+		///<summary>
+		/// Updates an existing component with stats calculated from a build script
+		///</summary>
+		public void Build (EntityNode component, object clientScript, string buildScriptRelativeResourcePath, string persistString = null)
 		{
-			Components = FromString(persistString).Components;
-		}
-
-		
-
-        public void Update()
-        {
-        }
-
-		public string BuildPersistString {get;}
-        public bool StatsChanged {get;}
-        public bool BuildChanged {get;}
-
-		
-        public override string ToString()
-        {
-            // NOTE: we only need to write out the build parameters and from that we can
-            //       reconstitute the full entity
-
-			// 1 - Memory<T> represents how the data is STORED in memory, in structs from which we can
-			//     store in contiguous memory
-			// 2 - So, a Laser will be made up of 3 "structs" like Component, Weapon and Laser for storing the data
-			//    and these structs will co-exist in our UserData object keyed by their typename
-			//    The Defense and InternalStructure too can be keyed this way and assigned later... with ArmorLayers being
-			//    somewhat special case because there are currently no maximum allowable limits
-            string persistString = null;
-
-			// TODO: next follows a series of parts that join together to create the full persist string
-			string componentPart = Components[0].ToString();
-			string weaponPart = Components[1].ToString();
-			string laserPart = Components[2].ToString();
-			 
-            // JSon == javascript object notation
-			persistString = System.Text.Json.JsonSerializer.Serialize(this);
-			Console.WriteLine("Build_Laser.ToString() - " + persistString);
-            return persistString;
-		}
-
-		
-        public IBuilder FromString (string persistString)
-        {
-            if (string.IsNullOrEmpty(persistString))
+			if (string.IsNullOrEmpty(persistString))
 			{
 				string[] parts = persistString.Split(COMPONENT_DELIMETER);
 				System.Diagnostics.Debug.Assert (parts.Length == 3);
@@ -8292,10 +8229,71 @@ return (0,0);
 			
             // NOTE: we only need the build parameters and from that we can
             //       create the full entity
-            Build_Laser laser = System.Text.Json.JsonSerializer.Deserialize<Build_Laser>(persistString);
-							
-			return laser;
-        }
+            component = System.Text.Json.JsonSerializer.Deserialize<EntityNode>(persistString);
+		}
+		
+		///<summary>
+		/// Creates an EntityNode using the properties from the client script, the specific build script path and a persist string.
+		///</summary>
+		public EntityNode Build (object clientScript,  string buildScriptRelativeResourcePath, string persistString = null)
+		{
+			EntityNode result = null;
+			
+			return result;
+		}
+
+		
+		public void SetProperties(PropertySpec[] properties)
+		{
+			
+		}
+		
+		
+		public PropertySpec[] GetProperties()
+		{
+			int count = 0;
+			PropertySpec[] results = new PropertySpec[count];
+			
+			results = BuildScript.GetCustomProperties();
+			
+			return results;
+		}
+		
+		
+        public override string ToString()
+        {
+            // NOTE: we only need to write out the build parameters and from that we can
+            //       reconstitute the full entity
+
+			// 1 - Memory<T> represents how the data is STORED in memory, in structs from which we can
+			//     store in contiguous memory
+			// 2 - So, a Laser will be made up of 3 "structs" like Component, Weapon and Laser for storing the data
+			//    and these structs will co-exist in our UserData object keyed by their typename
+			//    The Defense and InternalStructure too can be keyed this way and assigned later... with ArmorLayers being
+			//    somewhat special case because there are currently no maximum allowable limits
+            string persistString = null;
+
+			if (Component != null)
+			{
+				object[] structs = Component.GetUserStruct();	
+			}
+			
+			// TODO: the following is actually incorrect, we only need to persist the BUILD properties from THE BUILDSCRIPT
+			PropertySpec[] buildProperties = GetProperties();
+			
+			
+			// TODO: next follows a series of parts that join together to create the full persist string
+		//	string componentPart = Components[0].ToString();
+		//	string weaponPart = Components[1].ToString();
+		//	string laserPart = Components[2].ToString();
+			 
+			
+            // JSon == javascript object notation
+			persistString = System.Text.Json.JsonSerializer.Serialize(this);
+			Console.WriteLine("Build_Laser.ToString() - " + persistString);
+            return persistString;
+		}
+
 		
 #endregion
 	}

@@ -5218,7 +5218,8 @@ return (0,0);
 		
 		
 		protected UserData mUserData;
-		protected int mUserTypeID;   // can be defined by game##.dll or by an enum that is generated into a compiled binary at runtime
+		
+		
 		
 		public uint ShotsFired = 0; // todo: belongs in TacticalStation 
 		public Dictionary<SKILLS, Skill> Skills;
@@ -5227,9 +5228,7 @@ return (0,0);
         public EntityNode(string entityKey, int arrayIndex, double x, double y, double z, double xV, double yV) 
 			: base (arrayIndex, x, y, z, xV, yV)
         {
-            mArrayIndex = arrayIndex;
-			mUserTypeID = -1;
-				
+            mArrayIndex = arrayIndex;				
 			mID = entityKey;
 			mUserData = EntryClass.mCStoreUserData.CheckOut(mID);
 				
@@ -5240,7 +5239,7 @@ return (0,0);
 		
         public int EntityArrayIndex { get { return mArrayIndex; } set {mArrayIndex = value;}}
 		
-		public int UserTypeID { get {return mUserTypeID; } set {mUserTypeID = value;}}
+		public int UserTypeID { get {return mUserData.UserTypeID; } set { mUserData.UserTypeID = value;}}
 		
 		public UserData BlackBoardData { get {return mUserData;} set {mUserData = value;} }
 		
@@ -5591,6 +5590,11 @@ return (0,0);
 			//Console.WriteLine ("Transform.AddUserStruct() - INTERNAL = " + tup.Item1.ToString());
 		}
 			
+		public Dictionary<Type, Tuple<int, object>> GetUserStructs()
+		{
+			return mUserStructs;
+		}
+				
 		public object GetUserStruct(Type t, out int index)
 		{
 			index = -1;
@@ -8288,34 +8292,26 @@ return (0,0);
 		public EntityNode Build (object clientScript,  string buildScriptRelativeResourcePath, string persistString = null)
 		{
 			EntityNode result = null;
-			
 			return result;
 		}
 
 		
-		
 		private void Calculate()
 		{
-			
 			PropertySpec[] calculations = new PropertySpec[count];
-			
-			
 			object[] values = mPropertyValues.Values.ToArray();
 			PropertySpec[] buildProperties = GetProperties(out values);
 			
-
 			// retrieve some of the Component's properties such as Level to help compute
 			// the build stats. Or should "level" exist only in the Build stats?
 			//PropertySpec[] componentProperties = Component.GetCustomProperties(true);
 			int level = (int)mPropertyValues["Level"];
-			
 			
 			// compute stats for cost, weight, volume, surface area, 
 			double cost = level * 10d;
 			double weight = level * 1d;
 			double volume = level * 1d;
 			double surfaceArea = level * 0.25d;
-			
 			
 			calculations[0] = new PropertySpec("Cost", typeof(double).Name, "build", cost);
 			calculations[1] = new PropertySpec("Weight", typeof(double).Name, "build", weight);
@@ -8325,8 +8321,6 @@ return (0,0);
 			// NOTE: this should result in the Memory<T> records being updated for the 'Battery' component
 			//       and specifically it's 'struct PowerProducer' 
 			Component.SetCustomProperties(calculations);
-			
-				
 		}
 		
 		
@@ -8347,7 +8341,7 @@ return (0,0);
 			{
 				// todo: can I return a Tuple<> array that conains the struct and it's Type?
 				//       I should then store them as a Tuple<> as well...
-				object[] structs = Component.GetUserStruct();	
+				Dictionary<Type, Tuple<int, object>> structs = Component.GetUserStructs();	
 			}
 			
 			// TODO: the following is actually incorrect, we only need to persist the BUILD properties from THE BUILDSCRIPT
@@ -9565,13 +9559,14 @@ return (0,0);
 	{
 		private System.Collections.Concurrent.ConcurrentDictionary<string, UserData> mUserDataCollection; // Dictionary<string, UserData> mUserDataCollection;
 		
+		
+		
 		public UserDataStore()
 		{
 		    //mUserDataCollection = new Dictionary<string, UserData>();
 			mUserDataCollection = new System.Collections.Concurrent.ConcurrentDictionary<string, UserData>();
-			
 		}
-		
+
 		public UserData this[string entityID]
 		{
 			get 
@@ -9802,6 +9797,9 @@ return (0,0);
         // TODO: Collections field could be used perhaps to store nested Data?
         private Dictionary <string, UserData> Collections;
 
+		protected int mUserTypeID;   // can be defined by game##.dll or by an enum that is generated into a compiled binary at runtime
+		
+				
         /// <summary>
         /// UseData.ctor() uses the access modifier "internal" because an instance
         /// must be obtained via GameAPI which will result in a call to 
@@ -9812,6 +9810,7 @@ return (0,0);
         /// </summary>
         internal UserData()
         {
+			mUserTypeID = -1;
         }
 
 		internal UserData Clone ()
@@ -9846,6 +9845,13 @@ return (0,0);
             throw new NotImplementedException();
             return null;
 		}
+		
+		public int UserTypeID 
+		{ 
+			get {return mUserTypeID; } 
+			set { mUserTypeID = value;}
+		}
+		
 
         // TODO: our "Entity.BlackboardData" will contain an array of objects that each script
         //       for that Entity will assign and therefore know how to cast each array element.

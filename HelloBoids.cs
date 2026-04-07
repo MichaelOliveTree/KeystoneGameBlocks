@@ -907,6 +907,15 @@ namespace HelloBoids
 		
 		public Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> Spawn(ThreadedRandom rand, int arrayIndex, double width, double height, double depth)
 		{
+			
+			Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> result;
+				
+			// TODO: TEMP HACK - THE JSON Serialize and Deserialize of a PropertySpec[] DOES WORK!  
+			//Builder builder = new Builder();
+			//builder.ToString();
+			//Environment.Exit(0);
+			
+			
 			//Console.WriteLine ("Spawn() - Boid Spawn BEGIN at array index == " + arrayIndex.ToString());
 			string exLine = "Spawn 0";
 						
@@ -1054,7 +1063,7 @@ namespace HelloBoids
            		Octree.Add((EntityNode)b);
             }
 
-			Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> result = 
+			result = 
 					new Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode>(b, eyes, wings, laser, tacticalStation, battery, humanOperator);
 			return result;
 		}
@@ -1090,7 +1099,15 @@ namespace HelloBoids
 			storeComp.Span[compInternalIndex].Configuration = OpticalSensorConfiguration;
 			storeComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
 
-			// todo: power using as well
+			// powerconsumer struct
+			ComponentStore<PowerConsumer> storePowerConsumer = EntryClass.mCStoreCol.CheckOut<PowerConsumer>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+			int powerConsumerInternalIndex = -1;
+			Memory<PowerConsumer> memPowerConsumer = storePowerConsumer.CheckOut(out powerConsumerInternalIndex);
+			opticalSensor.AddUserStruct(typeof(PowerConsumer), memPowerConsumer, powerConsumerInternalIndex);
+			storePowerConsumer.Span[powerConsumerInternalIndex].Configuration = WingsConfiguration;
+			storePowerConsumer.Span[powerConsumerInternalIndex].EntityArrayIndex = arrayIndex;
+			
+			
 			int sensorInternalIndex = -1;
 			exLine = "CreateOpticalSensor 4";
 			try
@@ -1237,6 +1254,14 @@ namespace HelloBoids
 			//storeComp.Span[checkOutIndex].SurfaceArea = 1d;
 			//storeComp.Span[checkOutIndex].Volume = 0.2d;
 
+			// powerconsumer struct
+			ComponentStore<PowerConsumer> storePowerConsumer = EntryClass.mCStoreCol.CheckOut<PowerConsumer>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+			int powerConsumerInternalIndex = -1;
+			Memory<PowerConsumer> memPowerConsumer = storePowerConsumer.CheckOut(out powerConsumerInternalIndex);
+			laser.AddUserStruct(typeof(PowerConsumer), memPowerConsumer, powerConsumerInternalIndex);
+			storePowerConsumer.Span[powerConsumerInternalIndex].Configuration = WingsConfiguration;
+			storePowerConsumer.Span[powerConsumerInternalIndex].EntityArrayIndex = arrayIndex;
+			
 			// weapon struct
 			ComponentStore<Weapon> storeWeapon = EntryClass.mCStoreCol.CheckOut<Weapon>(EntryClass.NUM_ENTRIES);
             checkOutIndex = -1;
@@ -3516,7 +3541,7 @@ namespace HelloBoids
 						int index;
 						Memory<Production> mem = production.CheckOut(out index);
 						mem.Span[0] = p;
-						Console.WriteLine("RegisterProduction() - PRODUCTION '" + ((PRODUCTS)productID).ToString() + "' REGISTERED>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+						//Console.WriteLine("RegisterProduction() - PRODUCTION '" + ((PRODUCTS)productID).ToString() + "' REGISTERED>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
 						
 					}
 				
@@ -3787,25 +3812,363 @@ namespace HelloBoids
 			}
 		}
 		*/
+		
+		
+		
+	public enum PRODUCTS
+	{
+		None = 0,
+
+		ElectricalPower,
+
+		// Fuels
+
+
+		// Emissions and Signatures
+		OpticalReflection,    // aka: VisibleLightReflection,  camoflauge can reduce this "reflection" 
+		MicrowaveReflection,
+		MicrowaveEmission,
+		
+		// Damage Types
+		MicrowaveDamage = 1024,
+		FireDamage,
+		PlasmaFireDamage,
+		VaccumDamage,
+		RadiationDamage,
+		PressureDamage,   // eg too deep underwater or within a Gas Giant's atmosphere
+
+		CommandBoost = 2048,
+		MoraleBoost,   // like all modifiers, this too can actually be either negative or positive
+		Fatigue,
+		
+		
+		// Skill Modifiers
+		TacticalOperationsSkillModifier = 4096,
+		TargetingSkillModifier,
+
+		Haggling
+	}
+
+
+			 
+	
+	public enum SKILLS
+	{
+		HelmOperations,
+		TacticalOperations,
+		Piloting,
+		Targeting,
+		Engineering,
+		SensorOperations,
+
+		Command,
+		Morale
+	}
+
+	public enum PRODUCT_DISTRIBUTION_TYPE
+	{
+		List = 0,
+		Region
+	}
+	
+	
+	// TODO: Im not sure I need seperate Consumption and PowerConsumer 
+	//                            and    Production  and PowerProducer
+	//       Mostly I think, its so we can have a general struct for ALL 
+	//       sorts of Production... not just electrical power.
+	//       If we need production of Morale, Fatigue, Heat, Gamma Radiation, etc
+	//       then all of these can use the same struct... 
+		
+		
+	/*
+	Electromigration: The gradual movement of metal atoms in a semiconductor caused by electric current, leading to open or short circuits.
+	Thermal Cycling/Fatigue: Damage caused by expansion and contraction due to heat, leading to cracked solder joints.
+	Capacitor Degradation: Electrolytic capacitors "drying out" or leaking, a very common failure mode.
+	Corrosion: Oxidation of connectors and traces caused by moisture and air.
+	Oxidation: The loss of electrons in metal components, causing degradation.
+	Planned Obsolescence: A strategic design choice for a product to become unusable within a set time. 
+
+	How Electronics Wear Out:
+	Mechanical Wear: Parts that physically move, such as fans, hard drives, or button contacts, degrade due to friction.
+	Chemical Degradation: Capacitors can lose their charge capacity or break down, and battery performance fades over time.
+	Thermal Stress: Excessive heat can cause brittle fractures, warping of boards, or damage to components. 
+
+	Common Indicators of Wear:
+	Performance Reduction: Reduced battery life and slower performance.
+	Cosmetic Issues: Corrosion of metal parts, loosening of connectors, or damage to components.
+	Intermittent Failures: Components failing sporadically before complete breakdown. 
+
+	Relevant Concepts:
+	Bathtub Curve: Describes the likelihood of failures over time, which are high at the beginning ("infant mortality") and high at the end ("wearout period").
+	Software Rot: The gradual decline of software usability over time without modification. 
+	*/
+		
+	/*
+	public struct PowerProducer
+	{
+        public int EntityArrayIndex;
+		public CONFIGURATION Configuration;
+
+        
+        Definition: 1 kWh == 1 kW of power sustained for 1 hour.
+            Usage Example: A 2,500-watt clothes dryer used for 2 hours consumes 5 kWh (2.5kW x 2  hours).
+        Average Consumption: The average U.S. household consumes approximately 899 kWh per month, or about 30 kWh per day.
+        
+        public double Output;    // kWh    
+		public double Capacity;
+		public double Duration;  
+		public double MaxInput; // for a Battery, this is for recharging
+			
+			
+//		public float Rate;    // amount of units consumed per second?  This is probably meant to be Duration
+
+//        // confused on some of these vars because where does the machine/entity pass in
+//        // vars used for the computation, and which exist here?  I think one good argument
+//        // to keep them here is that a machine that produces/consumes multiple things
+//        // may have seperate throttle values and efficiency values and even different enable/disable
+//        // states
+//        // But why not have some of these custom properties in the Entity then?
+			// todo:efficiency should have a max value and a current value that can never exceed the max value.  Efficiency ranges from 0.0 - 1.0 
+        public float Efficiency; // at same throttle, increased efficiency will produce more
+//                                 // as the machine wears out between mainteneance efficiency
+//                                 // will drop.  It is also possible to increase efficiency
+
+        public float Throttle;  // value typically 0.0 - 1.0 but can exceed 1.0 with potential risk
+//                                // of damaging the machine (is Damage a customProperty in Entity?)
+			
+		// TODO: the 'Component struct' should probably have a WearAndTear value that limits the Max Hitpoints that can be recovered perhaps
+		//       unless the Component is repaired/refurbished/torndown+cleaned+reassembled/etc.
+		
+	}
+	*/
+	
+		
+	public struct Production
+    {
+		// todo: should i have a frequency or Hz?  Gravitation would be at Physics frequency, but other's should be 1 hz or every 1000 ms
+		// production is not serialized to XML because they are created by the scripts in code
+		public int ProducerEntityArrayIndex;
+		public int ProducerEntityInternalIndex;  
+		public uint ProductID;
+		//public bool Enabled;
+		public Vector3d Location; // location where this production is occurring (eg. explosion, heat signature, etc)
+
+		public object Value;  // eg. for thrust this contains double, for radar echos, UnitValue is a Vector3d position, for SkillModifiers, it can contain a SkillModifier struct.
+		public int Amount; // infinite = -1, else number of unit's 
+		public int NumUses; // a radiation producing bomb may only produce damage for 3 turns before it dissipates.
+		public float CooldownBetweenUses;
+
+		public PRODUCT_DISTRIBUTION_TYPE DistributionMode; 
+		// public Func<Production, string, bool> DistributionFilterFunc; // accepts Production and an EntityID and returns true if the test is passed
+		// used when DistributionType is List.  Contains id of entities consuming this product.  
+		// No searches (spatial or otherwise) reqt. "power links" and other "links" are good examples of their use.
+		public int[] DistributionList;  
+		public object SearchPrimitive;   // used with DistributionMode is a spatial search of some kind.
+
+			
+		// public int[] Consumers;  // list of Consumers indices from ComponentStore<Consumer> we're sending ProductID to.
+	}
+	
+		// consumption is more charged with the algorithm for computing how much consumption
+		// of the particular product the Entity will use.  This includes everything from 
+		// consuming damage or gravity to consuming electricity, water or fuel.
+		// It will take into account modifiers such as "stealth" to determine consumption if any. 
+		// For instance, a "microwaves" consumption could result in 0 consumption if the distance between
+		// producer and consumer is too great or there is an applicable "stealth" modifier
+
+		//  It will also take into account modifiers from the crew operator at a station for example.
+
+		// TODO: should our Consumption_Delegate return "ConsumptionResult" so that these changes
+		// can be sent to other players over the network?
+
+		// details information about how much this device will consume.  This is returned
+		// when Consumption delegate is invoked in a script for a particular entity.
+		// todo: maybe we should think of this as ConsumptionResults and host all the changes that need to be applied to the target entities
+		//       so we could include an array of PropertySpec and corresponding nodeIDs
+
+		
+	/*
+	public struct PowerConsumer  
+    {
+        public int EntityArrayIndex;    // Guid.NewGuid().ToString() results in a 36 character string.
+		public CONFIGURATION Configuration; 
+                
+        public double PowerRequirement;// per tick or per-use if "Continuous == false:
+        public double MinimumPower;
+		
+		public bool Breaker;  // NOTE: we do not use node.Enabled because that is seperate (for rendering AND updating) from a Component running it's production simulation or not.
+		public bool Continuous; // whether this component always consumes power when operating
+		public bool HasVariablePerformance; // can run at reduced power, but with reduced performance (eg sensor will have lower range)
+        
+		public int Priority;  // determines if there's insufficient power production, which consumers get higher priority to be powered during runtime 
+		
+        // runtime
+        public float BreakerCycleDuration;
+		
+		public long TimeStarted;
+		public float Duration;
+		
+		public bool Looping; // Repeating
+		public float CooldownDuration; 
+		public bool InCoolDown;
+    }
+	*/
+		
+		
+	public struct Consumption // todo: rename this to ConsumptionResult
+	{
+		// Consumption here is really PRODUCT CONSUMPTION RESULT struct that gets filled so that
+		// other players in the networked game can receive the "results" of 
+		// having consumed a product
+		// NOTE: There is no reference to which Enity provided the PRODUCTION... is this ok?  If during a Data Oriented Processor
+		//       pass multiple Producers contributed to the Conumption result, then we would need an array of Producers...
+		//       I think it's best to not worry about this yet.  This is NOT really ConsumptionResult, it's Consumption 
+		//       "Value" and "Amount" settings for how much to receive from a Producer, assuming the producer can supply the entire amount.
+		public int ConsumerEntityArrayIndex; // in KGB this would be the Entity.ID or GUID of the Consuming Entity
+		public int ConsumerInternalIndex; // the index into the Memory<T> of the entity that is consuming a product
+		public uint ProductID;     // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer
+		public object Value;
+		public int Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
+
+		//public string TargetID; // NOTE: this does mean that an entity performing consumption can change properties of other nodes and not just itself. Typically though, its only for entities within a single ship hierarchy from Exterior to Interior components
+		public PropertyOperation[] Operations;
+//       public Settings.PropertySpec[] Properties; // todo: what about HelmState and TacticalState properties? Well, "tacticalstate" and "helmstate" are properties in the ship.css and they are serializable over the wire.
+		// todo: do we need to be able to send this over the wire with NetBuffer Read and Write?
+		// todo: we should probably need to know whether the property values are meant to replace, increment, or decrement the existing value.  "store" is a good example. If we're multithreaded, we might need to lock each node before we apply changes
+		//       I could include an array of int[] operation; that is same length and specifiy 0=replace, 1=increment and 2= decrement, 3 = add array element, 4 = remove array element
+		// todo: maybe instead of seperate objects like HelmState and NavPoints we just use regular custompropertyspec for each member.  This will make it easier for ConsumptionResult handling without keystone.dll needing to know anything about those custom types.
+		// todo: well first, lets just use PropertySpec with intrinsic types.  
+	
+		// public int[] Producers;  // list of Producers indices from ComponentStore<Producer> we're receiving ProductID from.
+	}
+
+
+	public enum ModificationEffect // equivalent to distributionMode for Production
+	{
+		Individual,
+		List,
+		Party,
+		Area,
+		Region,
+		Faction
+	}
+
+	public struct SkillModifier
+	{ 
+		public int ProducerEntityArrayIndex; 
+		public PRODUCTS Product;  // modifiers are a type of PRODUCT for instance PRODUCT.MoraleBoost
+		public SKILLS SkillToTarget;      // the skill that will be affected eg Skill.Morale
+		public bool Enabled;
+		public int Amount;         // can be negative or positive e.g  +1 Morale
+		public int NumUses;
+		public float CooldownBetweenUses;
+	}
+	
+	// TODO: an Operator that has for example a targeting skill, (see struct LivingEntity)
+	//       will "PRODUCE" a bonus for that crew station every update.  It does not require
+	//       an "Update()" function within a script, it only needs the type of PRODUCTION defined
+	//       and registered via the Scripting API.  
+	public struct Skill
+	{
+		public SKILLS SkillType;
+		public int Level;     			// the level of this skill
+		public int BaseValue; 
+		public int EffectiveValue;
+		
+		// These are modifiers that this Skill struct naturally PRODUCES 
+		// (as in PRODUCTION and as in, modifiers that are built in to this specific Skill). 
+		// These are NOT external modifiers that are added to this Skill!
+	//	public SkillModifier[] Modifiers; 
+		public SkillModifier[] Production;
+		
+		
+		//public int Value()
+		//{
+		//	int result = BaseValue;
+			
+			//if (Modifiers != null)
+		//}
+		
+		/*
+		public void AddModifier(int producerIndex, PRODUCTS product, int amount, bool enabled = true, int numUses = -1)
+		{
+			SkillModifier m;
+			m.EntityIndex = producerIndex;
+			m.SkillToTarget = SkillType;
+			m.Enabled = enabled;
+			m.Product = product;
+			m.Amount = amount;
+			m.NumUses = numUses;
+			
+			AddModifier(m);
+		}
+		
+		public void AddModifier(SkillModifier modifier)
+		{
+			int length = 0;
+			
+			if (Modifiers == null)
+				Modifiers = new SkillModifier[1];
+			else
+			{
+				length = Modifiers.Length;
+				SkillModifier[] tmp = Modifiers;
+				Modifiers.CopyTo(tmp, 0);
+				
+				Modifiers = new SkillModifier[length];
+			}
+			
+			Modifiers[length] = modifier;
+		}
+		*/
+		
+		public void AddProduction(int producerEntityArrayIndex, PRODUCTS product, int amount, bool enabled = true, int numUses = -1)
+		{
+			SkillModifier m;
+			m.ProducerEntityArrayIndex = producerEntityArrayIndex;
+			m.SkillToTarget = SkillType;
+			m.Enabled = enabled;
+			m.Product = product;
+			m.Amount = amount;
+			m.NumUses = numUses;
+			m.CooldownBetweenUses = 1; // 1 second
+			AddProduction(m);
+		}
+		
+		public void AddProduction(SkillModifier modifier)
+		{
+			int length = 0;
+			
+			if (Production == null)
+				Production = new SkillModifier[1];
+			else
+			{
+				length = Production.Length;
+				SkillModifier[] tmp = Production;
+				Production.CopyTo(tmp, 0);
+				
+				Production = new SkillModifier[length];
+			}
+			
+			Production[length] = modifier;
+		}
+	}
+	
 		private void ProcessPowerConsumption(ComponentStore<Consumption> store, object[] parameters, int seed, GameTime gt)
 		{
 			Span<Consumption> consumption = store.Span;
-			
 			uint consumptionCount = store.Count;
-			
-			
 			uint productID = (uint)parameters[0];
 			ComponentStore<Production> production = (ComponentStore<Production>)parameters[1];	
 			uint productionCount = production.Count;
 			
+			//Console.WriteLine("ProcessPowerConsumption() - Producing ProductID == '" + ((PRODUCTS)productID).ToString() + "  Production Count == " + productionCount + " Consumption Count == " + consumptionCount);
 			
-			Console.WriteLine("ProcessPowerConsumption() - Producing ProductID == '" + ((PRODUCTS)productID).ToString() + "  Production Count == " + productionCount + " Consumption Count == " + consumptionCount);
-			
-			for (int i = 0; i < production.Count; i++)
+			for (int i = 0; i < productionCount; i++)
 			{
 				Production currentProduction = production.Span[i];
 
-				Console.WriteLine("ProcessPowerConsumption() - Entity '" + Boids[currentProduction.ProducerEntityArrayIndex].EntityKey + "' Producing '" + ((PRODUCTS)productID).ToString() );
+				//Console.WriteLine("ProcessPowerConsumption() - Entity '" + Boids[currentProduction.ProducerEntityArrayIndex].EntityKey + "' Producing '" + ((PRODUCTS)productID).ToString() );
 			
 				
 				//List<Consumption> consumers = mConsumption[productID];
@@ -3849,21 +4212,43 @@ namespace HelloBoids
 						try
 						{							
 							EntityNode producerEntity =  Boids[currentProduction.ProducerEntityArrayIndex];
-							if (producerEntity == null) continue;
+							EntityNode consumerEntity = Boids[currentConsumption.ConsumerEntityArrayIndex];
+							if (producerEntity == null || consumerEntity == null) continue;
 							
 							int index;
 							Memory<PowerProducer> producer = (Memory<PowerProducer>)producerEntity.GetUserStruct(typeof(PowerProducer), out index);
+							Memory<PowerConsumer> consumer = (Memory<PowerConsumer>)consumerEntity.GetUserStruct(typeof(PowerConsumer), out index);
+							
+							//double tmp = production.Span[currentProduction.ProducerEntityInternalIndex].Output;
+							//consumption[currentConsumption.ConsumerInternalIndex].;
+														
+							//producer.Span[0].Level -= currentConsumption.Amount;
 							producer.Span[0].Output -= currentConsumption.Amount;
+							//producer.Span[0].Capacity -= currentConsumption.Amount;
+							//producer.Span[0].Duration -= currentConsumption.Amount;
+							//producer.Span[0].MaxInput -= currentConsumption.Amount;
 							
+							consumer.Span[0].PowerRequirement = 10; // per tick or per-use if "Continuous == false:
+							consumer.Span[0].MinimumPower = 8;
+							consumer.Span[0].Breaker = true;
+							consumer.Span[0].Continuous = true; // whether this component always consumes power when operating
+							consumer.Span[0].HasVariablePerformance = false; // can run at reduced power, but with reduced performance (eg sensor will have lower range)
+							consumer.Span[0].Priority = 0;  // determines if there's insufficient power production, which consumers get higher priority to be powered during runtime 
 							
-							Console.WriteLine("ProcessPowerConsumption() - producer.Output == " + producer.Span[0].Output.ToString());
-							continue;
+							// runtime
+							consumer.Span[0].BreakerCycleDuration = 0;
+							consumer.Span[0].TimeStarted = 0;
+							consumer.Span[0].Duration = -1;
+							consumer.Span[0]. Looping = true; // Repeating
+							consumer.Span[0].CooldownDuration = 0; 
+							consumer.Span[0].InCoolDown = false;
 							
+							//Console.WriteLine("ProcessPowerConsumption() - producer.Output == " + producer.Span[0].Output.ToString());						
 							
 						}
 						catch (Exception ex)
 						{
-							Console.WriteLine("ProcessPowerConsumption() - ERROR: " + ex.Message);
+							Console.WriteLine("ProcessPowerConsumption() - ERROR: Production Entity = " + Boids[currentProduction.ProducerEntityArrayIndex].EntityKey + " Consumer Entity = " + Boids[currentConsumption.ConsumerEntityArrayIndex].EntityKey + " " + ex.Message);
 						}
 					} // end for of consumer distribution list
 				}
@@ -6575,60 +6960,6 @@ return (0,0);
 		DeployProbe
 	}
 
-	public enum PRODUCTS
-	{
-		None = 0,
-
-		ElectricalPower,
-
-		// Fuels
-
-
-		// Emissions and Signatures
-		OpticalReflection,    // aka: VisibleLightReflection,  camoflauge can reduce this "reflection" 
-		MicrowaveReflection,
-		MicrowaveEmission,
-		
-		// Damage Types
-		MicrowaveDamage = 1024,
-		FireDamage,
-		PlasmaFireDamage,
-		VaccumDamage,
-		RadiationDamage,
-		PressureDamage,   // eg too deep underwater or within a Gas Giant's atmosphere
-
-		CommandBoost = 2048,
-		MoraleBoost,   // like all modifiers, this too can actually be either negative or positive
-
-		// Skill Modifiers
-		TacticalOperationsSkillModifier = 4096,
-		TargetingSkillModifier,
-
-		Haggling
-	}
-
-
-			 
-	
-	public enum SKILLS
-	{
-		HelmOperations,
-		TacticalOperations,
-		Piloting,
-		Targeting,
-		Engineering,
-		SensorOperations,
-
-		Command,
-		Morale
-	}
-
-	public enum PRODUCT_DISTRIBUTION_TYPE
-	{
-		List = 0,
-		Region
-	}
-	
 	public class UnitedEarthCode
 	{
 
@@ -6710,46 +7041,6 @@ return (0,0);
 	}
 
 		
-		public struct Production
-    	{
-			// todo: should i have a frequency or Hz?  Gravitation would be at Physics frequency, but other's should be 1 hz or every 1000 ms
-			// production is not serialized to XML because they are created by the scripts in code
-			public int ProducerEntityArrayIndex;
-			public int ProducerEntityInternalIndex;  
-			public uint ProductID;
-			public bool Enabled;
-			public Vector3d Location; // location where this production is occurring (eg. explosion, heat signature, etc)
-			public object Value;  // eg. for thrust this contains double, for radar echos, UnitValue is a Vector3d position, for SkillModifiers, it can contain a SkillModifier struct.
-			public int Amount; // infinite = -1, else number of unit's 
-			public int NumUses;
-			public float CooldownBetweenUses;
-			
-			public PRODUCT_DISTRIBUTION_TYPE DistributionMode; 
-			// public Func<Production, string, bool> DistributionFilterFunc; // accepts Production and an EntityID and returns true if the test is passed
-			// used when DistributionType is List.  Contains id of entities consuming this product.  
-			// No searches (spatial or otherwise) reqt. "power links" and other "links" are good examples of their use.
-			public int[] DistributionList;  
-			public object SearchPrimitive;   // used with DistributionMode is a spatial search of some kind.
-			
-	//		public float Rate;    // amount of units consumed per second
-
-	//        // confused on some of these vars because where does the machine/entity pass in
-	//        // vars used for the computation, and which exist here?  I think one good argument
-	//        // to keep them here is that a machine that produces/consumes multiple things
-	//        // may have seperate throttle values and efficiency values and even different enable/disable
-	//        // states
-	//        // But why not have some of these custom properties in the Entity then?
-	//        public bool Enabled;
-	//        public float Efficiency; // at same throttle, increased efficiency will produce more
-	//                                 // as the machine wears out between mainteneance efficiency
-	//                                 // will drop.  It is also possible to increase efficiency
-
-	//        public float Throttle;  // value typically 0 -1.0 but can exceed 1.0 with potential risk
-	//                                // of damaging the machine (is Damage a customProperty in Entity?)
-			
-			
-		}
-	
 		public enum PropertyOperation : byte
 		{
 			Replace = 0,
@@ -6762,174 +7053,6 @@ return (0,0);
 			Additive_Divide
 		}
 
-		// consumption is more charged with the algorithm for computing how much consumption
-		// of the particular product the Entity will use.  This includes everything from 
-		// consuming damage or gravity to consuming electricity, water or fuel.
-		// It will take into account modifiers such as "stealth" to determine consumption if any. 
-		// For instance, a "microwaves" consumption could result in 0 consumption if the distance between
-		// producer and consumer is too great or there is an applicable "stealth" modifier
-
-		//  It will also take into account modifiers from the crew operator at a station for example.
-
-		// TODO: should our Consumption_Delegate return "ConsumptionResult" so that these changes
-		// can be sent to other players over the network?
-
-		// details information about how much this device will consume.  This is returned
-		// when Consumption delegate is invoked in a script for a particular entity.
-		// todo: maybe we should think of this as ConsumptionResults and host all the changes that need to be applied to the target entities
-		//       so we could include an array of PropertySpec and corresponding nodeIDs
-		public struct Consumption // todo: rename this to ConsumptionResult
-		{
-			// Consumption here is really PRODUCT CONSUMPTION RESULT struct that gets filled so that
-			// other players in the networked game can receive the "results" of 
-			// having consumed a product
-			// NOTE: There is no reference to which Enity provided the PRODUCTION... is this ok?  If during a Data Oriented Processor
-			//       pass multiple Producers contributed to the Conumption result, then we would need an array of Producers...
-			//       I think it's best to not worry about this yet.  This is NOT really ConsumptionResult, it's Consumption 
-			//       "Value" and "Amount" settings for how much to receive from a Producer, assuming the producer can supply the entire amount.
-			public int ConsumerEntityArrayIndex; // in KGB this would be the Entity.ID or GUID of the Consuming Entity
-			public int ConsumerInternalIndex; // the index into the Memory<T> of the entity that is consuming a product
-			public uint ProductID;     // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer
-			public object Value;
-			public int Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
-
-			//public string TargetID; // NOTE: this does mean that an entity performing consumption can change properties of other nodes and not just itself. Typically though, its only for entities within a single ship hierarchy from Exterior to Interior components
-			public PropertyOperation[] Operations;
-	 //       public Settings.PropertySpec[] Properties; // todo: what about HelmState and TacticalState properties? Well, "tacticalstate" and "helmstate" are properties in the ship.css and they are serializable over the wire.
-			// todo: do we need to be able to send this over the wire with NetBuffer Read and Write?
-			// todo: we should probably need to know whether the property values are meant to replace, increment, or decrement the existing value.  "store" is a good example. If we're multithreaded, we might need to lock each node before we apply changes
-			//       I could include an array of int[] operation; that is same length and specifiy 0=replace, 1=increment and 2= decrement, 3 = add array element, 4 = remove array element
-			// todo: maybe instead of seperate objects like HelmState and NavPoints we just use regular custompropertyspec for each member.  This will make it easier for ConsumptionResult handling without keystone.dll needing to know anything about those custom types.
-			// todo: well first, lets just use PropertySpec with intrinsic types.  
-		}
-
-
-	/// <summary>
-	/// These can overlap Skills, Stats, Armor DR and such because they can give bonuses (positive or negative)
-	/// to all of these things.
-	/// </summary>
-	//public enum ModificationType
-	//{
-	//	Morale,
-	//	Command
-	//}
-
-	//public struct Modification
-	//{
-	//	ModificationType Type;
-	//	int Level;
-	//}
-
-	public enum ModificationEffect
-	{
-		Individual,
-		List,
-		Party,
-		Area,
-		Region,
-		Faction
-	}
-
-	public struct SkillModifier
-	{ 
-		public int ProducerEntityArrayIndex; 
-		public PRODUCTS Product;  // modifiers are a type of PRODUCT for instance PRODUCT.MoraleBoost
-		public SKILLS SkillToTarget;      // the skill that will be affected eg Skill.Morale
-		public bool Enabled;
-		public int Amount;         // can be negative or positive e.g  +1 Morale
-		public int NumUses;
-		public float CooldownBetweenUses;
-	}
-	
-	// TODO: an Operator that has for example a targeting skill, (see struct LivingEntity)
-	//       will "PRODUCE" a bonus for that crew station every update.  It does not require
-	//       an "Update()" function within a script, it only needs the type of PRODUCTION defined
-	//       and registered via the Scripting API.  
-	public struct Skill
-	{
-		public SKILLS SkillType;
-		public int Level;     			// the level of this skill
-		public int BaseValue; 
-		public int EffectiveValue;
-		
-		// These are modifiers that this Skill struct naturally PRODUCES 
-		// (as in PRODUCTION and as in, modifiers that are built in to this specific Skill). 
-		// These are NOT external modifiers that are added to this Skill!
-	//	public SkillModifier[] Modifiers; 
-		public SkillModifier[] Production;
-		
-		
-		//public int Value()
-		//{
-		//	int result = BaseValue;
-			
-			//if (Modifiers != null)
-		//}
-		
-		/*
-		public void AddModifier(int producerIndex, PRODUCTS product, int amount, bool enabled = true, int numUses = -1)
-		{
-			SkillModifier m;
-			m.EntityIndex = producerIndex;
-			m.SkillToTarget = SkillType;
-			m.Enabled = enabled;
-			m.Product = product;
-			m.Amount = amount;
-			m.NumUses = numUses;
-			
-			AddModifier(m);
-		}
-		
-		public void AddModifier(SkillModifier modifier)
-		{
-			int length = 0;
-			
-			if (Modifiers == null)
-				Modifiers = new SkillModifier[1];
-			else
-			{
-				length = Modifiers.Length;
-				SkillModifier[] tmp = Modifiers;
-				Modifiers.CopyTo(tmp, 0);
-				
-				Modifiers = new SkillModifier[length];
-			}
-			
-			Modifiers[length] = modifier;
-		}
-		*/
-		
-		public void AddProduction(int producerEntityArrayIndex, PRODUCTS product, int amount, bool enabled = true, int numUses = -1)
-		{
-			SkillModifier m;
-			m.ProducerEntityArrayIndex = producerEntityArrayIndex;
-			m.SkillToTarget = SkillType;
-			m.Enabled = enabled;
-			m.Product = product;
-			m.Amount = amount;
-			m.NumUses = numUses;
-			m.CooldownBetweenUses = 1; // 1 second
-			AddProduction(m);
-		}
-		
-		public void AddProduction(SkillModifier modifier)
-		{
-			int length = 0;
-			
-			if (Production == null)
-				Production = new SkillModifier[1];
-			else
-			{
-				length = Production.Length;
-				SkillModifier[] tmp = Production;
-				Production.CopyTo(tmp, 0);
-				
-				Production = new SkillModifier[length];
-			}
-			
-			Production[length] = modifier;
-		}
-	}
 
 	/// <summary>
 	/// A SensorContact is a PRODUCT that is produced by a Sensor upon receiving
@@ -7115,14 +7238,6 @@ return (0,0);
 
 	
 	
-	
-	
-	
-	
-
-	
-	
-	
     public struct DeltaInfo
     {
         public int ID;
@@ -7177,6 +7292,20 @@ return (0,0);
 			Laser          = 1 << 19
 	}
 	
+	[Flags]
+	public enum USER_RUNTIME_FLAGS : uint
+	{
+		IsPowered =          0,
+		IsFueled =            1 << 0,
+		IsHealthyEnough =    1 << 1, 
+		OperatorHasSkills =  1 << 2, 
+		IsOperatorStatusOK = 1 << 3,
+		IsInUse =            1 << 4,  // aka isFiring for weapons)
+		CanAct =             1 << 5,  // (for Stations, can an additional Action be performed at this Station... depends on TL of the Station),
+		CanUse =             1 << 6,  // for Weapons this can be thought of as CanFire
+		IsReloading =        1 << 7, 
+		IsUnJamming =        1 << 8 // denotes a quick fix in the field requiring less than 1 minute to resolve (isFixingMinorMalfunction), 
+	}
 	
 	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
 	public struct LivingEntity
@@ -7206,21 +7335,6 @@ return (0,0);
 		{
 			return currentTime - CreationDateTime;
 		}
-	}
-	
-	[Flags]
-	public enum USER_RUNTIME_FLAGS : uint
-	{
-		IsPowered =          0,
-		IsFueled =            1 << 0,
-		IsHealthyEnough =    1 << 1, 
-		OperatorHasSkills =  1 << 2, 
-		IsOperatorStatusOK = 1 << 3,
-		IsInUse =            1 << 4,  // aka isFiring for weapons)
-		CanAct =             1 << 5,  // (for Stations, can an additional Action be performed at this Station... depends on TL of the Station),
-		CanUse =             1 << 6,  // for Weapons this can be thought of as CanFire
-		IsReloading =        1 << 7, 
-		IsUnJamming =        1 << 8 // denotes a quick fix in the field requiring less than 1 minute to resolve (isFixingMinorMalfunction), 
 	}
 			
 		
@@ -7562,6 +7676,9 @@ return (0,0);
         Average Consumption: The average U.S. household consumes approximately 899 kWh per month, or about 30 kWh per day.
         */
         public double Output;    // kWh    
+		public double Capacity;
+		public double Duration;  
+		public double MaxInput;
 	}
 	
 	// See Game01.Components
@@ -7570,12 +7687,14 @@ return (0,0);
         public int EntityArrayIndex;    // Guid.NewGuid().ToString() results in a 36 character string.
 		public CONFIGURATION Configuration; 
                 
-        public bool Breaker;
         public double PowerRequirement;// per tick or per-use if "Continuous == false:
+        public double MinimumPower;
+		
+		public bool Breaker;
 		public bool Continuous; // whether this component always consumes power when operating
 		public bool HasVariablePerformance; // can run at reduced power, but with reduced performance (eg sensor will have lower range)
-        public double MinimumPower;
-        public int Priority;  // determines if there's insufficient power production, which consumers get higher priority to be powered during runtime 
+        
+		public int Priority;  // determines if there's insufficient power production, which consumers get higher priority to be powered during runtime 
 		
         // runtime
         public float BreakerCycleDuration;
@@ -8188,16 +8307,16 @@ return (0,0);
 	
 	#endregion // Game01.GameObjects
 
-    #region IBuilder implementation
+    #region Builder implementation
 	// See KeystoneGameBlocks/Game01/Builders
-	public struct IBuilder
+	public struct Builder
     {
 		
 		public CONFIGURATION Configuration {get; set;}
 		public int UserTypeID {get; set;}
 		
 		private string mBuildScriptRelativeResourcePath;
-		private Dictionary<string, object> mPropertyValues;
+		private Dictionary<string, object> mBuildSpecificPropertyValues;
 				
 		public object BuildScript {get;}
 		public object ComponetScript {get;}
@@ -8206,8 +8325,14 @@ return (0,0);
         public string BuildPersistString {get;}
         private bool mPropertyChanged;
         private bool mBuildChanged;
-        
+        private bool mBuildScriptInitialized;
 		
+		
+		public Builder (EntityNode component)
+		{
+			if (component == null) throw new ArgumentOutOfRangeException("Builder.ctor() - Component argument cannot be null.");
+			Component = component;
+		}
 		
 		public void SetProperties(PropertySpec[] properties)
 		{
@@ -8217,9 +8342,9 @@ return (0,0);
 		}
 		
 		
-		public PropertySpec[] GetProperties(out object[] values)
+		public PropertySpec[] GetProperties(out Dictionary<string, object> buildSpecificPropertyValues)
 		{
-			PropertySpec[] results = null;
+			
 			
 			//if (BuildScript != null && BuildScript.TVResourceIsLoaded)
 			//	results = BuildScript.GetCustomProperties();
@@ -8230,19 +8355,31 @@ return (0,0);
 			// Output (aka Max Discharge Rate)
 			// Duration (max duration in seconds at Max Discharge Rate)
 			// MaxInput (for a Battery, this is maximum Input for recharging purposes)
-			int count = 5;
-			results = new PropertySpec[count];
 			
-			results[0] = new PropertySpec("Level", typeof(uint).Name, "build", 1);
-			results[1] = new PropertySpec("Capacity", typeof(double).Name, "build", 2500d);
-			results[2] = new PropertySpec("Output", typeof(double).Name, "build", 100d);
+			int level = 1;
+			double capacity = 2000;
 			
-			results[3] = new PropertySpec("Duration", typeof(double).Name, "build", 25d);
-			results[4] = new PropertySpec("MaxInput", typeof(double).Name, "build", 33d); // recharging takes significantly longer than discharging at lower technology levels
+			double output = 100;
+			double duration = 25d;
+			double maxInput = 33d;
 			
-			values = mPropertyValues.Values.ToArray();
+			buildSpecificPropertyValues = new Dictionary<string, object>();
+			buildSpecificPropertyValues.Add("Level", level);
+			buildSpecificPropertyValues.Add("Capacity", capacity);
+			buildSpecificPropertyValues.Add("Output", output);
+			buildSpecificPropertyValues.Add("Duration", duration);
+			buildSpecificPropertyValues.Add("MaxInput", maxInput);
 			
-			
+
+			PropertySpec[] buildSpecificProperties = new PropertySpec[]
+			{
+				new PropertySpec("Level", typeof(uint).Name, "build", level),
+				new PropertySpec("Capacity", typeof(double).Name, "build", capacity),
+				new PropertySpec("Output", typeof(double).Name, "build", output),
+				new PropertySpec("Duration", typeof(double).Name, "build", duration),
+				new PropertySpec("MaxInput", typeof(double).Name, "build", maxInput) // recharging takes significantly longer than discharging at lower technology levels
+			};
+
 			// For NON-battery Power Producers like gas generators, reactors, etc
 			// FuelType
 			// FuelConsumptionRate
@@ -8252,8 +8389,7 @@ return (0,0);
 			// Available = Math.Min(Capacity, Output - PowerDraw);
 			// PowerIn = combined power INPUT from all Producers (cannot exceed MaxInput)
 			
-			
-			return results;
+			return buildSpecificProperties;
 		}
 		
 
@@ -8269,16 +8405,9 @@ return (0,0);
 		{
 			if (string.IsNullOrEmpty(persistString))
 			{
-				string[] parts = persistString.Split(COMPONENT_DELIMETER);
-				System.Diagnostics.Debug.Assert (parts.Length == 3);
 				
-				Component componentStruct = System.Text.Json.JsonSerializer.Deserialize<Component>(parts[0]);
-				Weapon weaponStruct = System.Text.Json.JsonSerializer.Deserialize<Weapon>(parts[1]);
-				Laser_Struct laserStruct = System.Text.Json.JsonSerializer.Deserialize<Laser_Struct>(parts[2]);
-				
-				// todo: all of the above need to be checked in to the EntryClass.mColStore?
-									
 			}
+			
 			
 			
             // NOTE: we only need the build parameters and from that we can
@@ -8298,29 +8427,54 @@ return (0,0);
 		
 		private void Calculate()
 		{
-			PropertySpec[] calculations = new PropertySpec[count];
-			object[] values = mPropertyValues.Values.ToArray();
-			PropertySpec[] buildProperties = GetProperties(out values);
+			// GET BUILD SPECIFIC PROPERTIES FROM OUR INSTANCED BUILD SCRIPT... for now its just hardcoded
+			// SPECIFIC TO OUR 'BATTERY' PowerProducer 
+			// --------------------------------------------------------------------------------------------
+			Dictionary<string, object> buildSpecificPropertyValues = mBuildSpecificPropertyValues;
+			// the following line should be getting these from the BuildObjectScript
+			PropertySpec[] buildSpecificProperties = GetProperties(out buildSpecificPropertyValues);
 			
 			// retrieve some of the Component's properties such as Level to help compute
 			// the build stats. Or should "level" exist only in the Build stats?
 			//PropertySpec[] componentProperties = Component.GetCustomProperties(true);
-			int level = (int)mPropertyValues["Level"];
+			uint level = (uint)buildSpecificPropertyValues["Level"];
+			double capacity = (double)buildSpecificPropertyValues["Capacity"];
+			double output = (double)buildSpecificPropertyValues["Output"];
+			double duration = (double)buildSpecificPropertyValues["Duration"];
+			double maxInput = (double)buildSpecificPropertyValues["MaxInput"];
+
 			
+			// GET COMPONENT SPECIFIC PROPERTIES FROM OUR INSTANCED CLIENT ENTITY SCRIPT... for now its just hardcoded
+			// --------------------------------------------------------------------------------------------
+			double cost = 0d;
+			double weight = 0d;
+			double volume = 0d;
+			double surfaceArea = 0d;
+			
+			Dictionary<string, object> componentSpecificPropertyValues = new Dictionary<string, object>();
+			componentSpecificPropertyValues.Add("Cost", cost);
+			componentSpecificPropertyValues.Add("Weight", weight);
+			componentSpecificPropertyValues.Add("Volume", volume);
+			componentSpecificPropertyValues.Add("SurfaceArea", surfaceArea);
+						
 			// compute stats for cost, weight, volume, surface area, 
-			double cost = level * 10d;
-			double weight = level * 1d;
-			double volume = level * 1d;
-			double surfaceArea = level * 0.25d;
+			cost = level * 10d;
+			weight = level * 1d;
+			volume = level * 1d;
+			surfaceArea = level * 0.25d;
 			
-			calculations[0] = new PropertySpec("Cost", typeof(double).Name, "build", cost);
-			calculations[1] = new PropertySpec("Weight", typeof(double).Name, "build", weight);
-			calculations[2] = new PropertySpec("Volume", typeof(double).Name, "build", volume);
-			calculations[3] = new PropertySpec("SurfaceArea", typeof(double).Name, "build", surfaceArea); // recharging takes significantly longer than discharging at lower technology levels
+			// assign the computed values to a set of PropertySpec and to it's Entity
+			PropertySpec[] entityStats = new PropertySpec[] 
+			{
+				new PropertySpec("Cost", typeof(double).Name, "build", cost),
+				new PropertySpec("Weight", typeof(double).Name, "build", weight),
+				new PropertySpec("Volume", typeof(double).Name, "build", volume),
+				new PropertySpec("SurfaceArea", typeof(double).Name, "build", surfaceArea) // recharging takes significantly longer than discharging at lower technology levels
+			};
 			
 			// NOTE: this should result in the Memory<T> records being updated for the 'Battery' component
 			//       and specifically it's 'struct PowerProducer' 
-			Component.SetCustomProperties(calculations);
+// TEMP COMMENT OUT->			Component.SetCustomProperties(entityStats);
 		}
 		
 		
@@ -8335,31 +8489,58 @@ return (0,0);
 			//    and these structs will co-exist in our UserData object keyed by their typename
 			//    The Defense and InternalStructure too can be keyed this way and assigned later... with ArmorLayers being
 			//    somewhat special case because there are currently no maximum allowable limits
-            string persistString = null;
 
-			if (Component != null)
-			{
-				// todo: can I return a Tuple<> array that conains the struct and it's Type?
-				//       I should then store them as a Tuple<> as well...
-				Dictionary<Type, Tuple<int, object>> structs = Component.GetUserStructs();	
-			}
+			Dictionary<string, object> buildSpecificPropertyValues = mBuildSpecificPropertyValues;
+			PropertySpec[] buildSpecificProperties = GetProperties(out buildSpecificPropertyValues);
 			
-			// TODO: the following is actually incorrect, we only need to persist the BUILD properties from THE BUILDSCRIPT
-
+			// JSon == javascript object notation
+			var options = new System.Text.Json.JsonSerializerOptions 
+			{ 
+    			DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull    |
+					                     System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault,
+				WriteIndented = true
+			};
 			
+			string jsonString = System.Text.Json.JsonSerializer.Serialize(buildSpecificProperties, options);
+			Console.WriteLine("Builder.ToString() - SERIALIZE = " + jsonString);
 			
-			// TODO: next follows a series of parts that join together to create the full persist string
-		//	string componentPart = Components[0].ToString();
-		//	string weaponPart = Components[1].ToString();
-		//	string laserPart = Components[2].ToString();
-			 
+			//Being Compression + Base65 encoding
+			string compressedBase64 = Convert.ToBase64String(CompressWithBrotli(System.Text.Encoding.UTF8.GetBytes(jsonString)));
+			string decompressedBase64 = System.Text.Encoding.UTF8.GetString(Decompress(Convert.FromBase64String(compressedBase64)));
+			jsonString = decompressedBase64;
+			// End Base64 decoding and Decompression
 			
-            // JSon == javascript object notation
-			persistString = System.Text.Json.JsonSerializer.Serialize(this);
-			Console.WriteLine("Build_Laser.ToString() - " + persistString);
-            return persistString;
+			buildSpecificProperties = System.Text.Json.JsonSerializer.Deserialize<PropertySpec[]>(jsonString);
+			
+			Console.WriteLine("Builder.ToString() - DESERIALIZE count = " + buildSpecificProperties.Length.ToString());
+			Console.WriteLine("Build.ToString() - COMPLETED.");
+            return jsonString;
 		}
 
+		public static byte[] CompressWithBrotli(byte[] inputBytes)
+		{
+			using var outputStream = new MemoryStream();
+			using (var brotliStream = new System.IO.Compression.BrotliStream(outputStream, System.IO.Compression.CompressionLevel.Optimal))
+			{
+				brotliStream.Write(inputBytes, 0, inputBytes.Length);
+			}
+			return outputStream.ToArray();
+		}
+		
+		public static byte[] Decompress(byte[] compressedData)
+		{
+			using var inputStream = new MemoryStream(compressedData);
+			using var outputStream = new MemoryStream();
+			
+			using (var brotliStream = new System.IO.Compression.BrotliStream(inputStream, System.IO.Compression.CompressionMode.Decompress))
+			{
+				brotliStream.CopyTo(outputStream);
+			}
+			return  outputStream.ToArray();
+			
+			
+		}
+		
 		
 #endregion
 	}

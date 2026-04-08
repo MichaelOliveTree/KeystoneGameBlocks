@@ -907,7 +907,6 @@ namespace HelloBoids
 		
 		public Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> Spawn(ThreadedRandom rand, int arrayIndex, double width, double height, double depth)
 		{
-			
 			Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> result;
 				
 			// TODO: TEMP HACK - THE JSON Serialize and Deserialize of a PropertySpec[] DOES WORK!  
@@ -1131,9 +1130,10 @@ namespace HelloBoids
 			Production p;
 			p.ProducerEntityArrayIndex = opticalSensor.EntityArrayIndex;
 			p.ProducerEntityInternalIndex = opticalSensor.GetUserStructIndex(typeof(Transform.Transform_Struct));
+			//p.Consumers = null; <-- same as DistributionList?  what if we only are using a different DistributionMode that requires a search?
 			p.ProductID = 	(uint)PRODUCTS.OpticalReflection;
-			p.Location = Vector3d.Zero();
-			p.Enabled = true;
+			p.Position = Vector3d.Zero();
+			//p.Enabled = true;
 			p.Value = 1;
 			p.Amount = -1; // this should be diminished by the range of the sensor 
 			p.NumUses = -1;
@@ -1476,8 +1476,8 @@ namespace HelloBoids
 			p.ProducerEntityArrayIndex = battery.EntityArrayIndex;
 			p.ProducerEntityInternalIndex = powerProducerInternalIndex;
 			p.ProductID = 	(uint)PRODUCTS.ElectricalPower;
-			p.Location = Vector3d.Zero();
-			p.Enabled = true;
+			p.Position = Vector3d.Zero();
+			//p.Enabled = true;
 			p.Value = 1000d;  // the UNIT value... in this case it's a DOUBLE
 			p.Amount = -1; // a Battery can produce as much as is needed to supply all of it's Consumers until it runs out of Energy  
 			p.NumUses = 100; // This Battery can be used 100 times (100 updates or frames) before it runs out.  update every TICK if -1 NumUses
@@ -1557,8 +1557,8 @@ namespace HelloBoids
 			p.ProducerEntityArrayIndex = humanOperator.EntityArrayIndex;
 			p.ProducerEntityInternalIndex = livingEntityID;
 			p.ProductID = 	(uint)targetingSkill.Production[0].Product;  // TargetingSkillModifier
-			p.Location = Vector3d.Zero();
-			p.Enabled = true;
+			p.Position = Vector3d.Zero();
+			//p.Enabled = true;
 			p.Value = targetingSkill.Production[0];
 			p.Amount = targetingSkill.Production[0].Amount; // this will use the 
 			p.NumUses = -1;
@@ -3812,347 +3812,6 @@ namespace HelloBoids
 			}
 		}
 		*/
-		
-		
-		
-	public enum PRODUCTS
-	{
-		None = 0,
-
-		ElectricalPower,
-
-		// Fuels
-
-
-		// Emissions and Signatures
-		OpticalReflection,    // aka: VisibleLightReflection,  camoflauge can reduce this "reflection" 
-		MicrowaveReflection,
-		MicrowaveEmission,
-		
-		// Damage Types
-		MicrowaveDamage = 1024,
-		FireDamage,
-		PlasmaFireDamage,
-		VaccumDamage,
-		RadiationDamage,
-		PressureDamage,   // eg too deep underwater or within a Gas Giant's atmosphere
-
-		CommandBoost = 2048,
-		MoraleBoost,   // like all modifiers, this too can actually be either negative or positive
-		Fatigue,
-		
-		
-		// Skill Modifiers
-		TacticalOperationsSkillModifier = 4096,
-		TargetingSkillModifier,
-
-		Haggling
-	}
-
-
-			 
-	
-	public enum SKILLS
-	{
-		HelmOperations,
-		TacticalOperations,
-		Piloting,
-		Targeting,
-		Engineering,
-		SensorOperations,
-
-		Command,
-		Morale
-	}
-
-	public enum PRODUCT_DISTRIBUTION_TYPE
-	{
-		List = 0,
-		Region
-	}
-	
-	
-	// TODO: Im not sure I need seperate Consumption and PowerConsumer 
-	//                            and    Production  and PowerProducer
-	//       Mostly I think, its so we can have a general struct for ALL 
-	//       sorts of Production... not just electrical power.
-	//       If we need production of Morale, Fatigue, Heat, Gamma Radiation, etc
-	//       then all of these can use the same struct... 
-		
-		
-	/*
-	Electromigration: The gradual movement of metal atoms in a semiconductor caused by electric current, leading to open or short circuits.
-	Thermal Cycling/Fatigue: Damage caused by expansion and contraction due to heat, leading to cracked solder joints.
-	Capacitor Degradation: Electrolytic capacitors "drying out" or leaking, a very common failure mode.
-	Corrosion: Oxidation of connectors and traces caused by moisture and air.
-	Oxidation: The loss of electrons in metal components, causing degradation.
-	Planned Obsolescence: A strategic design choice for a product to become unusable within a set time. 
-
-	How Electronics Wear Out:
-	Mechanical Wear: Parts that physically move, such as fans, hard drives, or button contacts, degrade due to friction.
-	Chemical Degradation: Capacitors can lose their charge capacity or break down, and battery performance fades over time.
-	Thermal Stress: Excessive heat can cause brittle fractures, warping of boards, or damage to components. 
-
-	Common Indicators of Wear:
-	Performance Reduction: Reduced battery life and slower performance.
-	Cosmetic Issues: Corrosion of metal parts, loosening of connectors, or damage to components.
-	Intermittent Failures: Components failing sporadically before complete breakdown. 
-
-	Relevant Concepts:
-	Bathtub Curve: Describes the likelihood of failures over time, which are high at the beginning ("infant mortality") and high at the end ("wearout period").
-	Software Rot: The gradual decline of software usability over time without modification. 
-	*/
-		
-	/*
-	public struct PowerProducer
-	{
-        public int EntityArrayIndex;
-		public CONFIGURATION Configuration;
-
-        
-        Definition: 1 kWh == 1 kW of power sustained for 1 hour.
-            Usage Example: A 2,500-watt clothes dryer used for 2 hours consumes 5 kWh (2.5kW x 2  hours).
-        Average Consumption: The average U.S. household consumes approximately 899 kWh per month, or about 30 kWh per day.
-        
-        public double Output;    // kWh    
-		public double Capacity;
-		public double Duration;  
-		public double MaxInput; // for a Battery, this is for recharging
-			
-			
-//		public float Rate;    // amount of units consumed per second?  This is probably meant to be Duration
-
-//        // confused on some of these vars because where does the machine/entity pass in
-//        // vars used for the computation, and which exist here?  I think one good argument
-//        // to keep them here is that a machine that produces/consumes multiple things
-//        // may have seperate throttle values and efficiency values and even different enable/disable
-//        // states
-//        // But why not have some of these custom properties in the Entity then?
-			// todo:efficiency should have a max value and a current value that can never exceed the max value.  Efficiency ranges from 0.0 - 1.0 
-        public float Efficiency; // at same throttle, increased efficiency will produce more
-//                                 // as the machine wears out between mainteneance efficiency
-//                                 // will drop.  It is also possible to increase efficiency
-
-        public float Throttle;  // value typically 0.0 - 1.0 but can exceed 1.0 with potential risk
-//                                // of damaging the machine (is Damage a customProperty in Entity?)
-			
-		// TODO: the 'Component struct' should probably have a WearAndTear value that limits the Max Hitpoints that can be recovered perhaps
-		//       unless the Component is repaired/refurbished/torndown+cleaned+reassembled/etc.
-		
-	}
-	*/
-	
-		
-	public struct Production
-    {
-		// todo: should i have a frequency or Hz?  Gravitation would be at Physics frequency, but other's should be 1 hz or every 1000 ms
-		// production is not serialized to XML because they are created by the scripts in code
-		public int ProducerEntityArrayIndex;
-		public int ProducerEntityInternalIndex;  
-		public uint ProductID;
-		//public bool Enabled;
-		public Vector3d Location; // location where this production is occurring (eg. explosion, heat signature, etc)
-
-		public object Value;  // eg. for thrust this contains double, for radar echos, UnitValue is a Vector3d position, for SkillModifiers, it can contain a SkillModifier struct.
-		public int Amount; // infinite = -1, else number of unit's 
-		public int NumUses; // a radiation producing bomb may only produce damage for 3 turns before it dissipates.
-		public float CooldownBetweenUses;
-
-		public PRODUCT_DISTRIBUTION_TYPE DistributionMode; 
-		// public Func<Production, string, bool> DistributionFilterFunc; // accepts Production and an EntityID and returns true if the test is passed
-		// used when DistributionType is List.  Contains id of entities consuming this product.  
-		// No searches (spatial or otherwise) reqt. "power links" and other "links" are good examples of their use.
-		public int[] DistributionList;  
-		public object SearchPrimitive;   // used with DistributionMode is a spatial search of some kind.
-
-			
-		// public int[] Consumers;  // list of Consumers indices from ComponentStore<Consumer> we're sending ProductID to.
-	}
-	
-		// consumption is more charged with the algorithm for computing how much consumption
-		// of the particular product the Entity will use.  This includes everything from 
-		// consuming damage or gravity to consuming electricity, water or fuel.
-		// It will take into account modifiers such as "stealth" to determine consumption if any. 
-		// For instance, a "microwaves" consumption could result in 0 consumption if the distance between
-		// producer and consumer is too great or there is an applicable "stealth" modifier
-
-		//  It will also take into account modifiers from the crew operator at a station for example.
-
-		// TODO: should our Consumption_Delegate return "ConsumptionResult" so that these changes
-		// can be sent to other players over the network?
-
-		// details information about how much this device will consume.  This is returned
-		// when Consumption delegate is invoked in a script for a particular entity.
-		// todo: maybe we should think of this as ConsumptionResults and host all the changes that need to be applied to the target entities
-		//       so we could include an array of PropertySpec and corresponding nodeIDs
-
-		
-	/*
-	public struct PowerConsumer  
-    {
-        public int EntityArrayIndex;    // Guid.NewGuid().ToString() results in a 36 character string.
-		public CONFIGURATION Configuration; 
-                
-        public double PowerRequirement;// per tick or per-use if "Continuous == false:
-        public double MinimumPower;
-		
-		public bool Breaker;  // NOTE: we do not use node.Enabled because that is seperate (for rendering AND updating) from a Component running it's production simulation or not.
-		public bool Continuous; // whether this component always consumes power when operating
-		public bool HasVariablePerformance; // can run at reduced power, but with reduced performance (eg sensor will have lower range)
-        
-		public int Priority;  // determines if there's insufficient power production, which consumers get higher priority to be powered during runtime 
-		
-        // runtime
-        public float BreakerCycleDuration;
-		
-		public long TimeStarted;
-		public float Duration;
-		
-		public bool Looping; // Repeating
-		public float CooldownDuration; 
-		public bool InCoolDown;
-    }
-	*/
-		
-		
-	public struct Consumption // todo: rename this to ConsumptionResult
-	{
-		// Consumption here is really PRODUCT CONSUMPTION RESULT struct that gets filled so that
-		// other players in the networked game can receive the "results" of 
-		// having consumed a product
-		// NOTE: There is no reference to which Enity provided the PRODUCTION... is this ok?  If during a Data Oriented Processor
-		//       pass multiple Producers contributed to the Conumption result, then we would need an array of Producers...
-		//       I think it's best to not worry about this yet.  This is NOT really ConsumptionResult, it's Consumption 
-		//       "Value" and "Amount" settings for how much to receive from a Producer, assuming the producer can supply the entire amount.
-		public int ConsumerEntityArrayIndex; // in KGB this would be the Entity.ID or GUID of the Consuming Entity
-		public int ConsumerInternalIndex; // the index into the Memory<T> of the entity that is consuming a product
-		public uint ProductID;     // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer
-		public object Value;
-		public int Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
-
-		//public string TargetID; // NOTE: this does mean that an entity performing consumption can change properties of other nodes and not just itself. Typically though, its only for entities within a single ship hierarchy from Exterior to Interior components
-		public PropertyOperation[] Operations;
-//       public Settings.PropertySpec[] Properties; // todo: what about HelmState and TacticalState properties? Well, "tacticalstate" and "helmstate" are properties in the ship.css and they are serializable over the wire.
-		// todo: do we need to be able to send this over the wire with NetBuffer Read and Write?
-		// todo: we should probably need to know whether the property values are meant to replace, increment, or decrement the existing value.  "store" is a good example. If we're multithreaded, we might need to lock each node before we apply changes
-		//       I could include an array of int[] operation; that is same length and specifiy 0=replace, 1=increment and 2= decrement, 3 = add array element, 4 = remove array element
-		// todo: maybe instead of seperate objects like HelmState and NavPoints we just use regular custompropertyspec for each member.  This will make it easier for ConsumptionResult handling without keystone.dll needing to know anything about those custom types.
-		// todo: well first, lets just use PropertySpec with intrinsic types.  
-	
-		// public int[] Producers;  // list of Producers indices from ComponentStore<Producer> we're receiving ProductID from.
-	}
-
-
-	public enum ModificationEffect // equivalent to distributionMode for Production
-	{
-		Individual,
-		List,
-		Party,
-		Area,
-		Region,
-		Faction
-	}
-
-	public struct SkillModifier
-	{ 
-		public int ProducerEntityArrayIndex; 
-		public PRODUCTS Product;  // modifiers are a type of PRODUCT for instance PRODUCT.MoraleBoost
-		public SKILLS SkillToTarget;      // the skill that will be affected eg Skill.Morale
-		public bool Enabled;
-		public int Amount;         // can be negative or positive e.g  +1 Morale
-		public int NumUses;
-		public float CooldownBetweenUses;
-	}
-	
-	// TODO: an Operator that has for example a targeting skill, (see struct LivingEntity)
-	//       will "PRODUCE" a bonus for that crew station every update.  It does not require
-	//       an "Update()" function within a script, it only needs the type of PRODUCTION defined
-	//       and registered via the Scripting API.  
-	public struct Skill
-	{
-		public SKILLS SkillType;
-		public int Level;     			// the level of this skill
-		public int BaseValue; 
-		public int EffectiveValue;
-		
-		// These are modifiers that this Skill struct naturally PRODUCES 
-		// (as in PRODUCTION and as in, modifiers that are built in to this specific Skill). 
-		// These are NOT external modifiers that are added to this Skill!
-	//	public SkillModifier[] Modifiers; 
-		public SkillModifier[] Production;
-		
-		
-		//public int Value()
-		//{
-		//	int result = BaseValue;
-			
-			//if (Modifiers != null)
-		//}
-		
-		/*
-		public void AddModifier(int producerIndex, PRODUCTS product, int amount, bool enabled = true, int numUses = -1)
-		{
-			SkillModifier m;
-			m.EntityIndex = producerIndex;
-			m.SkillToTarget = SkillType;
-			m.Enabled = enabled;
-			m.Product = product;
-			m.Amount = amount;
-			m.NumUses = numUses;
-			
-			AddModifier(m);
-		}
-		
-		public void AddModifier(SkillModifier modifier)
-		{
-			int length = 0;
-			
-			if (Modifiers == null)
-				Modifiers = new SkillModifier[1];
-			else
-			{
-				length = Modifiers.Length;
-				SkillModifier[] tmp = Modifiers;
-				Modifiers.CopyTo(tmp, 0);
-				
-				Modifiers = new SkillModifier[length];
-			}
-			
-			Modifiers[length] = modifier;
-		}
-		*/
-		
-		public void AddProduction(int producerEntityArrayIndex, PRODUCTS product, int amount, bool enabled = true, int numUses = -1)
-		{
-			SkillModifier m;
-			m.ProducerEntityArrayIndex = producerEntityArrayIndex;
-			m.SkillToTarget = SkillType;
-			m.Enabled = enabled;
-			m.Product = product;
-			m.Amount = amount;
-			m.NumUses = numUses;
-			m.CooldownBetweenUses = 1; // 1 second
-			AddProduction(m);
-		}
-		
-		public void AddProduction(SkillModifier modifier)
-		{
-			int length = 0;
-			
-			if (Production == null)
-				Production = new SkillModifier[1];
-			else
-			{
-				length = Production.Length;
-				SkillModifier[] tmp = Production;
-				Production.CopyTo(tmp, 0);
-				
-				Production = new SkillModifier[length];
-			}
-			
-			Production[length] = modifier;
-		}
-	}
 	
 		private void ProcessPowerConsumption(ComponentStore<Consumption> store, object[] parameters, int seed, GameTime gt)
 		{
@@ -4769,6 +4428,394 @@ namespace HelloBoids
 					mIsDisposed = true;
 			}
         }
+	}
+	
+		
+	public enum PRODUCTS
+	{
+		None = 0,
+
+		ElectricalPower,
+
+		// Fuels
+
+
+		// Emissions and Signatures
+		OpticalReflection,    // aka: VisibleLightReflection,  camoflauge can reduce this "reflection" 
+		MicrowaveReflection,
+		MicrowaveEmission,
+		
+		// Damage Types
+		MicrowaveDamage = 1024,
+		FireDamage,
+		PlasmaFireDamage,
+		VaccumDamage,
+		RadiationDamage,
+		PressureDamage,   // eg too deep underwater or within a Gas Giant's atmosphere
+
+		CommandBoost = 2048,
+		MoraleBoost,   // like all modifiers, this too can actually be either negative or positive
+		Fatigue,
+		
+		
+		// Skill Modifiers
+		TacticalOperationsSkillModifier = 4096,
+		TargetingSkillModifier,
+
+		Haggling
+	}
+
+
+			 
+	
+	public enum SKILLS
+	{
+		HelmOperations,
+		TacticalOperations,
+		Piloting,
+		Targeting,
+		Engineering,
+		SensorOperations,
+
+		Command,
+		Morale
+	}
+
+	public enum PRODUCT_DISTRIBUTION_TYPE
+	{
+		List = 0,
+		Region
+	}
+	
+	
+	
+	// TODO: Im not sure I need seperate Consumption and PowerConsumer 
+	//                            and    Production  and PowerProducer
+	//       Mostly I think, its so we can have a general struct for ALL 
+	//       sorts of Production... not just electrical power.
+	//       If we need production of Morale, Fatigue, Heat, Gamma Radiation, etc
+	//       then all of these can use the same struct... 
+		
+		
+	/*
+	Electromigration: The gradual movement of metal atoms in a semiconductor caused by electric current, leading to open or short circuits.
+	Thermal Cycling/Fatigue: Damage caused by expansion and contraction due to heat, leading to cracked solder joints.
+	Capacitor Degradation: Electrolytic capacitors "drying out" or leaking, a very common failure mode.
+	Corrosion: Oxidation of connectors and traces caused by moisture and air.
+	Oxidation: The loss of electrons in metal components, causing degradation.
+	Planned Obsolescence: A strategic design choice for a product to become unusable within a set time. 
+
+	How Electronics Wear Out:
+	Mechanical Wear: Parts that physically move, such as fans, hard drives, or button contacts, degrade due to friction.
+	Chemical Degradation: Capacitors can lose their charge capacity or break down, and battery performance fades over time.
+	Thermal Stress: Excessive heat can cause brittle fractures, warping of boards, or damage to components. 
+
+	Common Indicators of Wear:
+	Performance Reduction: Reduced battery life and slower performance.
+	Cosmetic Issues: Corrosion of metal parts, loosening of connectors, or damage to components.
+	Intermittent Failures: Components failing sporadically before complete breakdown. 
+
+	Relevant Concepts:
+	Bathtub Curve: Describes the likelihood of failures over time, which are high at the beginning ("infant mortality") and high at the end ("wearout period").
+	Software Rot: The gradual decline of software usability over time without modification. 
+	*/
+
+		
+	/*
+	public struct PowerProducer
+	{
+        public int EntityArrayIndex;
+		public CONFIGURATION Configuration;
+
+        
+        Definition: 1 kWh == 1 kW of power sustained for 1 hour.
+            Usage Example: A 2,500-watt clothes dryer used for 2 hours consumes 5 kWh (2.5kW x 2  hours).
+        Average Consumption: The average U.S. household consumes approximately 899 kWh per month, or about 30 kWh per day.
+        
+        public double Output;    // kWh    
+		public double Capacity;
+		public double Duration;  
+		public double MaxInput; // for a Battery, this is for recharging
+			
+			
+//		public float Rate;    // amount of units consumed per second?  This is probably meant to be Duration
+
+//        // confused on some of these vars because where does the machine/entity pass in
+//        // vars used for the computation, and which exist here?  I think one good argument
+//        // to keep them here is that a machine that produces/consumes multiple things
+//        // may have seperate throttle values and efficiency values and even different enable/disable
+//        // states
+//        // But why not have some of these custom properties in the Entity then?
+			// todo:efficiency should have a max value and a current value that can never exceed the max value.  Efficiency ranges from 0.0 - 1.0 
+        public float Efficiency; // at same throttle, increased efficiency will produce more
+//                                 // as the machine wears out between mainteneance efficiency
+//                                 // will drop.  It is also possible to increase efficiency
+
+        public float Throttle;  // value typically 0.0 - 1.0 but can exceed 1.0 with potential risk
+//                                // of damaging the machine (is Damage a customProperty in Entity?)
+			
+		// TODO: the 'Component struct' should probably have a WearAndTear value that limits the Max Hitpoints that can be recovered perhaps
+		//       unless the Component is repaired/refurbished/torndown+cleaned+reassembled/etc.
+		
+	}
+	*/
+	
+		
+		
+	public struct Production
+    {
+		public uint ProductID;
+		
+		// todo: should i have a frequency or Hz?  Gravitation would be at Physics frequency, but other's should be 1 hz or every 1000 ms
+		// production is not serialized to XML because they are created by the scripts in code
+		public int ProducerEntityArrayIndex;
+		public int ProducerEntityInternalIndex;  
+		 			// In turn, the Producing Entity needs an index to this Production's index... and in fact, a list of all the Production indices it has registered.
+		
+		
+		// public int[] Consumers;  // list of Consumers indices from ComponentStore<Consumer> we're sending ProductID to.
+		
+		//public bool Enabled;
+		public Vector3d Position; // Position where this production occurred (eg. explosion, heat signature, etc)?  A radiation bomb or any explosion will need it's Position(Location) set so we can determine the falloff/attenuation of the damage, 
+
+		
+		public object Value;  // for Thrust, this would be a 'Vector3d'.  For damage, an 'int', for electrical power a 'double',  for radar echos, UnitValue is a Vector3d position, for SkillModifiers, it can contain a SkillModifier struct.
+		public int Amount; // infinite = -1, else number of unit's that are available to be consumed by Consumers this Production will be distributed too
+		
+		
+		public int NumUses; // a radiation producing bomb may only produce damage for 3 turns before it dissipates.
+		public float CooldownBetweenUses;
+
+		
+		public PRODUCT_DISTRIBUTION_TYPE DistributionMode; 
+		// public Func<Production, string, bool> DistributionFilterFunc; // accepts Production and an EntityID and returns true if the test is passed
+		// used when DistributionType is List.  Contains id of entities consuming this product.  
+		// No searches (spatial or otherwise) reqt. "power links" and other "links" are good examples of their use.
+		public int[] DistributionList;  // <-- rename to Consumers?
+		public object SearchPrimitive;   // used with DistributionMode is a spatial search of some kind.
+			
+		
+	}
+		
+	
+	// consumption is more charged with the algorithm for computing how much consumption
+	// of the particular product the Entity will use.  This includes everything from 
+	// consuming damage or gravity to consuming electricity, water or fuel.
+	// It will take into account modifiers such as "stealth" to determine consumption if any. 
+	// For instance, a "microwaves" consumption could result in 0 consumption if the distance between
+	// producer and consumer is too great or there is an applicable "stealth" modifier
+
+	//  It will also take into account modifiers from the crew operator at a station for example.
+
+	// TODO: should our Consumption_Delegate return "ConsumptionResult" so that these changes
+	// can be sent to other players over the network?
+
+	// details information about how much this device will consume.  This is returned
+	// when Consumption delegate is invoked in a script for a particular entity.
+	// todo: maybe we should think of this as ConsumptionResults and host all the changes that need to be applied to the target entities
+	//       so we could include an array of PropertySpec and corresponding nodeIDs
+
+		
+		
+	/*
+	public struct PowerConsumer  
+    {
+		// todo: just as Consumer struct has an index to this List<Boids> entry
+		//       this PowerConsumer should have an index to the Memory<Consumption> it registered 
+		//       Also, I think a Consumption should always have all the vars it needs to update
+		//       both the PowerConsumer's vars and the Producers based on it's PowerDraw amount.
+		//       
+		
+        public int EntityArrayIndex;    // Guid.NewGuid().ToString() results in a 36 character string.
+		public CONFIGURATION Configuration; 
+        
+		public bool Breaker;  // NOTE: we do not use node.Enabled because that is seperate (for rendering AND updating) from a Component running it's production simulation or not.
+        public double PowerRequirement;// per tick or per-use if "Continuous == false:
+        public double MinimumPower;
+		
+		public bool Continuous; // whether this component always consumes power when operating, or only when it is "Used" such as a Laser firing for a fixed duration
+		public float PerformanceSetting;  // 0.0 - 1.0.  We can get rid of HasVariablePerformance if PerformanceSetting >= 0 and <= 1.0
+		public bool HasVariablePerformance {get {return (PerformanceSettings >= 0.0f && PerformanceSetting <= 1.0f; }}; // can run at reduced power, but with reduced performance (eg sensor will have lower range)
+        
+		public int Priority;  // determines if there's insufficient power production, which consumers get higher priority to be powered during runtime 
+		
+		
+        // runtime
+        public float BreakerCycleDuration;
+		
+		public long TimeStarted;
+		public float Duration;
+		
+		public bool Looping; // Repeating
+		public float CooldownDuration; 
+		public bool InCoolDown;
+    }
+	*/
+		
+		
+	public struct Consumption // todo: rename this to ConsumptionResult
+	{
+		public uint ProductID;     // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer
+		
+		// Consumption here is really PRODUCT CONSUMPTION RESULT struct that gets filled so that
+		// other players in the networked game can receive the "results" of 
+		// having consumed a product
+		// NOTE: There is no reference to which Enity provided the PRODUCTION... is this ok?  If during a Data Oriented Processor
+		//       pass multiple Producers contributed to the Conumption result, then we would need an array of Producers...
+		//       I think it's best to not worry about this yet.  This is NOT really ConsumptionResult, it's Consumption 
+		//       "Value" and "Amount" settings for how much to receive from a Producer, assuming the producer can supply the entire amount.
+		public int ConsumerEntityArrayIndex; // in KGB this would be the Entity.ID or GUID of the Consuming Entity
+		public int ConsumerInternalIndex; // the index into the Memory<T> of the entity that is consuming a product.
+		                                  // In turn, the Consuming Entity needs an index to this Consumption's index... and in fact, a list of all the Consumption indices it has registered.
+		
+		// public int[] Producers;  // list of Producers indices from ComponentStore<Producer> we're receiving ProductID from.
+			
+		
+		public object Value;  // for Thrust, this would be a 'Vector3d'.  For damage, an 'int', for electrical power a 'double', 
+		public int Amount; // the number of Units to draw from the relevant Producer.  The Simulation EXE will know how to deal with UnitValue based on ProductID.  This could also be "damage." 
+		
+		//public string TargetID; // NOTE: this does mean that an entity performing consumption can change properties of other nodes and not just itself. Typically though, its only for entities within a single ship hierarchy from Exterior to Interior components
+		public PropertyOperation[] Operations; // <-- operation is how to apply the Value and Amount... eg... do we add, subtract, multiply, divide... etc
+		
+		
+		
+		// PROPERTIES is probably obsolete because the DataProcessors we assign will know exactly what properties to edit.  
+		//   These DataProcessors can be assigned to methods in Scripts or methods in Game01.dll 
+		
+		
+//       public Settings.PropertySpec[] Properties; // todo: what about HelmState and TacticalState properties? Well, "tacticalstate" and "helmstate" are properties in the ship.css and they are serializable over the wire.
+		// todo: do we need to be able to send this over the wire with NetBuffer Read and Write?
+		// todo: we should probably need to know whether the property values are meant to replace, increment, or decrement the existing value.  "store" is a good example. If we're multithreaded, we might need to lock each node before we apply changes
+		//       I could include an array of int[] operation; that is same length and specifiy 0=replace, 1=increment and 2= decrement, 3 = add array element, 4 = remove array element
+		// todo: maybe instead of seperate objects like HelmState and NavPoints we just use regular custompropertyspec for each member.  This will make it easier for ConsumptionResult handling without keystone.dll needing to know anything about those custom types.
+		// todo: well first, lets just use PropertySpec with intrinsic types.  
+		
+	}
+
+	
+		
+	// a producer that if providing continuous electrical power, IF it registers a Production item
+	// it must replenish that item at the beginning of every tick correct?
+		
+	// an item that is "used" and creates a Production like an LightEmission from a laser
+	// then, that Production is not continuous and only needs to be enabled/disabled... does 
+	// it need a refeence to the Laser?  Or does the "production" have all the data it needs
+	// maybe it has a reference to the PowerProducer?
+	// What about a LightEmission?  That clearly has no dependancy to the Laser except maybe
+	// the distance between the laser and the target it hits.
+	//
+	
+		
+		public enum ModificationEffect // equivalent to distributionMode for Production
+		{
+			Individual,
+			List,
+			Party,
+			Area,
+			Region,
+			Faction
+		}
+
+	
+	public struct SkillModifier
+	{ 
+		public int ProducerEntityArrayIndex; 
+		public PRODUCTS Product;  // modifiers are a type of PRODUCT for instance PRODUCT.MoraleBoost
+		public SKILLS SkillToTarget;      // the skill that will be affected eg Skill.Morale
+		public bool Enabled;
+		public int Amount;         // can be negative or positive e.g  +1 Morale
+		public int NumUses;
+		public float CooldownBetweenUses;
+	}
+	
+	// TODO: an Operator that has for example a targeting skill, (see struct LivingEntity)
+	//       will "PRODUCE" a bonus for that crew station every update.  It does not require
+	//       an "Update()" function within a script, it only needs the type of PRODUCTION defined
+	//       and registered via the Scripting API.  
+	public struct Skill
+	{
+		public SKILLS SkillType;
+		public int Level;     			// the level of this skill
+		public int BaseValue; 
+		public int EffectiveValue;
+		
+		// These are modifiers that this Skill struct naturally PRODUCES 
+		// (as in PRODUCTION and as in, modifiers that are built in to this specific Skill). 
+		// These are NOT external modifiers that are added to this Skill!
+	//	public SkillModifier[] Modifiers; 
+		public SkillModifier[] Production;
+		
+		
+		//public int Value()
+		//{
+		//	int result = BaseValue;
+			
+			//if (Modifiers != null)
+		//}
+		
+		/*
+		public void AddModifier(int producerIndex, PRODUCTS product, int amount, bool enabled = true, int numUses = -1)
+		{
+			SkillModifier m;
+			m.EntityIndex = producerIndex;
+			m.SkillToTarget = SkillType;
+			m.Enabled = enabled;
+			m.Product = product;
+			m.Amount = amount;
+			m.NumUses = numUses;
+			
+			AddModifier(m);
+		}
+		
+		public void AddModifier(SkillModifier modifier)
+		{
+			int length = 0;
+			
+			if (Modifiers == null)
+				Modifiers = new SkillModifier[1];
+			else
+			{
+				length = Modifiers.Length;
+				SkillModifier[] tmp = Modifiers;
+				Modifiers.CopyTo(tmp, 0);
+				
+				Modifiers = new SkillModifier[length];
+			}
+			
+			Modifiers[length] = modifier;
+		}
+		*/
+		
+		public void AddProduction(int producerEntityArrayIndex, PRODUCTS product, int amount, bool enabled = true, int numUses = -1)
+		{
+			SkillModifier m;
+			m.ProducerEntityArrayIndex = producerEntityArrayIndex;
+			m.SkillToTarget = SkillType;
+			m.Enabled = enabled;
+			m.Product = product;
+			m.Amount = amount;
+			m.NumUses = numUses;
+			m.CooldownBetweenUses = 1; // 1 second
+			AddProduction(m);
+		}
+		
+		public void AddProduction(SkillModifier modifier)
+		{
+			int length = 0;
+			
+			if (Production == null)
+				Production = new SkillModifier[1];
+			else
+			{
+				length = Production.Length;
+				SkillModifier[] tmp = Production;
+				Production.CopyTo(tmp, 0);
+				
+				Production = new SkillModifier[length];
+			}
+			
+			Production[length] = modifier;
+		}
 	}
 	
     ////////////////////////////////////////////////////////////////////////////////////////////////

@@ -3847,7 +3847,7 @@ namespace HelloBoids
 	
 		private void ProcessPowerConsumption(ComponentStore<Consumption> store, object[] parameters, int seed, GameTime gt)
 		{
-			Span<Consumption> consumption = store.Span;
+			
 			uint consumptionCount = store.Count;
 			uint productID = (uint)parameters[0];
 			
@@ -3857,9 +3857,13 @@ namespace HelloBoids
 			
 			//Console.WriteLine("ProcessPowerConsumption() - Producing ProductID == '" + ((PRODUCTS)productID).ToString() + "  Production Count == " + productionCount + " Consumption Count == " + consumptionCount);
 			
+			// TODO: Parallel 4 this...
 			// LOOP THROUGH ALL COMPONENTS THAT ARE PRODUCING PRODUCTS.ElectricalPower
-			for (int i = 0; i < productionCount; i++)
+			System.Threading.Tasks.Parallel.For(0, productionCount, i =>
+			//for (int i = 0; i < productionCount; i++)
 			{
+				Span<Consumption> allConsumptions = store.Span;
+				
 				// NOTE: by using production.Span[i], we never have to COPY the struct 
 				
 				//Console.WriteLine("ProcessPowerConsumption() - Entity '" + Boids[currentProduction.ProducerEntityArrayIndex].EntityKey + "' Producing '" + ((PRODUCTS)productID).ToString() );
@@ -3868,15 +3872,15 @@ namespace HelloBoids
 				//List<Consumption> consumers = mConsumption[productID];
 				//if (consumers == null) continue;
 
-				int[] distributionList = production.Span[i].Consumers;
-				if (production.Span[i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.List)
+				int[] distributionList = production.Span[(int)i].Consumers;
+				if (production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.List)
 				{
-					throw new NotImplementedException("ProcessPowerConsumption() - DistributionMode '" + production.Span[i].DistributionMode.ToString() + "' NOT YET SUPPORTED.");
+					throw new NotImplementedException("ProcessPowerConsumption() - DistributionMode '" + production.Span[(int)i].DistributionMode.ToString() + "' NOT YET SUPPORTED.");
 				}
 				
-				if (distributionList ==  null || distributionList.Length == 0) continue; // use 'return' keyword if using parallel.For
+				if (distributionList ==  null || distributionList.Length == 0) return; // use 'return' keyword if using parallel.For
 
-				EntityNode producerEntity =  Boids[production.Span[i].ProducerEntityArrayIndex];
+				EntityNode producerEntity =  Boids[production.Span[(int)i].ProducerEntityArrayIndex];
 				int indexProducer;
 				Memory<PowerProducer> producerEntityStruct = (Memory<PowerProducer>)producerEntity.GetUserStruct(typeof(PowerProducer), out indexProducer);
 				
@@ -3892,7 +3896,7 @@ namespace HelloBoids
 				
 				
 				// fill the Production with all of the 'Output' generated and stored for this tick()
-				production.Span[i].Store = producerEntityStruct.Span[0].Store;
+				production.Span[(int)i].Store = producerEntityStruct.Span[0].Store;
 					
 				try
 				{
@@ -3921,16 +3925,16 @@ namespace HelloBoids
 						//       based on the ProductID.
 						//       
 						
-						if (consumption[distributionList[j]].Equals(default(Consumption)))
+						if (allConsumptions[distributionList[j]].Equals(default(Consumption)))
 						{
 							Console.WriteLine("ProcessPowerConsumption() - Consumption '" + distributionList[j] + "'  is not registered.");
-							continue;
+							return;
 						}
 
 						try
 						{							
-							EntityNode consumerEntity = Boids[consumption[distributionList[j]].ConsumerEntityArrayIndex];
-							if (producerEntity == null || consumerEntity == null) continue;
+							EntityNode consumerEntity = Boids[allConsumptions[distributionList[j]].ConsumerEntityArrayIndex];
+							if (producerEntity == null || consumerEntity == null) return;
 							
 							int indexConsumer;
 							Memory<PowerConsumer> consumerEntityStruct = (Memory<PowerConsumer>)consumerEntity.GetUserStruct(typeof(PowerConsumer), out indexConsumer);
@@ -3939,9 +3943,9 @@ namespace HelloBoids
 							//      requirements based on any damage and thus changes to efficiency and such since last Tick()
 													
 
-							if (production.Span[i].Store >= consumption[distributionList[j]].Amount)
+							if (production.Span[(int)i].Store >= allConsumptions[distributionList[j]].Amount)
 							{	
-								production.Span[i].Store -= consumption[distributionList[j]].Amount;
+								production.Span[(int)i].Store -= allConsumptions[distributionList[j]].Amount;
 								
 								// todo:  flag the consumerEntityStruct's runtime flag "CanAct"
 								
@@ -3979,13 +3983,13 @@ namespace HelloBoids
 						}
 						catch (Exception ex)
 						{
-							Console.WriteLine("ProcessPowerConsumption() - ERROR: Production Entity = " + Boids[production.Span[i].ProducerEntityArrayIndex].EntityKey + " Consumer Entity = " + Boids[consumption[distributionList[j]].ConsumerEntityArrayIndex].EntityKey + " " + ex.Message);
+							Console.WriteLine("ProcessPowerConsumption() - ERROR: Production Entity = " + Boids[production.Span[(int)i].ProducerEntityArrayIndex].EntityKey + " Consumer Entity = " + Boids[allConsumptions[distributionList[j]].ConsumerEntityArrayIndex].EntityKey + " " + ex.Message);
 						}
 					} // end for of consumer distribution list
 					
 					
 					// assign the Store value of the Entity's "Store" to that of this Production
-					producerEntityStruct.Span[0].Store = production.Span[i].Store;
+					producerEntityStruct.Span[0].Store = production.Span[(int)i].Store;
 					
 				}
 				catch (Exception ex)

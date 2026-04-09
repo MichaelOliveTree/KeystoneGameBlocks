@@ -1472,13 +1472,21 @@ namespace HelloBoids
 			//storeComp.Span[compInternalIndex].Volume = 0.2d;
 			
 			// powerProducer struct
+			double BATTERY_POWER_STARTING_AMOUNT = 1000d;
 			ComponentStore<PowerProducer> storePowerProducers = EntryClass.mCStoreCol.CheckOut<PowerProducer>(EntryClass.NUM_ENTRIES); 
 			int powerProducerInternalIndex = -1;
 			Memory<PowerProducer> memPowerProducer = storePowerProducers.CheckOut(out powerProducerInternalIndex);
 			battery.AddUserStruct(typeof(PowerProducer), memPowerProducer, powerProducerInternalIndex);
 			storePowerProducers.Span[powerProducerInternalIndex].Configuration = BatteryConfiguration;
 			storePowerProducers.Span[powerProducerInternalIndex].EntityArrayIndex = arrayIndex;
-					
+			// todo: the .Store amount must be computed from it's Capacity and Output or Output and Duration
+			//       but for now just hardcode the value with a constant
+			storePowerProducers.Span[powerProducerInternalIndex].Capacity = BATTERY_POWER_STARTING_AMOUNT;
+			storePowerProducers.Span[powerProducerInternalIndex].Store = BATTERY_POWER_STARTING_AMOUNT;
+				
+			Builder build = new Builder();
+			build.Calculate();
+			
 			// each Battery can Produce a PRODUCTS.ElectricalPower
 			Production p;
 			p.ProducerEntityArrayIndex = battery.EntityArrayIndex;
@@ -1487,27 +1495,21 @@ namespace HelloBoids
 			p.Enabled = true;
 			
 			p.Value = 1;  // the UNIT value... in this case it's a DOUBLE
-			p.Store = 1000; // a Battery can produce as much as is needed to supply all of it's Consumers until it runs out of Energy  
+			p.Store = 0; // a Battery can produce as much as it can discharge supply all of it's Consumers until it runs out of Energy  
 			
-			p.StartTime = Utils.NowTicks();
+			p.StartTime =  -1; // Utils.NowTicks();
 			p.Duration = -1;
-			p.NumUses = 100; // This Battery can be used 100 times (100 updates or frames) before it runs out.  update every TICK if -1 NumUses
-			p.CooldownBetweenUses = 0;
+			p.NumUses = -1; // This Battery can be used until it's Capacity = 0
+			p.CooldownBetweenUses = -1;
 			
 			// TODO: the distribution list for PRODUCT.OpticalReflection is ignored for now.  We just use
 			//       adjacents I think to determine who we will distribute too
 			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
-			p.Consumers = null; //new int[] {checkOutIndex};
+			p.Consumers = null; //new int[] {checkOutIndex}; <-- see a few lines down where we add wingsConsumptionListIndex, eyesConsumptionListIndex, laserConsumptionListIndex, tacticalConsumptionListIndex, 
 			p.SearchPrimitive  = null;
 			p.Position = Vector3d.Zero();
 			p.Size = new Vector3d(1,1,1);
-			
-			p.SearchPrimitive  = null;
-			
-			
-			
-			
-
+		
 
 			// Wings, Eyes, Lasers, TacticalStation all CONSUME ElectricalPower
 			// TODO: these indices should probably be indices into PowerConsumer struct, NOT EntityArrayIndex into List<Boids>
@@ -3845,40 +3847,69 @@ namespace HelloBoids
 		}
 		*/
 	
-		private void ProcessPowerConsumption(ComponentStore<Consumption> store, object[] parameters, int seed, GameTime gt)
+		private void ProcessPowerConsumption(ComponentStore<Consumption> consumptionStore, object[] parameters, int seed, GameTime gt)
 		{
-			
-			uint consumptionCount = store.Count;
+			uint consumptionCount = consumptionStore.Count;
 			uint productID = (uint)parameters[0];
 			
 			ComponentStore<Production> production = (ComponentStore<Production>)parameters[1];	
-			
 			uint productionCount = production.Count;
 			
 			//Console.WriteLine("ProcessPowerConsumption() - Producing ProductID == '" + ((PRODUCTS)productID).ToString() + "  Production Count == " + productionCount + " Consumption Count == " + consumptionCount);
 			
-			// TODO: Parallel 4 this...
 			// LOOP THROUGH ALL COMPONENTS THAT ARE PRODUCING PRODUCTS.ElectricalPower
 			System.Threading.Tasks.Parallel.For(0, productionCount, i =>
 			//for (int i = 0; i < productionCount; i++)
 			{
-				Span<Consumption> allConsumptions = store.Span;
+				Span<Consumption> allConsumptions = consumptionStore.Span;
 				
 				// NOTE: by using production.Span[i], we never have to COPY the struct 
 				
 				//Console.WriteLine("ProcessPowerConsumption() - Entity '" + Boids[currentProduction.ProducerEntityArrayIndex].EntityKey + "' Producing '" + ((PRODUCTS)productID).ToString() );
 			
 				
-				//List<Consumption> consumers = mConsumption[productID];
-				//if (consumers == null) continue;
-
 				int[] distributionList = production.Span[(int)i].Consumers;
-				if (production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.List)
+				if (production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.List && production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.SingleItem)
 				{
 					throw new NotImplementedException("ProcessPowerConsumption() - DistributionMode '" + production.Span[(int)i].DistributionMode.ToString() + "' NOT YET SUPPORTED.");
+					if (production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.Region)
+					{
+						// find PowerConsumers that are inside of this entire Region (eg onboard the Starship)
+						
+					}
+					else if (production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.Zone)
+					{
+						// find PowerConsumers that are inside of this entire Zone (eg inside the current star system)
+						
+					}
+					else if (production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.BoundingBox)
+					{
+						// find PowerConsumers within this bound volume
+						BoundingBox box = (BoundingBox)production.Span[(int)i].SearchPrimitive;
+						
+					}
+					else if (production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.BoundingSphere)
+					{
+						BoundingSphere sphere = (BoundingSphere)production.Span[(int)i].SearchPrimitive;
+					}
+					else if (production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.BoundingCone)
+					{
+						//BoundingCone cone = (BoundingCone)production.Span[(int)i].SearchPrimitive;
+					}
+					else if (production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.PlanedHull)
+					{
+						//PlanedHull hull = (PlanedHull)production.Span[(int)i].SearchPrimitive;
+					}					
 				}
 				
 				if (distributionList ==  null || distributionList.Length == 0) return; // use 'return' keyword if using parallel.For
+
+				// NOTE: we are always guarnateed that any distributionList items already exist as registered
+				//       Consumption for this ProductID... so we don't have to verify consumers list contains 
+				//       all items within the distributionList
+				//List<Consumption> consumers = mConsumption[productID];
+				//if (consumers == null) continue;
+				// if (!consumers.Contains(distributionList)) return;
 
 				EntityNode producerEntity =  Boids[production.Span[(int)i].ProducerEntityArrayIndex];
 				int indexProducer;
@@ -3895,8 +3926,9 @@ namespace HelloBoids
 				//producerEntityStruct.Span[0].Store = newValue;
 				
 				
-				// fill the Production with all of the 'Output' generated and stored for this tick()
+				// fill the Production with all of the 'Output' generated and stored for this tick() and remove it from the producing Entity
 				production.Span[(int)i].Store = producerEntityStruct.Span[0].Store;
+				producerEntityStruct.Span[0].Store = 0;
 					
 				try
 				{
@@ -3941,25 +3973,48 @@ namespace HelloBoids
 							
 							//todo: update the consumption[distributionList[j]] and consumerEntityStruct
 							//      requirements based on any damage and thus changes to efficiency and such since last Tick()
-													
-
-							if (production.Span[(int)i].Store >= allConsumptions[distributionList[j]].Amount)
+							// todo: that should be done in DamageSystem right?						
+							double diff = production.Span[(int)i].Store - allConsumptions[distributionList[j]].Amount;
+							if (diff >= 0)
 							{	
 								production.Span[(int)i].Store -= allConsumptions[distributionList[j]].Amount;
 								
 								// todo:  flag the consumerEntityStruct's runtime flag "CanAct"
 								
+								// todo:
+								// NOTE: if we need to Spawn something like say a RadiationCloud because
+								// this reactor has been damaged enough to warrant it (though this would likely
+								// occur within DamageProcessor and not here...) then we do things like we normally
+								// do within KGB... we create a NetMessage and send it and then it gets queued 
+								// and eventually the result gets returned and handled by main thread.  
+								// TODO: we should also allow for spawning of many prefabs within a single NetMessage
+								// Unity does something similar using the "Entity Command Buffer (ECB)" but here KGB
+								// just uses one approach for ALL spawn scenarios including inside these 
+								// DataOrientedProcessors... the Network Message "KeyCommon.Messages.Node_Create_Request.cs" 
+								// (which can be accessible via function that handles the creation of the message packet for us)
+								// because we always use loopback anyway and modify the Scene on main thread each time.
+								// No special code required for us with KGB! \o/  Elegant.
+								// TODO: we may add code to pool (OBJECT POOL) some Entity prefabs more easily at the start of a scene.
+								
+								// NOTE: In the case of a RadiationCloud, we should consider that the owner of this cloud
+								//       will be the Reactor, and the RadiationCloud will own it's "Production" of
+								//       PRODUCTS.Radiation and will be responsible for Registering that Production.
+								//       So maybe this helps us with the idea that Entities tend to 'own' only one
+								//       type of PRODUCT?  Maybe not... i mean... even a rocket plume produces
+								//       PRODUCTS.Thrust and PRODUCTS.HeatSignature, PRODUCTS.HeatVolume, PRODUCTS.LightSignature
+								//       (note: its always better to seperate out a product like "Heat" into the actual distinct
+								//       functional roles they play... HeatSignature and HeatVolume 
 								
 							}
-							else
+							else if (production.Span[(int)i].Store - consumerEntityStruct.Span[0].MinimumPower >=0) // allConsumptions[distributionList[j]].Amount)
 							{
 								// there is not enough for full amount, can we meet the minimum power reqt?
-								//currentConsumption.
+								production.Span[(int)i].Store -= consumerEntityStruct.Span[0].MinimumPower;
 								
 								// todo: if there is no more power in the production.Span[i].Store, just break from the loop of consumers of this particular producing Entity
-								if (production.Span[i].Store == 0) break;
+								if (production.Span[(int)i].Store == 0) break;
 								
-								
+								// 
 							}
 							consumerEntityStruct.Span[0].PowerRequirement = 10; // per tick or per-use if "Continuous == false:
 							consumerEntityStruct.Span[0].MinimumPower = 8;
@@ -3990,14 +4045,14 @@ namespace HelloBoids
 					
 					// assign the Store value of the Entity's "Store" to that of this Production
 					producerEntityStruct.Span[0].Store = production.Span[(int)i].Store;
-					
+					Console.WriteLine("ProcessPowerConsumption() - Production Entity '" + Boids[production.Span[(int)i].ProducerEntityArrayIndex].EntityKey + "' Store Amount = " + producerEntityStruct.Span[0].Store.ToString());
 				}
 				catch (Exception ex)
 				{
 					Console.WriteLine("ProcessPowerConsumption() - " + ex.Message);
 				}
 
-			} // end for of current ComponentStore<Production>
+			}); // end for of current ComponentStore<Production> // NOTE: ');' parens + semicolon required at end if using parallel.for
 		}
 		
 		private void UpdateProduction(GameTime gt)
@@ -8560,7 +8615,22 @@ return (0,0);
 			double duration = (double)buildSpecificPropertyValues["Duration"];
 			double maxInput = (double)buildSpecificPropertyValues["MaxInput"];
 
+			// todo: we also need to take into account 'Component struct' craftsmanship, materials quality, Hitpoints - CurrentHP, Wear&Tear (Age\Power Cycles\Takeoff+Land Cycles\etc), 
+			//       NOTE: Some stats would need to be FIXED once a design is FINISHED because repairs should never allow for improved Armor or change in Weight, Volume, Surface Area
+			//             
+			//double efficiency;
+			//double throttle;
 			
+			// assign the build props and values to a set of PropertySpec and to it's Entity
+			buildSpecificProperties = new PropertySpec[] 
+			{
+				new PropertySpec("Capacity", typeof(double).Name, "build", capacity),
+				new PropertySpec("Output", typeof(double).Name, "build", output),
+				new PropertySpec("Duration", typeof(double).Name, "build", duration),
+				new PropertySpec("MaxInput", typeof(double).Name, "build", maxInput) 
+			};
+
+
 			// GET COMPONENT SPECIFIC PROPERTIES FROM OUR INSTANCED CLIENT ENTITY SCRIPT... for now its just hardcoded
 			// --------------------------------------------------------------------------------------------
 			double cost = 0d;
@@ -8583,16 +8653,17 @@ return (0,0);
 			// assign the computed values to a set of PropertySpec and to it's Entity
 			PropertySpec[] entityStats = new PropertySpec[] 
 			{
-				new PropertySpec("Cost", typeof(double).Name, "build", cost),
-				new PropertySpec("Weight", typeof(double).Name, "build", weight),
-				new PropertySpec("Volume", typeof(double).Name, "build", volume),
-				new PropertySpec("SurfaceArea", typeof(double).Name, "build", surfaceArea) // recharging takes significantly longer than discharging at lower technology levels
+				new PropertySpec("Cost", typeof(double).Name, "component", cost),
+				new PropertySpec("Weight", typeof(double).Name, "component", weight),
+				new PropertySpec("Volume", typeof(double).Name, "component", volume),
+				new PropertySpec("SurfaceArea", typeof(double).Name, "component", surfaceArea) // recharging takes significantly longer than discharging at lower technology levels
 			};
 			
 			// NOTE: this should result in the Memory<T> records being updated for the 'Battery' component
 			//       and specifically it's 'struct PowerProducer' 
 // TEMP COMMENT OUT->			Component.SetCustomProperties(entityStats);
 		}
+		
 		
 		
         public override string ToString()

@@ -1132,18 +1132,26 @@ namespace HelloBoids
 			p.ProducerEntityInternalIndex = opticalSensor.GetUserStructIndex(typeof(Transform.Transform_Struct));
 			//p.Consumers = null; <-- same as DistributionList?  what if we only are using a different DistributionMode that requires a search?
 			p.ProductID = 	(uint)PRODUCTS.OpticalReflection;
-			p.Position = Vector3d.Zero();
-			//p.Enabled = true;
+			p.Enabled = true;
+			
 			p.Value = 1;
-			p.Amount = -1; // this should be diminished by the range of the sensor 
+			p.Store = -1; // this should be diminished by the range of the sensor 
+			
+			p.StartTime = Utils.NowTicks();
+			p.Duration = -1;
 			p.NumUses = -1;
 			p.CooldownBetweenUses = 0;
+			
 			// TODO: the distribution list for PRODUCT.OpticalReflection is ignored for now.  We just use
 			//       adjacents I think to determine who we will distribute too
 			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
-			p.DistributionList = null; //new int[] {checkOutIndex};
+			p.Consumers = null; //new int[] {checkOutIndex};
 			p.SearchPrimitive  = null;
-	
+			p.Position = Vector3d.Zero();
+			p.Size = new Vector3d(1,1,1);
+			//p.BehaviorVelocity = Vector3d.Zero();
+			
+			
 			// TODO: the distribution list for PRODUCT.OpticalReflection is ignored for now.  We just use
 			//       adjacents I think to determine who we will distribute too
 			// each Droid can Consume a 'PRODUCT.OpticalReflection' 
@@ -1406,8 +1414,8 @@ namespace HelloBoids
 			c.ConsumerEntityArrayIndex = station.EntityArrayIndex;
 			c.ConsumerInternalIndex = transformIndex;
 			c.ProductID = (uint)PRODUCTS.ElectricalPower;
-			c.Value =  10;  // 10 kW/h
-			c.Amount = 1;
+			c.Value =  1;   
+			c.Amount = 10; // 10 kW/h
 			c.Operations = null;
 			
 			RegisterConsumption(station, c);
@@ -1476,14 +1484,31 @@ namespace HelloBoids
 			p.ProducerEntityArrayIndex = battery.EntityArrayIndex;
 			p.ProducerEntityInternalIndex = powerProducerInternalIndex;
 			p.ProductID = 	(uint)PRODUCTS.ElectricalPower;
-			p.Position = Vector3d.Zero();
-			//p.Enabled = true;
-			p.Value = 1000d;  // the UNIT value... in this case it's a DOUBLE
-			p.Amount = -1; // a Battery can produce as much as is needed to supply all of it's Consumers until it runs out of Energy  
+			p.Enabled = true;
+			
+			p.Value = 1;  // the UNIT value... in this case it's a DOUBLE
+			p.Store = 1000; // a Battery can produce as much as is needed to supply all of it's Consumers until it runs out of Energy  
+			
+			p.StartTime = Utils.NowTicks();
+			p.Duration = -1;
 			p.NumUses = 100; // This Battery can be used 100 times (100 updates or frames) before it runs out.  update every TICK if -1 NumUses
 			p.CooldownBetweenUses = 0;
+			
+			// TODO: the distribution list for PRODUCT.OpticalReflection is ignored for now.  We just use
+			//       adjacents I think to determine who we will distribute too
 			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
-				
+			p.Consumers = null; //new int[] {checkOutIndex};
+			p.SearchPrimitive  = null;
+			p.Position = Vector3d.Zero();
+			p.Size = new Vector3d(1,1,1);
+			
+			p.SearchPrimitive  = null;
+			
+			
+			
+			
+
+
 			// Wings, Eyes, Lasers, TacticalStation all CONSUME ElectricalPower
 			// TODO: these indices should probably be indices into PowerConsumer struct, NOT EntityArrayIndex into List<Boids>
 			int boidArrayIndex = arrayIndex - BATTERY_OFFSET;
@@ -1504,8 +1529,8 @@ namespace HelloBoids
 			//       updated in mProduction.
 			//       There's another problem as well... the ConsumptionListIndex is not easily available during Ship EngineeringStation's manual changing of 
 			//       a distributionList.  The DISPLAY would simply need to do a conversion of the List<Consumption> index to the EntityArrayIndex and vice-versa
-			p.DistributionList = new int[] {wingsConsumptionListIndex, eyesConsumptionListIndex, laserConsumptionListIndex, tacticalConsumptionListIndex};
-			p.SearchPrimitive  = null;
+			p.Consumers = new int[] {wingsConsumptionListIndex, eyesConsumptionListIndex, laserConsumptionListIndex, tacticalConsumptionListIndex};
+			
 				
 			RegisterProduction(battery, p);
 			
@@ -1557,20 +1582,27 @@ namespace HelloBoids
 			p.ProducerEntityArrayIndex = humanOperator.EntityArrayIndex;
 			p.ProducerEntityInternalIndex = livingEntityID;
 			p.ProductID = 	(uint)targetingSkill.Production[0].Product;  // TargetingSkillModifier
-			p.Position = Vector3d.Zero();
-			//p.Enabled = true;
-			p.Value = targetingSkill.Production[0];
-			p.Amount = targetingSkill.Production[0].Amount; // this will use the 
-			p.NumUses = -1;
-			p.CooldownBetweenUses = 0;
-			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
+			p.Enabled = true;
 			
+			p.Value = targetingSkill.Production[0];  // ??
+			p.Store = targetingSkill.Production[0].Amount; // ??
+			
+			p.StartTime = Utils.NowTicks();
+			p.Duration = -1;
+			p.NumUses = -1; // The targetingSkillModifier is used as long as the Operator remains (note: if operator levels up, this modifier should change too yes?)
+			p.CooldownBetweenUses = 0;
+			
+			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
+
+			p.SearchPrimitive  = null;
+			p.Position = Vector3d.Zero();
+			p.Size = new Vector3d(1,1,1);
+						
 			int stationArrayIndex = arrayIndex - HUMAN_OPERATOR_OFFSET + TACTICAL_STATION_OFFSET;
 			int stationConsumerListIndex = GetConsumerIndex (p.ProductID, stationArrayIndex);
 			
-			p.DistributionList = new int[] {stationConsumerListIndex};
-			p.SearchPrimitive  = null;
-				
+			p.Consumers = new int[] {stationConsumerListIndex};
+			
 			
 			RegisterProduction(humanOperator, p);
 					
@@ -3818,34 +3850,61 @@ namespace HelloBoids
 			Span<Consumption> consumption = store.Span;
 			uint consumptionCount = store.Count;
 			uint productID = (uint)parameters[0];
+			
 			ComponentStore<Production> production = (ComponentStore<Production>)parameters[1];	
+			
 			uint productionCount = production.Count;
 			
 			//Console.WriteLine("ProcessPowerConsumption() - Producing ProductID == '" + ((PRODUCTS)productID).ToString() + "  Production Count == " + productionCount + " Consumption Count == " + consumptionCount);
 			
+			// LOOP THROUGH ALL COMPONENTS THAT ARE PRODUCING PRODUCTS.ElectricalPower
 			for (int i = 0; i < productionCount; i++)
 			{
-				Production currentProduction = production.Span[i];
-
+				// NOTE: by using production.Span[i], we never have to COPY the struct 
+				
 				//Console.WriteLine("ProcessPowerConsumption() - Entity '" + Boids[currentProduction.ProducerEntityArrayIndex].EntityKey + "' Producing '" + ((PRODUCTS)productID).ToString() );
 			
 				
 				//List<Consumption> consumers = mConsumption[productID];
 				//if (consumers == null) continue;
 
-				int[] distributionList = currentProduction.DistributionList;
-				if (distributionList ==  null || distributionList.Length == 0) continue; // return if using parallel.For
+				int[] distributionList = production.Span[i].Consumers;
+				if (production.Span[i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.List)
+				{
+					throw new NotImplementedException("ProcessPowerConsumption() - DistributionMode '" + production.Span[i].DistributionMode.ToString() + "' NOT YET SUPPORTED.");
+				}
+				
+				if (distributionList ==  null || distributionList.Length == 0) continue; // use 'return' keyword if using parallel.For
 
+				EntityNode producerEntity =  Boids[production.Span[i].ProducerEntityArrayIndex];
+				int indexProducer;
+				Memory<PowerProducer> producerEntityStruct = (Memory<PowerProducer>)producerEntity.GetUserStruct(typeof(PowerProducer), out indexProducer);
+				
+				// Update the Producer Entity's Struct's Output, Capacity, and Duration based on Level, Damage, Efficiency
+				// that may have changed since last Tick()
+
+				//producerEntityStruct.Span[0].Level ;
+				//producerEntityStruct.Span[0].Output;
+				//producerEntityStruct.Span[0].Capacity;
+				//producerEntityStruct.Span[0].Duration;
+				//producerEntityStruct.Span[0].MaxInput;
+				//producerEntityStruct.Span[0].Store = newValue;
+				
+				
+				// fill the Production with all of the 'Output' generated and stored for this tick()
+				production.Span[i].Store = producerEntityStruct.Span[0].Store;
+					
 				try
 				{
-					// Parallelizing the INNER LOOP is typically not recommended because
+					// LOOP THROUGH ALL CONSUMERS OF THIS CURRENT PRODUCER'S PRODUCTS.ElectricalPower
+					// (NOTE: Parallelizing the INNER LOOP is typically not recommended because
 					// each time the OUTER loop completes, it has to recreate all the threads
 					// for the INNER LOOP.
 					// Maybe this is OK for our use case since we are essentially running different
 					// processing code for different PRODUCTS.  For instance, distributing PRODUCTS.ElectricalPower
 					// is not the same as applying PRODUCTS.Morale or PRODUCTS.FatigueRecovery and so if we
 					// were to parallelize the OUTER loop, those loops might finish in dramatically different
-					// lengths of time because the work can be totally different.
+					// lengths of time because the work can be totally different.)
 					for (int j = 0; j < distributionList.Length; j++)
 					{
 						// TODO: above we are iterating, but really what we want I think is to 
@@ -3861,8 +3920,8 @@ namespace HelloBoids
 						//       we do with OPTICAL_SENSORS and LIFECYCLE  so we just do a simple "key"  look up of the Processor function
 						//       based on the ProductID.
 						//       
-						Consumption currentConsumption = consumption[distributionList[j]];
-						if (currentConsumption.Equals(default(Consumption)))
+						
+						if (consumption[distributionList[j]].Equals(default(Consumption)))
 						{
 							Console.WriteLine("ProcessPowerConsumption() - Consumption '" + distributionList[j] + "'  is not registered.");
 							continue;
@@ -3870,46 +3929,64 @@ namespace HelloBoids
 
 						try
 						{							
-							EntityNode producerEntity =  Boids[currentProduction.ProducerEntityArrayIndex];
-							EntityNode consumerEntity = Boids[currentConsumption.ConsumerEntityArrayIndex];
+							EntityNode consumerEntity = Boids[consumption[distributionList[j]].ConsumerEntityArrayIndex];
 							if (producerEntity == null || consumerEntity == null) continue;
 							
-							int index;
-							Memory<PowerProducer> producer = (Memory<PowerProducer>)producerEntity.GetUserStruct(typeof(PowerProducer), out index);
-							Memory<PowerConsumer> consumer = (Memory<PowerConsumer>)consumerEntity.GetUserStruct(typeof(PowerConsumer), out index);
+							int indexConsumer;
+							Memory<PowerConsumer> consumerEntityStruct = (Memory<PowerConsumer>)consumerEntity.GetUserStruct(typeof(PowerConsumer), out indexConsumer);
 							
-							//double tmp = production.Span[currentProduction.ProducerEntityInternalIndex].Output;
-							//consumption[currentConsumption.ConsumerInternalIndex].;
-														
-							//producer.Span[0].Level -= currentConsumption.Amount;
-							producer.Span[0].Output -= currentConsumption.Amount;
-							//producer.Span[0].Capacity -= currentConsumption.Amount;
-							//producer.Span[0].Duration -= currentConsumption.Amount;
-							//producer.Span[0].MaxInput -= currentConsumption.Amount;
-							
-							consumer.Span[0].PowerRequirement = 10; // per tick or per-use if "Continuous == false:
-							consumer.Span[0].MinimumPower = 8;
-							consumer.Span[0].Breaker = true;
-							consumer.Span[0].Continuous = true; // whether this component always consumes power when operating
-							consumer.Span[0].HasVariablePerformance = false; // can run at reduced power, but with reduced performance (eg sensor will have lower range)
-							consumer.Span[0].Priority = 0;  // determines if there's insufficient power production, which consumers get higher priority to be powered during runtime 
+							//todo: update the consumption[distributionList[j]] and consumerEntityStruct
+							//      requirements based on any damage and thus changes to efficiency and such since last Tick()
+													
+
+							if (production.Span[i].Store >= consumption[distributionList[j]].Amount)
+							{	
+								production.Span[i].Store -= consumption[distributionList[j]].Amount;
+								
+								// todo:  flag the consumerEntityStruct's runtime flag "CanAct"
+								
+								
+							}
+							else
+							{
+								// there is not enough for full amount, can we meet the minimum power reqt?
+								//currentConsumption.
+								
+								// todo: if there is no more power in the production.Span[i].Store, just break from the loop of consumers of this particular producing Entity
+								if (production.Span[i].Store == 0) break;
+								
+								
+							}
+							consumerEntityStruct.Span[0].PowerRequirement = 10; // per tick or per-use if "Continuous == false:
+							consumerEntityStruct.Span[0].MinimumPower = 8;
+							consumerEntityStruct.Span[0].Breaker = true;
+							consumerEntityStruct.Span[0].Continuous = true; // whether this component always consumes power when operating
+							consumerEntityStruct.Span[0].PerformanceSetting = 1.0f; // can run at reduced power, but with reduced performance (eg sensor will have lower range)
+							consumerEntityStruct.Span[0].Priority = 0;  // determines if there's insufficient power production, which consumers get higher priority to be powered during runtime 
 							
 							// runtime
-							consumer.Span[0].BreakerCycleDuration = 0;
-							consumer.Span[0].TimeStarted = 0;
-							consumer.Span[0].Duration = -1;
-							consumer.Span[0]. Looping = true; // Repeating
-							consumer.Span[0].CooldownDuration = 0; 
-							consumer.Span[0].InCoolDown = false;
+							consumerEntityStruct.Span[0].BreakerCycleDuration = 0;
+							consumerEntityStruct.Span[0].TimeStarted = 0;
+							consumerEntityStruct.Span[0].Duration = -1;
+							consumerEntityStruct.Span[0]. Looping = true; // Repeating
+							consumerEntityStruct.Span[0].CooldownDuration = 0; 
+							consumerEntityStruct.Span[0].InCoolDown = false;
+							
+							
 							
 							//Console.WriteLine("ProcessPowerConsumption() - producer.Output == " + producer.Span[0].Output.ToString());						
 							
 						}
 						catch (Exception ex)
 						{
-							Console.WriteLine("ProcessPowerConsumption() - ERROR: Production Entity = " + Boids[currentProduction.ProducerEntityArrayIndex].EntityKey + " Consumer Entity = " + Boids[currentConsumption.ConsumerEntityArrayIndex].EntityKey + " " + ex.Message);
+							Console.WriteLine("ProcessPowerConsumption() - ERROR: Production Entity = " + Boids[production.Span[i].ProducerEntityArrayIndex].EntityKey + " Consumer Entity = " + Boids[consumption[distributionList[j]].ConsumerEntityArrayIndex].EntityKey + " " + ex.Message);
 						}
 					} // end for of consumer distribution list
+					
+					
+					// assign the Store value of the Entity's "Store" to that of this Production
+					producerEntityStruct.Span[0].Store = production.Span[i].Store;
+					
 				}
 				catch (Exception ex)
 				{
@@ -4483,8 +4560,14 @@ namespace HelloBoids
 
 	public enum PRODUCT_DISTRIBUTION_TYPE
 	{
-		List = 0,
-		Region
+		SingleItem = 0,
+		List,
+		Region,
+		Zone,
+		BoundingSphere,
+		BoundingBox,
+		BoundingCone,
+		PlanedHull
 	}
 	
 	
@@ -4521,44 +4604,6 @@ namespace HelloBoids
 	*/
 
 		
-	/*
-	public struct PowerProducer
-	{
-        public int EntityArrayIndex;
-		public CONFIGURATION Configuration;
-
-        
-        Definition: 1 kWh == 1 kW of power sustained for 1 hour.
-            Usage Example: A 2,500-watt clothes dryer used for 2 hours consumes 5 kWh (2.5kW x 2  hours).
-        Average Consumption: The average U.S. household consumes approximately 899 kWh per month, or about 30 kWh per day.
-        
-        public double Output;    // kWh    
-		public double Capacity;
-		public double Duration;  
-		public double MaxInput; // for a Battery, this is for recharging
-			
-			
-//		public float Rate;    // amount of units consumed per second?  This is probably meant to be Duration
-
-//        // confused on some of these vars because where does the machine/entity pass in
-//        // vars used for the computation, and which exist here?  I think one good argument
-//        // to keep them here is that a machine that produces/consumes multiple things
-//        // may have seperate throttle values and efficiency values and even different enable/disable
-//        // states
-//        // But why not have some of these custom properties in the Entity then?
-			// todo:efficiency should have a max value and a current value that can never exceed the max value.  Efficiency ranges from 0.0 - 1.0 
-        public float Efficiency; // at same throttle, increased efficiency will produce more
-//                                 // as the machine wears out between mainteneance efficiency
-//                                 // will drop.  It is also possible to increase efficiency
-
-        public float Throttle;  // value typically 0.0 - 1.0 but can exceed 1.0 with potential risk
-//                                // of damaging the machine (is Damage a customProperty in Entity?)
-			
-		// TODO: the 'Component struct' should probably have a WearAndTear value that limits the Max Hitpoints that can be recovered perhaps
-		//       unless the Component is repaired/refurbished/torndown+cleaned+reassembled/etc.
-		
-	}
-	*/
 	
 		
 		
@@ -4573,28 +4618,39 @@ namespace HelloBoids
 		 			// In turn, the Producing Entity needs an index to this Production's index... and in fact, a list of all the Production indices it has registered.
 		
 		
-		// public int[] Consumers;  // list of Consumers indices from ComponentStore<Consumer> we're sending ProductID to.
+		// cached list of Consumers indices from ComponentStore<Consumer> we're sending ProductID to.  
+		// For DistributionMode.List or .Item this array does NOT need to be recomputed as it would if
+		// a Search() was required to find Consumers within a certain range or volume each frame.
+		// Those are typically more used for things like Heat and Radiation from an Explosion prefab
+		// and NOT for ElectricalPower production for instance.
+		public int[] Consumers;  
+		//public int[] DistributionList;  // <-- same as Consumers
+		public bool Enabled;
 		
-		//public bool Enabled;
-		public Vector3d Position; // Position where this production occurred (eg. explosion, heat signature, etc)?  A radiation bomb or any explosion will need it's Position(Location) set so we can determine the falloff/attenuation of the damage, 
-
 		
 		public object Value;  // for Thrust, this would be a 'Vector3d'.  For damage, an 'int', for electrical power a 'double',  for radar echos, UnitValue is a Vector3d position, for SkillModifiers, it can contain a SkillModifier struct.
-		public int Amount; // infinite = -1, else number of unit's that are available to be consumed by Consumers this Production will be distributed too
+		public double Store; // infinite = -1, else number of unit's that are available to be consumed by Consumers this Production will be distributed too
 		
-		
+		public double Duration;
+		public double StartTime;
 		public int NumUses; // a radiation producing bomb may only produce damage for 3 turns before it dissipates.
 		public float CooldownBetweenUses;
 
 		
+		// SingleItem, List, Region, Zone, BoundingSphere, BoundingBox, BoundingCone,  PlanedHull
 		public PRODUCT_DISTRIBUTION_TYPE DistributionMode; 
 		// public Func<Production, string, bool> DistributionFilterFunc; // accepts Production and an EntityID and returns true if the test is passed
 		// used when DistributionType is List.  Contains id of entities consuming this product.  
 		// No searches (spatial or otherwise) reqt. "power links" and other "links" are good examples of their use.
-		public int[] DistributionList;  // <-- rename to Consumers?
-		public object SearchPrimitive;   // used with DistributionMode is a spatial search of some kind.
-			
+
+		// cast to BoundingSphere, BoundingCone, or BoundingBox used with DistributionMode is a spatial search of some kind.
+		public object SearchPrimitive;   
+		public Vector3d Position; // Position of Primitive where this production occurred (eg. explosion, heat signature, etc)?  A radiation bomb or any explosion will need it's Position(Location) set so we can determine the falloff/attenuation of the damage, 
+		public Vector3d Size;
 		
+		// Primitive - expand, contract, staythesame, fade, intensify
+		// BehaviorVelocity - Starting velocity in meters per second
+		// BehaviorGradient/Attenuation/Falloff
 	}
 		
 	
@@ -4615,42 +4671,6 @@ namespace HelloBoids
 	// todo: maybe we should think of this as ConsumptionResults and host all the changes that need to be applied to the target entities
 	//       so we could include an array of PropertySpec and corresponding nodeIDs
 
-		
-		
-	/*
-	public struct PowerConsumer  
-    {
-		// todo: just as Consumer struct has an index to this List<Boids> entry
-		//       this PowerConsumer should have an index to the Memory<Consumption> it registered 
-		//       Also, I think a Consumption should always have all the vars it needs to update
-		//       both the PowerConsumer's vars and the Producers based on it's PowerDraw amount.
-		//       
-		
-        public int EntityArrayIndex;    // Guid.NewGuid().ToString() results in a 36 character string.
-		public CONFIGURATION Configuration; 
-        
-		public bool Breaker;  // NOTE: we do not use node.Enabled because that is seperate (for rendering AND updating) from a Component running it's production simulation or not.
-        public double PowerRequirement;// per tick or per-use if "Continuous == false:
-        public double MinimumPower;
-		
-		public bool Continuous; // whether this component always consumes power when operating, or only when it is "Used" such as a Laser firing for a fixed duration
-		public float PerformanceSetting;  // 0.0 - 1.0.  We can get rid of HasVariablePerformance if PerformanceSetting >= 0 and <= 1.0
-		public bool HasVariablePerformance {get {return (PerformanceSettings >= 0.0f && PerformanceSetting <= 1.0f; }}; // can run at reduced power, but with reduced performance (eg sensor will have lower range)
-        
-		public int Priority;  // determines if there's insufficient power production, which consumers get higher priority to be powered during runtime 
-		
-		
-        // runtime
-        public float BreakerCycleDuration;
-		
-		public long TimeStarted;
-		public float Duration;
-		
-		public bool Looping; // Repeating
-		public float CooldownDuration; 
-		public bool InCoolDown;
-    }
-	*/
 		
 		
 	public struct Consumption // todo: rename this to ConsumptionResult
@@ -7711,37 +7731,81 @@ return (0,0);
 		}
 	}
 	
+	
 	// See Game01.Components
 	public struct PowerProducer
 	{
         public int EntityArrayIndex;
 		public CONFIGURATION Configuration;
 
-        /*
-        Definition: 1 kWh == 1 kW of power sustained for 1 hour.
-            Usage Example: A 2,500-watt clothes dryer used for 2 hours consumes 5 kWh (2.5kW x 2  hours).
-        Average Consumption: The average U.S. household consumes approximately 899 kWh per month, or about 30 kWh per day.
-        */
+        
+        //Definition: 1 kWh == 1 kW of power sustained for 1 hour.
+        //    Usage Example: A 2,500-watt clothes dryer used for 2 hours consumes 5 kWh (2.5kW x 2  hours).
+        //Average Consumption: The average U.S. household consumes approximately 899 kWh per month, or about 30 kWh per day.
+        
         public double Output;    // kWh    
 		public double Capacity;
 		public double Duration;  
-		public double MaxInput;
+		public double MaxInput; // for a Battery, this is for recharging
+		
+		public double Store;
+		
+		// todo:efficiency should have a max value and a current value that can never exceed the max value.  Efficiency ranges from 0.0 - 1.0 
+        public float Efficiency; // at same throttle, increased efficiency will produce more
+//                                 // as the machine wears out between mainteneance efficiency
+//                                 // will drop.  It is also possible to increase efficiency
+
+        public float Throttle;  // aka: Regulator.  This value typically 0.0 - 1.0 but can exceed 1.0 with potential risk
+//                                // of damaging the machine (is Damage a customProperty in Entity?)
+			
+		// TODO: the 'Component struct' should probably have a WearAndTear value that limits the Max Hitpoints that can be recovered perhaps
+		//       unless the Component is repaired/refurbished/torndown+cleaned+reassembled/etc.
+		
+		
+		// The index into the ComponentStore<Production> internal Memory<Production>
+		// From there we can get an array of Consumers.
+		// NOTE: Entities can produce more than one Production.  For instance,
+		// a Reactor may normally just produce ElectricalPower but if it is damaged
+		// it may also start Producing Heat and Radiation.  This is why we need
+		// a seperate 'struct Production' for storing Production and why we cannot
+		// just use this struct (PowerProducer) as the Production.  
+		// NOTE: We use a lookup into the ComponentStore<Production> instead of storing 
+		// the Production's themselves because modifying them here would NOT modify them
+		// in the ComponentStore<Production> unless instead we stored the Memory<T> for each
+		// and that is not necessary.
+		public int[] Production;
+		
+		private const int ELECTRICAL = 0;
+		private const int HEAT       = 1;
+		private const int RADIATION  = 2;
+		
+
+		
 	}
 	
+		
 	// See Game01.Components
 	public struct PowerConsumer  
     {
+		// todo: just as Consumer struct has an index to this List<Boids> entry
+		//       this PowerConsumer should have an index to the Memory<Consumption> it registered 
+		//       Also, I think a Consumption should always have all the vars it needs to update
+		//       both the PowerConsumer's vars and the Producers based on it's PowerDraw amount.
+		//       
+		
         public int EntityArrayIndex;    // Guid.NewGuid().ToString() results in a 36 character string.
 		public CONFIGURATION Configuration; 
-                
+        
+		public bool Breaker;  // NOTE: we do not use node.Enabled because that is seperate (for rendering AND updating) from a Component running it's production simulation or not.
         public double PowerRequirement;// per tick or per-use if "Continuous == false:
         public double MinimumPower;
 		
-		public bool Breaker;
-		public bool Continuous; // whether this component always consumes power when operating
-		public bool HasVariablePerformance; // can run at reduced power, but with reduced performance (eg sensor will have lower range)
+		public bool Continuous; // whether this component always consumes power when operating, or only when it is "Used" such as a Laser firing for a fixed duration
+		public float PerformanceSetting;  // 0.0 - 1.0.  We can get rid of HasVariablePerformance if PerformanceSetting >= 0 and <= 1.0
+		public bool HasVariablePerformance {get {return (PerformanceSetting >= 0.0f && PerformanceSetting <= 1.0f); }} // can run at reduced power, but with reduced performance (eg sensor will have lower range)
         
 		public int Priority;  // determines if there's insufficient power production, which consumers get higher priority to be powered during runtime 
+		
 		
         // runtime
         public float BreakerCycleDuration;
@@ -7754,7 +7818,9 @@ return (0,0);
 		public bool InCoolDown;
     }
 	
+		
 	
+
 	public struct TacticalStation
 	{
 		public class StationAction

@@ -224,7 +224,7 @@ namespace HelloBoids
         // the more cpu cycles needed. Tweak these values
         // to find a good balance between performance and
         // simulation/behavior quality
-		public static double MAX_SEARCH_DISTANCE = 35d;
+		//public static double MAX_SEARCH_DISTANCE = 35d;
 		public static double SEPERATION_DISTANCE = 50.0d;
 		public static double ALIGNMENT_DISTANCE = 25.5d;
 		public static double COHESION_DISTANCE = 25.5d;
@@ -1146,12 +1146,9 @@ namespace HelloBoids
 			//       adjacents I think to determine who we will distribute too
 			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
 			p.Consumers = null; //new int[] {checkOutIndex};
-			p.SearchPrimitive  = null;
-			p.Position = Vector3d.Zero();
-			p.Size = new Vector3d(1,1,1);
-			//p.BehaviorVelocity = Vector3d.Zero();
-			
-			
+			p.SearchReferenceEntity  = null;
+
+						
 			// TODO: the distribution list for PRODUCT.OpticalReflection is ignored for now.  We just use
 			//       adjacents I think to determine who we will distribute too
 			// each Droid can Consume a 'PRODUCT.OpticalReflection' 
@@ -1485,7 +1482,7 @@ namespace HelloBoids
 			storePowerProducers.Span[powerProducerInternalIndex].Store = BATTERY_POWER_STARTING_AMOUNT;
 				
 			Builder build = new Builder();
-			build.Calculate();
+			//build.Calculate();
 			
 			// each Battery can Produce a PRODUCTS.ElectricalPower
 			Production p;
@@ -1504,12 +1501,10 @@ namespace HelloBoids
 			
 			// TODO: the distribution list for PRODUCT.OpticalReflection is ignored for now.  We just use
 			//       adjacents I think to determine who we will distribute too
-			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
+			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.BoundingBox;
 			p.Consumers = null; //new int[] {checkOutIndex}; <-- see a few lines down where we add wingsConsumptionListIndex, eyesConsumptionListIndex, laserConsumptionListIndex, tacticalConsumptionListIndex, 
-			p.SearchPrimitive  = null;
-			p.Position = Vector3d.Zero();
-			p.Size = new Vector3d(1,1,1);
-		
+			p.SearchReferenceEntity = battery; // TODO: we should do a test to see if storing a reference is better than just an index into the Boids[] List<>
+			Console.WriteLine ("CreateBattery() - SearchReferenceEntity is SET AND VALID == " + (p.SearchReferenceEntity!= null).ToString());
 
 			// Wings, Eyes, Lasers, TacticalStation all CONSUME ElectricalPower
 			// TODO: these indices should probably be indices into PowerConsumer struct, NOT EntityArrayIndex into List<Boids>
@@ -1596,9 +1591,7 @@ namespace HelloBoids
 			
 			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.List;
 
-			p.SearchPrimitive  = null;
-			p.Position = Vector3d.Zero();
-			p.Size = new Vector3d(1,1,1);
+			p.SearchReferenceEntity  = null;
 						
 			int stationArrayIndex = arrayIndex - HUMAN_OPERATOR_OFFSET + TACTICAL_STATION_OFFSET;
 			int stationConsumerListIndex = GetConsumerIndex (p.ProductID, stationArrayIndex);
@@ -3453,6 +3446,30 @@ namespace HelloBoids
 			return found;		
 		}
 		
+		///<summary>
+		/// This is the target that the operator (either crew member or computer) of a Targeting Crew Station
+		/// will be attempting to fire upon.  
+		/// Return value is a List of Tuples containing the EntityNode and Distance to that Entity
+		/// </summary>
+		private List<Tuple<EntityNode, double>> FindNearestTarget (EntityNode source, BoundingBox searchArea)
+		{
+			double maxDistanceSquared = searchArea.RadiusSquared; 
+			
+			Func<EntityNode, EntityNode, Tuple<bool, double>> match = (current, neighbor) =>            {
+                
+				if (current == neighbor) return new Tuple<bool, double>(false, -1);
+                double distanceSquared = Vector3d.GetDistance3dSquared(neighbor.Translation, current.Translation);
+				if (distanceSquared <= maxDistanceSquared) return new Tuple<bool, double>(true, distanceSquared);
+                return new Tuple<bool, double>(false, -1);
+            };
+			
+			List<Tuple<EntityNode, double>> found  = this.Octree.Query(source, true, searchArea, match);
+			if (found == null) return null;
+			
+			//Console.WriteLine("FindNearestTarget found count == " + found.Count.ToString());
+			return found;		
+		}
+		
 		
 #if USE_MEMORY_T
         private List<EntityNode> SpatialQueryLocal(Span<Transform.Transform_Struct> memSpan, OctreeOctant refSpatialNode, int refIndex, double distance, bool recurse, BoundingSphere searchSphere)
@@ -3871,34 +3888,55 @@ namespace HelloBoids
 				int[] distributionList = production.Span[(int)i].Consumers;
 				if (production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.List && production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.SingleItem)
 				{
-					throw new NotImplementedException("ProcessPowerConsumption() - DistributionMode '" + production.Span[(int)i].DistributionMode.ToString() + "' NOT YET SUPPORTED.");
-					if (production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.Region)
+					
+					if (production.Span[(int)i].DistributionMode == PRODUCT_DISTRIBUTION_TYPE.Region)
 					{
 						// find PowerConsumers that are inside of this entire Region (eg onboard the Starship)
-						
+						throw new NotImplementedException("ProcessPowerConsumption() - DistributionMode '" + production.Span[(int)i].DistributionMode.ToString() + "' NOT YET SUPPORTED.");
 					}
-					else if (production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.Zone)
+					else if (production.Span[(int)i].DistributionMode == PRODUCT_DISTRIBUTION_TYPE.Zone)
 					{
 						// find PowerConsumers that are inside of this entire Zone (eg inside the current star system)
-						
+						throw new NotImplementedException("ProcessPowerConsumption() - DistributionMode '" + production.Span[(int)i].DistributionMode.ToString() + "' NOT YET SUPPORTED.");
 					}
-					else if (production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.BoundingBox)
+					else if (production.Span[(int)i].DistributionMode == PRODUCT_DISTRIBUTION_TYPE.BoundingBox)
 					{
 						// find PowerConsumers within this bound volume
-						BoundingBox box = (BoundingBox)production.Span[(int)i].SearchPrimitive;
+						//Console.WriteLine ("SearchReferenceEntity is SET AND VALID == " + (production.Span[(int)i].SearchReferenceEntity != null).ToString());
+						BoundingBox searchBox = (BoundingBox)((EntityNode)production.Span[(int)i].SearchReferenceEntity).BoundingBox;
+						searchBox = new BoundingBox(searchBox.Center, EntryClass.bSim.Max_Search_Distance);
+						
+						
+						List<Tuple<EntityNode, double>> found = EntryClass.bSim.FindNearestTarget((EntityNode)production.Span[(int)i].SearchReferenceEntity, searchBox);
+						if (found == null) return;
+						
+						distributionList = new int[found.Count];
+						for (int h = 0; h < distributionList.Length; h++)
+						{
+							// NOTE: This needs to be the Memory<T> index, not the Entity Array Index
+							EntityNode e = found[h].Item1;
+							int indexConsumer;
+							Memory<PowerConsumer> consumerEntityStruct = (Memory<PowerConsumer>)e.GetUserStruct(typeof(PowerConsumer), out indexConsumer);
+							distributionList[h] = indexConsumer;
+						}
+						
+						Console.WriteLine("Battery using SearchBox...");
 						
 					}
-					else if (production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.BoundingSphere)
+					else if (production.Span[(int)i].DistributionMode == PRODUCT_DISTRIBUTION_TYPE.BoundingSphere)
 					{
-						BoundingSphere sphere = (BoundingSphere)production.Span[(int)i].SearchPrimitive;
+						//BoundingSphere sphere =  (BoundingSphere)((EntityNode)production.Span[(int)i].SearchReferenceEntity).BoundingSphere;
+						throw new NotImplementedException("ProcessPowerConsumption() - DistributionMode '" + production.Span[(int)i].DistributionMode.ToString() + "' NOT YET SUPPORTED.");
 					}
-					else if (production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.BoundingCone)
+					else if (production.Span[(int)i].DistributionMode == PRODUCT_DISTRIBUTION_TYPE.BoundingCone)
 					{
 						//BoundingCone cone = (BoundingCone)production.Span[(int)i].SearchPrimitive;
+						throw new NotImplementedException("ProcessPowerConsumption() - DistributionMode '" + production.Span[(int)i].DistributionMode.ToString() + "' NOT YET SUPPORTED.");
 					}
-					else if (production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.PlanedHull)
+					else if (production.Span[(int)i].DistributionMode == PRODUCT_DISTRIBUTION_TYPE.PlanedHull)
 					{
 						//PlanedHull hull = (PlanedHull)production.Span[(int)i].SearchPrimitive;
+						throw new NotImplementedException("ProcessPowerConsumption() - DistributionMode '" + production.Span[(int)i].DistributionMode.ToString() + "' NOT YET SUPPORTED.");
 					}					
 				}
 				
@@ -4045,7 +4083,7 @@ namespace HelloBoids
 					
 					// assign the Store value of the Entity's "Store" to that of this Production
 					producerEntityStruct.Span[0].Store = production.Span[(int)i].Store;
-					Console.WriteLine("ProcessPowerConsumption() - Production Entity '" + Boids[production.Span[(int)i].ProducerEntityArrayIndex].EntityKey + "' Store Amount = " + producerEntityStruct.Span[0].Store.ToString());
+					//Console.WriteLine("ProcessPowerConsumption() - Production Entity '" + Boids[production.Span[(int)i].ProducerEntityArrayIndex].EntityKey + "' Store Amount = " + producerEntityStruct.Span[0].Store.ToString());
 				}
 				catch (Exception ex)
 				{
@@ -4703,12 +4741,16 @@ namespace HelloBoids
 		// No searches (spatial or otherwise) reqt. "power links" and other "links" are good examples of their use.
 
 		// cast to BoundingSphere, BoundingCone, or BoundingBox used with DistributionMode is a spatial search of some kind.
-		public object SearchPrimitive;   
-		public Vector3d Position; // Position of Primitive where this production occurred (eg. explosion, heat signature, etc)?  A radiation bomb or any explosion will need it's Position(Location) set so we can determine the falloff/attenuation of the damage, 
-		public Vector3d Size;
+		public object SearchReferenceEntity;   // since this struct is stored in ComponentStore<Production> we do NOT have to worry about boxing when casting the Memory<T> to a struct
+		//[obsolete] public Vector3d Position; // Position of Primitive where this production occurred (eg. explosion, heat signature, etc)?  A radiation bomb or any explosion will need it's Position(Location) set so we can determine the falloff/attenuation of the damage, 
+		//[obsolete] public Vector3d Size;        // taken from SearchReferenceEntity.BoundingBox/Sphere
+		//[obsolete] public Vector3d Velocity;    // taken from SearchReferenceEntity.Velocity 
+		//[obsolete] public Vector3d Acceleration;
 		
-		// Primitive - expand, contract, staythesame, fade, intensify
-		// BehaviorVelocity - Starting velocity in meters per second
+		
+		// PrimitiveTransformBehavior - none (stay the same), expand (positive scaling), contract (negative scaling), translate, rotate
+		// PrimitiveStrengthBehavior - fade, intensify
+		
 		// BehaviorGradient/Attenuation/Falloff
 	}
 		
@@ -8615,11 +8657,17 @@ return (0,0);
 			double duration = (double)buildSpecificPropertyValues["Duration"];
 			double maxInput = (double)buildSpecificPropertyValues["MaxInput"];
 
-			// todo: we also need to take into account 'Component struct' craftsmanship, materials quality, Hitpoints - CurrentHP, Wear&Tear (Age\Power Cycles\Takeoff+Land Cycles\etc), 
-			//       NOTE: Some stats would need to be FIXED once a design is FINISHED because repairs should never allow for improved Armor or change in Weight, Volume, Surface Area
+			// todo: we also need to take into account 'Component struct'
+			//    - craftsmanship, 
+			//    - materials quality
+			//    - Hitpoints - CurrentHP (damage)
+			//    - Wear&Tear (Power or Duty Cycles\Takeoff+Land Cycles\etc) 
+			//       NOTE: Some stats would need to be FIXED once a design is FINISHED because repairs should never allow for improved Armor or change in Weight, Volume, Surface Area.
+			//             So, really it's CAPACITY and or DURATION that needs to be modified when efficiency and/or throttle changes
+			// 
 			//             
-			//double efficiency;
-			//double throttle;
+			//double efficiency = (double)buildSpecificPropertyValues["Efficiency"];
+			//double throttle = (double)buildSpecificPropertyValues["Throttle"];
 			
 			// assign the build props and values to a set of PropertySpec and to it's Entity
 			buildSpecificProperties = new PropertySpec[] 

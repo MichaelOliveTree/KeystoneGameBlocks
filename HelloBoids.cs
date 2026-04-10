@@ -1697,6 +1697,8 @@ namespace HelloBoids
 			double elapsedSeconds = gt.ElapsedSeconds; 
             mIntervalTimers.Update(elapsedSeconds);
 
+			int linePos = 0;
+			
 			//Console.WriteLine("Update() - ELAPSED SECONDS == " + gt.TotalElapsedSeconds.ToString());
 			
 			try
@@ -1728,7 +1730,7 @@ namespace HelloBoids
 				{
 					// production that occurs every frame
 					UpdateProduction(gt);
-					
+					linePos = 1;
 					// NOTE: mLimitedProduction may not be necessary as we now track the NumUses for any given Production and if
 			//       p.NumUses == 0, then we remove that production at the end of UpdateProduction();
 					// unlike normal production, limited production only occurs for .NumUses which typically is just 1 use
@@ -1738,7 +1740,7 @@ namespace HelloBoids
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine("Update() - UpdateProduction() " + ex.Message);
+					Console.WriteLine("Update() - UpdateProduction() - " + ex.Message);
 				}
 				
 
@@ -1747,6 +1749,7 @@ namespace HelloBoids
 					// NOTE: ProcessOpticalSensors() is added as a mDataProcessor which means our mNeighbors<> Dictionary
 					//       will not be initialized during this first call to Do_Droid_Logic()!
 					Do_Droid_Logic (Seeds.Master, elapsedSeconds);
+					linePos = 2;
 				}
 				catch (Exception ex)
 				{
@@ -1760,6 +1763,7 @@ namespace HelloBoids
 				try
 				{
 					mSkillModificationSystem.Process(livingEntityStore, null, Seeds.Master, gt);
+					linePos = 3;
 				}
 				catch (Exception ex)
 				{
@@ -1770,6 +1774,7 @@ namespace HelloBoids
 				try
 				{
 					mDamageSystem.Process(livingEntityStore, null, Seeds.Master, gt);
+					linePos = 4;
 				}
 				catch (Exception ex)
 				{
@@ -1780,6 +1785,7 @@ namespace HelloBoids
 				try
 				{
 					mDamageOverTimeSystem.Process(livingEntityStore, null, Seeds.Master, gt);
+					linePos = 5;
 				}
 				catch (Exception ex)
 				{
@@ -1794,7 +1800,7 @@ namespace HelloBoids
 					// OPTICAL_SENSING <- creation of mNeighbors<> adjacency 
 					// FLOCKING
 					mDataProcessor.Update(gt, Boids.ToArray());
-					
+					linePos = 6;
 					// mProductionProcessor.Update(gt, Boids.ToArray());
 					// POWER_PRODUCTION
 					// POWER_CONSUMPTION
@@ -1803,7 +1809,7 @@ namespace HelloBoids
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine("Update() - mDataProcessor.Update() " + ex.Message);
+					Console.WriteLine("Update() - mDataProcessor.Update() - LINE #=" + linePos.ToString() + " " + ex.Message);
 				}				
 	#endif
 			}
@@ -2915,6 +2921,8 @@ namespace HelloBoids
 				
 				//EntityNode currentBoid = ; // Boids[(int)i];
 				int currentEntityArrayIndex = allTransforms[(int)i].EntityArrayIndex;
+				System.Diagnostics.Debug.Assert(Boids[allTransforms[(int)i].EntityArrayIndex] is Boid);
+				
 				
 				//int currentInternalTransformIndex = memSpan[i].InternalTransformIndex; // currentBoid.GetUserStructIndex(typeof(Transform.Transform_Struct));
 				//System.Diagnostics.Debug.Assert (i == currentInternalTransformIndex, "ProcessOpticalSensors() - These indices should match now but wont once we destroy/spawn new Droids. ");
@@ -2987,7 +2995,8 @@ namespace HelloBoids
 								{
 									EntityNode potentialNeighbor = ents[j];
 									if (Boids[currentEntityArrayIndex] == potentialNeighbor) continue;
-									
+									if (!potentialNeighbor.HasConfiguration((uint)CONFIGURATION.Sentient) || potentialNeighbor.HasConfiguration((uint)CONFIGURATION.Intelligent)) continue;
+																		   
 									int potentialInternalTransformIndex = potentialNeighbor.GetUserStructIndex(typeof(Transform.Transform_Struct));
 									int potentialArrayIndex = allTransforms[potentialInternalTransformIndex].EntityArrayIndex;
 									
@@ -3949,7 +3958,7 @@ namespace HelloBoids
 						double maxDistanceSquared = 1;//searchBox.RadiusSquared;
 						
 						Func<EntityNode, EntityNode, Tuple<bool, double>> match = (current, neighbor) =>  {
-							if (current == neighbor || neighbor.HasConfiguration((uint)CONFIGURATION.PowerUsing)) return new Tuple<bool, double>(false, -1);
+							if (current == neighbor || !neighbor.HasConfiguration((uint)CONFIGURATION.PowerUsing)) return new Tuple<bool, double>(false, -1);
                 			//if (current == neighbor) return new Tuple<bool, double>(false, -1);
 							double distanceSquared = Vector3d.GetDistance3dSquared(neighbor.Translation, current.Translation);
 							if (distanceSquared <= maxDistanceSquared) return new Tuple<bool, double>(true, distanceSquared);
@@ -9233,6 +9242,8 @@ return (0,0);
         {
             foreach (string key in mProcessors.Keys)
             {
+				try
+				{
                 var func = mProcessors[key];
 				int seed = 0;
 			
@@ -9278,7 +9289,12 @@ return (0,0);
  					//  laserImpalingDamage.Invoke(storeLaserImpalingDamage, args, seed, gt);
 					//	break;
 					default:
-						throw new NotImplementedException();
+						throw new NotImplementedException("DataProcessorsStore() - Update() - key '" + key + "' not supported.");
+				}
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("DataProcessorsStore() - Update() - ERROR with processing at key '" + key + "' - " + ex.Message);
 				}
 				
                 

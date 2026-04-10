@@ -1062,15 +1062,19 @@ namespace HelloBoids
 			
 			eyes.Translation = pos;
 			eyes.BoundingBox = box; // HACK -direct BoundingBox assignment.  I need a BoundingBox set to insert into Octree since we dont have any geometry to auto compute one for us. 
+			eyes.Configuration |= (uint)CONFIGURATION.PowerUsing; // eyes are sensors so use power
 			
 			wings.Translation = pos;
 			wings.BoundingBox = box; // HACK
+			wings.Configuration |= (uint)CONFIGURATION.PowerUsing; // wings flap so use power
 			
 			laser.Translation = pos;
 			laser.BoundingBox = box;// HACK
+			laser.Configuration |= (uint)CONFIGURATION.PowerUsing; // lasers obviously use power
 			
 			tacticalStation.Translation = pos;
 			tacticalStation.BoundingBox = box;// HACK
+			laser.Configuration |= (uint)CONFIGURATION.PowerUsing; // stations have fancy computer screens that use power
 			
 			battery.Translation = pos;
 			battery.BoundingBox = box;// HACK
@@ -2189,6 +2193,8 @@ namespace HelloBoids
 					
 					// use the existing neigbors from "Eyes" (optical scanner) to find the single closest but valid target available to the current droid
 					// This overloaded version of FindNearestTarget() returns the sorted list of neighbors from closest to furthest along with their distances to the current droid
+					
+					
 					List<EntityNode> tmp = FindNearestTarget(currentBoid, neighbors, out distances);
 					if (tmp == null || tmp.Count == 0)
 						return;     // NOTE: for parallel.For we use "return"
@@ -3941,10 +3947,9 @@ namespace HelloBoids
 						searchBox = new BoundingBox(searchBox.Center, Utils.GetMax(EntryClass.bSim.SeparationDistance, EntryClass.bSim.AlignmentDistance, EntryClass.bSim.CohesionDistance));
 						
 						double maxDistanceSquared = 1;//searchBox.RadiusSquared;
-						int outIndex;
 						
 						Func<EntityNode, EntityNode, Tuple<bool, double>> match = (current, neighbor) =>  {
-							if (current == neighbor || neighbor.GetUserStruct(typeof(PowerConsumer), out outIndex) == null) return new Tuple<bool, double>(false, -1);
+							if (current == neighbor || neighbor.HasConfiguration((uint)CONFIGURATION.PowerUsing)) return new Tuple<bool, double>(false, -1);
                 			//if (current == neighbor) return new Tuple<bool, double>(false, -1);
 							double distanceSquared = Vector3d.GetDistance3dSquared(neighbor.Translation, current.Translation);
 							if (distanceSquared <= maxDistanceSquared) return new Tuple<bool, double>(true, distanceSquared);
@@ -6144,7 +6149,16 @@ return (0,0);
 			#endif
 		}
 
-				/*
+		private uint mConfiguration;
+				
+		public bool HasConfiguration (uint configuration)
+		{
+			return (mConfiguration & configuration) != 0;
+		}
+			
+		public uint Configuration { get {return mConfiguration; } set {mConfiguration = value; }}
+				
+		/*
 		/// <summary>
 		/// The typeAsKey is the T part of the Memory<T> we pass in, and NOT the Typeof(Memory<T>)
 		/// </summary>

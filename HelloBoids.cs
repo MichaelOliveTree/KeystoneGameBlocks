@@ -1054,12 +1054,40 @@ namespace HelloBoids
 			
 			// HUMAN OPERATOR for the tactical station
 			EntityNode humanOperator = CreateHumanOperator(arrayIndex + HUMAN_OPERATOR_OFFSET);
-					
 			
+			
+			
+			Vector3d pos = new Vector3d(posX, posY, posZ);
+			BoundingBox box = new BoundingBox (pos, 1);
+			
+			eyes.Translation = pos;
+			eyes.BoundingBox = box; // HACK -direct BoundingBox assignment.  I need a BoundingBox set to insert into Octree since we dont have any geometry to auto compute one for us. 
+			
+			wings.Translation = pos;
+			wings.BoundingBox = box; // HACK
+			
+			laser.Translation = pos;
+			laser.BoundingBox = box;// HACK
+			
+			tacticalStation.Translation = pos;
+			tacticalStation.BoundingBox = box;// HACK
+			
+			battery.Translation = pos;
+			battery.BoundingBox = box;// HACK
+			
+			humanOperator.Translation = pos;
+			humanOperator.BoundingBox = box;// HACK
 			
 		    if (this.Octree != null)
             {
            		Octree.Add((EntityNode)b);
+				
+				Octree.Add((EntityNode)eyes);
+				Octree.Add((EntityNode)wings);
+				Octree.Add((EntityNode)laser);
+				Octree.Add((EntityNode)tacticalStation);
+				Octree.Add((EntityNode)battery);
+				Octree.Add((EntityNode)humanOperator);
             }
 
 			result = 
@@ -1118,8 +1146,12 @@ namespace HelloBoids
 				storeSensor.Span[sensorInternalIndex].Configuration = OpticalSensorConfiguration;
 				storeSensor.Span[sensorInternalIndex].EntityArrayIndex = arrayIndex;
 				//storeSensor.Span[sensorInternalIndex].InternalComponentIndex = -1; // TODO:  this should be from "Component" struct not sensorInternalIndex;
-				storeSensor.Span[sensorInternalIndex].RangeSquared = EntryClass.MAX_SEARCH_DISTANCE * EntryClass.MAX_SEARCH_DISTANCE;
+				exLine = "CreateOpticalSensor 5";
+				storeSensor.Span[sensorInternalIndex].RangeSquared = Utils.GetMax(this.SeparationDistance, this.AlignmentDistance, this.CohesionDistance);
+				exLine = "CreateOpticalSensor 6";
+				storeSensor.Span[sensorInternalIndex].RangeSquared *= storeSensor.Span[sensorInternalIndex].RangeSquared; // square it
 				//storeSensor.Span[sensorInternalIndex].ScanRating = 2000; // <-- this is a computed stat based on TL and Power, that generally ranges from 10 - 40+  (google "gurps vehicles 2nd edition radar scan rating")
+				exLine = "CreateOpticalSensor 7";
 			}
 			catch (Exception ex)
 			{
@@ -1504,7 +1536,7 @@ namespace HelloBoids
 			p.DistributionMode = PRODUCT_DISTRIBUTION_TYPE.BoundingBox;
 			p.Consumers = null; //new int[] {checkOutIndex}; <-- see a few lines down where we add wingsConsumptionListIndex, eyesConsumptionListIndex, laserConsumptionListIndex, tacticalConsumptionListIndex, 
 			p.SearchReferenceEntity = battery; // TODO: we should do a test to see if storing a reference is better than just an index into the Boids[] List<>
-			Console.WriteLine ("CreateBattery() - SearchReferenceEntity is SET AND VALID == " + (p.SearchReferenceEntity!= null).ToString());
+			//Console.WriteLine ("CreateBattery() - SearchReferenceEntity is SET AND VALID == " + (p.SearchReferenceEntity!= null).ToString());
 
 			// Wings, Eyes, Lasers, TacticalStation all CONSUME ElectricalPower
 			// TODO: these indices should probably be indices into PowerConsumer struct, NOT EntityArrayIndex into List<Boids>
@@ -3451,18 +3483,20 @@ namespace HelloBoids
 		/// will be attempting to fire upon.  
 		/// Return value is a List of Tuples containing the EntityNode and Distance to that Entity
 		/// </summary>
-		private List<Tuple<EntityNode, double>> FindNearestTarget (EntityNode source, BoundingBox searchArea)
+		private List<Tuple<EntityNode, double>> FindNearestTarget (EntityNode source, BoundingBox searchArea, Func<EntityNode, EntityNode, Tuple<bool, double>> match = null)
 		{
 			double maxDistanceSquared = searchArea.RadiusSquared; 
 			
-			Func<EntityNode, EntityNode, Tuple<bool, double>> match = (current, neighbor) =>            {
+			if (match == null)
+			{
+				match = (current, neighbor) =>            {
                 
 				if (current == neighbor) return new Tuple<bool, double>(false, -1);
                 double distanceSquared = Vector3d.GetDistance3dSquared(neighbor.Translation, current.Translation);
 				if (distanceSquared <= maxDistanceSquared) return new Tuple<bool, double>(true, distanceSquared);
                 return new Tuple<bool, double>(false, -1);
-            };
-			
+            	};
+			}
 			List<Tuple<EntityNode, double>> found  = this.Octree.Query(source, true, searchArea, match);
 			if (found == null) return null;
 			
@@ -3904,11 +3938,23 @@ namespace HelloBoids
 						// find PowerConsumers within this bound volume
 						//Console.WriteLine ("SearchReferenceEntity is SET AND VALID == " + (production.Span[(int)i].SearchReferenceEntity != null).ToString());
 						BoundingBox searchBox = (BoundingBox)((EntityNode)production.Span[(int)i].SearchReferenceEntity).BoundingBox;
-						searchBox = new BoundingBox(searchBox.Center, EntryClass.bSim.Max_Search_Distance);
+						searchBox = new BoundingBox(searchBox.Center, Utils.GetMax(EntryClass.bSim.SeparationDistance, EntryClass.bSim.AlignmentDistance, EntryClass.bSim.CohesionDistance));
 						
+						double maxDistanceSquared = 1;//searchBox.RadiusSquared;
+						int outIndex;
 						
-						List<Tuple<EntityNode, double>> found = EntryClass.bSim.FindNearestTarget((EntityNode)production.Span[(int)i].SearchReferenceEntity, searchBox);
+						Func<EntityNode, EntityNode, Tuple<bool, double>> match = (current, neighbor) =>  {
+							if (current == neighbor || neighbor.GetUserStruct(typeof(PowerConsumer), out outIndex) == null) return new Tuple<bool, double>(false, -1);
+                			//if (current == neighbor) return new Tuple<bool, double>(false, -1);
+							double distanceSquared = Vector3d.GetDistance3dSquared(neighbor.Translation, current.Translation);
+							if (distanceSquared <= maxDistanceSquared) return new Tuple<bool, double>(true, distanceSquared);
+                			return new Tuple<bool, double>(false, -1);
+           					 };  
+							
+						List<Tuple<EntityNode, double>> found = EntryClass.bSim.FindNearestTarget((EntityNode)production.Span[(int)i].SearchReferenceEntity, searchBox, match);
+						
 						if (found == null) return;
+						Console.WriteLine("ProcessPowerConsumption() - Found count == " + found.Count.ToString());
 						
 						distributionList = new int[found.Count];
 						for (int h = 0; h < distributionList.Length; h++)
@@ -3920,8 +3966,7 @@ namespace HelloBoids
 							distributionList[h] = indexConsumer;
 						}
 						
-						Console.WriteLine("Battery using SearchBox...");
-						
+						Console.WriteLine("ProcessPowerConsumption() - Battery using SearchBox...");
 					}
 					else if (production.Span[(int)i].DistributionMode == PRODUCT_DISTRIBUTION_TYPE.BoundingSphere)
 					{
@@ -5799,6 +5844,8 @@ return (0,0);
         public BoundingBox BoundingBox
         {
             get { return _box; }
+			//TEMP HACK allow Set here since we have no meshes to compute automatically
+			set { _box = value;}
         }
 
 		public OctreeOctant SpatialNode
@@ -10765,6 +10812,7 @@ if (mEntityNodesCollection == null) return null;
 					return;
 				}
 
+				if (entityNode.BoundingBox.Radius <= 0) throw new Exception("OctreeOctant.Add() - Entity BoundingBox invalid.");
 				double entityRadius = entityNode.BoundingBox.Radius;
 
 				// note: we intentionally compute a radius without taking into account hypotenuse.
@@ -19622,6 +19670,13 @@ public abstract class PlanedFrustum
             return A | R | G | B;
         }
 				
+		public static double GetMax(double value1, double value2, double value3)
+		{
+			double result = System.Math.Max(value1, value2);
+			result = System.Math.Max(result, value3);
+			return result;
+		}
+		
 		// ArrayExtensions from KeystoneStandardLibrary.Extensions.ArrayExtensions
 		/// <summary>
         /// Grow an array by one element and append new element there.

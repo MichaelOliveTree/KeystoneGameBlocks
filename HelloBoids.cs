@@ -697,27 +697,16 @@ namespace HelloBoids
 #if USE_MEMORY_T
         public DataProcessorsStore mDataProcessor;
 #endif
+
 		
-		// NOTE: mLimitedProduction may not be necessary as we now track the NumUses for any given Production and if
-		//       p.NumUses == 0, then we remove that production at the end of UpdateProduction();
-		// private System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>> mLimitedProduction;
-	
-		// TODO: mProduction and mConsumption should probably be ConcurrentDictionary<int, Memory<Production>> 
-		//                                                       ConcurrentDictionary<int, Memory<Consumption>> 
-		//       NOT List<> like below.
-		//       Then perhaps we can have a method that is called ProcessProduction(production, consumption) or ApplyProduction(production, consumption);
-		//       that will determine which types they are and then choose the correct underlying system
-		//       eg.  PowerConsumptionSystem.Add (production, consumption)
-		//        
-		//internal System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>> mProduction;
-        //internal System.Collections.Concurrent.ConcurrentDictionary<uint, List<Consumption>> mConsumption;
-		internal System.Collections.Concurrent.ConcurrentDictionary<uint, ComponentStore<Production>> mProduction;
-        internal System.Collections.Concurrent.ConcurrentDictionary<uint, ComponentStore<Consumption>> mConsumption;
 		
 		
         public List<EntityNode> Boids { get; set; }
+		
 		private System.Collections.Concurrent.ConcurrentDictionary<int, List<Tuple<int, double>>> mNeighbors = new System.Collections.Concurrent.ConcurrentDictionary<int, List<Tuple<int, double>>>();
-
+		internal System.Collections.Concurrent.ConcurrentDictionary<uint, ComponentStore<Production>> mProduction;
+        internal System.Collections.Concurrent.ConcurrentDictionary<uint, ComponentStore<Consumption>> mConsumption;
+		
 		
         public Seeds Seeds { get; set; }
 						 
@@ -914,7 +903,6 @@ namespace HelloBoids
 			//builder.ToString();
 			//Environment.Exit(0);
 			
-			
 			//Console.WriteLine ("Spawn() - Boid Spawn BEGIN at array index == " + arrayIndex.ToString());
 			string exLine = "Spawn 0";
 						
@@ -973,7 +961,6 @@ namespace HelloBoids
 			{
 				Console.WriteLine(exLine + " " + ex.Message);
 			}
-			
 			
 			
 			// private const CONFIGURATION BoidConfiguration = CONFIGURATION.Transform | CONFIGURATION.RigidBody | CONFIGURATION.Sentient | CONFIGURATION.SelfPropelled;
@@ -1052,6 +1039,7 @@ namespace HelloBoids
 			// BATTERY to power Eyes, Wings, Laser and TacticalStation
 			EntityNode battery = CreateBattery(arrayIndex + BATTERY_OFFSET);
 			
+			////////////////////////////////////////////////////////////////////////////////////////////////////
 			// HUMAN OPERATOR for the tactical station
 			EntityNode humanOperator = CreateHumanOperator(arrayIndex + HUMAN_OPERATOR_OFFSET);
 			
@@ -1085,7 +1073,9 @@ namespace HelloBoids
 		    if (this.Octree != null)
             {
            		Octree.Add((EntityNode)b);
-				
+				// NOTE: in KGB these Entities would be children of the parent node Boid and then
+				//       the Boid would get added to the Octree and then any child entities would get
+				//       recursively added to the Octree automatically.
 				Octree.Add((EntityNode)eyes);
 				Octree.Add((EntityNode)wings);
 				Octree.Add((EntityNode)laser);
@@ -1110,10 +1100,7 @@ namespace HelloBoids
 			// values
 			string exLine =  "CreateOpticalSensor 1";
 			string entityKey = "sensor_" + arrayIndex.ToString(); // prefix with "sensor_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!
-			EntityNode opticalSensor = null;
-			
-			opticalSensor = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); // OpticalSensor is the Droid's 'eyes'
-
+			EntityNode opticalSensor = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); // OpticalSensor is the Droid's 'eyes'
 			
 			//CONFIGURATION OpticalSensorConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.Sensor;
 	
@@ -1168,7 +1155,7 @@ namespace HelloBoids
 			p.ProducerEntityInternalIndex = opticalSensor.GetUserStructIndex(typeof(Transform.Transform_Struct));
 			//p.Consumers = null; <-- same as DistributionList?  what if we only are using a different DistributionMode that requires a search?
 			p.ProductID = 	(uint)PRODUCTS.OpticalReflection;
-			p.Enabled = true;
+			p.Breaker = true;
 			
 			p.Value = 1;
 			p.Store = -1; // this should be diminished by the range of the sensor 
@@ -1192,6 +1179,7 @@ namespace HelloBoids
 			c.ConsumerEntityArrayIndex = opticalSensor.EntityArrayIndex;
 			c.ConsumerInternalIndex = sensorInternalIndex;
 			c.ProductID = (uint)PRODUCTS.OpticalReflection;
+			c.Breaker = true;
 			c.Value =  null;
 			c.Amount = 1;
 			c.Operations = null;
@@ -1204,6 +1192,7 @@ namespace HelloBoids
 			c.ConsumerEntityArrayIndex = opticalSensor.EntityArrayIndex;
 			c.ConsumerInternalIndex = transformIndex;
 			c.ProductID = (uint)PRODUCTS.ElectricalPower;
+			c.Breaker = true;
 			c.Value =  2;  // 10 kW/h
 			c.Amount = 1;
 			c.Operations = null;
@@ -1249,6 +1238,7 @@ namespace HelloBoids
 			c.ConsumerEntityArrayIndex = wings.EntityArrayIndex;
 			c.ConsumerInternalIndex = transformIndex;
 			c.ProductID = (uint)PRODUCTS.ElectricalPower;
+			c.Breaker = true;
 			c.Value =  5;  // 5 kW/h
 			c.Amount = 1;
 			c.Operations = null;
@@ -1268,8 +1258,7 @@ namespace HelloBoids
 					
 			mIntervalTimers.Register(entityKey, "droid_canfire", 0.00d);
 			mIntervalTimers.Register(entityKey, "droid_isfiring", 0.06d);
-			
-			
+						
 			//CONFIGURATION LaserConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.Weapon | CONFIGURATION.Laser;
 			
 			// transform struct
@@ -1365,6 +1354,7 @@ namespace HelloBoids
 			c.ConsumerEntityArrayIndex = laser.EntityArrayIndex;
 			c.ConsumerInternalIndex = transformIndex;
 			c.ProductID = (uint)PRODUCTS.ElectricalPower;
+			c.Breaker = true;
 			c.Value =  25;  // 10 kW/h
 			c.Amount = 1;
 			c.Operations = null;
@@ -1447,6 +1437,7 @@ namespace HelloBoids
 			c.ConsumerEntityArrayIndex = station.EntityArrayIndex;
 			c.ConsumerInternalIndex = transformIndex;
 			c.ProductID = (uint)PRODUCTS.ElectricalPower;
+			c.Breaker = true;
 			c.Value =  1;   
 			c.Amount = 10; // 10 kW/h
 			c.Operations = null;
@@ -1458,6 +1449,7 @@ namespace HelloBoids
 			c.ConsumerEntityArrayIndex = station.EntityArrayIndex;
 			c.ConsumerInternalIndex = transformIndex;
 			c.ProductID = (uint)PRODUCTS.TargetingSkillModifier;
+			c.Breaker = true;   // for SkillModifiers, this is just whether the Skill Modifier is currently enabled or not.
 			c.Value =  null;
 			c.Amount = 1;
 			c.Operations = null;
@@ -1472,8 +1464,7 @@ namespace HelloBoids
 		{
 			string exLine = "CreateBattery 1";
 			string entityKey = "battery_" + arrayIndex.ToString(); // prefix with "laser_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!			
-			
-
+		
 			EntityNode battery = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
 					
 			//CONFIGURATION BatteryConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerProducer;
@@ -1514,18 +1505,26 @@ namespace HelloBoids
 			storePowerProducers.Span[powerProducerInternalIndex].EntityArrayIndex = arrayIndex;
 			// todo: the .Store amount must be computed from it's Capacity and Output or Output and Duration
 			//       but for now just hardcode the value with a constant
+			storePowerProducers.Span[powerProducerInternalIndex].Output = 0;
 			storePowerProducers.Span[powerProducerInternalIndex].Capacity = BATTERY_POWER_STARTING_AMOUNT;
+			storePowerProducers.Span[powerProducerInternalIndex].Duration = 120f; // seconds
 			storePowerProducers.Span[powerProducerInternalIndex].Store = BATTERY_POWER_STARTING_AMOUNT;
-				
-			Builder build = new Builder();
-			//build.Calculate();
+			storePowerProducers.Span[powerProducerInternalIndex].Breaker = true;
+			
+			
+			string buildScriptRelativePath = "\\scripts_build\\battery_builder.css";
+			Builder build = new Builder(buildScriptRelativePath);
+			build.Calculate(battery);
+	
+			
+			
 			
 			// each Battery can Produce a PRODUCTS.ElectricalPower
 			Production p;
 			p.ProducerEntityArrayIndex = battery.EntityArrayIndex;
 			p.ProducerEntityInternalIndex = powerProducerInternalIndex;
 			p.ProductID = 	(uint)PRODUCTS.ElectricalPower;
-			p.Enabled = true;
+			p.Breaker = true;
 			
 			p.Value = 1;  // the UNIT value... in this case it's a DOUBLE
 			p.Store = 0; // a Battery can produce as much as it can discharge supply all of it's Consumers until it runs out of Energy  
@@ -1615,7 +1614,7 @@ namespace HelloBoids
 			p.ProducerEntityArrayIndex = humanOperator.EntityArrayIndex;
 			p.ProducerEntityInternalIndex = livingEntityID;
 			p.ProductID = 	(uint)targetingSkill.Production[0].Product;  // TargetingSkillModifier
-			p.Enabled = true;
+			p.Breaker = true;
 			
 			p.Value = targetingSkill.Production[0];  // ??
 			p.Store = targetingSkill.Production[0].Amount; // ??
@@ -3929,10 +3928,12 @@ namespace HelloBoids
 			{
 				Span<Consumption> allConsumptions = consumptionStore.Span;
 				
+				if (production.Span[(int)i].Breaker == false) return;
+				
 				// NOTE: by using production.Span[i], we never have to COPY the struct 
 				
 				//Console.WriteLine("ProcessPowerConsumption() - Entity '" + Boids[currentProduction.ProducerEntityArrayIndex].EntityKey + "' Producing '" + ((PRODUCTS)productID).ToString() );
-			
+			    
 				
 				int[] distributionList = production.Span[(int)i].Consumers;
 				if (production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.List && production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.SingleItem)
@@ -4760,9 +4761,6 @@ namespace HelloBoids
 	*/
 
 		
-	
-		
-		
 	public struct Production
     {
 		public uint ProductID;
@@ -4771,8 +4769,7 @@ namespace HelloBoids
 		// production is not serialized to XML because they are created by the scripts in code
 		public int ProducerEntityArrayIndex;
 		public int ProducerEntityInternalIndex;  
-		 			// In turn, the Producing Entity needs an index to this Production's index... and in fact, a list of all the Production indices it has registered.
-		
+		 // In turn, the Producing Entity needs an index to this Production's index... and in fact, a list of all the Production indices it has registered.
 		
 		// cached list of Consumers indices from ComponentStore<Consumer> we're sending ProductID to.  
 		// For DistributionMode.List or .Item this array does NOT need to be recomputed as it would if
@@ -4781,8 +4778,7 @@ namespace HelloBoids
 		// and NOT for ElectricalPower production for instance.
 		public int[] Consumers;  
 		//public int[] DistributionList;  // <-- same as Consumers
-		public bool Enabled;
-		
+		public bool Breaker;
 		
 		public object Value;  // for Thrust, this would be a 'Vector3d'.  For damage, an 'int', for electrical power a 'double',  for radar echos, UnitValue is a Vector3d position, for SkillModifiers, it can contain a SkillModifier struct.
 		public double Store; // infinite = -1, else number of unit's that are available to be consumed by Consumers this Production will be distributed too
@@ -4799,7 +4795,7 @@ namespace HelloBoids
 		// used when DistributionType is List.  Contains id of entities consuming this product.  
 		// No searches (spatial or otherwise) reqt. "power links" and other "links" are good examples of their use.
 
-		// cast to BoundingSphere, BoundingCone, or BoundingBox used with DistributionMode is a spatial search of some kind.
+		// can then use SearchReferenceEntity.BoundingBox, .BoundingSphere, BoundingCone with DistributionMode is a spatial search of some kind.
 		public object SearchReferenceEntity;   // since this struct is stored in ComponentStore<Production> we do NOT have to worry about boxing when casting the Memory<T> to a struct
 		//[obsolete] public Vector3d Position; // Position of Primitive where this production occurred (eg. explosion, heat signature, etc)?  A radiation bomb or any explosion will need it's Position(Location) set so we can determine the falloff/attenuation of the damage, 
 		//[obsolete] public Vector3d Size;        // taken from SearchReferenceEntity.BoundingBox/Sphere
@@ -4850,6 +4846,7 @@ namespace HelloBoids
 		
 		// public int[] Producers;  // list of Producers indices from ComponentStore<Producer> we're receiving ProductID from.
 			
+		public bool Breaker;
 		
 		public object Value;  // for Thrust, this would be a 'Vector3d'.  For damage, an 'int', for electrical power a 'double', 
 		public int Amount; // the number of Units to draw from the relevant Producer.  The Simulation EXE will know how to deal with UnitValue based on ProductID.  This could also be "damage." 
@@ -5870,9 +5867,19 @@ return (0,0);
         }
 
 	
+		#region Custom Properties
+		PropertySpec[] mCustomProperties;
+		public void SetCustomProperties(PropertySpec[] buildSpecificProperties)
+		{
+			mCustomProperties = buildSpecificProperties;
+		}
 		
-		
-		
+		public PropertySpec[] GetCustomProperties()
+		{
+			return mCustomProperties;
+		}
+		#endregion
+				
 		
 		private List<Target> mTargets;
 		public List<Target> GetTargets()
@@ -7908,12 +7915,14 @@ return (0,0);
 	{
         public int EntityArrayIndex;
 		public CONFIGURATION Configuration;
-
+		
+		public bool Breaker;      // NOTE: we do not use node.Enabled because that is seperate (for rendering AND updating) from a Component running it's production simulation or not.
         
         //Definition: 1 kWh == 1 kW of power sustained for 1 hour.
         //    Usage Example: A 2,500-watt clothes dryer used for 2 hours consumes 5 kWh (2.5kW x 2  hours).
         //Average Consumption: The average U.S. household consumes approximately 899 kWh per month, or about 30 kWh per day.
         
+		
         public double Output;    // kWh    
 		public double Capacity;
 		public double Duration;  
@@ -7926,11 +7935,17 @@ return (0,0);
 //                                 // as the machine wears out between mainteneance efficiency
 //                                 // will drop.  It is also possible to increase efficiency
 
+		
         public float Throttle;  // aka: Regulator.  This value typically 0.0 - 1.0 but can exceed 1.0 with potential risk
 //                                // of damaging the machine (is Damage a customProperty in Entity?)
 			
 		// TODO: the 'Component struct' should probably have a WearAndTear value that limits the Max Hitpoints that can be recovered perhaps
 		//       unless the Component is repaired/refurbished/torndown+cleaned+reassembled/etc.
+		
+		// the following are PowerProducer runtime STATS that belong in 'struct PowerProducer'
+		public double PowerDraw; //- combined power drawn from all Consumers (cannot exceed Output)
+		public double PowerAvailable; // = Math.Min(Capacity, Output - PowerDraw);
+		public double PowerIn; // = combined power INPUT from all Producers (cannot exceed MaxInput)  Should this only exist in PowerConsumer?
 		
 		
 		// The index into the ComponentStore<Production> internal Memory<Production>
@@ -8595,16 +8610,18 @@ return (0,0);
 	// See KeystoneGameBlocks/Game01/Builders
 	public struct Builder
     {
-		
 		public CONFIGURATION Configuration {get; set;}
 		public int UserTypeID {get; set;}
 		
 		private string mBuildScriptRelativeResourcePath;
 		private Dictionary<string, object> mBuildSpecificPropertyValues;
 				
-		public object BuildScript {get;}
-		public object ComponetScript {get;}
-		public EntityNode Component {get;}
+		private object mBuildScript;
+		private object mComponetScript;
+		
+		private EntityNode mComponent;
+		public EntityNode Component { get {return mComponent;}}
+		
 		
         public string BuildPersistString {get;}
         private bool mPropertyChanged;
@@ -8612,15 +8629,31 @@ return (0,0);
         private bool mBuildScriptInitialized;
 		
 		
-		public Builder (EntityNode component)
+		public Builder (string buildScriptRelativeResourcePath)
 		{
-			if (component == null) throw new ArgumentOutOfRangeException("Builder.ctor() - Component argument cannot be null.");
-			Component = component;
+			if (string.IsNullOrEmpty(buildScriptRelativeResourcePath)) throw new ArgumentOutOfRangeException("Builder.ctor() - Build Script relative path cannot be null.");
+			mBuildScriptRelativeResourcePath = buildScriptRelativeResourcePath;
+
+			// TODO: Load this Build Script.  This script CAN be shared because the Values of the 
+			//       Build properties are stored inm the Component
+			//mBuildScript = Repository.Create("Builder", mBuildScriptRelativeResourcePath);
 		}
+		
+		
+		//public CSScript BuildScript
+		//{
+		//	get { return mBuildScript;}
+		//}
+		
+		
+		//public CSScript ComponentScript
+		//{
+		//	get { return if (Component == null) return null; return Component.ComponentScript;}
+		//}
+		
 		
 		public void SetProperties(PropertySpec[] properties)
 		{
-			
 			mPropertyChanged = true;
 			mBuildChanged = true;
 		}
@@ -8628,11 +8661,6 @@ return (0,0);
 		
 		public PropertySpec[] GetProperties(out Dictionary<string, object> buildSpecificPropertyValues)
 		{
-			
-			
-			//if (BuildScript != null && BuildScript.TVResourceIsLoaded)
-			//	results = BuildScript.GetCustomProperties();
-				
 			// TEMP: These are hard-coded 'build specific' properties for a Battery Power Producer 
 			
 			// Capacity (Watt hours / kJ)
@@ -8640,19 +8668,37 @@ return (0,0);
 			// Duration (max duration in seconds at Max Discharge Rate)
 			// MaxInput (for a Battery, this is maximum Input for recharging purposes)
 			
-			int level = 1;
+			uint level = 1;
 			double capacity = 2000;
 			
 			double output = 100;
 			double duration = 25d;
 			double maxInput = 33d;
+			double efficiency = 0.92d;
+			double throttle = 1.0d;	
 			
 			buildSpecificPropertyValues = new Dictionary<string, object>();
 			buildSpecificPropertyValues.Add("Level", level);
+			buildSpecificPropertyValues.Add("Breaker", true);
 			buildSpecificPropertyValues.Add("Capacity", capacity);
 			buildSpecificPropertyValues.Add("Output", output);
 			buildSpecificPropertyValues.Add("Duration", duration);
 			buildSpecificPropertyValues.Add("MaxInput", maxInput);
+			
+			buildSpecificPropertyValues.Add("Efficiency", efficiency);
+			buildSpecificPropertyValues.Add("Throttle", throttle);
+			
+			// todo: we also need to take into account 'Component struct'
+			//    - craftsmanship, 
+			//    - materials quality
+			//    - Ruggedized
+			//    - Wear&Tear (Power or Duty Cycles\Takeoff+Land Cycles\etc) 
+			//       NOTE: Some stats would need to be FIXED once a design is FINISHED because repairs should never allow for improved Armor or change in Weight, Volume, Surface Area.
+			//             So, really it's CAPACITY and or DURATION that needs to be modified when efficiency and/or throttle changes
+			// 
+			//    - Hitpoints - CurrentHP (damage)
+			//    - DR / PassiveDefense
+			
 			
 
 			PropertySpec[] buildSpecificProperties = new PropertySpec[]
@@ -8667,50 +8713,18 @@ return (0,0);
 			// For NON-battery Power Producers like gas generators, reactors, etc
 			// FuelType
 			// FuelConsumptionRate
-			
-			// the following are PowerProducer runtime STATS that belong in 'struct PowerProducer'
-			// PowerDraw - combined power drawn from all Consumers (cannot exceed Output)
-			// Available = Math.Min(Capacity, Output - PowerDraw);
-			// PowerIn = combined power INPUT from all Producers (cannot exceed MaxInput)
+
 			
 			return buildSpecificProperties;
 		}
-		
-
-		public void Build (string clientScript, string buildScriptRelativeResourcePath, string persistString = null)
-		{
-			
-		}
-		
-		///<summary>
-		/// Updates an existing component with stats calculated from a build script
-		///</summary>
-		public void Build (EntityNode component, object clientScript, string buildScriptRelativeResourcePath, string persistString = null)
-		{
-			if (string.IsNullOrEmpty(persistString))
-			{
 				
-			}
-			
-			
-			
-            // NOTE: we only need the build parameters and from that we can
-            //       create the full entity
-            component = System.Text.Json.JsonSerializer.Deserialize<EntityNode>(persistString);
-		}
 		
-		///<summary>
-		/// Creates an EntityNode using the properties from the client script, the specific build script path and a persist string.
-		///</summary>
-		public EntityNode Build (object clientScript,  string buildScriptRelativeResourcePath, string persistString = null)
-		{
-			EntityNode result = null;
-			return result;
-		}
-
 		
-		private void Calculate()
+		public void Calculate(EntityNode component)
 		{
+			if (component == null) throw new ArgumentNullException();
+			mComponent = component;
+			
 			// GET BUILD SPECIFIC PROPERTIES FROM OUR INSTANCED BUILD SCRIPT... for now its just hardcoded
 			// SPECIFIC TO OUR 'BATTERY' PowerProducer 
 			// --------------------------------------------------------------------------------------------
@@ -8722,11 +8736,15 @@ return (0,0);
 			// the build stats. Or should "level" exist only in the Build stats?
 			//PropertySpec[] componentProperties = Component.GetCustomProperties(true);
 			uint level = (uint)buildSpecificPropertyValues["Level"];
+			bool breaker = (bool)buildSpecificPropertyValues["Breaker"];
 			double capacity = (double)buildSpecificPropertyValues["Capacity"];
 			double output = (double)buildSpecificPropertyValues["Output"];
 			double duration = (double)buildSpecificPropertyValues["Duration"];
 			double maxInput = (double)buildSpecificPropertyValues["MaxInput"];
-
+			//double efficiency = (double)buildSpecificPropertyValues["Efficiency"];
+			//double throttle = (double)buildSpecificPropertyValues["Throttle"];
+			
+			
 			// todo: we also need to take into account 'Component struct'
 			//    - craftsmanship, 
 			//    - materials quality
@@ -8736,18 +8754,21 @@ return (0,0);
 			//             So, really it's CAPACITY and or DURATION that needs to be modified when efficiency and/or throttle changes
 			// 
 			//             
-			//double efficiency = (double)buildSpecificPropertyValues["Efficiency"];
-			//double throttle = (double)buildSpecificPropertyValues["Throttle"];
 			
-			// assign the build props and values to a set of PropertySpec and to it's Entity
+			
+			// ASSIGN the build props and values to a set of PropertySpec and to it's Entity
 			buildSpecificProperties = new PropertySpec[] 
 			{
+				new PropertySpec("Level", typeof(uint).Name, "build", level),
 				new PropertySpec("Capacity", typeof(double).Name, "build", capacity),
 				new PropertySpec("Output", typeof(double).Name, "build", output),
 				new PropertySpec("Duration", typeof(double).Name, "build", duration),
 				new PropertySpec("MaxInput", typeof(double).Name, "build", maxInput) 
 			};
 
+			
+			
+			
 
 			// GET COMPONENT SPECIFIC PROPERTIES FROM OUR INSTANCED CLIENT ENTITY SCRIPT... for now its just hardcoded
 			// --------------------------------------------------------------------------------------------
@@ -8755,12 +8776,6 @@ return (0,0);
 			double weight = 0d;
 			double volume = 0d;
 			double surfaceArea = 0d;
-			
-			Dictionary<string, object> componentSpecificPropertyValues = new Dictionary<string, object>();
-			componentSpecificPropertyValues.Add("Cost", cost);
-			componentSpecificPropertyValues.Add("Weight", weight);
-			componentSpecificPropertyValues.Add("Volume", volume);
-			componentSpecificPropertyValues.Add("SurfaceArea", surfaceArea);
 						
 			// compute stats for cost, weight, volume, surface area, 
 			cost = level * 10d;
@@ -8769,7 +8784,7 @@ return (0,0);
 			surfaceArea = level * 0.25d;
 			
 			// assign the computed values to a set of PropertySpec and to it's Entity
-			PropertySpec[] entityStats = new PropertySpec[] 
+			PropertySpec[] componentCustomProperties = new PropertySpec[] 
 			{
 				new PropertySpec("Cost", typeof(double).Name, "component", cost),
 				new PropertySpec("Weight", typeof(double).Name, "component", weight),
@@ -8777,11 +8792,19 @@ return (0,0);
 				new PropertySpec("SurfaceArea", typeof(double).Name, "component", surfaceArea) // recharging takes significantly longer than discharging at lower technology levels
 			};
 			
+			
+			Dictionary<string, object> componentCustomPropertyValues = new Dictionary<string, object>();
+			componentCustomPropertyValues.Add("Cost", cost);
+			componentCustomPropertyValues.Add("Weight", weight);
+			componentCustomPropertyValues.Add("Volume", volume);
+			componentCustomPropertyValues.Add("SurfaceArea", surfaceArea);
+			
 			// NOTE: this should result in the Memory<T> records being updated for the 'Battery' component
-			//       and specifically it's 'struct PowerProducer' 
-// TEMP COMMENT OUT->			Component.SetCustomProperties(entityStats);
+			//       and specifically it's 'struct PowerProducer' internally within Entity... that means the
+			//       CustomProperties must know which interfaces to use for each property
+			mComponent.SetCustomProperties(buildSpecificProperties);
+			mComponent.SetCustomProperties(componentCustomProperties);
 		}
-		
 		
 		
         public override string ToString()
@@ -8811,8 +8834,8 @@ return (0,0);
 			Console.WriteLine("Builder.ToString() - SERIALIZE = " + jsonString);
 			
 			//Being Compression + Base65 encoding
-			string compressedBase64 = Convert.ToBase64String(CompressWithBrotli(System.Text.Encoding.UTF8.GetBytes(jsonString)));
-			string decompressedBase64 = System.Text.Encoding.UTF8.GetString(Decompress(Convert.FromBase64String(compressedBase64)));
+			string compressedBase64 = Convert.ToBase64String(Utils.CompressWithBrotli(System.Text.Encoding.UTF8.GetBytes(jsonString)));
+			string decompressedBase64 = System.Text.Encoding.UTF8.GetString(Utils.DecompressWithBrotli(Convert.FromBase64String(compressedBase64)));
 			jsonString = decompressedBase64;
 			// End Base64 decoding and Decompression
 			
@@ -8822,32 +8845,6 @@ return (0,0);
 			Console.WriteLine("Build.ToString() - COMPLETED.");
             return jsonString;
 		}
-
-		public static byte[] CompressWithBrotli(byte[] inputBytes)
-		{
-			using var outputStream = new MemoryStream();
-			using (var brotliStream = new System.IO.Compression.BrotliStream(outputStream, System.IO.Compression.CompressionLevel.Optimal))
-			{
-				brotliStream.Write(inputBytes, 0, inputBytes.Length);
-			}
-			return outputStream.ToArray();
-		}
-		
-		public static byte[] Decompress(byte[] compressedData)
-		{
-			using var inputStream = new MemoryStream(compressedData);
-			using var outputStream = new MemoryStream();
-			
-			using (var brotliStream = new System.IO.Compression.BrotliStream(inputStream, System.IO.Compression.CompressionMode.Decompress))
-			{
-				brotliStream.CopyTo(outputStream);
-			}
-			return  outputStream.ToArray();
-			
-			
-		}
-		
-		
 #endregion
 	}
 	
@@ -8864,11 +8861,11 @@ return (0,0);
         // 3) Do we need to support rendering Proxies here (2D and 3D?)
 		public struct EntitySystemUpdateContext
     	{
-        // see SelectionNode or Elements.SwitchNode for help
-	
+        	// see SelectionNode or Elements.SwitchNode for help
+			
+			
     	}
 	
-
         int Seed { get; }
         int EntityCount { get; }
         bool MultithreadingEnabled { get; set; }
@@ -19705,6 +19702,30 @@ public abstract class PlanedFrustum
 			double result = System.Math.Max(value1, value2);
 			result = System.Math.Max(result, value3);
 			return result;
+		}
+		
+		public static byte[] CompressWithBrotli(byte[] inputBytes)
+		{
+			using var outputStream = new MemoryStream();
+			using (var brotliStream = new System.IO.Compression.BrotliStream(outputStream, System.IO.Compression.CompressionLevel.Optimal))
+			{
+				brotliStream.Write(inputBytes, 0, inputBytes.Length);
+			}
+			return outputStream.ToArray();
+		}
+		
+		public static byte[] DecompressWithBrotli(byte[] compressedData)
+		{
+			using var inputStream = new MemoryStream(compressedData);
+			using var outputStream = new MemoryStream();
+			
+			using (var brotliStream = new System.IO.Compression.BrotliStream(inputStream, System.IO.Compression.CompressionMode.Decompress))
+			{
+				brotliStream.CopyTo(outputStream);
+			}
+			return  outputStream.ToArray();
+			
+			
 		}
 		
 		// ArrayExtensions from KeystoneStandardLibrary.Extensions.ArrayExtensions

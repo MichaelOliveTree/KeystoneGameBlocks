@@ -7593,7 +7593,7 @@ return (0,0);
 		
         public string FullName;
 		
-		public int Level; // technological level. 
+		public uint Level; // technological level. 
 		
         public float MaterialQuality; // cheap vs very fine materials (eg poorly refined steel vs damascus steel)
         public float Craftsmanship;   // how well the item is put together or manufactured (often taking into account the skill level of the maker)
@@ -8663,6 +8663,14 @@ return (0,0);
 		{
 			// TEMP: These are hard-coded 'build specific' properties for a Battery Power Producer 
 			
+			
+			PropertySpec[] properties;
+			
+			// based on the CONFIGURATION, retreive the Properties for the various structs used by this CONFIGURATION
+			
+			
+			
+			
 			// Capacity (Watt hours / kJ)
 			// Output (aka Max Discharge Rate)
 			// Duration (max duration in seconds at Max Discharge Rate)
@@ -8699,17 +8707,9 @@ return (0,0);
 			//    - Hitpoints - CurrentHP (damage)
 			//    - DR / PassiveDefense
 			
+			PropertySpec[] buildSpecificProperties = GetProperties_PowerProducer();
+
 			
-
-			PropertySpec[] buildSpecificProperties = new PropertySpec[]
-			{
-				new PropertySpec("Level", typeof(uint).Name, "build", level),
-				new PropertySpec("Capacity", typeof(double).Name, "build", capacity),
-				new PropertySpec("Output", typeof(double).Name, "build", output),
-				new PropertySpec("Duration", typeof(double).Name, "build", duration),
-				new PropertySpec("MaxInput", typeof(double).Name, "build", maxInput) // recharging takes significantly longer than discharging at lower technology levels
-			};
-
 			// For NON-battery Power Producers like gas generators, reactors, etc
 			// FuelType
 			// FuelConsumptionRate
@@ -8718,7 +8718,167 @@ return (0,0);
 			return buildSpecificProperties;
 		}
 				
+		private PropertySpec[] GetProperties_Component()
+		{
+			uint level = 1;
+			string fullname = "Battery";
+			float craftsmanship = 0.5f;
+			float materialQuality = 0.5f;
+			bool ruggedized = false;
+			bool repairable = true;
+				
+			double weight = 0;
+			double cost = 0;
+			double volume = 0;
+			double surfaceArea = 0;
+			
+			PropertySpec[] componentCustomProperties = new PropertySpec[] 
+			{
+				//public int EntityArrayIndex;
+				//public CONFIGURATION Configuration;
+				new PropertySpec ("Level", typeof(uint).Name, "component", 1),
+				new PropertySpec("Name", typeof(string).Name, "component", (object)fullname),
+
+				
+				new PropertySpec ("Material Quality", typeof(float).Name, "component", craftsmanship),
+				new PropertySpec ("Craftsmanship", typeof(float).Name, "component", materialQuality),
+				new PropertySpec ("Ruggedized", typeof(bool).Name, "component", ruggedized),
+				new PropertySpec ("Repairable", typeof(bool).Name, "component", repairable),
+			
+				/// <summary>
+				/// Number of Human (as opposed to software/AI) Operators Required (if 0 then RequiresOperator {get { return NumOperatorsRequired > 0;}}
+				///	      
+				/// NOTE: if this is a medical bed 1 or 2 might be required.  For instance, the First "operator" is the patient and the Second "operator" is the Medical Professional.  
+				///       The second operator isnt always necessary depending on what the first "operator" is doing... if recovering for instance, no second operator is needed.
+				///</summary>
+				new PropertySpec ("Number of Operators Required", typeof(int).Name, "component", 0),
+				
+				/// <summary>
+				/// The required skills an Operator must have to use this Component
+				/// </summary>
+//				public Skill[] Skills;
+
+//			    public ExternalArmor Defense; 
+//				public InternalStructure Internals; 	
+
+				// stats
+				new PropertySpec("Cost", typeof(double).Name, "component", cost),
+				new PropertySpec("Weight", typeof(double).Name, "component", weight),
+				new PropertySpec("Volume", typeof(double).Name, "component", volume),
+				new PropertySpec("SurfaceArea", typeof(double).Name, "component", surfaceArea) // recharging takes significantly longer than discharging at lower technology levels
+					
+				/*	
+				// runtime
+					// what about state?  like , waiting for Operator to arrive?
+					public int[] OperatorIDs;
+					// LivingEntity vs Component both have this mRuntimeFlags but they are unique to each interface because typically LivingEntity and Component structs DO NOT exist within the same Entity.
+					// - this could conceivably change in the future if for instance a Cyborg or Robot was also a "Character" that was needed the LivingEntity struct. 
+					public uint mUserRuntimeFlags;
+					public uint mUserStructFlags;
+
+					public int CurrentHP; // HitPoints - Damage == CurrentHP;
+
+
+					public float StartTime; // when "Use" began
+					public float Duration;  // if the "Use" is of a set Duration, track how long that Duration is... for instance, a sleep duration might be 6 hours of gameTime
+
+					// todo: these bools would go into runtime stats as bitflags
+					// along with isPowered, isFueld, isHealthyEnough, hasSkills, isOperatorStatusOK, isInUse(aka isFiring for weapons), canAct (for tacticalStations),
+					// isReloading, isUnJamming (isFixingMalfunction), 
+					public bool InUse;
+					public bool Looping; // Repeating
+					public float CooldownDuration; 
+				*/
+				
+				
+				
+			};
 		
+			return componentCustomProperties;
+		}
+		
+		private PropertySpec[] GetProperties_PowerProducer()
+		{
+			
+			double capacity = 1000d;
+			double output = 100;
+			double duration = 0d;
+			double maxInput = 50d;
+			double efficiency = 0.7d;
+			double throttle = .75d;
+			
+			PropertySpec[] buildSpecificProperties = new PropertySpec[]
+			{
+				new PropertySpec("Capacity", typeof(double).Name, "build", capacity),
+				new PropertySpec("Output", typeof(double).Name, "build", output),
+				new PropertySpec("Duration", typeof(double).Name, "build", duration),
+				new PropertySpec("MaxInput", typeof(double).Name, "build", maxInput), // recharging takes significantly longer than discharging at lower technology levels
+				new PropertySpec("Efficiency", typeof(double).Name, "build", efficiency),
+				new PropertySpec("Throttle", typeof(double).Name, "build", throttle)
+			};
+
+			return buildSpecificProperties;
+		}
+		
+		
+		private PropertySpec[] GetProperties_PowerConsumer()
+		{
+			PropertySpec[] buildSpecificProperties = new PropertySpec[]
+			{	
+				
+				
+				public bool Breaker;  // NOTE: we do not use node.Enabled because that is seperate (for rendering AND updating) from a Component running it's production simulation or not.
+				public double PowerRequirement;// per tick or per-use if "Continuous == false:
+				public double MinimumPower;
+
+				public bool Continuous; // whether this component always consumes power when operating, or only when it is "Used" such as a Laser firing for a fixed duration
+				public float PerformanceSetting;  // 0.0 - 1.0.  We can get rid of HasVariablePerformance if PerformanceSetting >= 0 and <= 1.0
+				public bool HasVariablePerformance {get {return (PerformanceSetting >= 0.0f && PerformanceSetting <= 1.0f); }} // can run at reduced power, but with reduced performance (eg sensor will have lower range)
+
+				public int Priority;  // determines if there's insufficient power production, which consumers get higher priority to be powered during runtime 
+
+
+				// runtime
+				public float BreakerCycleDuration;
+
+				public long TimeStarted;
+				public float Duration;
+
+				public bool Looping; // Repeating
+				public float CooldownDuration; 
+				public bool InCoolDown;
+				
+				
+				new PropertySpec("Level", typeof(uint).Name, "build", level),
+				new PropertySpec("Breaker", typeof(bool).Name, "runtime", breaker),
+				new PropertySpec("Capacity", typeof(double).Name, "build", capacity),
+				new PropertySpec("Output", typeof(double).Name, "build", output),
+				new PropertySpec("Duration", typeof(double).Name, "build", duration),
+				new PropertySpec("MaxInput", typeof(double).Name, "build", maxInput), // recharging takes significantly longer than discharging at lower technology levels
+				new PropertySpec("Efficiency", typeof(double).Name, "build", duration),
+				new PropertySpec("Throttle", typeof(double).Name, "build", maxInput)
+			};
+
+			return buildSpecificProperties;
+		}
+		
+		
+		private PropertySpec[] GetProperties_Armor()
+		{
+			PropertySpec[] buildSpecificProperties = new PropertySpec[]
+			{
+				//new PropertySpec("Level", typeof(uint).Name, "build", level),
+				//new PropertySpec("Breaker", typeof(bool).Name, "runtime", breaker),
+				//new PropertySpec("Capacity", typeof(double).Name, "build", capacity),
+			//	new PropertySpec("Output", typeof(double).Name, "build", output),
+				//new PropertySpec("Duration", typeof(double).Name, "build", duration),
+				//new PropertySpec("MaxInput", typeof(double).Name, "build", maxInput), // recharging takes significantly longer than discharging at lower technology levels
+				//new PropertySpec("Efficiency", typeof(double).Name, "build", duration),
+				//new PropertySpec("Throttle", typeof(double).Name, "build", maxInput)		
+			};
+			
+			return buildSpecificProperties;
+		}
 		
 		public void Calculate(EntityNode component)
 		{
@@ -8744,7 +8904,6 @@ return (0,0);
 			//double efficiency = (double)buildSpecificPropertyValues["Efficiency"];
 			//double throttle = (double)buildSpecificPropertyValues["Throttle"];
 			
-			
 			// todo: we also need to take into account 'Component struct'
 			//    - craftsmanship, 
 			//    - materials quality
@@ -8753,8 +8912,7 @@ return (0,0);
 			//       NOTE: Some stats would need to be FIXED once a design is FINISHED because repairs should never allow for improved Armor or change in Weight, Volume, Surface Area.
 			//             So, really it's CAPACITY and or DURATION that needs to be modified when efficiency and/or throttle changes
 			// 
-			//             
-			
+         
 			
 			// ASSIGN the build props and values to a set of PropertySpec and to it's Entity
 			buildSpecificProperties = new PropertySpec[] 
@@ -8766,8 +8924,6 @@ return (0,0);
 				new PropertySpec("MaxInput", typeof(double).Name, "build", maxInput) 
 			};
 
-			
-			
 			
 
 			// GET COMPONENT SPECIFIC PROPERTIES FROM OUR INSTANCED CLIENT ENTITY SCRIPT... for now its just hardcoded

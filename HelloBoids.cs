@@ -2562,15 +2562,26 @@ namespace HelloBoids
 					q.Add(r);
 					roePolicy.Add(q);
 			
-					SensorContact c = contacts[j];
+					SensorContact currentContact = contacts[j];
 					
 					if (roePolicy.Execute())
 					{
+						// Targets are those SensorContacts that friendly forces will potentially fire upon.
+						// Whereas SensorContacts is all contacts regardless of FoF status.
 						Target t = new Target();
+						t = current.GetTarget(c.ContactEntityArrayIndex);
+						if (t.Equals(default(Target))
+						{
+
+						}
+						else 
+						{
+							t.TargetedBy = Utils.ArrayAppend(t.TargetedBy, (int)i);       // other Ships/Vehciles/Entities, ground radars, factions, etc that are targeting this Target
+ 		//
+						}
 						t.EntityArrayIndex = c.ContactEntityArrayIndex;
 						t.WeaponsAssigned = null;
-						t.TargetedBy = new int[]{(int)i};      // other Ships/Vehciles/Entities, ground radars, factions, etc that are targeting this Target
-						t.Status = Target.STATUS.Active; //
+												t.Status = Target.STATUS.Active;
 						t.CrewStatus = Target.CREWSTATUS.Alive;
 						t.Hitpoints = 20;        // Boids[c.ContactIndex].Hitpoints; // max hitpoints of target... should a Sensor be able to know this exact number?  It's really just a game thing and maybe we should just use visual observations of condition of ship instead
 						t.CurrentHitPoints = 18; // Boids[c.ContactIndex].CurrentHP ; // used to determine % damage of Target
@@ -2609,6 +2620,7 @@ namespace HelloBoids
 			//Console.WriteLine("End target prioritization...");
 		}
 		
+
 		/// <summary>
 		/// A callback function for a Rule 'Condition' to find the LeftOperand
 		/// </summary>

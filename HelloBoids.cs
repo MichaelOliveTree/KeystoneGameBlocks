@@ -2508,6 +2508,7 @@ namespace HelloBoids
 			//Console.WriteLine("DoContactListSorting() - COMPLETED.");
 		}
 		
+		
 		/// <summary>
 		/// based on policies
 		/// </summary>
@@ -2569,8 +2570,8 @@ namespace HelloBoids
 						// Targets are those SensorContacts that friendly forces will potentially fire upon.
 						// Whereas SensorContacts is all contacts regardless of FoF status.
 						Target t = new Target();
-						t = current.GetTarget(c.ContactEntityArrayIndex);
-						if (t.Equals(default(Target))
+						t = current.GetTarget(currentContact.ContactEntityArrayIndex);
+						if (t.Equals(default(Target)))
 						{
 
 						}
@@ -2579,7 +2580,7 @@ namespace HelloBoids
 							t.TargetedBy = Utils.ArrayAppend(t.TargetedBy, (int)i);       // other Ships/Vehciles/Entities, ground radars, factions, etc that are targeting this Target
  		//
 						}
-						t.EntityArrayIndex = c.ContactEntityArrayIndex;
+						t.EntityArrayIndex = currentContact.ContactEntityArrayIndex;
 						t.WeaponsAssigned = null;
 												t.Status = Target.STATUS.Active;
 						t.CrewStatus = Target.CREWSTATUS.Alive;
@@ -5827,7 +5828,6 @@ return (0,0);
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // BEGIN NODES
-	
     public class EntityNode : Transform
     {
         protected string mID; // entityKey
@@ -5837,10 +5837,7 @@ return (0,0);
         protected BoundingBox _box;
         protected OctreeOctant _octant;
 		
-		
 		protected UserData mUserData;
-		
-		
 		
 		public uint ShotsFired = 0; // todo: belongs in TacticalStation 
 		public Dictionary<SKILLS, Skill> Skills;
@@ -5878,8 +5875,7 @@ return (0,0);
             set { _octant = value; }
         }
 
-	
-		#region Custom Properties
+	#region Custom Properties
 		PropertySpec[] mCustomProperties;
 		public void SetCustomProperties(PropertySpec[] buildSpecificProperties)
 		{
@@ -5890,9 +5886,10 @@ return (0,0);
 		{
 			return mCustomProperties;
 		}
-		#endregion
+	#endregion
+
 				
-		
+	#region PLACE_THIS_CODE_IN_SCRIPT_FOR_TACTICAL_STATION
 		private List<Target> mTargets;
 		public List<Target> GetTargets()
 		{
@@ -5916,7 +5913,6 @@ return (0,0);
 				mTargets.Add(t);
 			else
 				mTargets[found] = t;
-			
 		}
 		
 		public void Add (Target[] t)
@@ -5933,11 +5929,17 @@ return (0,0);
 				mTargets.Clear();
 		}
 		
-		
-		
-		#region PLACE_THIS_CODE_IN_SCRIPT_FOR_TACTICAL_STATION
-		// TODO: this should normally be in TacticalStation script correct?
-		//         
+		public Target GetTarget (int entityArrayIndex)
+		{
+			if (mTargets == null || mTargets.Count == 0) return default(Target);
+			
+			for (int i = 0; i < mTargets.Count; i++)
+				if (mTargets[i].EntityArrayIndex == entityArrayIndex)
+					return mTargets[i];
+			
+			return default(Target);
+		}
+		        
 		private List<SensorContact> mSensorContacts;
 		public List<SensorContact> GetSensorContacts()
 		{
@@ -5970,7 +5972,7 @@ return (0,0);
 			for (int i = 0; i < contacts.Count; i++)
 				Add(contacts[i]);
 		}
-		#endregion
+	#endregion
 		
 		
 		
@@ -8835,40 +8837,30 @@ return (0,0);
 		
 		private PropertySpec[] GetProperties_PowerConsumer()
 		{
+			bool breaker =            true;  // NOTE: we do not use node.Enabled because that is seperate (for rendering AND updating) from a Component running it's production simulation or not.
+			double powerRequirement = 100d;// per tick or per-use if "Continuous == false:
+			double minimumPower = 90d;
+			bool continuous = true; // whether this component always consumes power when operating, or only when it is "Used" such as a Laser firing for a fixed duration
+			bool looping = false; // Repeating
+			float performanceSetting = 1.0f;  // 0.0 - 1.0.  We can get rid of HasVariablePerformance if PerformanceSetting >= 0 and <= 1.0
+			//bool HasVariablePerformance {get {return (PerformanceSetting >= 0.0f && PerformanceSetting <= 1.0f); }} // can run at reduced power, but with reduced performance (eg sensor will have lower range)
+			float duration = 2.0f;          // the length of time that one "Use" takes
+			float cooldownDuration = 1.0f;  // the required downtime after the Duration of the previous "use", for the next "use" to be able to occur	
+			int priority = 1;  // determines if there's insufficient power production, which consumers get higher priority to be powered during runtime 
+			float efficiency = .75f;
+			
 			PropertySpec[] buildSpecificProperties = new PropertySpec[]
 			{	
-				
-				
-				public bool Breaker;  // NOTE: we do not use node.Enabled because that is seperate (for rendering AND updating) from a Component running it's production simulation or not.
-				public double PowerRequirement;// per tick or per-use if "Continuous == false:
-				public double MinimumPower;
-
-				public bool Continuous; // whether this component always consumes power when operating, or only when it is "Used" such as a Laser firing for a fixed duration
-				public float PerformanceSetting;  // 0.0 - 1.0.  We can get rid of HasVariablePerformance if PerformanceSetting >= 0 and <= 1.0
-				public bool HasVariablePerformance {get {return (PerformanceSetting >= 0.0f && PerformanceSetting <= 1.0f); }} // can run at reduced power, but with reduced performance (eg sensor will have lower range)
-
-				public int Priority;  // determines if there's insufficient power production, which consumers get higher priority to be powered during runtime 
-
-
-				// runtime
-				public float BreakerCycleDuration;
-
-				public long TimeStarted;
-				public float Duration;
-
-				public bool Looping; // Repeating
-				public float CooldownDuration; 
-				public bool InCoolDown;
-				
-				
-				new PropertySpec("Level", typeof(uint).Name, "build", level),
 				new PropertySpec("Breaker", typeof(bool).Name, "runtime", breaker),
-				new PropertySpec("Capacity", typeof(double).Name, "build", capacity),
-				new PropertySpec("Output", typeof(double).Name, "build", output),
-				new PropertySpec("Duration", typeof(double).Name, "build", duration),
-				new PropertySpec("MaxInput", typeof(double).Name, "build", maxInput), // recharging takes significantly longer than discharging at lower technology levels
-				new PropertySpec("Efficiency", typeof(double).Name, "build", duration),
-				new PropertySpec("Throttle", typeof(double).Name, "build", maxInput)
+				new PropertySpec("PowerRequirement", typeof(double).Name, "build", powerRequirement),
+				new PropertySpec("MinimumPower", typeof(double).Name, "build", minimumPower),
+				new PropertySpec("Continuous", typeof(bool).Name, "build", continuous),
+				new PropertySpec("Looping", typeof(bool).Name, "build", looping),
+				new PropertySpec("PerformanceSetting", typeof(double).Name, "build", performanceSetting), // recharging takes significantly longer than discharging at lower technology levels
+				new PropertySpec("Efficiency", typeof(double).Name, "build", efficiency),
+				new PropertySpec("CooldownDuration", typeof(double).Name, "build", cooldownDuration),
+				new PropertySpec("Duration", typeof(double).Name, "build", duration),				
+				new PropertySpec("Priority", typeof(double).Name, "build", priority)
 			};
 
 			return buildSpecificProperties;
@@ -19090,7 +19082,6 @@ public abstract class PlanedFrustum
                 //mLastTotalElapsedTime = mTotalElapsedTime;
                 mTotalElapsedTime += mStopwatch.Elapsed.TotalSeconds;// Time.ElapsedSeconds(mStartTime); // Hypnotron Feb.12.2015 - added conversion to milliseconds since seconds and milliseconds  
 
-
                 // ...and will accumulate the timers for 50 frames
                 // This could be made with an elapsed time calculation,
                 // to accumulate a full second for example
@@ -21425,7 +21416,101 @@ public abstract class PlanedFrustum
 		}
 	}
 	
+	
+	internal class Statistics
+	{
+		private UserDataStore mContext;
+		Dictionary<string, int> mCounters = new Dictionary<string, int>();
 		
+		// https://redis.io/docs/latest/develop/get-started/data-store/
+		// HSET bike:1 model Deimos brand Ergonom type 'Enduro bikes' price 4972
+		
+		// so this is a key that would be made up of 4 keyvalue pairs.  Each kvp is delimited by colons
+		// each key and value is delimited by a space.
+		
+		// bike 1:model Deimos:brand Ergonom:type 'Enduro bikes':price 4972
+		
+		// hmm... the first is a QUANTITY also though... im not sure how this works
+		// > HGET bike:1 model
+		// "Deimos"
+		
+		// IStatistics stats = (IStatistics)EntityNode.UserData.Get(this.ID, "stats");
+		
+		// string action = "defeated" ;
+		// string key = action + "," + "Droid_123";
+		
+		// Increment (this.ID, key)
+		
+		// how would you sum totals... sure we can
+		// parse each string for the "defeated" text, but that seems slow and annoying...
+		// 
+		// defeated
+		// defeated_by
+		// attacked_by
+		// 
+		
+		
+		// A) We want to accomplish two things
+		//    1) We want to track for EACH droid, how many of every OTHER droid, we've defeated and with what weapon and what operator at the Station
+		//    2) We need fast access to these Stats and that these stats should remain in memory after a DROID is defeated so that it can be respawned
+		//       and continue to create stats.
+		//    3) We DO NOT NEED TO CREATE A LOG of ALL EVENTS FOR THIS....  WE MAY EVENTUALLY, BUT PURPOSE OF THIS IS ONLY TO CREATE COMBAT STATS TRACKING
+		
+		// EntityStats[]  <-- same index as the EntityArrayIndex
+		//                <-- uses Memory<T> underneath and a UserDataStore
+		//                <-- 
+		//
+		// 
+		// 
+		//  
+		
+		public Statistics(UserDataStore uds)
+		{
+			if (uds == null) throw new ArgumentNullException("Statistics.ctor() - UserDataStore parameter cannot be null.");
+			mContext = uds;
+		}
+		
+		public UserDataStore Context {get {return mContext;}}
+		
+		// https://stackoverflow.com/questions/74811627/whats-the-best-way-to-store-a-finite-number-of-stats
+		// http://blog.ndepend.com/faster-dictionary-in-c/
+		// https://codesignal.com/learn/courses/revision-of-csharp-dictionaries-and-their-use-in-practice/lessons/data-aggregation-using-dictionaries-in-csharp
+		// https://codesignal.com/learn/courses/hashing-dictionaries-and-collections-in-csharp/lessons/advanced-dictionary-operations-in-csharp
+		public void Increment(string entityKey, KeyValuePair<string, string>[] keys)
+		{
+			if (keys == null || keys.Length == 0) return;
+			
+			int count = keys.Length;
+			
+			string VP_DELIM = " ";
+			string KVP_DELIM = ":";
+			
+			string combinedKey = null;
+			for (int i = 0; i < count; i++)
+			{
+				if (!string.IsNullOrEmpty(combinedKey)) combinedKey += KVP_DELIM;
+				
+				combinedKey += keys[i].Key + VP_DELIM + keys[i].Value;
+				
+			}
+			
+			Increment(combinedKey);
+		}
+		
+		public void Increment(string key)
+		{
+			if (mCounters.ContainsKey(key)) 
+			{
+                mCounters[key]++;
+			}
+			else // it doesn't currently exist, so we add it
+			{
+				mCounters[key] = 1;
+			}
+		}
+	}
+		
+	
 	public class Query 
 	{
 		private UserDataStore mContext;

@@ -806,7 +806,7 @@ namespace HelloBoids
 #if USE_MEMORY_T
 
             // add data processors
-            DataProcessorsStore.Processor<LivingEntity> lifeCycleBehavior = DoLifeCycle;
+            DataProcessorsStore.Processor<LifeForm> lifeCycleBehavior = DoLifeCycle;
             mDataProcessor.Add("LIFECYCLE", lifeCycleBehavior);
 
 			
@@ -980,10 +980,10 @@ namespace HelloBoids
 			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
 		
 			// LIVING ENTITY
-			ComponentStore<LivingEntity> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+			ComponentStore<LifeForm> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LifeForm>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
             int livingEntityID = -1;
-            Memory<LivingEntity> memLivingEnt = storeLivingEntity.CheckOut(out livingEntityID);
-			b.AddUserStruct(typeof(LivingEntity), memLivingEnt, livingEntityID);
+            Memory<LifeForm> memLivingEnt = storeLivingEntity.CheckOut(out livingEntityID);
+			b.AddUserStruct(typeof(LifeForm), memLivingEnt, livingEntityID);
 			
 			storeLivingEntity.Span[livingEntityID].Age = 1;
 			storeLivingEntity.Span[livingEntityID].Hitpoints = 20;
@@ -1582,10 +1582,10 @@ namespace HelloBoids
 			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
 		
 			// LIVING ENTITY
-			ComponentStore<LivingEntity> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LivingEntity>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+			ComponentStore<LifeForm> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LifeForm>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
             int livingEntityID = -1;
-            Memory<LivingEntity> memLivingEnt = storeLivingEntity.CheckOut(out livingEntityID);
-			humanOperator.AddUserStruct(typeof(LivingEntity), memLivingEnt, livingEntityID);
+            Memory<LifeForm> memLivingEnt = storeLivingEntity.CheckOut(out livingEntityID);
+			humanOperator.AddUserStruct(typeof(LifeForm), memLivingEnt, livingEntityID);
 			
 			storeLivingEntity.Span[livingEntityID].Age = 1;
 			storeLivingEntity.Span[livingEntityID].Hitpoints = 20;
@@ -1755,8 +1755,8 @@ namespace HelloBoids
 					Console.WriteLine("Update() - Do_Droid_Logic() " + ex.Message);
 				}
 				
-				ComponentStore<LivingEntity> livingEntityStore = null;
-				livingEntityStore = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
+				ComponentStore<LifeForm> livingEntityStore = null;
+				livingEntityStore = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
 				
 				//  modifications before damage?  I think this is probably the way to
 				try
@@ -2118,7 +2118,7 @@ namespace HelloBoids
 			//Console.WriteLine("Do_Droid_Logic() - DoWeaponsCanFire()");
 			DoWeaponsCanFire();
 			
-			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
+			ComponentStore<LifeForm> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 						
@@ -2290,7 +2290,7 @@ namespace HelloBoids
 			return;
 			// TODO: fix indices and such
 			
-			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
+			ComponentStore<LifeForm> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 				
@@ -2319,7 +2319,7 @@ namespace HelloBoids
 		
 		private void DoStationCanActStatus()
 		{
-			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
+			ComponentStore<LifeForm> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 			
@@ -2803,15 +2803,15 @@ namespace HelloBoids
 		}
 			
 		
-        private void DoLifeCycle(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
+        private void DoLifeCycle(ComponentStore<LifeForm> store, object[] parameters, int seed, GameTime gt)
         {
-			ComponentStore<LivingEntity> testLEComp = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
+			ComponentStore<LifeForm> testLEComp = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
 			//Console.WriteLine("DoLifeCycle() - Stores are the same == " + (store == testLEComp).ToString());
 			
 			// TODO: until both paths use DoLifeCycle(), this will throw off deterministism for Memory<T> path
     		return;
     
-			Span<LivingEntity> livingEntitySpan = store.Span;
+			Span<LifeForm> livingEntitySpan = store.Span;
 	
 			int recordCount = (int)store.Count;
 			
@@ -4363,7 +4363,7 @@ namespace HelloBoids
 				public int Amount;
 			}
 						
-			public void Apply(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
+			public void Apply(ComponentStore<LifeForm> store, object[] parameters, int seed, GameTime gt)
 			{
 				// NOTE: the store used here must refer to the actual memStore the Droid uses
 				//       to store it's data or else there is no way to update that Droid...Duh!
@@ -4373,14 +4373,14 @@ namespace HelloBoids
 				//       to know which ones to use
 				//       
 				if (store == null) return;
-				Span<LivingEntity> memSpan = store.Span;
+				Span<LifeForm> memSpan = store.Span;
 				List<ModificationResult> records = (List<ModificationResult>)parameters[0];					
 				
 				if (records != null)
 				{
 					for (int i = 0; i < records.Count; i++)
 					{
-						LivingEntity e = (LivingEntity)memSpan[records[i].TargetIndex]; // todo: this should be the target to which the Modification should be applied
+						LifeForm e = (LifeForm)memSpan[records[i].TargetIndex]; // todo: this should be the target to which the Modification should be applied
 						// = records[i].Amount;
 						
 						SKILLS s = records[i].SkillType;
@@ -4428,10 +4428,10 @@ namespace HelloBoids
 				mSkillModResults.Clear();
 			}
 					
-			public void Process(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
+			public void Process(ComponentStore<LifeForm> store, object[] parameters, int seed, GameTime gt)
 			{
 				if (store == null) return;
-				Span<LivingEntity> memSpan = store.Span;
+				Span<LifeForm> memSpan = store.Span;
 				
 				Clear();
 				
@@ -4461,7 +4461,7 @@ namespace HelloBoids
 			}
 			
 
-			public void Apply(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
+			public void Apply(ComponentStore<LifeForm> store, object[] parameters, int seed, GameTime gt)
 			{
 				// NOTE: the store used here must refer to the actual memStore the Droid uses
 				//       to store it's data or else there is no way to update that Droid...Duh!
@@ -4471,14 +4471,14 @@ namespace HelloBoids
 				//       to know which ones to use
 				//       
 				if (store == null) return;
-				Span<LivingEntity> memSpan = store.Span;
+				Span<LifeForm> memSpan = store.Span;
 				List<DamageResult> records = (List<DamageResult>)parameters[0];					
 				
 				if (records != null)
 				{
 					for (int i = 0; i < records.Count; i++)
 					{
-						LivingEntity e = (LivingEntity)memSpan[records[i].EntityIndex];
+						LifeForm e = (LifeForm)memSpan[records[i].EntityIndex];
 						e.Hitpoints += records[i].Amount;
 					}
 				}
@@ -4528,10 +4528,10 @@ namespace HelloBoids
 				mDamageResults.Clear();
 			}
 					
-			public void Process(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
+			public void Process(ComponentStore<LifeForm> store, object[] parameters, int seed, GameTime gt)
 			{
 				if (store == null) return;
-				Span<LivingEntity> memSpan = store.Span;
+				Span<LifeForm> memSpan = store.Span;
 				
 				Clear();
 				
@@ -4613,10 +4613,10 @@ namespace HelloBoids
 			/// FireDamage for example, can last for several seconds and so any one particular FireDamage record is
 			/// not removed from the ComponentStore<> until it's expired
 			/// </summary>
-			public void Process(ComponentStore<LivingEntity> store, object[] parameters, int seed, GameTime gt)
+			public void Process(ComponentStore<LifeForm> store, object[] parameters, int seed, GameTime gt)
 			{
 				if (store == null) return;
-				Span<LivingEntity> memSpan = store.Span;
+				Span<LifeForm> memSpan = store.Span;
 				
 				Clear();
 				
@@ -7156,6 +7156,581 @@ return (0,0);
 	
 
 	
+	
+////////////////////////////////////////////////////////////////////////////////////////////////
+#region Policy Rules
+	
+			
+		// POLICIES AND RULES 
+		// todo: the ai captain needs a "mission" or "objectives" for each mission
+		// ordinance Rules
+		// ROE example: see HelloConditions.cs
+			
+		// http://www.gamasutra.com/view/news/198377/Video_Valves_system_for_creating_AIdriven_dynamic_dialog.php   <- now on Youtube @ https://www.youtube.com/watch?v=tAbBID3N64A
+		// http://www.valvesoftware.com/publications/2012/GDC2012_Ruskin_Elan_DynamicDialog.pdf
+		// NOTE: in Valve's Zombie game, for the npc voice logic, they share
+		//       all of this knowledge in a single knowledge base rather than allowing
+		//       each to have it's own in a fragmented way and it makes running through
+		//       them sequentially to find voice responses that match a search much faster and easier.
+		//       Valve's Left 4 Dead voice logic is very much a flat database but generated by flattening
+		//		 a scenegraph style directed acyclic graph (DAG))	
+		
+			/* 
+			https://stackoverflow.com/questions/31879609/flattening-a-graph
+			https://deephaven.io/core/docs/conceptual/dag/
+			https://github.com/madelson/Traverse
+			//	http://www.gamasutra.com/blogs/GuyHasson/20120706/173705/Story_Design_Tips_Better_NPC_Interaction_Part_II.php
+		//  -> Flattening a DAG ->   https://medium.com/@chipzt/directed-acyclic-graphs-dags-8d479ed14967
+		
+			"Flattening" a Directed Acyclic Graph (DAG) in C# is typically achieved using a topological sort algorithm. 
+			This process results in a linear ordering of all nodes such that for every directed edge from node A to 
+			node B, A appears before B in the list. This linear sequence is the "flattened" representation of the DAG, 
+			often used for task scheduling and dependency resolution. 
+			Implementation Concepts in C#
+			To flatten a DAG in C#, you would generally follow these steps:
+			Represent the DAG: Define a class for the nodes and a way to store the edges (e.g., an adjacency list or a 
+			dictionary where keys are nodes and values are lists of their children).
+			Implement Topological Sort: Use an algorithm like Kahn's algorithm or a depth-first search (DFS) based 
+			approach to generate a topological ordering.
+
+			Iterate and Collect: The result of the topological sort is your flattened list of nodes. 
+
+			Example C# Code Snippet (Conceptual)
+			A common approach for topological sort uses DFS: 
+
+		public class Node<T>
+		{
+			public T Value { get; set; }
+			public List<Node<T>> Dependencies { get; set; } = new List<Node<T>>();
+		}
+
+		public static List<Node<T>> TopologicalSort<T>(List<Node<T>> nodes)
+		{
+			var sortedList = new List<Node<T>>();
+			var visited = new HashSet<Node<T>>();
+			var recursionStack = new HashSet<Node<T>>();
+
+			foreach (var node in nodes)
+			{
+				if (!visited.Contains(node))
+				{
+					SortUtil(node, visited, recursionStack, sortedList);
+				}
+			}
+			// Result needs to be reversed if using DFS post-order traversal
+			sortedList.Reverse(); 
+			return sortedList;
+		}
+
+		private static void SortUtil<T>(Node<T> node, HashSet<Node<T>> visited, HashSet<Node<T>> recursionStack, List<Node<T>> sortedList)
+		{
+			visited.Add(node);
+			recursionStack.Add(node); // Used for cycle detection (crucial for DAG validation)
+
+			foreach (var dependency in node.Dependencies)
+			{
+				if (!visited.Contains(dependency))
+				{
+					SortUtil(dependency, visited, recursionStack, sortedList);
+				}
+				else if (recursionStack.Contains(dependency))
+				{
+					// Cycle detected - the graph is NOT a DAG and cannot be flattened this way
+					throw new Exception("Graph contains a cycle!"); 
+				}
+			}
+
+			recursionStack.Remove(node);
+			sortedList.Add(node);
+		}
+
+		Note: A true "flattening" into a simple linear list is only possible if the graph is, in fact, a DAG (meaning it has no cycles). 
+		If a cycle is present, the process cannot terminate in a finite order, and an exception should be thrown. 
+
+		For a complete, working example or to use a library that handles graph operations, you might explore graph libraries for C# or
+		refer to examples on platforms like Stack Overflow.  https://stackoverflow.com/questions/31879609/flattening-a-graph
+		*/
+			
+			
+			
+		//	- The trick is how the KEY for each flattened path is created and then used when building the query string!!!		
+		//	http://www.gamasutra.com/blogs/GuyHasson/20120706/173705/Story_Design_Tips_Better_NPC_Interaction_Part_II.php
+		//  -> Flattening a DAG ->   https://medium.com/@chipzt/directed-acyclic-graphs-dags-8d479ed14967
+			
+		//			- sort rules alphabetically.  Why?
+		//				- well this way when running the comparisons of the QUERIES against the CONDITIONS of each rule,
+		//			as we iterate through each QUERY "key" we don't have to re-start an iteration at the beginning of every CONDITION "key" 
+		//			because we know they are in same alphabetical order as the QUERIES collection.  For instance:
+		//			QUERY: A:100, B:50, C:true, F:false
+		//			RULE1:
+		//          	CONDITIONS: A:<=500 && A: >=0 
+		//              CONDITIONS: C:<=True && >=True
+		//				- in the above, we start to iterate through the 4 query tuples and for each naivly we iterate each CONDITION
+		//                but instead, when we find a matching condition, we don't need to start over.  We can resume because we know that
+		//                the CONDITIONS are sorted the same way so when testing QUERY part B, we can resume iteration of CONDITION and next
+		//				  CONDITION will be C: so we know B doesn't exist (else the iteration cursor would have been moved back to beginning).		
+		//
+		//          TODO: currently our normal propertybag stores it's data as DefaultValue and does not actually hook back to a
+		//			      collection of objects.  It should actually store to same object store so that the data can also be read
+		//                directly through the object store and not through the entity.  Recall that originally, the point of using the PropertySpec's
+		//                was to get propertybag GUI rendering for free via propertygrid control.
+		//
+		//			- hash buckets for different regions and/or other basic buckets similarly to what we do when we cull
+		//			- store pointers to the value we want to compare rather than have to query that game data
+		//			- sort by decreasing # of criteria (as we do with TileMap auto-tile rules)
+		//			- represent every comparision as a >= x >= b  
+		//				eg.   return (10 >= ptrCharacterXHitpoints && ptrCharacterXHitpoints >= 100);    
+		//
+		//		 So in a way, what we want there is a Blackboard class that can
+		//       manage all that for us, and then when we first initialize a behavior
+		//       on an Entity, it will grab a blackboard blob from the allocator and
+		//       assign it to the Enity.Knowledge
+		//       - and since the dialogue tree structure is essentially a flattened DAG (like a scenegraph)
+		//		 which seems to take on a Rules Engine like functionality because it becomes serial
+		//       test and not a branching test.
+		//       - thus, each "record" has an owner and can be referenced and read/written to
+		//       from the UserDataStore.  There is a question of whether this data should remain in 
+		//       DB form.. perhaps cached for recent access.  Well, i think it must be cached or else
+		//       way too slow for the type of use we do.  Do we CheckIn/CheckOut data blobs?  We could do some
+		//       really fast computations I think and threaded, on an in memory "blackboard" where each blackboard 
+		//       can be defined and hold all of same record types (eg all stars, all worlds, all npcs) so that
+		//       manipulation of their data is... well... its all very functional style and not OO.
+		//		 - THE CACHE COHERENCY BECOMES EXCELLENT.
+		//		   - perhaps each derived blackboard itself becomes a data manipulator that knows how to read/write it's data
+		//	       and then the sqlite or whatever storage occurs as generic using array of field definitions
+		//			- Being able to define custom blackboards is nice because we now have fixed size fields
+		//
+		//		 - is the UserDataStore a global like Pager and Repository?
+		//		- maybe each Blackboard gets instantiated EXE side and so we get StarData : UserData 
+		//      that gets used for all stars and which we can write custom data manipulation against
+		//		- we could even read/write to it like we do with Packets... and perhaps even use unsafe code for even greater performance
+		// (See E:\dev\_projects\_XNA\Mercury Particle Engine\ProjectMercury.WindowsEmitters\Emitter.cs.Update() method)
+		// but one thing it does which i think defeats the purpose somewhat perhaps is it creates a fixed pointer to the particle array rather than allocating it as pointer from start.  having to "fix" it seems like enough overhead to nullify any performance advantages
+		
+		//  - Production productID and Consumers can be stored here as well.  Do we still want to use scripts for these entities? or
+		//    would scripts assigned to each data store type be more efficient?
+		//  - for economic simulation this could be very fast
+		//	- AI simulation may be more needed case for a single player 1.0 game release
+		//		- blackboard data can store Area_Of_Interest data generated from other pre- calculations 
+		//  - for NPC simulation this can be very fast too when running out behavior tree against this data
+		//    and eventually we probably stop simulating Entity AI in Entity.Update() and move it to an Update() 
+		//    of simulation that will iterate through npcs by iterating through the blackboard data (limiting iterating 
+		//    to X count that fit into an alotted timeslice using threading as available and as needed)
+		
+		//		- IN OTHER WORDS, by iterating through the array of UserData to perform entity updates, can we properly update
+		//    these variables with appropriate functions and have the update reflected in the Entity itself?  For example, lets say
+		//    we have 50 entities that are doing wander steering behavior... can we run a singular script that operates on blackboard user data
+		//    to update all 50 of those entities?  rather than 50 calls to entity.update() and 50 script calls.
+		//          - if the scripts each entity uses can be one of the ways we sort entities when updating their data, then we can easily
+		//          update all entities using a particular script.... similar to how we do renders of sorted entities
+		//			- if our scene update() loop added entities to be updated in sorted buckets... but for now this is jsut brainstorming idea, since it could slow us down
+		//  Feb.6.2026 -> Regarding the above question which is Data-Oriented processing model, YES WE CAN.  This is what i have been in fact implementing for last few months
+		//                
+		//
+		
+		// TODO: google cache coherency as it relates to flat databases 
+		//			- and .net c#
+		// TODO: isn't BehaviorContext.Knowledge already associated with Entity?  And shouldn't this data replace Entity CustomProperties? and Rename var from Knowledge to Entity.CustomData
+                                   //       and is now stored in sqlite where our scene representation which uses xml is seperate from the entity custom data which is db stored.  Our EntityAPI for
+                                   //       getting custom data can now also use methods with type safety.  Further we no longer have to care about custom data being serialized to xml and perhaps this
+                                   //       speeds up our ability to save scene when we are editing maps as well as saving game state
+        							// TODO: however, will this type of CustomProperties now no longer be easily editable in a PropertyGrid and if not, is that ok?
+        							//      we're using custom html interfaces now anyway right?
+        							//      we must start with _just_ custom properties for now but actually just RenderingContext 
+        							// TODO: also what about shaders?  right now those use custom properties for shader params/vars and should not be stored in a db!
+        							// TODO: actually volume, surfacearea,cost,weight for all celestial bodes is already being used as custom properties!
+        							//       So question is, how do we connect those to a datastore?
+        							//		 - well just as we use GetProperties() SetProperties() where a single reader/writer of xml store is operating
+        							//       we can do same for UserData.   We can convert to GetProperties and SetProperties() and we can also
+        							//       use other methods of iterating thru the list of custom data. For now, let's just focus on Viewpoint for Chase
+        					
+			// is there a way to track the data for an individual Entity via an Index into array of records and to have this record
+			// index maintained during lifetime? indices can be checked in / checked out
+
+			// locally, we dont really need to use entityID as part of a record key either, locally we can use just an Index
+			// and perhaps a lookup value... but i think in short term, we should continue to focus on just Viewpoint and Chase cam
+			// and if that goes well, Stars and see about how it works with LoadTVResource() and restoring DB via a LoadCustomData()
+	
+	// Directives
+	// Treaties
+	// RulesOfEngagement
+	// Orders
+	// Objectives
+	// OrdianceUsePolicy
+	// EnergyAllocationPolicy
+	
+	
+	// combat specific assessmemnts
+	// ----
+	// Readyness, CapacityToAct;
+	// CapabilityAssessment;
+	// OutcomeAssessment;
+	public class ExecutiveDirectives
+	{
+		// Keystone.Simulation.Missions.Mission
+		// Keystone.Simulaton.Missions.MissionData
+		// Keystone.Simulation.Missions.Objective
+
+	//	public Mission Mission;
+	//	public Orders Orders;
+
+		// Game01.GameObjects.ExecutiveDirectives.RulesOfEngagement
+		public struct RulesOfEngagement
+		{
+			public bool FireOnFreighters; // usually always false
+			public bool RetreatRatherThanFightIfPossible;
+				//      - never fire first except during wartime
+				//		- diplomacy first unless state of war
+				//      - never fire on disabled ships or otherwise  non-threats
+				//		- pre-emptive policy
+				//		- disable priority
+				//			- shields
+				//			- weapons
+				//			- engines
+				//		- proportiality / proportional response
+				//		- nuclear weapons only to deter opposing nuclear threat only (some ships may have a mission of always staying hidden and running silent and nuclear deterences in case of an attack on homeworld and homeworld is destroyed, the retaliatory strike option will still exist to carry out its mission
+				//		- 
+
+
+		}
+	}
+
+
+	public class Policy
+	{
+		// eg: A Policy contains a list of Queries that represent testing for a 
+		//     related series of conditions.
+		//     For instance, a subset of the Rules of Engagement (RoE) policy says "Do Not Fire On Friendlies" 
+		//     needs to check for the following:
+		//     - Is the target a member of "Membership_Earth_Alliance"
+		//     - Is the target a member of "Colonial_Expeditionary_Fleet"
+		//     - Has the target fired upon us or an ally, and thus, is in breach of this policy itself?
+		
+		// Let's say the question is, Can this Target vessel be fired upon?  
+		// we want to build this query up as a type of Policy for When can a vessel be fired upon?
+		
+		private List<Query> mQueries;
+		private string mErrorReason;
+		
+		
+		public Policy()
+		{
+			mQueries = new List<Query>();
+		}
+		
+		public Query[] Queries {get {if (mQueries == null) return null; return mQueries.ToArray();}}
+		
+		
+		public void Add(Query q)
+		{
+			if (mQueries == null) mQueries = new List<Query>();
+			mQueries.Add(q);
+		}
+		
+		public bool Execute ()
+		{
+			if (mQueries == null || mQueries.Count == 0) return true;
+			
+			for (int i = 0; i < mQueries.Count; i++)
+			{
+				UserDataStore context = mQueries[i].Context;
+				if (!mQueries[i].Execute()) return false;
+			}
+			
+			return true;
+		}
+	}
+	
+	
+	public class Query 
+	{
+		private UserDataStore mContext;
+		private Rule[] mRules;
+		
+		public Query(UserDataStore uds)
+		{
+			if (uds == null) throw new ArgumentNullException("Query.ctor() - UserDataStore parameter cannot be null.");
+			mContext = uds;
+		}
+		
+		public UserDataStore Context {get {return mContext;}}
+		
+		public Rule[] Rules { get {return mRules;}}
+		
+		public void Add(Rule r)
+		{
+			// ArrayAppend() is using Keystone namespace but actually is in KeyStandardLibrary
+			// Keystone.Extensions.ArrayExtensions.	
+			mRules = Utils.ArrayAppend<Rule>(mRules, r);
+		}
+		
+		public bool Execute ()
+		{
+			if (mRules == null || mRules.Length == 0) return true;
+			
+			//Console.WriteLine("Executing rules");
+			for (int i = 0; i < mRules.Length; i++)
+				if (!mRules[i].Evaluate(mContext)) return false;
+			
+			return true;
+		}
+	}
+
+	
+	/// <summary>
+	/// Rules should be sorted from highest number of Conditions to lowest so that we always test against highest number first so we can potentially early-exit
+	/// <summary>
+	public class Rule
+	{
+		private string mConcept;
+		private string mDescription;
+		private Condition[] mConditions;
+		//public Response Response;
+		//public Remember Remember;
+		//public Trigger Trigger;
+		public string ErrorReason;
+		
+		public Rule (string concept, string description)
+		{
+			mConcept = concept;
+			mDescription = description;
+		}
+		
+		public void Add(Condition c)
+		{
+			// ArrayAppend() is using Keystone namespace but actually is in KeyStandardLibrary
+			// Keystone.Extensions.ArrayExtensions.	
+			mConditions = Utils.ArrayAppend<Condition>(mConditions, c);
+		}
+
+		public void Remove (Condition c)
+		{
+			//mConditions = Utils.ArrayRemove<Condition>(mConditions, c);
+		}
+		
+		public bool Evaluate(UserDataStore context)
+		{
+			if (mConditions == null || mConditions.Length == 0) return true;
+			
+			//Console.WriteLine("Evaluating " + mConditions.Length.ToString() + " conditions");
+			for (int i = 0; i < mConditions.Length; i++)
+			{
+				string left = null;
+				string right = null;
+				if (mConditions[i].LeftOperandIsDelegate)
+				{
+					// the LEFT operand delegate to invoke.  The RIGHT operand is what we want to compare it against 
+					left = mConditions[i].OperandLeftDelegate(mConditions[i].DelegateArgs);
+					right = mConditions[i].OperandRight;
+					//Console.WriteLine("Condition.Evaluate() - Left IS a delegate LEFT == " + left + " RIGHT == " + right);
+				}
+				else
+				{	
+					// left is the KVP to look up.  right is what we want to compare it against 
+					System.Diagnostics.Debug.Assert (context != null, "Context is not null.");
+					left = context[mConditions[i].EntityKey].GetString(mConditions[i].OperandLeft);
+					right = mConditions[i].OperandRight; // context[mConditions[i].EntityKey].GetString(mConditions[i].OperandRight);  		
+					//Console.WriteLine("Condition.Evaluate() - Left is NOT a delegate LEFT == " + left + " RIGHT == " + right);
+				}
+				
+				switch (mConditions[i].mEvalType)
+				{
+					case Condition.EVAL_TYPE.EQUALS:
+						if (left != right) return false; // todo: ErrorReason = 
+						break;
+
+					case Condition.EVAL_TYPE.NOT_EQUALS:
+						if (left == right) return false; // todo: ErrorReason = 
+						break;
+
+					case Condition.EVAL_TYPE.LESS_THAN:
+						if (MicroEx.Evaluate(left + " >= " + right)) return false; // todo: ErrorReason = 
+						break;
+						//return OperandLeft < OperandRight;
+
+					case Condition.EVAL_TYPE.GREATER_THAN:
+						if (MicroEx.Evaluate(left + " <= " + right)) return false; // todo: ErrorReason = 
+						break;
+						//return OperandLeft > OperandRight;
+
+					default:
+						throw new ArgumentOutOfRangeException("Condition.Evaluate() - Unexpected evalType '" + mConditions[i].mEvalType.ToString() + "'");
+
+				}
+			}
+			return true;
+		}
+	}
+	
+	
+	public class Condition
+	{
+		public enum EVAL_TYPE : int
+		{
+			EQUALS = 0,
+			NOT_EQUALS = 1,
+			LESS_THAN = 2,
+			GREATER_THAN = 3
+		}
+		
+		public string Name;
+		public string Description;
+		
+		public bool LeftOperandIsDelegate;
+		// there's generally no reason for BOTH the left and right operands to be a delegate.  
+		// The left will be our delegate and the right will be the operand we want to compare the result of the delegate to
+		public Func<object[], string> OperandLeftDelegate; 
+		public object[] DelegateArgs;
+		
+		// The 'key' into our UserDataStore context that will return the 'value' we want for the left operand
+		public string OperandLeft;
+		// The 'key' into our UserDataStore context that will return the 'value' we want for the right operand
+		public string OperandRight;
+		public EVAL_TYPE mEvalType;
+		
+		
+		public string EntityKey;
+		
+		
+		public Condition (string name, string description, string entityKey, EVAL_TYPE eval, string operandLeft, string operandRight)
+		{
+			Name = name;
+			Description = description;
+			OperandLeft = operandLeft;
+			OperandRight = operandRight;
+			mEvalType = eval;
+			EntityKey = entityKey; // our UserDataStore holds a Dictionary<string, UserData> with the string 'key' being the EntityID the UserData belongs too. 
+			LeftOperandIsDelegate = false;
+		}
+		
+		public Condition (string name, string description, string entityKey, EVAL_TYPE eval, Func<object[], string> operandLeft, string operandRight, object[] delegateArgs)
+		{
+			Name = name;
+			Description = description;
+
+			DelegateArgs = delegateArgs;
+			OperandLeftDelegate = operandLeft;
+			OperandRight = operandRight;
+			mEvalType = eval;
+			EntityKey = entityKey; // our UserDataStore holds a Dictionary<string, UserData> with the string 'key' being the EntityID the UserData belongs too. 
+			LeftOperandIsDelegate = true;
+		}
+	}
+	
+	
+	
+	internal class Statistics
+	{
+		private UserDataStore mContext;
+		Dictionary<string, int> mCounters = new Dictionary<string, int>();
+		
+		// https://redis.io/docs/latest/develop/get-started/data-store/
+		// HSET bike:1 model Deimos brand Ergonom type 'Enduro bikes' price 4972
+		
+		// so this is a key that would be made up of 4 keyvalue pairs.  Each kvp is delimited by colons
+		// each key and value is delimited by a space.
+		
+		// bike 1:      model Deimos:brand Ergonom:type 'Enduro bikes':price 4972
+		
+		
+		
+		
+		
+		
+		
+		// hmm... the first is a QUANTITY also though... im not sure how this works
+		// > HGET bike:1 model
+		// "Deimos"
+		
+		// IStatistics stats = (IStatistics)EntityNode.UserData.Get(this.ID, "stats");
+		
+		// string action = "defeated" ;
+		// string key = action + "," + "Droid_123";
+		
+		// Increment (this.ID, key)
+		
+		// how would you sum totals... sure we can
+		// parse each string for the "defeated" text, but that seems slow and annoying...
+		// Parsing 768 KVPs for each Droid seems an extremly slow operation...  
+		
+		
+		
+		// EntityID->stats-> "kvp...."
+		// attacked 
+		// defeated Droid123 3:Droid345 1:Droid989 1  <-- Dictionary<string, Dictionary<string, int>> 
+		// defeated_by
+		// attacked_by
+		// faction memberships
+		// crew members
+		
+		
+		
+		// A) We want to accomplish two things
+		//    1) We want to track for EACH droid, how many of every OTHER droid, we've defeated and with what weapon and what operator at the Station
+		//    2) We need fast access to these Stats and that these stats should remain in memory after a DROID is defeated so that it can be respawned
+		//       and continue to create stats.
+		//    3) We DO NOT NEED TO CREATE A LOG of ALL EVENTS FOR THIS....  WE MAY EVENTUALLY, BUT PURPOSE OF THIS IS ONLY TO CREATE COMBAT STATS TRACKING
+		
+		// EntityStats[]  <-- same index as the EntityArrayIndex
+		//                <-- uses Memory<T> underneath and a UserDataStore
+		//                <-- 
+		//
+		// 
+		// 
+		//  
+		
+		public Statistics(UserDataStore uds)
+		{
+			if (uds == null) throw new ArgumentNullException("Statistics.ctor() - UserDataStore parameter cannot be null.");
+			mContext = uds;
+		}
+		
+		public UserDataStore Context {get {return mContext;}}
+		
+		// https://stackoverflow.com/questions/74811627/whats-the-best-way-to-store-a-finite-number-of-stats
+		// http://blog.ndepend.com/faster-dictionary-in-c/
+		// https://codesignal.com/learn/courses/revision-of-csharp-dictionaries-and-their-use-in-practice/lessons/data-aggregation-using-dictionaries-in-csharp
+		// https://codesignal.com/learn/courses/hashing-dictionaries-and-collections-in-csharp/lessons/advanced-dictionary-operations-in-csharp
+		public void Increment(string entityKey, KeyValuePair<string, string>[] keys)
+		{
+			if (keys == null || keys.Length == 0) return;
+			
+			int count = keys.Length;
+			
+			string VP_DELIM = " ";
+			string KVP_DELIM = ":";
+			
+			string combinedKey = null;
+			for (int i = 0; i < count; i++)
+			{
+				if (!string.IsNullOrEmpty(combinedKey)) combinedKey += KVP_DELIM;
+				
+				combinedKey += keys[i].Key + VP_DELIM + keys[i].Value;
+				
+			}
+			
+			Increment(combinedKey);
+		}
+		
+		public void Increment(string key)
+		{
+			if (mCounters.ContainsKey(key)) 
+			{
+                mCounters[key]++;
+			}
+			else // it doesn't currently exist, so we add it
+			{
+				mCounters[key] = 1;
+			}
+		}
+	}
+		
+	
+	
+#endregion   //Rules, Queries, Policies, Conditions
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// STRUCTS AND IENTITYSYSTEMS
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -7230,53 +7805,7 @@ return (0,0);
 	public struct CrewMemberServiceRecord
 	{
 
-
 	}
-
-	// Directives
-	// Treaties
-	// RulesOfEngagement
-	// Orders
-	// Objectives
-	// OrdianceUsePolicy
-	// EnergyAllocationPolicy
-	
-	
-	// combat specific assessmemnts
-	// ----
-	// Readyness, CapacityToAct;
-	// CapabilityAssessment;
-	// OutcomeAssessment;
-	public class ExecutiveDirectives
-	{
-		// Keystone.Simulation.Missions.Mission
-		// Keystone.Simulaton.Missions.MissionData
-		// Keystone.Simulation.Missions.Objective
-
-	//	public Mission Mission;
-	//	public Orders Orders;
-
-		// Game01.GameObjects.ExecutiveDirectives.RulesOfEngagement
-		public struct RulesOfEngagement
-		{
-			public bool FireOnFreighters; // usually always false
-			public bool RetreatRatherThanFightIfPossible;
-				//      - never fire first except during wartime
-				//		- diplomacy first unless state of war
-				//      - never fire on disabled ships or otherwise  non-threats
-				//		- pre-emptive policy
-				//		- disable priority
-				//			- shields
-				//			- weapons
-				//			- engines
-				//		- proportiality / proportional response
-				//		- nuclear weapons only to deter opposing nuclear threat only (some ships may have a mission of always staying hidden and running silent and nuclear deterences in case of an attack on homeworld and homeworld is destroyed, the retaliatory strike option will still exist to carry out its mission
-				//		- 
-
-
-		}
-	}
-
 
 	
 	public struct Membership
@@ -7530,25 +8059,26 @@ return (0,0);
 		None               =  1 << 0,
 		Transform          =  1 << 1,
 		RigidBody          =  1 << 2,
-		Sentient           =  1 << 3,    // something that is 'AWARE' and can 'FEEL' and 'PERCEIVE' and has statistics like 'Age', 'Hitpoints' and such and survival Skills
-		Intelligent        = 1 << 4,     // a SENTIENT that can recognize 'TRUTH' and operates on more than 'INSTINCT'  Can signify anything from an Android to a Human to an alien Xenomorph.  Characters can have Memberships and Skills other than Survival related
+		LifeForm           =  1 << 3,
+		Sentient           =  1 << 4,    // something that is 'AWARE' and can 'FEEL' and 'PERCEIVE' and has statistics like 'Age', 'Hitpoints' and such and survival Skills
+		Intelligent        = 1 << 5,     // a SENTIENT that can recognize 'TRUTH' and operates on more than 'INSTINCT'  Can signify anything from an Android to a Human to an alien Xenomorph.  Characters can have Memberships and Skills other than Survival related
 		
-		SelfPropelled      = 1 << 5,    // can move under it's own power such as a Human or a Droid
-		Container          = 1 << 6,  // Vehicles, Buildings that can have Components, Sentient's and even other Containers within it.
-		Assembly           = 1 << 7,   // includes things attached to the EXTERIOR of Containers like Turrets, Pods, Superstructures, Towers, Masts
-		Component          = 1 << 8,  // interior items of a building or vehicle that contain basic stats like Weight, Volume, Surface Area, Cost, and can be Armored
+		SelfPropelled      = 1 << 6,    // can move under it's own power such as a Human or a Droid
+		Container          = 1 << 7,  // Vehicles, Buildings that can have Components, Sentient's and even other Containers within it.
+		Assembly           = 1 << 8,   // includes things attached to the EXTERIOR of Containers like Turrets, Pods, Superstructures, Towers, Masts
+		Component          = 1 << 9,  // interior items of a building or vehicle that contain basic stats like Weight, Volume, Surface Area, Cost, and can be Armored
 			// Useable
-			Sensor         = 1 << 9,     // 
-			Station        = 1 << 10,     // a type of Component that allows commands to be issued to various Crew and Components
-			HelmStation    = 1 << 11,
-			TacticalStation  = 1 << 12,
-			EngineeringStation = 1 << 13,
-			PowerProducing  = 1 << 14,
-			PowerUsing     = 1 << 15,
-			FuelGenerator  = 1 << 16,
-			FuelUsing      = 1 << 17,
-			Weapon         = 1 << 18,
-			Laser          = 1 << 19
+			Sensor         = 1 << 10,     // 
+			Station        = 1 << 11,     // a type of Component that allows commands to be issued to various Crew and Components
+			HelmStation    = 1 << 12,
+			TacticalStation  = 1 << 13,
+			EngineeringStation = 1 << 14,
+			PowerProducing  = 1 << 15,
+			PowerUsing     = 1 << 16,
+			FuelGenerator  = 1 << 17,
+			FuelUsing      = 1 << 18,
+			Weapon         = 1 << 19,
+			Laser          = 1 << 20
 	}
 	
 	[Flags]
@@ -7567,7 +8097,7 @@ return (0,0);
 	}
 	
 	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
-	public struct LivingEntity
+	public struct LifeForm
 	{
 		public int EntityArrayIndex;
 		public CONFIGURATION Configuration;
@@ -7728,7 +8258,7 @@ return (0,0);
 		
 			errorReason = null;
 			
-			ComponentStore<LivingEntity> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LivingEntity>(0);
+			ComponentStore<LifeForm> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
 			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 						
@@ -8616,9 +9146,316 @@ return (0,0);
 		}
 
     }
-	
-	
+
 	#endregion // Game01.GameObjects
+
+    public interface IEntitySystem
+    {
+        // 1) an IEntitySystem of type "City{World.Country.Province.County}" might include many different types of child IEntitySystem within it.
+        //    eg. University, Factory, Arthouses, Houses of Worship, Acadamies, Mines, Lodges, Farms, Museums, Research Fascilities, Heavy Idustries, Parks
+        //        Parks, etc.
+        //        - These IEntitySystems are very much like the Simulation of a Vehicle and it's part... each uses "Production and Consumption" that can be
+        //        received by the Simulation.cs in a very consistant/agnosic way.
+        //        - people with various "skills" can be "produced" from Academies... not just minerals, crops, or commodities.
+        //        - these Systems also CONSUME from "Stores"... how do we assign Stores and make them available to something like a "City?"
+        // 2) Stores - food, supplies, medicines, clothing, energy
+        // 3) Do we need to support rendering Proxies here (2D and 3D?)
+		public struct EntitySystemUpdateContext
+    	{
+        	// see SelectionNode or Elements.SwitchNode for help
+			
+			
+    	}
+	
+        int Seed { get; }
+        int EntityCount { get; }
+        bool MultithreadingEnabled { get; set; }
+
+        // TODO: perhaps grab the max count from a configuration file
+        int MaxEntityCount { get; set; }
+
+        void GenerateSystem();
+        // todo: need delegates for handling the Generate()
+        // todo: need delegate for Create() of single IProcGeneratedItem
+
+
+        // libnoise uses this to find a value on a texture
+        object GetValue(double x, double y, double z);
+        IProcGeneratedItem GetItem(string address);
+        IProcGeneratedItem GetItem(int index);
+        IProcGeneratedItem GetItem(string guid, int seed);
+
+        void Update(double elapsedSeconds, EntitySystemUpdateContext context);
+        void Read();
+        void Write();
+    }
+
+	
+
+    public abstract class EntitySystemBase : EntityNode, IEntitySystem
+    {
+        public delegate IProcGeneratedItem CreateEntityHandler(int seed, string path);
+        public delegate void GenerateSystemHandler(int seed);
+        public delegate void UpdateHandler(double elapsedSeconds, IEntitySystem.EntitySystemUpdateContext context);
+
+        // private variables
+        protected string mPath;
+        protected int mMaxEntityCount;
+        protected bool mMultithreadingEnabled;
+
+        protected int mTickID; // incremented everytime Update() is called.  NOTE: Update() is not necessarily called once per frame.
+        protected int mSeed;
+
+        protected UpdateHandler[] mUpdateHandlers;
+
+        // properties
+        public int Seed { get { return mSeed; } }
+        public int TickID { get { return mTickID; } }
+        public int EntityCount { get { return 0; } }
+        public bool MultithreadingEnabled { get { return mMultithreadingEnabled; } set { mMultithreadingEnabled = value; } }
+
+        public int MaxEntityCount { get; set; }
+
+		protected EntitySystemBase(string guid) : base(guid, guid.GetHashCode(), 0, 0, 0, 0, 0)
+		{
+			
+		}
+		
+        public virtual void Update(double elapsedSeconds, IEntitySystem.EntitySystemUpdateContext context)
+        {
+            // select from mUpdateHandlers based on context... its essentially like update LOD where the
+            // update simulation can be simpler when this IEntitySystem is far away or has no players near it...
+        }
+
+        public virtual void GenerateSystem()
+        {
+        }
+        // todo: need delegates for handling the Generate()
+        // todo: need delegate for Create() of single IProcGeneratedItem
+
+
+        // libnoise uses this to find a value on a texture
+        public virtual object GetValue(double x, double y, double z)
+        {
+            return null;
+        }
+
+        public virtual IProcGeneratedItem GetItem(string address)
+        {
+            return null;
+        }
+        public virtual IProcGeneratedItem GetItem(int index)
+        {
+            return null;
+        }
+
+        public virtual IProcGeneratedItem GetItem(string guid, int seed)
+        {
+            return null;
+        }
+
+        public virtual void Read()
+        {
+        }
+
+        public virtual void Write()
+        {
+        }
+
+    }
+
+    public class City : EntitySystemBase
+    {
+
+        // City specific structs
+        private struct Terrain
+        {
+            public bool Mountainous;
+            public bool Landlocked;
+            //public Resource[] Resources;			
+        }
+
+        private struct Environment
+        {
+            public float Pollution; // coefficient
+            public float WildLife; // diversity coefficient 
+
+        }
+
+
+        private struct Government
+        {
+            public int Type;  // 
+
+        }
+
+        private struct Infrastructure
+        {
+            public bool Highways;
+            public bool SeaPorts;
+            public bool Airport;
+            public bool Railroads;
+            public int HousingUnits;
+
+        }
+
+        private struct Economy
+        {
+            public int Credits;
+            //public Store[] Stores;
+            //public Resources[] ResourcesRealized;
+            //public Resources[] ResourcesUnrealized;
+            //public Product[] Commodities;
+
+        }
+		
+        /*Factories_Light; // produce finished goods
+        Factories_Medium;
+        Factories_Heavy; 
+        Factories_SuperHeavy;
+        PowerPlants;
+        Mines;
+        Farms;
+        Fisheries;
+
+        Universities;
+        Academies;
+        */
+
+
+        // City specific variables
+        private int mOwnerID; // eg FactionID
+        private Economy mEconomy;
+        private Queue<EntityNode> mBuildQueue;
+
+        private City[] mConnections; // migration, tourism,  trade
+
+
+        public City(string guid) : base(guid)
+        {
+        }
+
+
+    }
+
+    public class Population : EntitySystemBase
+    {
+
+        public Population(string guid) : base(guid)
+        {
+        }
+
+
+        public override IProcGeneratedItem GetItem(string address)
+        {
+
+            return null;
+        }
+
+        public override object GetValue(double x, double y, double z)
+        {
+            throw new NotImplementedException();
+        }
+        public override IProcGeneratedItem GetItem(int index)
+        {
+            return null;
+        }
+
+        /// <summary>
+        /// From the GUID, we can lookup the address (hierarchical region) and then the seed used to generate this Entity
+        /// and a "changedState" save file that contains all changed data that is different from the
+        /// Entity that is initially created from the seed.
+        /// </summary>
+        public override IProcGeneratedItem GetItem(string guid, int seed)
+        {
+            // todo: note the guid must always be assigned if it's being generated from a seed because
+            //       a GUID cannot be generated from a seed.  It is always going to be a new GUID if we call guid = System.Guid.NewGuid()
+
+            return null;
+        }
+
+        //public IProcGeneratedItem[] GetItems (Rectangle bounds)
+        //{
+        // todo: note the guid must always be assigned if it's being generated from a seed because
+        //       a GUID cannot be generated from a seed.  It is always going to be a new GUID if we call guid = System.Guid.NewGuid()
+
+        //	return null;
+        //}
+
+        public override void GenerateSystem()
+        {
+        }
+
+        public virtual ProcGeneratedItem Create()
+        {
+            return null;
+
+        }
+
+    }
+
+
+    public class BoidFactory : Population
+    {
+        public BoidFactory(string guid) : base(guid)
+        {
+        }
+
+        public override void Update(double elapsedSeconds, IEntitySystem.EntitySystemUpdateContext context)
+        {
+
+        }
+    }
+
+
+    // TODO: these interfaces should support LayeredProcGen chunks
+    //       Wave Function Collapse
+    //       LibNoise style texture generation, but with more control over generating "chunks"
+    //       that connect to each other as opposed to a giant texture that then has to be stiched
+    //       together after the fact
+    public interface IProcGeneratedItem
+    {
+        int Seed { get; }
+        //public Settings.PropertySpec[] Deltas {get ;}
+
+    }
+
+    public abstract class ProcGeneratedItem : IProcGeneratedItem
+    {
+        public int mSeed;
+
+        public int Seed { get { return mSeed; } }
+    }
+
+    // SEE EntityNode above!  EntityNode is equivalent to Keystone.Entities.Entity
+    //public class Entity : ProcGeneratedItem
+    //{
+    //  public struct LivingEntity
+    //  {
+    //     // see class Boid "public struct LivingEntity"
+    //
+    //  }
+    //	public Entity (string guid)
+    //	{
+    //	}
+    //}
+
+    public class TerrainChunk : ProcGeneratedItem
+    {
+
+    }
+
+    public class ProceduralTexture : IProcGeneratedItem
+    {
+        public int mSeed;
+
+        public int Seed { get { return mSeed; } }
+    }
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
 
     #region Builder implementation
 	// See KeystoneGameBlocks/Game01/Builders
@@ -9008,309 +9845,6 @@ return (0,0);
 #endregion
 	}
 	
-    public interface IEntitySystem
-    {
-        // 1) an IEntitySystem of type "City{World.Country.Province.County}" might include many different types of child IEntitySystem within it.
-        //    eg. University, Factory, Arthouses, Houses of Worship, Acadamies, Mines, Lodges, Farms, Museums, Research Fascilities, Heavy Idustries, Parks
-        //        Parks, etc.
-        //        - These IEntitySystems are very much like the Simulation of a Vehicle and it's part... each uses "Production and Consumption" that can be
-        //        received by the Simulation.cs in a very consistant/agnosic way.
-        //        - people with various "skills" can be "produced" from Academies... not just minerals, crops, or commodities.
-        //        - these Systems also CONSUME from "Stores"... how do we assign Stores and make them available to something like a "City?"
-        // 2) Stores - food, supplies, medicines, clothing, energy
-        // 3) Do we need to support rendering Proxies here (2D and 3D?)
-		public struct EntitySystemUpdateContext
-    	{
-        	// see SelectionNode or Elements.SwitchNode for help
-			
-			
-    	}
-	
-        int Seed { get; }
-        int EntityCount { get; }
-        bool MultithreadingEnabled { get; set; }
-
-        // TODO: perhaps grab the max count from a configuration file
-        int MaxEntityCount { get; set; }
-
-        void GenerateSystem();
-        // todo: need delegates for handling the Generate()
-        // todo: need delegate for Create() of single IProcGeneratedItem
-
-
-        // libnoise uses this to find a value on a texture
-        object GetValue(double x, double y, double z);
-        IProcGeneratedItem GetItem(string address);
-        IProcGeneratedItem GetItem(int index);
-        IProcGeneratedItem GetItem(string guid, int seed);
-
-        void Update(double elapsedSeconds, EntitySystemUpdateContext context);
-        void Read();
-        void Write();
-    }
-
-	
-
-    public abstract class EntitySystemBase : EntityNode, IEntitySystem
-    {
-        public delegate IProcGeneratedItem CreateEntityHandler(int seed, string path);
-        public delegate void GenerateSystemHandler(int seed);
-        public delegate void UpdateHandler(double elapsedSeconds, IEntitySystem.EntitySystemUpdateContext context);
-
-        // private variables
-        protected string mPath;
-        protected int mMaxEntityCount;
-        protected bool mMultithreadingEnabled;
-
-        protected int mTickID; // incremented everytime Update() is called.  NOTE: Update() is not necessarily called once per frame.
-        protected int mSeed;
-
-        protected UpdateHandler[] mUpdateHandlers;
-
-        // properties
-        public int Seed { get { return mSeed; } }
-        public int TickID { get { return mTickID; } }
-        public int EntityCount { get { return 0; } }
-        public bool MultithreadingEnabled { get { return mMultithreadingEnabled; } set { mMultithreadingEnabled = value; } }
-
-        public int MaxEntityCount { get; set; }
-
-		protected EntitySystemBase(string guid) : base(guid, guid.GetHashCode(), 0, 0, 0, 0, 0)
-		{
-			
-		}
-		
-        public virtual void Update(double elapsedSeconds, IEntitySystem.EntitySystemUpdateContext context)
-        {
-            // select from mUpdateHandlers based on context... its essentially like update LOD where the
-            // update simulation can be simpler when this IEntitySystem is far away or has no players near it...
-        }
-
-        public virtual void GenerateSystem()
-        {
-        }
-        // todo: need delegates for handling the Generate()
-        // todo: need delegate for Create() of single IProcGeneratedItem
-
-
-        // libnoise uses this to find a value on a texture
-        public virtual object GetValue(double x, double y, double z)
-        {
-            return null;
-        }
-
-        public virtual IProcGeneratedItem GetItem(string address)
-        {
-            return null;
-        }
-        public virtual IProcGeneratedItem GetItem(int index)
-        {
-            return null;
-        }
-
-        public virtual IProcGeneratedItem GetItem(string guid, int seed)
-        {
-            return null;
-        }
-
-        public virtual void Read()
-        {
-        }
-
-        public virtual void Write()
-        {
-        }
-
-    }
-
-    public class City : EntitySystemBase
-    {
-
-        // City specific structs
-        private struct Terrain
-        {
-            public bool Mountainous;
-            public bool Landlocked;
-            //public Resource[] Resources;			
-        }
-
-        private struct Environment
-        {
-            public float Pollution; // coefficient
-            public float WildLife; // diversity coefficient 
-
-        }
-
-
-        private struct Government
-        {
-            public int Type;  // 
-
-        }
-
-        private struct Infrastructure
-        {
-            public bool Highways;
-            public bool SeaPorts;
-            public bool Airport;
-            public bool Railroads;
-            public int HousingUnits;
-
-        }
-
-        private struct Economy
-        {
-            public int Credits;
-            //public Store[] Stores;
-            //public Resources[] ResourcesRealized;
-            //public Resources[] ResourcesUnrealized;
-            //public Product[] Commodities;
-
-        }
-		
-        /*Factories_Light; // produce finished goods
-        Factories_Medium;
-        Factories_Heavy; 
-        Factories_SuperHeavy;
-        PowerPlants;
-        Mines;
-        Farms;
-        Fisheries;
-
-        Universities;
-        Academies;
-        */
-
-
-        // City specific variables
-        private int mOwnerID; // eg FactionID
-        private Economy mEconomy;
-        private Queue<EntityNode> mBuildQueue;
-
-        private City[] mConnections; // migration, tourism,  trade
-
-
-        public City(string guid) : base(guid)
-        {
-        }
-
-
-    }
-
-    public class Population : EntitySystemBase
-    {
-
-        public Population(string guid) : base(guid)
-        {
-        }
-
-
-        public override IProcGeneratedItem GetItem(string address)
-        {
-
-            return null;
-        }
-
-        public override object GetValue(double x, double y, double z)
-        {
-            throw new NotImplementedException();
-        }
-        public override IProcGeneratedItem GetItem(int index)
-        {
-            return null;
-        }
-
-        /// <summary>
-        /// From the GUID, we can lookup the address (hierarchical region) and then the seed used to generate this Entity
-        /// and a "changedState" save file that contains all changed data that is different from the
-        /// Entity that is initially created from the seed.
-        /// </summary>
-        public override IProcGeneratedItem GetItem(string guid, int seed)
-        {
-            // todo: note the guid must always be assigned if it's being generated from a seed because
-            //       a GUID cannot be generated from a seed.  It is always going to be a new GUID if we call guid = System.Guid.NewGuid()
-
-            return null;
-        }
-
-        //public IProcGeneratedItem[] GetItems (Rectangle bounds)
-        //{
-        // todo: note the guid must always be assigned if it's being generated from a seed because
-        //       a GUID cannot be generated from a seed.  It is always going to be a new GUID if we call guid = System.Guid.NewGuid()
-
-        //	return null;
-        //}
-
-        public override void GenerateSystem()
-        {
-        }
-
-        public virtual ProcGeneratedItem Create()
-        {
-            return null;
-
-        }
-
-    }
-
-
-    public class BoidFactory : Population
-    {
-        public BoidFactory(string guid) : base(guid)
-        {
-        }
-
-        public override void Update(double elapsedSeconds, IEntitySystem.EntitySystemUpdateContext context)
-        {
-
-        }
-    }
-
-
-    // TODO: these interfaces should support LayeredProcGen chunks
-    //       Wave Function Collapse
-    //       LibNoise style texture generation, but with more control over generating "chunks"
-    //       that connect to each other as opposed to a giant texture that then has to be stiched
-    //       together after the fact
-    public interface IProcGeneratedItem
-    {
-        int Seed { get; }
-        //public Settings.PropertySpec[] Deltas {get ;}
-
-    }
-
-    public abstract class ProcGeneratedItem : IProcGeneratedItem
-    {
-        public int mSeed;
-
-        public int Seed { get { return mSeed; } }
-    }
-
-    // SEE EntityNode above!  EntityNode is equivalent to Keystone.Entities.Entity
-    //public class Entity : ProcGeneratedItem
-    //{
-    //  public struct LivingEntity
-    //  {
-    //     // see class Boid "public struct LivingEntity"
-    //
-    //  }
-    //	public Entity (string guid)
-    //	{
-    //	}
-    //}
-
-    public class TerrainChunk : ProcGeneratedItem
-    {
-
-    }
-
-    public class ProceduralTexture : IProcGeneratedItem
-    {
-        public int mSeed;
-
-        public int Seed { get { return mSeed; } }
-    }
-	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 
@@ -9422,8 +9956,8 @@ return (0,0);
   		                flocking.Invoke(store0, args, seed, gt);
 						break;
 					case "LIFECYCLE":
-						Processor<LivingEntity> life = (Processor<LivingEntity>)func;
-				   		ComponentStore<LivingEntity> store1 = mComponentStoreCollection.CheckOut<LivingEntity>(0);
+						Processor<LifeForm> life = (Processor<LifeForm>)func;
+				   		ComponentStore<LifeForm> store1 = mComponentStoreCollection.CheckOut<LifeForm>(0);
  						life.Invoke(store1, args, seed, gt);
 						break;
 					case "LASERS":
@@ -21172,521 +21706,6 @@ public abstract class PlanedFrustum
             set { type = value; }
         }
     }
-	
-	
-	
-	
-	
-
-#region Policy Rules
-	
-			
-		// POLICIES AND RULES 
-		// todo: the ai captain needs a "mission" or "objectives" for each mission
-		// ordinance Rules
-		// ROE example: see HelloConditions.cs
-			
-		// http://www.gamasutra.com/view/news/198377/Video_Valves_system_for_creating_AIdriven_dynamic_dialog.php   <- now on Youtube @ https://www.youtube.com/watch?v=tAbBID3N64A
-		// http://www.valvesoftware.com/publications/2012/GDC2012_Ruskin_Elan_DynamicDialog.pdf
-		// NOTE: in Valve's Zombie game, for the npc voice logic, they share
-		//       all of this knowledge in a single knowledge base rather than allowing
-		//       each to have it's own in a fragmented way and it makes running through
-		//       them sequentially to find voice responses that match a search much faster and easier.
-		//       Valve's Left 4 Dead voice logic is very much a flat database but generated by flattening
-		//		 a scenegraph style directed acyclic graph (DAG))	
-		
-			/* 
-			https://stackoverflow.com/questions/31879609/flattening-a-graph
-			https://deephaven.io/core/docs/conceptual/dag/
-			https://github.com/madelson/Traverse
-			//	http://www.gamasutra.com/blogs/GuyHasson/20120706/173705/Story_Design_Tips_Better_NPC_Interaction_Part_II.php
-		//  -> Flattening a DAG ->   https://medium.com/@chipzt/directed-acyclic-graphs-dags-8d479ed14967
-		
-			"Flattening" a Directed Acyclic Graph (DAG) in C# is typically achieved using a topological sort algorithm. 
-			This process results in a linear ordering of all nodes such that for every directed edge from node A to 
-			node B, A appears before B in the list. This linear sequence is the "flattened" representation of the DAG, 
-			often used for task scheduling and dependency resolution. 
-			Implementation Concepts in C#
-			To flatten a DAG in C#, you would generally follow these steps:
-			Represent the DAG: Define a class for the nodes and a way to store the edges (e.g., an adjacency list or a 
-			dictionary where keys are nodes and values are lists of their children).
-			Implement Topological Sort: Use an algorithm like Kahn's algorithm or a depth-first search (DFS) based 
-			approach to generate a topological ordering.
-
-			Iterate and Collect: The result of the topological sort is your flattened list of nodes. 
-
-			Example C# Code Snippet (Conceptual)
-			A common approach for topological sort uses DFS: 
-
-		public class Node<T>
-		{
-			public T Value { get; set; }
-			public List<Node<T>> Dependencies { get; set; } = new List<Node<T>>();
-		}
-
-		public static List<Node<T>> TopologicalSort<T>(List<Node<T>> nodes)
-		{
-			var sortedList = new List<Node<T>>();
-			var visited = new HashSet<Node<T>>();
-			var recursionStack = new HashSet<Node<T>>();
-
-			foreach (var node in nodes)
-			{
-				if (!visited.Contains(node))
-				{
-					SortUtil(node, visited, recursionStack, sortedList);
-				}
-			}
-			// Result needs to be reversed if using DFS post-order traversal
-			sortedList.Reverse(); 
-			return sortedList;
-		}
-
-		private static void SortUtil<T>(Node<T> node, HashSet<Node<T>> visited, HashSet<Node<T>> recursionStack, List<Node<T>> sortedList)
-		{
-			visited.Add(node);
-			recursionStack.Add(node); // Used for cycle detection (crucial for DAG validation)
-
-			foreach (var dependency in node.Dependencies)
-			{
-				if (!visited.Contains(dependency))
-				{
-					SortUtil(dependency, visited, recursionStack, sortedList);
-				}
-				else if (recursionStack.Contains(dependency))
-				{
-					// Cycle detected - the graph is NOT a DAG and cannot be flattened this way
-					throw new Exception("Graph contains a cycle!"); 
-				}
-			}
-
-			recursionStack.Remove(node);
-			sortedList.Add(node);
-		}
-
-		Note: A true "flattening" into a simple linear list is only possible if the graph is, in fact, a DAG (meaning it has no cycles). 
-		If a cycle is present, the process cannot terminate in a finite order, and an exception should be thrown. 
-
-		For a complete, working example or to use a library that handles graph operations, you might explore graph libraries for C# or
-		refer to examples on platforms like Stack Overflow.  https://stackoverflow.com/questions/31879609/flattening-a-graph
-		*/
-			
-			
-			
-		//	- The trick is how the KEY for each flattened path is created and then used when building the query string!!!		
-		//	http://www.gamasutra.com/blogs/GuyHasson/20120706/173705/Story_Design_Tips_Better_NPC_Interaction_Part_II.php
-		//  -> Flattening a DAG ->   https://medium.com/@chipzt/directed-acyclic-graphs-dags-8d479ed14967
-			
-		//			- sort rules alphabetically.  Why?
-		//				- well this way when running the comparisons of the QUERIES against the CONDITIONS of each rule,
-		//			as we iterate through each QUERY "key" we don't have to re-start an iteration at the beginning of every CONDITION "key" 
-		//			because we know they are in same alphabetical order as the QUERIES collection.  For instance:
-		//			QUERY: A:100, B:50, C:true, F:false
-		//			RULE1:
-		//          	CONDITIONS: A:<=500 && A: >=0 
-		//              CONDITIONS: C:<=True && >=True
-		//				- in the above, we start to iterate through the 4 query tuples and for each naivly we iterate each CONDITION
-		//                but instead, when we find a matching condition, we don't need to start over.  We can resume because we know that
-		//                the CONDITIONS are sorted the same way so when testing QUERY part B, we can resume iteration of CONDITION and next
-		//				  CONDITION will be C: so we know B doesn't exist (else the iteration cursor would have been moved back to beginning).		
-		//
-		//          TODO: currently our normal propertybag stores it's data as DefaultValue and does not actually hook back to a
-		//			      collection of objects.  It should actually store to same object store so that the data can also be read
-		//                directly through the object store and not through the entity.  Recall that originally, the point of using the PropertySpec's
-		//                was to get propertybag GUI rendering for free via propertygrid control.
-		//
-		//			- hash buckets for different regions and/or other basic buckets similarly to what we do when we cull
-		//			- store pointers to the value we want to compare rather than have to query that game data
-		//			- sort by decreasing # of criteria (as we do with TileMap auto-tile rules)
-		//			- represent every comparision as a >= x >= b  
-		//				eg.   return (10 >= ptrCharacterXHitpoints && ptrCharacterXHitpoints >= 100);    
-		//
-		//		 So in a way, what we want there is a Blackboard class that can
-		//       manage all that for us, and then when we first initialize a behavior
-		//       on an Entity, it will grab a blackboard blob from the allocator and
-		//       assign it to the Enity.Knowledge
-		//       - and since the dialogue tree structure is essentially a flattened DAG (like a scenegraph)
-		//		 which seems to take on a Rules Engine like functionality because it becomes serial
-		//       test and not a branching test.
-		//       - thus, each "record" has an owner and can be referenced and read/written to
-		//       from the UserDataStore.  There is a question of whether this data should remain in 
-		//       DB form.. perhaps cached for recent access.  Well, i think it must be cached or else
-		//       way too slow for the type of use we do.  Do we CheckIn/CheckOut data blobs?  We could do some
-		//       really fast computations I think and threaded, on an in memory "blackboard" where each blackboard 
-		//       can be defined and hold all of same record types (eg all stars, all worlds, all npcs) so that
-		//       manipulation of their data is... well... its all very functional style and not OO.
-		//		 - THE CACHE COHERENCY BECOMES EXCELLENT.
-		//		   - perhaps each derived blackboard itself becomes a data manipulator that knows how to read/write it's data
-		//	       and then the sqlite or whatever storage occurs as generic using array of field definitions
-		//			- Being able to define custom blackboards is nice because we now have fixed size fields
-		//
-		//		 - is the UserDataStore a global like Pager and Repository?
-		//		- maybe each Blackboard gets instantiated EXE side and so we get StarData : UserData 
-		//      that gets used for all stars and which we can write custom data manipulation against
-		//		- we could even read/write to it like we do with Packets... and perhaps even use unsafe code for even greater performance
-		// (See E:\dev\_projects\_XNA\Mercury Particle Engine\ProjectMercury.WindowsEmitters\Emitter.cs.Update() method)
-		// but one thing it does which i think defeats the purpose somewhat perhaps is it creates a fixed pointer to the particle array rather than allocating it as pointer from start.  having to "fix" it seems like enough overhead to nullify any performance advantages
-		
-		//  - Production productID and Consumers can be stored here as well.  Do we still want to use scripts for these entities? or
-		//    would scripts assigned to each data store type be more efficient?
-		//  - for economic simulation this could be very fast
-		//	- AI simulation may be more needed case for a single player 1.0 game release
-		//		- blackboard data can store Area_Of_Interest data generated from other pre- calculations 
-		//  - for NPC simulation this can be very fast too when running out behavior tree against this data
-		//    and eventually we probably stop simulating Entity AI in Entity.Update() and move it to an Update() 
-		//    of simulation that will iterate through npcs by iterating through the blackboard data (limiting iterating 
-		//    to X count that fit into an alotted timeslice using threading as available and as needed)
-		
-		//		- IN OTHER WORDS, by iterating through the array of UserData to perform entity updates, can we properly update
-		//    these variables with appropriate functions and have the update reflected in the Entity itself?  For example, lets say
-		//    we have 50 entities that are doing wander steering behavior... can we run a singular script that operates on blackboard user data
-		//    to update all 50 of those entities?  rather than 50 calls to entity.update() and 50 script calls.
-		//          - if the scripts each entity uses can be one of the ways we sort entities when updating their data, then we can easily
-		//          update all entities using a particular script.... similar to how we do renders of sorted entities
-		//			- if our scene update() loop added entities to be updated in sorted buckets... but for now this is jsut brainstorming idea, since it could slow us down
-		//  Feb.6.2026 -> Regarding the above question which is Data-Oriented processing model, YES WE CAN.  This is what i have been in fact implementing for last few months
-		//                
-		//
-		
-		// TODO: google cache coherency as it relates to flat databases 
-		//			- and .net c#
-		// TODO: isn't BehaviorContext.Knowledge already associated with Entity?  And shouldn't this data replace Entity CustomProperties? and Rename var from Knowledge to Entity.CustomData
-                                   //       and is now stored in sqlite where our scene representation which uses xml is seperate from the entity custom data which is db stored.  Our EntityAPI for
-                                   //       getting custom data can now also use methods with type safety.  Further we no longer have to care about custom data being serialized to xml and perhaps this
-                                   //       speeds up our ability to save scene when we are editing maps as well as saving game state
-        							// TODO: however, will this type of CustomProperties now no longer be easily editable in a PropertyGrid and if not, is that ok?
-        							//      we're using custom html interfaces now anyway right?
-        							//      we must start with _just_ custom properties for now but actually just RenderingContext 
-        							// TODO: also what about shaders?  right now those use custom properties for shader params/vars and should not be stored in a db!
-        							// TODO: actually volume, surfacearea,cost,weight for all celestial bodes is already being used as custom properties!
-        							//       So question is, how do we connect those to a datastore?
-        							//		 - well just as we use GetProperties() SetProperties() where a single reader/writer of xml store is operating
-        							//       we can do same for UserData.   We can convert to GetProperties and SetProperties() and we can also
-        							//       use other methods of iterating thru the list of custom data. For now, let's just focus on Viewpoint for Chase
-        					
-			// is there a way to track the data for an individual Entity via an Index into array of records and to have this record
-			// index maintained during lifetime? indices can be checked in / checked out
-
-			// locally, we dont really need to use entityID as part of a record key either, locally we can use just an Index
-			// and perhaps a lookup value... but i think in short term, we should continue to focus on just Viewpoint and Chase cam
-			// and if that goes well, Stars and see about how it works with LoadTVResource() and restoring DB via a LoadCustomData()
-			
-	public class Policy
-	{
-		// eg: A Policy contains a list of Queries that represent testing for a 
-		//     related series of conditions.
-		//     For instance, a subset of the Rules of Engagement (RoE) policy says "Do Not Fire On Friendlies" 
-		//     needs to check for the following:
-		//     - Is the target a member of "Membership_Earth_Alliance"
-		//     - Is the target a member of "Colonial_Expeditionary_Fleet"
-		//     - Has the target fired upon us or an ally, and thus, is in breach of this policy itself?
-		
-		// Let's say the question is, Can this Target vessel be fired upon?  
-		// we want to build this query up as a type of Policy for When can a vessel be fired upon?
-		
-		private List<Query> mQueries;
-		private string mErrorReason;
-		
-		
-		public Policy()
-		{
-			mQueries = new List<Query>();
-		}
-		
-		public Query[] Queries {get {if (mQueries == null) return null; return mQueries.ToArray();}}
-		
-		
-		public void Add(Query q)
-		{
-			if (mQueries == null) mQueries = new List<Query>();
-			mQueries.Add(q);
-		}
-		
-		public bool Execute ()
-		{
-			if (mQueries == null || mQueries.Count == 0) return true;
-			
-			for (int i = 0; i < mQueries.Count; i++)
-			{
-				UserDataStore context = mQueries[i].Context;
-				if (!mQueries[i].Execute()) return false;
-			}
-			
-			return true;
-		}
-	}
-	
-	
-	internal class Statistics
-	{
-		private UserDataStore mContext;
-		Dictionary<string, int> mCounters = new Dictionary<string, int>();
-		
-		// https://redis.io/docs/latest/develop/get-started/data-store/
-		// HSET bike:1 model Deimos brand Ergonom type 'Enduro bikes' price 4972
-		
-		// so this is a key that would be made up of 4 keyvalue pairs.  Each kvp is delimited by colons
-		// each key and value is delimited by a space.
-		
-		// bike 1:model Deimos:brand Ergonom:type 'Enduro bikes':price 4972
-		
-		// hmm... the first is a QUANTITY also though... im not sure how this works
-		// > HGET bike:1 model
-		// "Deimos"
-		
-		// IStatistics stats = (IStatistics)EntityNode.UserData.Get(this.ID, "stats");
-		
-		// string action = "defeated" ;
-		// string key = action + "," + "Droid_123";
-		
-		// Increment (this.ID, key)
-		
-		// how would you sum totals... sure we can
-		// parse each string for the "defeated" text, but that seems slow and annoying...
-		// 
-		// defeated
-		// defeated_by
-		// attacked_by
-		// 
-		
-		
-		// A) We want to accomplish two things
-		//    1) We want to track for EACH droid, how many of every OTHER droid, we've defeated and with what weapon and what operator at the Station
-		//    2) We need fast access to these Stats and that these stats should remain in memory after a DROID is defeated so that it can be respawned
-		//       and continue to create stats.
-		//    3) We DO NOT NEED TO CREATE A LOG of ALL EVENTS FOR THIS....  WE MAY EVENTUALLY, BUT PURPOSE OF THIS IS ONLY TO CREATE COMBAT STATS TRACKING
-		
-		// EntityStats[]  <-- same index as the EntityArrayIndex
-		//                <-- uses Memory<T> underneath and a UserDataStore
-		//                <-- 
-		//
-		// 
-		// 
-		//  
-		
-		public Statistics(UserDataStore uds)
-		{
-			if (uds == null) throw new ArgumentNullException("Statistics.ctor() - UserDataStore parameter cannot be null.");
-			mContext = uds;
-		}
-		
-		public UserDataStore Context {get {return mContext;}}
-		
-		// https://stackoverflow.com/questions/74811627/whats-the-best-way-to-store-a-finite-number-of-stats
-		// http://blog.ndepend.com/faster-dictionary-in-c/
-		// https://codesignal.com/learn/courses/revision-of-csharp-dictionaries-and-their-use-in-practice/lessons/data-aggregation-using-dictionaries-in-csharp
-		// https://codesignal.com/learn/courses/hashing-dictionaries-and-collections-in-csharp/lessons/advanced-dictionary-operations-in-csharp
-		public void Increment(string entityKey, KeyValuePair<string, string>[] keys)
-		{
-			if (keys == null || keys.Length == 0) return;
-			
-			int count = keys.Length;
-			
-			string VP_DELIM = " ";
-			string KVP_DELIM = ":";
-			
-			string combinedKey = null;
-			for (int i = 0; i < count; i++)
-			{
-				if (!string.IsNullOrEmpty(combinedKey)) combinedKey += KVP_DELIM;
-				
-				combinedKey += keys[i].Key + VP_DELIM + keys[i].Value;
-				
-			}
-			
-			Increment(combinedKey);
-		}
-		
-		public void Increment(string key)
-		{
-			if (mCounters.ContainsKey(key)) 
-			{
-                mCounters[key]++;
-			}
-			else // it doesn't currently exist, so we add it
-			{
-				mCounters[key] = 1;
-			}
-		}
-	}
-		
-	
-	public class Query 
-	{
-		private UserDataStore mContext;
-		private Rule[] mRules;
-		
-		public Query(UserDataStore uds)
-		{
-			if (uds == null) throw new ArgumentNullException("Query.ctor() - UserDataStore parameter cannot be null.");
-			mContext = uds;
-		}
-		
-		public UserDataStore Context {get {return mContext;}}
-		
-		public Rule[] Rules { get {return mRules;}}
-		
-		public void Add(Rule r)
-		{
-			// ArrayAppend() is using Keystone namespace but actually is in KeyStandardLibrary
-			// Keystone.Extensions.ArrayExtensions.	
-			mRules = Utils.ArrayAppend<Rule>(mRules, r);
-		}
-		
-		public bool Execute ()
-		{
-			if (mRules == null || mRules.Length == 0) return true;
-			
-			//Console.WriteLine("Executing rules");
-			for (int i = 0; i < mRules.Length; i++)
-				if (!mRules[i].Evaluate(mContext)) return false;
-			
-			return true;
-		}
-	}
-
-	
-	/// <summary>
-	/// Rules should be sorted from highest number of Conditions to lowest so that we always test against highest number first so we can potentially early-exit
-	/// <summary>
-	public class Rule
-	{
-		private string mConcept;
-		private string mDescription;
-		private Condition[] mConditions;
-		//public Response Response;
-		//public Remember Remember;
-		//public Trigger Trigger;
-		public string ErrorReason;
-		
-		public Rule (string concept, string description)
-		{
-			mConcept = concept;
-			mDescription = description;
-		}
-		
-		public void Add(Condition c)
-		{
-			// ArrayAppend() is using Keystone namespace but actually is in KeyStandardLibrary
-			// Keystone.Extensions.ArrayExtensions.	
-			mConditions = Utils.ArrayAppend<Condition>(mConditions, c);
-		}
-
-		public void Remove (Condition c)
-		{
-			//mConditions = Utils.ArrayRemove<Condition>(mConditions, c);
-		}
-		
-		public bool Evaluate(UserDataStore context)
-		{
-			if (mConditions == null || mConditions.Length == 0) return true;
-			
-			//Console.WriteLine("Evaluating " + mConditions.Length.ToString() + " conditions");
-			for (int i = 0; i < mConditions.Length; i++)
-			{
-				string left = null;
-				string right = null;
-				if (mConditions[i].LeftOperandIsDelegate)
-				{
-					// the LEFT operand delegate to invoke.  The RIGHT operand is what we want to compare it against 
-					left = mConditions[i].OperandLeftDelegate(mConditions[i].DelegateArgs);
-					right = mConditions[i].OperandRight;
-					//Console.WriteLine("Condition.Evaluate() - Left IS a delegate LEFT == " + left + " RIGHT == " + right);
-				}
-				else
-				{	
-					// left is the KVP to look up.  right is what we want to compare it against 
-					System.Diagnostics.Debug.Assert (context != null, "Context is not null.");
-					left = context[mConditions[i].EntityKey].GetString(mConditions[i].OperandLeft);
-					right = mConditions[i].OperandRight; // context[mConditions[i].EntityKey].GetString(mConditions[i].OperandRight);  		
-					//Console.WriteLine("Condition.Evaluate() - Left is NOT a delegate LEFT == " + left + " RIGHT == " + right);
-				}
-				
-				switch (mConditions[i].mEvalType)
-				{
-					case Condition.EVAL_TYPE.EQUALS:
-						if (left != right) return false; // todo: ErrorReason = 
-						break;
-
-					case Condition.EVAL_TYPE.NOT_EQUALS:
-						if (left == right) return false; // todo: ErrorReason = 
-						break;
-
-					case Condition.EVAL_TYPE.LESS_THAN:
-						if (MicroEx.Evaluate(left + " >= " + right)) return false; // todo: ErrorReason = 
-						break;
-						//return OperandLeft < OperandRight;
-
-					case Condition.EVAL_TYPE.GREATER_THAN:
-						if (MicroEx.Evaluate(left + " <= " + right)) return false; // todo: ErrorReason = 
-						break;
-						//return OperandLeft > OperandRight;
-
-					default:
-						throw new ArgumentOutOfRangeException("Condition.Evaluate() - Unexpected evalType '" + mConditions[i].mEvalType.ToString() + "'");
-
-				}
-			}
-			return true;
-		}
-	}
-	
-	
-	public class Condition
-	{
-		public enum EVAL_TYPE : int
-		{
-			EQUALS = 0,
-			NOT_EQUALS = 1,
-			LESS_THAN = 2,
-			GREATER_THAN = 3
-		}
-		
-		public string Name;
-		public string Description;
-		
-		public bool LeftOperandIsDelegate;
-		// there's generally no reason for BOTH the left and right operands to be a delegate.  
-		// The left will be our delegate and the right will be the operand we want to compare the result of the delegate to
-		public Func<object[], string> OperandLeftDelegate; 
-		public object[] DelegateArgs;
-		
-		// The 'key' into our UserDataStore context that will return the 'value' we want for the left operand
-		public string OperandLeft;
-		// The 'key' into our UserDataStore context that will return the 'value' we want for the right operand
-		public string OperandRight;
-		public EVAL_TYPE mEvalType;
-		
-		
-		public string EntityKey;
-		
-		
-		public Condition (string name, string description, string entityKey, EVAL_TYPE eval, string operandLeft, string operandRight)
-		{
-			Name = name;
-			Description = description;
-			OperandLeft = operandLeft;
-			OperandRight = operandRight;
-			mEvalType = eval;
-			EntityKey = entityKey; // our UserDataStore holds a Dictionary<string, UserData> with the string 'key' being the EntityID the UserData belongs too. 
-			LeftOperandIsDelegate = false;
-		}
-		
-		public Condition (string name, string description, string entityKey, EVAL_TYPE eval, Func<object[], string> operandLeft, string operandRight, object[] delegateArgs)
-		{
-			Name = name;
-			Description = description;
-
-			DelegateArgs = delegateArgs;
-			OperandLeftDelegate = operandLeft;
-			OperandRight = operandRight;
-			mEvalType = eval;
-			EntityKey = entityKey; // our UserDataStore holds a Dictionary<string, UserData> with the string 'key' being the EntityID the UserData belongs too. 
-			LeftOperandIsDelegate = true;
-		}
-	}
-	
-#endregion 
 
 	
 	

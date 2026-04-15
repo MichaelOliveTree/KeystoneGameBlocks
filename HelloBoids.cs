@@ -702,6 +702,12 @@ namespace HelloBoids
 		
 		
         public List<EntityNode> Boids { get; set; }
+					// NOTE: The statistics do not exist within each Droid and so we can keep them
+			//       when a Droid is Destroyed and then Respawned and the Statistics can continue
+			//       to accumulate with the newly spawned replacement for that Droid assuming its using
+			//       the same ID/Profile which is how I envision a screensaver type auto-play game would work.
+		public List<Statistics> Statistics {get; set;}
+		
 		
 		private System.Collections.Concurrent.ConcurrentDictionary<int, List<Tuple<int, double>>> mNeighbors = new System.Collections.Concurrent.ConcurrentDictionary<int, List<Tuple<int, double>>>();
 		internal System.Collections.Concurrent.ConcurrentDictionary<uint, ComponentStore<Production>> mProduction;
@@ -844,8 +850,14 @@ namespace HelloBoids
 
 			Boids = new List<EntityNode>(new EntityNode[numElements]);
 			//Boids = Enumerable.Repeat<EntityNode>(null, numElements).ToList();
+						// NOTE: The statistics do not exist within each Droid and so we can keep them
+			//       when a Droid is Destroyed and then Respawned and the Statistics can continue
+			//       to accumulate with the newly spawned replacement for that Droid assuming its using
+			//       the same ID/Profile which is how I envision a screensaver type auto-play game would work.
+			string PREFIX = "_stats";
+			Statistics = new List<Statistics>(new Statistics[numElements]);
 			
-			
+
 			// Spawn the Boids using Parallel.For() and optional memory fragmenting
 			System.Threading.Tasks.Parallel.For(0, numBoids, i=>
             //for (int i = 0; i < numBoids; i++)
@@ -871,6 +883,8 @@ namespace HelloBoids
 				Boids[arrayIndex + BATTERY_OFFSET]          = result.Item6;
 				Boids[arrayIndex + HUMAN_OPERATOR_OFFSET]   = result.Item7;
 				
+				
+				Statistics[arrayIndex] = new Statistics (EntryClass.bSim.Boids[arrayIndex].EntityKey);
 				
 				//Boids.Add(b); // <-- will not work here as List<> is not threadsafe
 				//Console.WriteLine("i == " + i.ToString()); 
@@ -7450,6 +7464,7 @@ return (0,0);
 		private UserDataStore mContext;
 		private Rule[] mRules;
 		
+		// see line 2535 for useage 
 		public Query(UserDataStore uds)
 		{
 			if (uds == null) throw new ArgumentNullException("Query.ctor() - UserDataStore parameter cannot be null.");
@@ -7558,7 +7573,6 @@ return (0,0);
 
 					default:
 						throw new ArgumentOutOfRangeException("Condition.Evaluate() - Unexpected evalType '" + mConditions[i].mEvalType.ToString() + "'");
-
 				}
 			}
 			return true;
@@ -7622,7 +7636,7 @@ return (0,0);
 	
 	
 	
-	internal class Statistics
+	public class Statistics
 	{
 		private UserDataStore mContext;
 		Dictionary<string, int> mCounters = new Dictionary<string, int>();
@@ -7708,13 +7722,30 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		// 
 		//  
 		
-		public Statistics(UserDataStore uds)
+		private UserData mBlackboardData;
+		
+		public Statistics(string key)
 		{
-			if (uds == null) throw new ArgumentNullException("Statistics.ctor() - UserDataStore parameter cannot be null.");
-			mContext = uds;
+			mBlackboardData = EntryClass.mCStoreUserData.CheckOut(key);
+			
+			// lets say a Ship is detected and we want to check if it has fired upon any friendly 
+			// recently.  Friendly means any Ship that is of the same "faction."
+			// 
+			// List<Targets> = Statistics[targetEntityArrayIndex].GetList("targets");
+			// for (int i = 0; i < targets.Length; i++)
+			// {
+			//    // TODO: the call to AttackedBy() should be a record that contains the DATE, TIME, LOCATION and other details of that attack such as what weapon was used and what was hit or targeted.
+			//             and whether a HIT or MISS was recorded.
+			//    string[] attackedByEntitiesArrayIndices = targets[i].AttackedBy();
+			//	  for (int j = 0; j < attackedByEntitiesArrayIndices.Length; j++)
+			//        if (Boids[attackedByEntitiesArrayIndices[j]].GetMembership("red"))
+			//			  return true;
+			// }
+			
+			
 		}
 		
-		public UserDataStore Context {get {return mContext;}}
+		public UserData BlackboardData {get { return mBlackboardData; } }
 		
 		// https://stackoverflow.com/questions/74811627/whats-the-best-way-to-store-a-finite-number-of-stats
 		// http://blog.ndepend.com/faster-dictionary-in-c/
@@ -7735,12 +7766,13 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 				if (!string.IsNullOrEmpty(combinedKey)) combinedKey += KVP_DELIM;
 				
 				combinedKey += keys[i].Key + VP_DELIM + keys[i].Value;
-				
 			}
 			
 			Increment(combinedKey);
 		}
 		
+		// todo: this should probably go in UserData with the above overload being the only one
+		//       that exists because it has the responsibility of combinging the kvps into one key
 		public void Increment(string key)
 		{
 			if (mCounters.ContainsKey(key)) 

@@ -7186,7 +7186,9 @@ return (0,0);
 			This process results in a linear ordering of all nodes such that for every directed edge from node A to 
 			node B, A appears before B in the list. This linear sequence is the "flattened" representation of the DAG, 
 			often used for task scheduling and dependency resolution. 
+			
 			Implementation Concepts in C#
+			
 			To flatten a DAG in C#, you would generally follow these steps:
 			Represent the DAG: Define a class for the nodes and a way to store the edges (e.g., an adjacency list or a 
 			dictionary where keys are nodes and values are lists of their children).
@@ -7197,6 +7199,7 @@ return (0,0);
 
 			Example C# Code Snippet (Conceptual)
 			A common approach for topological sort uses DFS: 
+
 
 		public class Node<T>
 		{
@@ -7391,11 +7394,11 @@ return (0,0);
 				//		- nuclear weapons only to deter opposing nuclear threat only (some ships may have a mission of always staying hidden and running silent and nuclear deterences in case of an attack on homeworld and homeworld is destroyed, the retaliatory strike option will still exist to carry out its mission
 				//		- 
 
-
 		}
 	}
 
 
+	
 	public class Policy
 	{
 		// eg: A Policy contains a list of Queries that represent testing for a 
@@ -7663,7 +7666,33 @@ return (0,0);
 		// faction memberships
 		// crew members
 		
-		
+		/*
+		For a dogfighting space sim leaderboard, track Win/Loss Ratio, Kill/Death Ratio (KDR), and Score per Minute (SPM) as primary performance indicators. Include specialized metrics like Total Damage Dealt, Accuracy Percentage, Objective Points, and Target Lock Time to reward skilled flying, high-damage loadouts, and objective-oriented gameplay over just raw kills. 
+Reddit
+Reddit
+ +2
+Key Leaderboard Categories
+Core Combat Stats:
+KDR: Measures pure lethality.
+Win/Loss Ratio: Highlights team players who focus on victory.
+Score per Minute (SPM): Measures efficiency and consistent engagement.
+Skill-Based Stats:
+Accuracy %: Shots landed vs. fired.
+Total Damage Dealt: Rewards damage over just last-hitting for kills.
+Average Damage per Kill: Distinguishes snipers from finishers.
+Tactical Stats:
+Target Lock Time: Measures fast target acquisition.
+Objective Points: Rewards time spent on objectives (e.g., node capturing, flag carrying).
+Most Dangerous Enemy: Tracks against whom the player has the highest win rate.
+Ship Performance (Contextual):
+Time Spent in Speed Class (SCM): Measures maneuvering skill.
+Missile Efficiency: Hits vs. launched missiles. 
+Reddit
+Reddit
+ +2
+Why These Matter
+According to a discussion on Reddit, Win/Loss and SPM are often better indicators of true skill and teamwork than raw kills, especially in objective-focused gameplay. For dogfights, damage dealing and accuracy are often more indicative of pilot skill, as discussed in Reddit. 
+	*/
 		
 		// A) We want to accomplish two things
 		//    1) We want to track for EACH droid, how many of every OTHER droid, we've defeated and with what weapon and what operator at the Station

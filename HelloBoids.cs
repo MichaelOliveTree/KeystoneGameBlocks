@@ -266,7 +266,7 @@ namespace HelloBoids
 		public static string OUTPUT_FILENAME = "hello_output.txt";
 
 		
-		
+
         public static void Main()
         {			
             MODE = "Memory<T>";
@@ -854,7 +854,7 @@ namespace HelloBoids
 			//       when a Droid is Destroyed and then Respawned and the Statistics can continue
 			//       to accumulate with the newly spawned replacement for that Droid assuming its using
 			//       the same ID/Profile which is how I envision a screensaver type auto-play game would work.
-			string PREFIX = "_stats";
+			string PREFIX = "stats_";
 			Statistics = new List<Statistics>(new Statistics[numElements]);
 			
 
@@ -884,7 +884,7 @@ namespace HelloBoids
 				Boids[arrayIndex + HUMAN_OPERATOR_OFFSET]   = result.Item7;
 				
 				
-				Statistics[arrayIndex] = new Statistics (EntryClass.bSim.Boids[arrayIndex].EntityKey);
+				Statistics[arrayIndex] = new Statistics (PREFIX + arrayIndex.ToString());
 				
 				//Boids.Add(b); // <-- will not work here as List<> is not threadsafe
 				//Console.WriteLine("i == " + i.ToString()); 
@@ -1915,8 +1915,7 @@ namespace HelloBoids
 				double cohesionDistanceSquared = cohesionDistance * cohesionDistance;
 				
 				double elapsedSeconds = gt.ElapsedSeconds;
-            	double largestDistance = System.Math.Max(this.SeparationDistance, this.AlignmentDistance);
-            	largestDistance = System.Math.Max(largestDistance, this.CohesionDistance);
+            	double largestDistance = Utils.GetMax(this.SeparationDistance, this.AlignmentDistance, this.CohesionDistance);
             	double largestDistanceSquared = largestDistance * largestDistance;
             
 				
@@ -2407,7 +2406,7 @@ namespace HelloBoids
 				
 				int sensorsCount = 0;
 				if (sensorEntities != null) sensorsCount = sensorEntities.Length;
-				//Console.WriteLine("DoContactListSorting() - Sensor Count == " + sensorsCount);
+				//Console.WriteLine("CreateContactListFromAdjacents() - Sensor Count == " + sensorsCount);
 				if (sensorEntities == null) return; 
 				
 				//Console.WriteLine ("4");
@@ -2415,14 +2414,16 @@ namespace HelloBoids
 				// grab the neighbors/adjacents for this Droid.  The returned parameter List<Tuple<int, double>> tells us which Droid (int) index was detected and the (double) distance to it  
 				List<Tuple<int, double>> neighbors = null;
 				
-				//Console.WriteLine("DoContactListSorting() - Looking for Neighbors at Array Index  == " + currentArrayIndex.ToString());
+				//Console.WriteLine("CreateContactListFromAdjacents() - Looking for Neighbors at Array Index  == " + currentArrayIndex.ToString());
 				//foreach (int key in mNeighbors.Keys)
 				//	Console.WriteLine ("Key == " + key.ToString());
 				
 				bool success = mNeighbors.TryGetValue(currentBoidArrayIndex, out neighbors);
 								
-				//Console.WriteLine("DoContactListSorting() - Found '" + neighbors.Count.ToString() + "' Adjacents for Droid @ Array Index == '" + currentArrayIndex.ToString() + "' ");
+				Console.WriteLine("DoContactListSorting() - Found '" + neighbors.Count.ToString() + "' Adjacents for Droid @ Array Index == '" + currentArrayIndex.ToString() + "' ");
 				List<SensorContact> contacts = new List<SensorContact>();
+				
+				//Console.WriteLine("CreateContactListFromAdjacents - 1");
 				
 				// iterate through all the potential "contacts"
 				for (int j = 0; j < neighbors.Count; j++)
@@ -2434,6 +2435,7 @@ namespace HelloBoids
 					int potentialContactsInternalTransformIndex = neighbors[(int)j].Item1; 
 					int potentialContactsEntityArrayIndex = allTransforms.Span[potentialContactsInternalTransformIndex].EntityArrayIndex;
 			  
+					Console.WriteLine("CreateContactListFromAdjacents - 2");
 					// Iterate through all the Sensors the current Droid is using to see which ones might
 					// detect this potential contact.  This is why a "SensorContact" may already exist
 					// in the List<SensorContact> 'contacts'  because multiple Sensors on _the_same_ship_
@@ -2445,7 +2447,9 @@ namespace HelloBoids
 						int sensorArrayIndex = sensorStruct.Span[0].EntityArrayIndex;
 						
 						double sensorRangeSquared = sensorStruct.Span[0].RangeSquared;
-						//Console.WriteLine("DoContactListSorting() - Range = " +  sensorRangeSquared.ToString() + " Distance to Contact ==  " + distanceSquared.ToString());
+						
+						Console.WriteLine("CreateContactListFromAdjacents() - Range = " +  sensorRangeSquared.ToString() + " Distance to Contact ==  " + distanceSquared.ToString());
+						
 						if (sensorRangeSquared >= distanceSquared)
 						{
 							SensorContact c;
@@ -2457,7 +2461,7 @@ namespace HelloBoids
 
 							if (!c.Equals(default(SensorContact)))
 							{
-								Console.WriteLine("DoContactListSorting() - sensor contact name == " + c.Name);
+								Console.WriteLine("CreateContactListFromAdjacents() - sensor contact name == " + c.Name);
 								if (c.SensorsIndices == null) 
 									c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices,  sensorArrayIndex); // sensorStructIndex);
 								else
@@ -2506,7 +2510,7 @@ namespace HelloBoids
 
 								c.Add(t);			
 								contacts.Add(c);
-								//Console.WriteLine("DoContactListSorting() - Added NEW SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
+								Console.WriteLine("DoContactListSorting() - Added NEW SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
 							}
 						} // end sensor range check
 					} // end for SensorsCount
@@ -2536,9 +2540,12 @@ namespace HelloBoids
 				
 				Boid current = (Boid)Boids[i];
 				
+				Console.WriteLine("DoTargetPrioritization - 1");
+				
 				List<SensorContact> contacts = current.GetSensorContacts();
 				if (contacts == null || contacts.Count == 0) return;
-								
+				Console.WriteLine("DoTargetPrioritization - Contacts Count == " + contacts.Count.ToString());
+				
 				//List<Target> targets = current.GetTargets();
 				current.ClearTargets();
 								
@@ -2558,10 +2565,10 @@ namespace HelloBoids
 					string description = "Never fire on any Droid that is a member of our Faction.";
 					 
 					Condition.EVAL_TYPE eval = Condition.EVAL_TYPE.NOT_EQUALS;
-					string operandLeft = "faction";
 					string friendlyFaction = EntryClass.mCStoreUserData[currentKey].GetString("faction");  
-					string operandRight = friendlyFaction;
-					
+					string operandLeft = friendlyFaction;
+					string operandRight = EntryClass.mCStoreUserData[targetKey].GetString("faction");  
+						
 					Condition condition = new Condition(name, description, targetKey, eval, operandLeft, operandRight);
 											
 					r.Add(condition);
@@ -2573,12 +2580,12 @@ namespace HelloBoids
 					object[] delegateArgs = new object[]{currentKey, targetKey};
 					condition = new Condition(name, description, targetKey, eval, IsCombatant, operandRight, delegateArgs);
 					r.Add(condition);
-			
 					q.Add(r);
 					roePolicy.Add(q);
 			
 					SensorContact currentContact = contacts[j];
 					
+					Console.WriteLine("DoTargetPrioritization - PRE- roePolicy.Execute()" );
 					if (roePolicy.Execute())
 					{
 						// Targets are those SensorContacts that friendly forces will potentially fire upon.
@@ -2592,17 +2599,16 @@ namespace HelloBoids
 						else 
 						{
 							t.TargetedBy = Utils.ArrayAppend(t.TargetedBy, (int)i);       // other Ships/Vehciles/Entities, ground radars, factions, etc that are targeting this Target
- 		//
 						}
 						t.EntityArrayIndex = currentContact.ContactEntityArrayIndex;
 						t.WeaponsAssigned = null;
-												t.Status = Target.STATUS.Active;
+						t.Status = Target.STATUS.Active;
 						t.CrewStatus = Target.CREWSTATUS.Alive;
 						t.Hitpoints = 20;        // Boids[c.ContactIndex].Hitpoints; // max hitpoints of target... should a Sensor be able to know this exact number?  It's really just a game thing and maybe we should just use visual observations of condition of ship instead
 						t.CurrentHitPoints = 18; // Boids[c.ContactIndex].CurrentHP ; // used to determine % damage of Target
 
 						current.Add(t);
-						//Console.WriteLine("Rules of Engagement execute completed... Target added.");
+						Console.WriteLine("Rules of Engagement execute completed... Target added.");
 					}
 				}
 			});
@@ -4080,7 +4086,6 @@ namespace HelloBoids
 						//       And again, each of these will contain a functin to use to handle Production and Consumption... just like 
 						//       we do with OPTICAL_SENSORS and LIFECYCLE  so we just do a simple "key"  look up of the Processor function
 						//       based on the ProductID.
-						//       
 						
 						if (allConsumptions[distributionList[j]].Equals(default(Consumption)))
 						{
@@ -5411,20 +5416,20 @@ if (neighbors!= null)
             // for each CURRENT boid is O(n^2) and is too 
             // expensive
             // Iterate through precomputed nearISH neihbors
-if (neighbors!= null)
-            for (int i = 0; i < neighbors.Count; i++)
-            {
-                //if (i == currentIndex) continue;
-                double distance = Vector3d.GetDistance3d(mem[currentIndex].Translation, mem[neighbors[i]].Translation);
+			if (neighbors!= null)
+				for (int i = 0; i < neighbors.Count; i++)
+				{
+					//if (i == currentIndex) continue;
+					double distance = Vector3d.GetDistance3d(mem[currentIndex].Translation, mem[neighbors[i]].Translation);
 
-                if (distance < separationDistance)
-                {
-                    if (distance > 0d) // Hypnotron Dec.4.2025 - required divide by 0 check
-                    {
-                        steer += (mem[currentIndex].Translation - mem[neighbors[i]].Translation) / distance;
-                    }
-                }
-            }
+					if (distance < separationDistance)
+					{
+						if (distance > 0d) // Hypnotron Dec.4.2025 - required divide by 0 check
+						{
+							steer += (mem[currentIndex].Translation - mem[neighbors[i]].Translation) / distance;
+						}
+					}
+				}
 
             return (steer.x * separationFactor, steer.y * separationFactor);
         }
@@ -5977,7 +5982,7 @@ return (0,0);
 			else 
 				mSensorContacts[found].Add(c.Telemetry);
 			
-			//Console.WriteLine("EntityNode.Add(SensorContact) - SensorContact added.");
+			Console.WriteLine("EntityNode.Add(SensorContact) - SensorContact added.");
 		}
 		
 		public void Add (List<SensorContact> contacts)
@@ -7652,9 +7657,6 @@ return (0,0);
 		
 		
 		
-		
-		
-		
 		// hmm... the first is a QUANTITY also though... im not sure how this works
 		// > HGET bike:1 model
 		// "Deimos"
@@ -7738,14 +7740,13 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			//             and whether a HIT or MISS was recorded.
 			//    string[] attackedByEntitiesArrayIndices = targets[i].AttackedBy();
 			//	  for (int j = 0; j < attackedByEntitiesArrayIndices.Length; j++)
-			//        if (Boids[attackedByEntitiesArrayIndices[j]].GetMembership("red"))
+			//        if (Boids[attackedByEntitiesArrayIndices[j]].GetMembership("Red"))
 			//			  return true;
 			// }
-			
-			
 		}
 		
 		public UserData BlackboardData {get { return mBlackboardData; } }
+		
 		
 		// https://stackoverflow.com/questions/74811627/whats-the-best-way-to-store-a-finite-number-of-stats
 		// http://blog.ndepend.com/faster-dictionary-in-c/
@@ -7785,9 +7786,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			}
 		}
 	}
-		
-	
-	
+			
 #endregion   //Rules, Queries, Policies, Conditions
 ////////////////////////////////////////////////////////////////////////////////////////////////
 

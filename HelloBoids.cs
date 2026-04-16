@@ -225,9 +225,9 @@ namespace HelloBoids
         // to find a good balance between performance and
         // simulation/behavior quality
 		//public static double MAX_SEARCH_DISTANCE = 35d;
-		public static double SEPERATION_DISTANCE = 50.0d;
-		public static double ALIGNMENT_DISTANCE = 25.5d;
-		public static double COHESION_DISTANCE = 25.5d;
+		public static double SEPERATION_DISTANCE = 150.0d;
+		public static double ALIGNMENT_DISTANCE = 15.5d;
+		public static double COHESION_DISTANCE = 12.5d;
 		
 		public static double SEPARATION_FACTOR = 0.5d;
 		public static double ALIGNMENT_FACTOR = 0.2d;
@@ -742,7 +742,7 @@ namespace HelloBoids
 		public static SkillSystem mSkillSystem = new SkillSystem();
 		
 		private const CONFIGURATION HumanOperatorConfiguration = CONFIGURATION.Transform | CONFIGURATION.RigidBody | CONFIGURATION.Sentient | CONFIGURATION.Intelligent | CONFIGURATION.SelfPropelled;
-		private const CONFIGURATION BoidConfiguration = CONFIGURATION.Transform | CONFIGURATION.RigidBody | CONFIGURATION.Sentient | CONFIGURATION.SelfPropelled;
+		private const CONFIGURATION BoidConfiguration = CONFIGURATION.Transform | CONFIGURATION.RigidBody | CONFIGURATION.LifeForm | CONFIGURATION.SelfPropelled;
 		private const CONFIGURATION OpticalSensorConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.Sensor;
 		private const CONFIGURATION WingsConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing;
 		private const CONFIGURATION LaserConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.Weapon | CONFIGURATION.Laser;
@@ -933,6 +933,7 @@ namespace HelloBoids
 			try
 			{
 				b = new Boid(entityKey, arrayIndex, posX, posY, posZ, vX, vY);
+				b.Configuration = (uint)BoidConfiguration;
 				// NOTE: since each Droid will have an "Operator" and "TacticalStation" merged into it's blackboarddata,
 				//       all we really need to do is stick to a naming convention like "operator_#####"  and "tactical_#####" 
 				//       when adding those Keys.
@@ -1076,13 +1077,15 @@ namespace HelloBoids
 			
 			tacticalStation.Translation = pos;
 			tacticalStation.BoundingBox = box;// HACK
-			laser.Configuration |= (uint)CONFIGURATION.PowerUsing; // stations have fancy computer screens that use power
+			tacticalStation.Configuration |= (uint)CONFIGURATION.PowerUsing; // stations have fancy computer screens that use power
 			
 			battery.Translation = pos;
 			battery.BoundingBox = box;// HACK
+			battery.Configuration = (uint)CONFIGURATION.PowerProducing;
 			
 			humanOperator.Translation = pos;
 			humanOperator.BoundingBox = box;// HACK
+			humanOperator.Configuration = (uint)HumanOperatorConfiguration;
 			
 		    if (this.Octree != null)
             {
@@ -2420,7 +2423,7 @@ namespace HelloBoids
 				
 				bool success = mNeighbors.TryGetValue(currentBoidArrayIndex, out neighbors);
 								
-				Console.WriteLine("DoContactListSorting() - Found '" + neighbors.Count.ToString() + "' Adjacents for Droid @ Array Index == '" + currentArrayIndex.ToString() + "' ");
+				//Console.WriteLine("DoContactListSorting() - Found '" + neighbors.Count.ToString() + "' Adjacents for Droid @ Array Index == '" + currentArrayIndex.ToString() + "' ");
 				List<SensorContact> contacts = new List<SensorContact>();
 				
 				//Console.WriteLine("CreateContactListFromAdjacents - 1");
@@ -2540,7 +2543,7 @@ namespace HelloBoids
 				
 				Boid current = (Boid)Boids[i];
 				
-				Console.WriteLine("DoTargetPrioritization - 1");
+				//Console.WriteLine("DoTargetPrioritization - 1");
 				
 				List<SensorContact> contacts = current.GetSensorContacts();
 				if (contacts == null || contacts.Count == 0) return;
@@ -2921,10 +2924,9 @@ namespace HelloBoids
             double alignmentDistanceSquared = alignmentDistance * alignmentDistance;
             double cohesionDistanceSquared = cohesionDistance * cohesionDistance;
 		   
-            double largestDistance = System.Math.Max(this.SeparationDistance, this.AlignmentDistance);
-            largestDistance = System.Math.Max(largestDistance, this.CohesionDistance);
+            double largestDistance = Utils.GetMax(separationDistance, alignmentDistance, cohesionDistance);
             double largestDistanceSquared = largestDistance * largestDistance;
-			double searchRadius = largestDistance * 0.5d;
+			
 			
 			// TODO: do we need a BaseEntity Struct that  just contains the EntityArrayIndex, UserTypeID and Configuration?
 			
@@ -3000,10 +3002,10 @@ namespace HelloBoids
 				using (EntryClass.CodeProfiler.HookUp("GetNeighbors"))
 				{
 					BoundingBox searchArea;
-					//using (EntryClass.CodeProfiler.HookUp("GetSearchArea"))
-                    	searchArea = new BoundingBox(allTransforms[(int)i].Translation, searchRadius);
+					double searchRadius = largestDistance * 0.5d;
+                    searchArea = new BoundingBox(allTransforms[(int)i].Translation, searchRadius);
 					//BoundingBox searchArea = new BoundingBox(currentBoidTranslation, radius);
-			//		System.Console.WriteLine("Translation MEMORY<T> = " + memSpan[i].Translation.ToString());
+					//System.Console.WriteLine("ProcessOpticalSensors() - Translation = " + allTransforms[(int)i].Translation.ToString() + " Search Radius = " + searchRadius.ToString());
                     
                     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
                     // INLINED VERSION OF "ITERATIVE DEPTH-FIRST" TRAVERSAL OF OCTREE TO FIND NEIGHBORING BOIDS OF THE CURRENT ONE
@@ -3025,14 +3027,22 @@ namespace HelloBoids
 							{
 								for (int j = 0; j < ents.Length; j++)
 								{
+									Console.WriteLine("ProcessOpticalSensors() - Entities within octant == " + ents.Length.ToString());
+									
 									EntityNode potentialNeighbor = ents[j];
 									if (Boids[currentEntityArrayIndex] == potentialNeighbor) continue;
-									if (!potentialNeighbor.HasConfiguration((uint)CONFIGURATION.Sentient) || potentialNeighbor.HasConfiguration((uint)CONFIGURATION.Intelligent)) continue;
-																		   
+									System.Diagnostics.Debug.Assert (potentialNeighbor.Configuration != 0, "ProcessOpticalSensors() - CONFIGURATION for Entity '" + potentialNeighbor.EntityKey + "' is set to 'None' and is likely an ERROR.");
+									if (potentialNeighbor.Configuration != (uint)BoidConfiguration) continue;
+																		
 									int potentialInternalTransformIndex = potentialNeighbor.GetUserStructIndex(typeof(Transform.Transform_Struct));
 									int potentialArrayIndex = allTransforms[potentialInternalTransformIndex].EntityArrayIndex;
 									
-									if (currentOctant.MaxRadius * 2d <= largestDistance)
+									Console.WriteLine("ProcessOpticalSensors() - Entities within octant == " + ents.Length.ToString());
+									
+									// if the MaxRadius of this Octant is less than the searchRadius
+									// then all Entities within this Octant are within the search area
+									// and don't require individual potentialNeighbor.BoundingBox.Intereset() tests.
+									if (currentOctant.MaxRadius <= searchRadius)
 									{
 										double distanceToNeighboringBoidSquared;
 										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
@@ -3056,7 +3066,7 @@ namespace HelloBoids
 										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
 										//   distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(currentOctant.EntityNodes[j].Translation, currentBoid.Translation);
 
-										//System.Diagnostics.Debug.WriteLine("Calculated distanceSquared to neighboring boid = " + distanceToNeighboringBoidSquared.ToString());
+										Console.WriteLine("Calculated distanceSquared to neighboring boid = " + distanceToNeighboringBoidSquared.ToString());
 										if (distanceToNeighboringBoidSquared <= largestDistanceSquared)
 											// NOTE: we do in fact key the main dictionary<> with an EntityArrayIndex, but the found Tuple contains the internalTransformStruct's Index.
 											//       for now this is ok
@@ -8114,7 +8124,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 	
 	
 	[Flags]
-	public enum CONFIGURATION
+	public enum CONFIGURATION : uint
 	{
 		None               =  1 << 0,
 		Transform          =  1 << 1,
@@ -19254,9 +19264,7 @@ public abstract class PlanedFrustum
             //double elapsedMilliseconds = _elapsedSeconds * 1000d;
             //_time = _time.Add(new TimeSpan(0, 0, 0, 0, (int)elapsedMilliseconds));
 			_time = _time.AddSeconds(elapsedSeconds);
-			
             mTicks = _time.Ticks; 
-
 
             IntervalTimers.Update(elapsedSeconds);
         }

@@ -3025,10 +3025,16 @@ namespace HelloBoids
 							EntityNode[] ents = currentOctant.EntityNodes;
 							if (ents != null)
 							{
+								Console.WriteLine("ProcessOpticalSensors() - Entities within octant == " + ents.Length.ToString());
+								
 								for (int j = 0; j < ents.Length; j++)
 								{
-									Console.WriteLine("ProcessOpticalSensors() - Entities within octant == " + ents.Length.ToString());
+									Console.WriteLine("ProcessOpticalSensors() - ent " + j.ToString() + " = '" + ents[j].EntityKey);
 									
+								}
+								
+								for (int j = 0; j < ents.Length; j++)
+								{
 									EntityNode potentialNeighbor = ents[j];
 									if (Boids[currentEntityArrayIndex] == potentialNeighbor) continue;
 									System.Diagnostics.Debug.Assert (potentialNeighbor.Configuration != 0, "ProcessOpticalSensors() - CONFIGURATION for Entity '" + potentialNeighbor.EntityKey + "' is set to 'None' and is likely an ERROR.");
@@ -3036,9 +3042,7 @@ namespace HelloBoids
 																		
 									int potentialInternalTransformIndex = potentialNeighbor.GetUserStructIndex(typeof(Transform.Transform_Struct));
 									int potentialArrayIndex = allTransforms[potentialInternalTransformIndex].EntityArrayIndex;
-									
-									Console.WriteLine("ProcessOpticalSensors() - Entities within octant == " + ents.Length.ToString());
-									
+																	
 									// if the MaxRadius of this Octant is less than the searchRadius
 									// then all Entities within this Octant are within the search area
 									// and don't require individual potentialNeighbor.BoundingBox.Intereset() tests.
@@ -11515,16 +11519,14 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
                 {
                     mSemaphoreSlim.Wait(-1);
                 
-if (mEntityNodesCollection == null) return null;
-                return mEntityNodesCollection.ToArray();
-            
+					if (mEntityNodesCollection == null) return null;
+					
+					return mEntityNodesCollection.ToArray();
                  }
                  finally
                  {
                      mSemaphoreSlim.Release();
-                     
                  }
-            
             }
         }
 
@@ -11786,23 +11788,23 @@ if (mEntityNodesCollection == null) return null;
 			//lock(mAddLock)
 			try
 			{
+				
+				mSemaphoreSlim.Wait(-1); // -1 waits indefinetly, otherwise parameter represents maximum milliseconds to wait
+
+				// is the entity still in this bounds?
+				// we dont have to test the radius of the entityNode because
+				// we already know it fits.
+				if (mBox.Contains(entityNode.BoundingBox.Center)) return;
+
+				// inform the parent that the entity in this octant no longer fits
+				// NOTE: we do not add/remove the entityNode here.  The parent must do it
+				// so that we don't trigger collapse of all 8 of it's children before parent can 
+				// have a chance to fit it into one of its other 7 children
+				if (this.IsRoot == false)
 				{
-					mSemaphoreSlim.Wait(-1); // -1 waits indefinetly, otherwise parameter represents maximum milliseconds to wait
-
-					// is the entity still in this bounds?
-					// we dont have to test the radius of the entityNode because
-					// we already know it fits.
-					if (mBox.Contains(entityNode.BoundingBox.Center)) return;
-
-					// inform the parent that the entity in this octant no longer fits
-					// NOTE: we do not add/remove the entityNode here.  The parent must do it
-					// so that we don't trigger collapse of all 8 of it's children before parent can 
-					// have a chance to fit it into one of its other 7 children
-					if (this.IsRoot == false)
-					{
-						mParent.Move(this, entityNode); // calls updward to Parent
-					}
+					mParent.Move(this, entityNode); // calls updward to Parent
 				}
+				
 			}
 			finally
 			{
@@ -11823,6 +11825,7 @@ if (mEntityNodesCollection == null) return null;
 						found = true;
 						break;
 					}
+			
 			if (!found) throw new Exception("OctreeOctant.Move() - Invalid previousOctant.");
 			#endif
 			
@@ -11842,11 +11845,8 @@ if (mEntityNodesCollection == null) return null;
 			// that contains the entityNode.. and provided the entityNode has not changed size
 			// (particularly has not gotten larger) we are guaranteed that the parent octant
 			// is large enought to contain it if the entityNode's center is with in it.
-
-			// 
-			
-			
-			
+		
+						
 			OctreeOctant newOctant = previousOctant;
 			if (previousOctant.mParent != null)
 				newOctant = previousOctant.mParent;

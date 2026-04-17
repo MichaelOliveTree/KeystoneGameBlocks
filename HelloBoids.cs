@@ -225,7 +225,7 @@ namespace HelloBoids
         // to find a good balance between performance and
         // simulation/behavior quality
 		//public static double MAX_SEARCH_DISTANCE = 35d;
-		public static double SEPERATION_DISTANCE = 150.0d;
+		public static double SEPERATION_DISTANCE = 25.0d;
 		public static double ALIGNMENT_DISTANCE = 15.5d;
 		public static double COHESION_DISTANCE = 12.5d;
 		
@@ -716,7 +716,7 @@ namespace HelloBoids
 		
         public Seeds Seeds { get; set; }
 						 
-		public ThreadedRandom mTHRandom;
+		//public ThreadedRandom mTHRandom;
 		
         private double SeparationDistance;
         private double SeparationFactor ;
@@ -839,7 +839,7 @@ namespace HelloBoids
 
 			System.Diagnostics.Debug.Assert(EntryClass.NUM_ENTRIES == numBoids);
 	
-			mTHRandom = new ThreadedRandom(this.Seeds.Master);
+			
 			Console.WriteLine("BoidSimulation.ctor() - Preparing to Spawn " + numBoids + " with SEED == " + this.Seeds.Master.ToString());
 			
 			//NOTE: List<> (which stores our Boids and EntityNode) is not threadsafe and so for .Add() we must prefill it with 
@@ -862,6 +862,8 @@ namespace HelloBoids
 			System.Threading.Tasks.Parallel.For(0, numBoids, i=>
             //for (int i = 0; i < numBoids; i++)
             {
+				Random mTHRandom = ThreadedRandom.Instance; //(this.Seeds.Master);
+				
                 // todo: the above doesn't make a diff, but perhaps
                 // if i added dummy objects into the array instead..?
                 object[] tmp = MemoryFragmenter.CreateAndFreeObjects(EntryClass.FRAGMENTED_OBJ_SIZE);
@@ -908,7 +910,7 @@ namespace HelloBoids
 		
 		
 		
-		public Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> Spawn(ThreadedRandom rand, int arrayIndex, double width, double height, double depth)
+		public Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> Spawn(Random rand, int arrayIndex, double width, double height, double depth)
 		{
 			Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> result;
 				
@@ -994,7 +996,7 @@ namespace HelloBoids
 			transform.Span[0].Configuration = BoidConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
 			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
 		
-			// LIVING ENTITY
+			// LIFE FORM
 			ComponentStore<LifeForm> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LifeForm>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
             int livingEntityID = -1;
             Memory<LifeForm> memLivingEnt = storeLivingEntity.CheckOut(out livingEntityID);
@@ -2451,7 +2453,7 @@ namespace HelloBoids
 						
 						double sensorRangeSquared = sensorStruct.Span[0].RangeSquared;
 						
-						Console.WriteLine("CreateContactListFromAdjacents() - Range = " +  sensorRangeSquared.ToString() + " Distance to Contact ==  " + distanceSquared.ToString());
+						Console.WriteLine("CreateContactListFromAdjacents() - Range = " +  sensorRangeSquared.ToString() + " Distance to Contact ==  " + Math.Sqrt(distanceSquared).ToString());
 						
 						if (sensorRangeSquared >= distanceSquared)
 						{
@@ -2884,7 +2886,9 @@ namespace HelloBoids
 				// todo: i think we need to check to see if this record is for
 				//       an Entity that is enabled
 				double age = gt.TotalElapsedSeconds - livingEntitySpan[i].CreationDateTime;
-				Spawn(this.mTHRandom, i, width, height, depth);
+				Random mTHRandom = ThreadedRandom.Instance;  //(this.Seeds.Master);
+				
+				Spawn(mTHRandom, i, width, height, depth);
 			}
         }
 		
@@ -2919,12 +2923,13 @@ namespace HelloBoids
 			double maxSpeed = (double)parameters[7];
             
             //Console.WriteLine("ProcessOpticalSensors() - parameters count OK");
-            
+            double largestDistance = Utils.GetMax(separationDistance, alignmentDistance, cohesionDistance);
+			
             double seperatationDistanceSquare = separationDistance * separationDistance;
             double alignmentDistanceSquared = alignmentDistance * alignmentDistance;
             double cohesionDistanceSquared = cohesionDistance * cohesionDistance;
 		   
-            double largestDistance = Utils.GetMax(separationDistance, alignmentDistance, cohesionDistance);
+            
             double largestDistanceSquared = largestDistance * largestDistance;
 			
 			
@@ -2933,8 +2938,8 @@ namespace HelloBoids
 			
 			int recordCount = (int)transformStructStore.Count;
 			
-			//Console.WriteLine("ProcessOpticalSensors() - TransformStore's Record count == " + recordCount.ToString());
-			
+			Console.WriteLine("ProcessOpticalSensors() - TransformStore's Record count == " + recordCount.ToString());
+			Console.WriteLine("ProcessOpticalSensors() - Largest Distance Squared == " + largestDistanceSquared.ToString());
             System.Threading.Tasks.Parallel.For(0, recordCount, i =>
 			//for (int i = 0; i < recordCount; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
             {
@@ -3006,7 +3011,8 @@ namespace HelloBoids
                     searchArea = new BoundingBox(allTransforms[(int)i].Translation, searchRadius);
 					//BoundingBox searchArea = new BoundingBox(currentBoidTranslation, radius);
 					//System.Console.WriteLine("ProcessOpticalSensors() - Translation = " + allTransforms[(int)i].Translation.ToString() + " Search Radius = " + searchRadius.ToString());
-                    
+                    System.Console.WriteLine ("Search radius == " + searchRadius.ToString());
+						
                     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
                     // INLINED VERSION OF "ITERATIVE DEPTH-FIRST" TRAVERSAL OF OCTREE TO FIND NEIGHBORING BOIDS OF THE CURRENT ONE
 					// NOTE: We use this inline version that uses a stack<> to avoid recursion because having to load the span<T> onto
@@ -3025,13 +3031,14 @@ namespace HelloBoids
 							EntityNode[] ents = currentOctant.EntityNodes;
 							if (ents != null)
 							{
-								Console.WriteLine("ProcessOpticalSensors() - Entities within octant == " + ents.Length.ToString());
-								
-								for (int j = 0; j < ents.Length; j++)
-								{
-									Console.WriteLine("ProcessOpticalSensors() - ent " + j.ToString() + " = '" + ents[j].EntityKey);
-									
-								}
+								//Console.WriteLine("ProcessOpticalSensors() - Entities within octant == " + ents.Length.ToString());
+								//
+								//for (int j = 0; j < ents.Length; j++)
+								//{
+								//	double d =  Vector3d.GetDistance3d(Boids[allTransforms[(int)i].EntityArrayIndex].Translation, ents[j].Translation);
+								//	Console.WriteLine("ProcessOpticalSensors() - ent " + j.ToString() + " = '" + ents[j].EntityKey + " DISTANCE == " + d.ToString());
+								//	
+								//}
 								
 								for (int j = 0; j < ents.Length; j++)
 								{
@@ -3042,15 +3049,21 @@ namespace HelloBoids
 																		
 									int potentialInternalTransformIndex = potentialNeighbor.GetUserStructIndex(typeof(Transform.Transform_Struct));
 									int potentialArrayIndex = allTransforms[potentialInternalTransformIndex].EntityArrayIndex;
-																	
+														
+									//Console.WriteLine("ProcessOpticalSensors() - abcd..........");
+									
 									// if the MaxRadius of this Octant is less than the searchRadius
 									// then all Entities within this Octant are within the search area
 									// and don't require individual potentialNeighbor.BoundingBox.Intereset() tests.
 									if (currentOctant.MaxRadius <= searchRadius)
 									{
+										Console.WriteLine("ProcessOpticalSensors() - Octant's Max Radius == " +  currentOctant.MaxRadius.ToString());
+										
 										double distanceToNeighboringBoidSquared;
 										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
 										distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(allTransforms[potentialInternalTransformIndex].Translation, allTransforms[(int)i].Translation);
+										
+										Console.WriteLine("ProcessOpticalSensors() - Distance to Adjacent Droid == " +  distanceToNeighboringBoidSquared.ToString());
 										
 							 			mNeighbors[currentEntityArrayIndex].Add(new Tuple<int, double> (potentialInternalTransformIndex, distanceToNeighboringBoidSquared));
                          			}   
@@ -3070,7 +3083,7 @@ namespace HelloBoids
 										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
 										//   distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(currentOctant.EntityNodes[j].Translation, currentBoid.Translation);
 
-										Console.WriteLine("Calculated distanceSquared to neighboring boid = " + distanceToNeighboringBoidSquared.ToString());
+										//Console.WriteLine("Calculated distanceSquared to neighboring boid = " + distanceToNeighboringBoidSquared.ToString());
 										if (distanceToNeighboringBoidSquared <= largestDistanceSquared)
 											// NOTE: we do in fact key the main dictionary<> with an EntityArrayIndex, but the found Tuple contains the internalTransformStruct's Index.
 											//       for now this is ok
@@ -20220,7 +20233,8 @@ public abstract class PlanedFrustum
 		{
 			mSeed = seed;
 		}
-
+		
+		/*
 		// NOTE: the use of the "ThreadLocal<>" generic  provides a thread-local Random instance , meaning each thread that accesses the variable mRandom, gets an independently initialized copy of the variable.
 		// This mechanism ensures data isolation between threads, eliminating the need for synchronization and thus improving performance and simplifying concurrent programming. 
 		private readonly System.Threading.ThreadLocal<Random> mTLRandom =
@@ -20235,7 +20249,36 @@ public abstract class PlanedFrustum
 		public double NextDouble()
 		{
 			return mTLRandom.Value.NextDouble();
+		} 
+		*/
+			
+			
+		
+		// https://codeblog.jonskeet.uk/2009/11/04/revisiting-randomness/
+		private static readonly Random globalRandom = new Random();
+		private static readonly object globalLock = new object();
+
+		private static readonly System.Threading.ThreadLocal<Random> mTLRandom = new System.Threading.ThreadLocal<Random>(NewRandom);
+
+		public static Random NewRandom()
+		{
+			lock (globalLock)
+			{
+				return new Random(globalRandom.Next());
+			}
 		}
+
+		public static Random Instance { get { return mTLRandom.Value; } }
+
+		public static int Next()
+		{
+			return Instance.Next();
+		}
+		
+		public double NextDouble()
+		{
+			return Instance.NextDouble();
+		} 
 	}
 	#endregion
 

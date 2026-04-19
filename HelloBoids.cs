@@ -2394,6 +2394,8 @@ namespace HelloBoids
 				//       we could skip any TacticalStation that is not designated as PRIMARY TacticalStation
 				
 				EntityNode currentStation = Boids[currentStationArrayIndex]; // <-- if we can get the Sensors without having to get the current Boid... hmm...
+				System.Diagnostics.Debug.Assert(currentStation.EntityKey.Contains("tactical"), "ProcessOpticalSensors() - Entity is NOT a TacticalStation.");
+				
 				int currentBoidArrayIndex = currentStation.EntityArrayIndex - TACTICAL_STATION_OFFSET;
 				Boid currentBoid = (Boid)Boids[currentBoidArrayIndex];
 				
@@ -2513,8 +2515,7 @@ namespace HelloBoids
 					} // end for SensorsCount
 				} // end for neihbors Count
 				
-				// add all of the SensorContacts to the current Droid.  In KGB
-				// this will be the TacticalStation instead, and it will be responsible for
+				// add all of the SensorContacts to the current TacticalStation, and it will be responsible for
 				// properly merging these SensorContacts with existing ones so as to maintain
 				// proper SensorContact histories for all detected Entities.
 				currentStation.Add(contacts); 

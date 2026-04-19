@@ -2103,8 +2103,7 @@ namespace HelloBoids
 
         	//Console.WriteLine("Do_Droid_Logic() - DoDeviceReadyStatus()");
 			DoDeviceReadyStatus();
-			
-			
+						
 			
 			//Console.WriteLine("Do_Droid_Logic() - DoStationCanActStatus()");
 			DoStationCanActStatus();
@@ -2136,9 +2135,9 @@ namespace HelloBoids
 			//Console.WriteLine("Do_Droid_Logic() - DoWeaponsCanFire()");
 			DoWeaponsCanFire();
 			
-			ComponentStore<LifeForm> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
-			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
-			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
+			//ComponentStore<LifeForm> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
+			//ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
+			//ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 						
 			//Console.WriteLine("Do_Droid_Logic() - preparing for loop()");
 			int recordCount = Boids.Count;
@@ -2176,9 +2175,6 @@ namespace HelloBoids
 				//      - any Contacts in list marked as FOF.Foe + FOF.Hostile as opposed to just FOF.Foe (note: stale contacts are still treated as available in case of need to persue)
 				//      	- FOF.Withdrawing may be ignored for example if ROE says we don't persue in this circumstance including disabled ships and unarmed ships like freighters
 				
-				// NOTE: The issue here is sometimes we iterate through List<Boids> and other times
-				//       by mem.Span.Length.  So to be consistant, we try to keep the Span indices matching
-				//       
 				EntityNode[] weapons = currentBoid.GetWeapons();				
 				int weaponIndex;
 				Memory<Weapon>weaponStruct = (Memory<Weapon>) weapons[0].GetUserStruct(typeof(Weapon), out weaponIndex);
@@ -2214,17 +2210,14 @@ namespace HelloBoids
 					
 					//List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE); // TODO: Hopefully this FindNearestTarget() can be optimized.... spatial searches even with Octree is slow.
 					
-					// use the existing neigbors from "Eyes" (optical scanner) to find the single closest but valid target available to the current droid
 					// This overloaded version of FindNearestTarget() returns the sorted list of neighbors from closest to furthest along with their distances to the current droid
-					
-					
 					List<EntityNode> tmp = FindNearestTarget(currentBoid, neighbors, out distances);
 					if (tmp == null || tmp.Count == 0)
 						return;     // NOTE: for parallel.For we use "return"
 						// continue; // NOTE: for regular for() loop we use "continue"
 
 					targets = tmp.OfType<Boid>().ToList();
-					//Console.WriteLine("Do_Droid_Logic() - Droid @ Array Index '" + currentArrayIndex.ToString() + "' Found " + targets.Count.ToString() + " targets.");
+					Console.WriteLine("Do_Droid_Logic() - Droid @ Array Index '" + currentArrayIndex.ToString() + "' Found " + targets.Count.ToString() + " targets.");
 					
 					try
 					{
@@ -2236,7 +2229,7 @@ namespace HelloBoids
 						{
 							currentBoid.ShotsFired++;
 							
-							//Console.WriteLine("Do_Droid_Logic() - Droid @ Array Index '" + currentArrayIndex.ToString() + "' firing shot # " + currentBoid.ShotsFired.ToString() + " on Droid @ Array Index '" + currentTarget.EntityArrayIndex.ToString() + "'");
+							Console.WriteLine("Do_Droid_Logic() - Droid @ Array Index '" + currentArrayIndex.ToString() + "' firing shot # " + currentBoid.ShotsFired.ToString() + " on Droid @ Array Index '" + currentTarget.EntityArrayIndex.ToString() + "'");
 
 							// NOTE: here we assume the Fire() occurs immediately using a lightspeed laser and the damage is instantaneous 
 							//       and does not need any travel time to reach the currentTarget
@@ -2251,7 +2244,6 @@ namespace HelloBoids
 									dCount = damages.Length;
 								
 								//Console.WriteLine("Do_Droid_Logic() - Damages Produced = " + dCount.ToString());
-
 							}
 							catch(Exception ex)
 							{
@@ -2392,7 +2384,7 @@ namespace HelloBoids
 					return;
 				}	
 				
-				int currentArrayIndex = allTacticalStations.Span[(int)i].EntityArrayIndex; // current.EntityArrayIndex; //  current.GetUserStructIndex(typeof(Transform.Transform_Struct));
+				int currentStationArrayIndex = allTacticalStations.Span[(int)i].EntityArrayIndex; // current.EntityArrayIndex; //  current.GetUserStructIndex(typeof(Transform.Transform_Struct));
 				//System.Diagnostics.Debug.Assert( (int)i == currentArrayIndex, "DoContactListSorting() - array index does not match...");
 				// the adjacnets that are stored in neighbors from the overall mNeighbors is very much stores Area of Interest for each Droid
 				// but we will only send them things that their sensors can detect (and "eyes" are treated as optical sensors)
@@ -2401,7 +2393,7 @@ namespace HelloBoids
 				// TODO: Should we be iterating over the 'TacticalStation' struct's and NOT the Boids array? and then getting the SensorContacts from it?
 				//       we could skip any TacticalStation that is not designated as PRIMARY TacticalStation
 				
-				EntityNode currentStation = Boids[currentArrayIndex]; // <-- if we can get the Sensors without having to get the current Boid... hmm...
+				EntityNode currentStation = Boids[currentStationArrayIndex]; // <-- if we can get the Sensors without having to get the current Boid... hmm...
 				int currentBoidArrayIndex = currentStation.EntityArrayIndex - TACTICAL_STATION_OFFSET;
 				Boid currentBoid = (Boid)Boids[currentBoidArrayIndex];
 				
@@ -2545,14 +2537,18 @@ namespace HelloBoids
 				
 				Boid current = (Boid)Boids[i];
 				
-				//Console.WriteLine("DoTargetPrioritization - 1");
+				//int stationID = current.GetTacticalStations()[0]; 
+				EntityNode tacticalStation = current.GetTacticalStations()[0]; //(EntityNode)Boids[stationID];
 				
-				List<SensorContact> contacts = current.GetSensorContacts();
+				
+				Console.WriteLine("DoTargetPrioritization - for TacticalStatin '" + tacticalStation.EntityKey + "'");
+				
+				List<SensorContact> contacts = tacticalStation.GetSensorContacts();
 				if (contacts == null || contacts.Count == 0) return;
 				Console.WriteLine("DoTargetPrioritization - Contacts Count == " + contacts.Count.ToString());
 				
-				//List<Target> targets = current.GetTargets();
-				current.ClearTargets();
+				//List<Target> targets = tacticalStation.GetTargets();
+				tacticalStation.ClearTargets();
 								
 				for (int j = 0; j < contacts.Count; j++)
 				{
@@ -2612,7 +2608,7 @@ namespace HelloBoids
 						t.Hitpoints = 20;        // Boids[c.ContactIndex].Hitpoints; // max hitpoints of target... should a Sensor be able to know this exact number?  It's really just a game thing and maybe we should just use visual observations of condition of ship instead
 						t.CurrentHitPoints = 18; // Boids[c.ContactIndex].CurrentHP ; // used to determine % damage of Target
 
-						current.Add(t);
+						tacticalStation.Add(t);
 						Console.WriteLine("Rules of Engagement execute completed... Target added.");
 					}
 				}
@@ -2938,8 +2934,8 @@ namespace HelloBoids
 			
 			int recordCount = (int)transformStructStore.Count;
 			
-			Console.WriteLine("ProcessOpticalSensors() - TransformStore's Record count == " + recordCount.ToString());
-			Console.WriteLine("ProcessOpticalSensors() - Largest Distance Squared == " + largestDistanceSquared.ToString());
+			//Console.WriteLine("ProcessOpticalSensors() - TransformStore's Record count == " + recordCount.ToString());
+			//Console.WriteLine("ProcessOpticalSensors() - Largest Distance Squared == " + largestDistanceSquared.ToString());
             System.Threading.Tasks.Parallel.For(0, recordCount, i =>
 			//for (int i = 0; i < recordCount; i++) // TODO: this needs to use the store.ComponentCount since the memSpan may have empty records at positions >= store.ComponentCount
             {
@@ -3011,7 +3007,7 @@ namespace HelloBoids
                     searchArea = new BoundingBox(allTransforms[(int)i].Translation, searchRadius);
 					//BoundingBox searchArea = new BoundingBox(currentBoidTranslation, radius);
 					//System.Console.WriteLine("ProcessOpticalSensors() - Translation = " + allTransforms[(int)i].Translation.ToString() + " Search Radius = " + searchRadius.ToString());
-                    System.Console.WriteLine ("Search radius == " + searchRadius.ToString());
+                    //System.Console.WriteLine ("Search radius == " + searchRadius.ToString());
 						
                     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
                     // INLINED VERSION OF "ITERATIVE DEPTH-FIRST" TRAVERSAL OF OCTREE TO FIND NEIGHBORING BOIDS OF THE CURRENT ONE
@@ -3049,46 +3045,27 @@ namespace HelloBoids
 																		
 									int potentialInternalTransformIndex = potentialNeighbor.GetUserStructIndex(typeof(Transform.Transform_Struct));
 									int potentialArrayIndex = allTransforms[potentialInternalTransformIndex].EntityArrayIndex;
-														
-									//Console.WriteLine("ProcessOpticalSensors() - abcd..........");
-									
-									// if the MaxRadius of this Octant is less than the searchRadius
-									// then all Entities within this Octant are within the search area
-									// and don't require individual potentialNeighbor.BoundingBox.Intereset() tests.
-									if (currentOctant.MaxRadius <= searchRadius)
-									{
-										Console.WriteLine("ProcessOpticalSensors() - Octant's Max Radius == " +  currentOctant.MaxRadius.ToString());
-										
-										double distanceToNeighboringBoidSquared;
-										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
-										distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(allTransforms[potentialInternalTransformIndex].Translation, allTransforms[(int)i].Translation);
-										
-										Console.WriteLine("ProcessOpticalSensors() - Distance to Adjacent Droid == " +  distanceToNeighboringBoidSquared.ToString());
-										
-							 			mNeighbors[currentEntityArrayIndex].Add(new Tuple<int, double> (potentialInternalTransformIndex, distanceToNeighboringBoidSquared));
-                         			}   
-                         			else
-									{   
-										// if (currentOctant.EntityNodes[j].SpanIndex == currentBoid.SpanIndex) continue; 
-										//using (EntryClass.CodeProfiler.HookUp("IntersectsSearchArea"))
-										if (!potentialNeighbor.BoundingBox.Intersects(searchArea)) 
-											continue;
-								
-										double distanceToNeighboringBoidSquared;
-										// TODO: if i stored the SpanIndex in the Octree instead of the EntityNode perhaps that would help?
-										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
-											distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(allTransforms[potentialInternalTransformIndex].Translation, allTransforms[(int)i].Translation);
-											//distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(allTransforms[potentialNeighbor.SpanIndex].Translation, currentBoidTranslation);
 
-										//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
-										//   distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(currentOctant.EntityNodes[j].Translation, currentBoid.Translation);
+									// if (currentOctant.EntityNodes[j].SpanIndex == currentBoid.SpanIndex) continue; 
+									//using (EntryClass.CodeProfiler.HookUp("IntersectsSearchArea"))
+									if (!potentialNeighbor.BoundingBox.Intersects(searchArea)) 
+										continue;
 
-										//Console.WriteLine("Calculated distanceSquared to neighboring boid = " + distanceToNeighboringBoidSquared.ToString());
-										if (distanceToNeighboringBoidSquared <= largestDistanceSquared)
-											// NOTE: we do in fact key the main dictionary<> with an EntityArrayIndex, but the found Tuple contains the internalTransformStruct's Index.
-											//       for now this is ok
-											mNeighbors[currentEntityArrayIndex].Add(new Tuple<int, double>(potentialInternalTransformIndex, distanceToNeighboringBoidSquared));
-     								}       
+									double distanceToNeighboringBoidSquared;
+									// TODO: if i stored the SpanIndex in the Octree instead of the EntityNode perhaps that would help?
+									//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
+									distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(allTransforms[potentialInternalTransformIndex].Translation, allTransforms[(int)i].Translation);
+									//distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(allTransforms[potentialNeighbor.SpanIndex].Translation, currentBoidTranslation);
+
+									//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
+									//   distanceToNeighboringBoidSquared = Vector3d.GetDistance3dSquared(currentOctant.EntityNodes[j].Translation, currentBoid.Translation);
+
+									//Console.WriteLine("Calculated distanceSquared to neighboring boid = " + distanceToNeighboringBoidSquared.ToString());
+									if (distanceToNeighboringBoidSquared <= largestDistanceSquared)
+										// NOTE: we do in fact key the main dictionary<> with an EntityArrayIndex, but the found Tuple contains the internalTransformStruct's Index.
+										//       for now this is ok
+										mNeighbors[currentEntityArrayIndex].Add(new Tuple<int, double>(potentialInternalTransformIndex, distanceToNeighboringBoidSquared));
+
              					}  // end for ents[]        
 							}
 						
@@ -3125,6 +3102,7 @@ namespace HelloBoids
 			//Console.WriteLine("ProcessOpticalSensors() - COMPLETE ");
         }
 		
+		
         private void DoFlocking(ComponentStore<Transform.Transform_Struct> store, object[] parameters, int seed, GameTime gt)
         {
 			double elapsedSeconds = gt.ElapsedSeconds;
@@ -3132,6 +3110,7 @@ namespace HelloBoids
 			// NOTE: store MUST be of the type Transform_Struct as the neighbor's tuples use .Item1 to hold that InternalTransformIndex and NOT the EntityArrayIndex
 			int recordCount = (int)store.Count;
 
+			
 			//Console.WriteLine ("Span and Store Size Agree == " + (store.Span.Length == store.Size).ToString());
 			
             //using (EntryClass.CodeProfiler.HookUp("AssignSpan"))
@@ -6009,7 +5988,7 @@ return (0,0);
 			else 
 				mSensorContacts[found].Add(c.Telemetry);
 			
-			Console.WriteLine("EntityNode.Add(SensorContact) - SensorContact added.");
+			Console.WriteLine("EntityNode.Add(SensorContact) - SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
 		}
 		
 		public void Add (List<SensorContact> contacts)
@@ -7671,6 +7650,7 @@ return (0,0);
 	public class Statistics
 	{
 		private UserDataStore mContext;
+		private UserData mBlackboardData;
 		Dictionary<string, int> mCounters = new Dictionary<string, int>();
 		
 		// https://redis.io/docs/latest/develop/get-started/data-store/
@@ -7751,7 +7731,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		// 
 		//  
 		
-		private UserData mBlackboardData;
+		
 		
 		public Statistics(string key)
 		{
@@ -10432,7 +10412,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		/// </summary>
         public Memory<T> CheckOut(out int index) // aka: MemoryPool<T>.Rent() 
         {
-			
             //lock (mSync)
 			try
 			{
@@ -10452,15 +10431,13 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 							//Console.WriteLine("ComponentStore.CheckOut() - line 1" + ex.Message);
 						}
 						
-
 						// using stack<int> of available indices
 						if (mAvailableForCheckOut.Count > 0)
 						{
 							mRecordCount++;
 							int i = mAvailableForCheckOut.Pop();
 							
-							uint tmp = Count;
-							
+							//uint tmp = Count;
 							try
 							{
 								InUse[i] = true;
@@ -10497,8 +10474,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 							mRecordCount++;
 							int i = mAvailableForCheckOut.Pop();
 							
-							uint tmp = Count;
-							Console.WriteLine("CheckOut() - " + tmp.ToString());
+							//uint tmp = Count;
 							try
 							{
 								InUse[i] = true;
@@ -10516,7 +10492,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 							Console.WriteLine("CheckOut() - THIS SHOULD NOT HAPPEN.");
 						}
 						return null;
-						
 						//return CheckOut(out index);
 					}
 					catch (Exception ex)
@@ -10547,7 +10522,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
                         mAvailableForCheckOut.Push(i);
 						mRecordCount--;
                         return;
-
                         // todo: Components.Span[i] = default(T);    
                     }
             }

@@ -2434,7 +2434,7 @@ namespace HelloBoids
 					int potentialContactsInternalTransformIndex = neighbors[(int)j].Item1; 
 					int potentialContactsEntityArrayIndex = allTransforms.Span[potentialContactsInternalTransformIndex].EntityArrayIndex;
 			  
-					Console.WriteLine("CreateContactListFromAdjacents - 2");
+					//Console.WriteLine("CreateContactListFromAdjacents - 2");
 					// Iterate through all the Sensors the current Droid is using to see which ones might
 					// detect this potential contact.  This is why a "SensorContact" may already exist
 					// in the List<SensorContact> 'contacts'  because multiple Sensors on _the_same_ship_
@@ -2515,10 +2515,12 @@ namespace HelloBoids
 					} // end for SensorsCount
 				} // end for neihbors Count
 				
+
 				// add all of the SensorContacts to the current TacticalStation, and it will be responsible for
 				// properly merging these SensorContacts with existing ones so as to maintain
 				// proper SensorContact histories for all detected Entities.
-				currentStation.Add(contacts); 
+				if (contacts != null)
+					currentStation.Add(contacts); 
 			});
 			
 			//Console.WriteLine("DoContactListSorting() - COMPLETED.");
@@ -2541,12 +2543,11 @@ namespace HelloBoids
 				//int stationID = current.GetTacticalStations()[0]; 
 				EntityNode tacticalStation = current.GetTacticalStations()[0]; //(EntityNode)Boids[stationID];
 				
-				
-				Console.WriteLine("DoTargetPrioritization - for TacticalStatin '" + tacticalStation.EntityKey + "'");
+				//Console.WriteLine("DoTargetPrioritization - for TacticalStatin '" + tacticalStation.EntityKey + "'");
 				
 				List<SensorContact> contacts = tacticalStation.GetSensorContacts();
 				if (contacts == null || contacts.Count == 0) return;
-				Console.WriteLine("DoTargetPrioritization - Contacts Count == " + contacts.Count.ToString());
+				//Console.WriteLine("DoTargetPrioritization - Contacts Count == " + contacts.Count.ToString());
 				
 				//List<Target> targets = tacticalStation.GetTargets();
 				tacticalStation.ClearTargets();
@@ -2567,9 +2568,8 @@ namespace HelloBoids
 					string description = "Never fire on any Droid that is a member of our Faction.";
 					 
 					Condition.EVAL_TYPE eval = Condition.EVAL_TYPE.NOT_EQUALS;
-					string friendlyFaction = EntryClass.mCStoreUserData[currentKey].GetString("faction");  
-					string operandLeft = friendlyFaction;
-					string operandRight = EntryClass.mCStoreUserData[targetKey].GetString("faction");  
+					string operandLeft = "faction";
+					string operandRight = "faction";  
 						
 					Condition condition = new Condition(name, description, targetKey, eval, operandLeft, operandRight);
 											
@@ -2587,9 +2587,10 @@ namespace HelloBoids
 			
 					SensorContact currentContact = contacts[j];
 					
-					Console.WriteLine("DoTargetPrioritization - PRE- roePolicy.Execute()" );
+					//Console.WriteLine("DoTargetPrioritization - PRE- roePolicy.Execute()" );
 					if (roePolicy.Execute())
 					{
+						Console.WriteLine("DoTargetPrioritization() - Rules of Engagement execute completed... preparing to add Target.");
 						// Targets are those SensorContacts that friendly forces will potentially fire upon.
 						// Whereas SensorContacts is all contacts regardless of FoF status.
 						Target t = new Target();
@@ -2610,7 +2611,7 @@ namespace HelloBoids
 						t.CurrentHitPoints = 18; // Boids[c.ContactIndex].CurrentHP ; // used to determine % damage of Target
 
 						tacticalStation.Add(t);
-						Console.WriteLine("Rules of Engagement execute completed... Target added.");
+						Console.WriteLine("DoTargetPrioritization() - Rules of Engagement execute completed... Target added.");
 					}
 				}
 			});
@@ -2645,9 +2646,12 @@ namespace HelloBoids
 		
 
 		/// <summary>
-		/// A callback function for a Rule 'Condition' to find the LeftOperand
+		/// A callback function for a Rule 'Condition.'
+		/// NOTE: If we need to use a callback function, there is no need to evaluate
+		///       a left and right 'operand' because it can all be done here using
+		///       the passed in object[] args.
 		/// </summary>
-		private string IsCombatant(object[] args)
+		private bool IsCombatant(object[] args)
 		{
 			// todo: we need both the key of the tacticalstation (currently just the current Droid)
 			//       and the potential target contact key and index
@@ -2677,7 +2681,7 @@ namespace HelloBoids
 				}
 			
 			
-			return "false";
+			return false;
 		}
 			
 		/// <summary>
@@ -5974,8 +5978,10 @@ return (0,0);
 		
 		public void Add (SensorContact c)
 		{
-			if (mSensorContacts == null) mSensorContacts = new List<SensorContact>();
 			
+			if (mSensorContacts == null) mSensorContacts = new List<SensorContact>();
+			Console.WriteLine("EntityNode.Add(SensorContact) - 222 SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
+
 			int found = -1;
 			for (int i = 0; i < mSensorContacts.Count; i++)
 				if (mSensorContacts[i].Name == c.Name)
@@ -5984,12 +5990,13 @@ return (0,0);
 					break;
 				}
 			
+			Console.WriteLine("EntityNode.Add(SensorContact) - 333 SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
 			if (found == -1) 
 				mSensorContacts.Add (c);
 			else 
 				mSensorContacts[found].Add(c.Telemetry);
 			
-			Console.WriteLine("EntityNode.Add(SensorContact) - SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
+			Console.WriteLine("EntityNode.Add(SensorContact) - 444 SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
 		}
 		
 		public void Add (List<SensorContact> contacts)
@@ -7542,7 +7549,7 @@ return (0,0);
 		{
 			if (mConditions == null || mConditions.Length == 0) return true;
 			
-			//Console.WriteLine("Evaluating " + mConditions.Length.ToString() + " conditions");
+			
 			for (int i = 0; i < mConditions.Length; i++)
 			{
 				string left = null;
@@ -7550,17 +7557,20 @@ return (0,0);
 				if (mConditions[i].LeftOperandIsDelegate)
 				{
 					// the LEFT operand delegate to invoke.  The RIGHT operand is what we want to compare it against 
-					left = mConditions[i].OperandLeftDelegate(mConditions[i].DelegateArgs);
-					right = mConditions[i].OperandRight;
-					//Console.WriteLine("Condition.Evaluate() - Left IS a delegate LEFT == " + left + " RIGHT == " + right);
+					bool result = mConditions[i].OperandLeftDelegate(mConditions[i].DelegateArgs);
+					//right = context[mConditions[i].EntityKey].GetString(mConditions[i].OperandRight);  	// mConditions[i].OperandRight;
+					if (result) continue;
+					return false;
+					
+					Console.WriteLine("Condition.Evaluate() - LEFT IS A DELEGATE --> LEFT == " + left + " RIGHT == " + right);
 				}
 				else
 				{	
 					// left is the KVP to look up.  right is what we want to compare it against 
 					System.Diagnostics.Debug.Assert (context != null, "Context is not null.");
 					left = context[mConditions[i].EntityKey].GetString(mConditions[i].OperandLeft);
-					right = mConditions[i].OperandRight; // context[mConditions[i].EntityKey].GetString(mConditions[i].OperandRight);  		
-					//Console.WriteLine("Condition.Evaluate() - Left is NOT a delegate LEFT == " + left + " RIGHT == " + right);
+					
+					right = context[mConditions[i].EntityKey].GetString(mConditions[i].OperandRight);  		
 				}
 				
 				switch (mConditions[i].mEvalType)
@@ -7608,7 +7618,7 @@ return (0,0);
 		public bool LeftOperandIsDelegate;
 		// there's generally no reason for BOTH the left and right operands to be a delegate.  
 		// The left will be our delegate and the right will be the operand we want to compare the result of the delegate to
-		public Func<object[], string> OperandLeftDelegate; 
+		public Func<object[], bool> OperandLeftDelegate; 
 		public object[] DelegateArgs;
 		
 		// The 'key' into our UserDataStore context that will return the 'value' we want for the left operand
@@ -7632,7 +7642,7 @@ return (0,0);
 			LeftOperandIsDelegate = false;
 		}
 		
-		public Condition (string name, string description, string entityKey, EVAL_TYPE eval, Func<object[], string> operandLeft, string operandRight, object[] delegateArgs)
+		public Condition (string name, string description, string entityKey, EVAL_TYPE eval, Func<object[], bool> operandLeft, string operandRight, object[] delegateArgs)
 		{
 			Name = name;
 			Description = description;

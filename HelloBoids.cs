@@ -1746,6 +1746,12 @@ namespace HelloBoids
 				
 				try
 				{
+					// CLEAR
+									
+					mDamageSystem.Clear();
+					mDamageOverTimeSystem.Clear();
+					
+					
 					// production that occurs every frame
 					UpdateProduction(gt);
 					linePos = 1;
@@ -1762,6 +1768,7 @@ namespace HelloBoids
 				}
 				
 
+				
 				try
 				{
 					// NOTE: ProcessOpticalSensors() is added as a mDataProcessor which means our mNeighbors<> Dictionary
@@ -1798,7 +1805,6 @@ namespace HelloBoids
 				{
 					Console.WriteLine("Update() - Damage System " + ex.Message);
 				}
-				
 				
 				try
 				{
@@ -2011,25 +2017,6 @@ namespace HelloBoids
 
 #if USE_MEMORY_T
 		
-			
-		// not used... but would be used with parallel.Invoke() as in
-		/*
-			// TEMP - Parallel test using a lambda
-			var size = memSpan.Length;
-			System.Threading.Tasks.Parallel.Invoke(
-				() =>  DoParallelTest(store, 0, size / 2),
-				() => DoParallelTest(store, size/2, size)
-			);
-		*/
-		
-		private void DoParallelTest(ComponentStore<Transform.Transform_Struct> store, int start, int end)
-		{
-			int l = store.Span.Length;
-			int a = l * start * end;
-			Console.WriteLine(a.ToString());
-		}
-		
-		
 		/// <summary>
 		/// Seed would typically be Seeds.Local_Droid_Logic + mCurrentFrame;
 		/// </summary>
@@ -2119,7 +2106,6 @@ namespace HelloBoids
 			CreateContactListFromAdjacents(); // based on policies
 			
 			
-			
 			//Console.WriteLine("Do_Droid_Logic() - DoTargetPrioritization()");
 			DoTargetPrioritization();
 			
@@ -2129,7 +2115,6 @@ namespace HelloBoids
 			//       processor in a single call from here...
 			//Console.WriteLine("Do_Droid_Logic() - DoWeaponFitnessScores()");
 			DoWeaponFitnessScores(null, null);
-			
 			
 			
 			//Console.WriteLine("Do_Droid_Logic() - DoWeaponsCanFire()");
@@ -2146,15 +2131,15 @@ namespace HelloBoids
             {
 				if (Boids[(int)i] is Boid == false) return;
 				
-				Boid currentBoid = (Boid)Boids[(int)i];
+				Boid attacker = (Boid)Boids[(int)i];
 				// NOTE: Transform_Struct will  host indices for Boids, OpticalSensors and TacticalStations
-				int currentInternalIndex = currentBoid.GetUserStructIndex(typeof(Transform.Transform_Struct));
-				int currentArrayIndex = currentBoid.EntityArrayIndex;
-				System.Diagnostics.Debug.Assert (currentArrayIndex == i, "Do_Droid_Logic() - i and currentArrayIndex do not match.");
+				int currentInternalIndex = attacker.GetUserStructIndex(typeof(Transform.Transform_Struct));
+				int attackerArrayIndex = attacker.EntityArrayIndex;
+				System.Diagnostics.Debug.Assert (attackerArrayIndex == i, "Do_Droid_Logic() - i and attackerArrayIndex do not match.");
 				
 				
 				// get a reference to the Station and determine if it "CanAct()"
-				EntityNode[] tacticalStationEnts = currentBoid.GetTacticalStations();
+				EntityNode[] tacticalStationEnts = attacker.GetTacticalStations();
 				if (tacticalStationEnts == null || tacticalStationEnts.Length == 0) return;
 
 				int stationArrayIndex = tacticalStationEnts[0].EntityArrayIndex;  
@@ -2175,7 +2160,7 @@ namespace HelloBoids
 				//      - any Contacts in list marked as FOF.Foe + FOF.Hostile as opposed to just FOF.Foe (note: stale contacts are still treated as available in case of need to persue)
 				//      	- FOF.Withdrawing may be ignored for example if ROE says we don't persue in this circumstance including disabled ships and unarmed ships like freighters
 				
-				EntityNode[] weapons = currentBoid.GetWeapons();				
+				EntityNode[] weapons = attacker.GetWeapons();				
 				int weaponIndex;
 				Memory<Weapon>weaponStruct = (Memory<Weapon>) weapons[0].GetUserStruct(typeof(Weapon), out weaponIndex);
 				
@@ -2194,7 +2179,7 @@ namespace HelloBoids
 
 					try
 					{
-						bool success = mNeighbors.TryGetValue(currentArrayIndex, out neighbors);
+						bool success = mNeighbors.TryGetValue(attackerArrayIndex, out neighbors);
 						if (!success) 
 						{
 							//System.Diagnostics.Debug.Assert(mNeighbors.Count > 0, "Do_Droig_Logic() - ASSERTION FAILED - Check that optical Sensors[] list is being filled via Spawn().");
@@ -2204,20 +2189,20 @@ namespace HelloBoids
 					}
 					catch (Exception ex)
 					{
-						Console.WriteLine("Do_Droid_Logic() -  Droid Array Index '" + currentArrayIndex.ToString() + "' does not exist. " + ex.Message);
+						Console.WriteLine("Do_Droid_Logic() -  Attacker Droid Array Index '" + attackerArrayIndex.ToString() + "' does not exist. " + ex.Message);
 					}
 				
 					
 					//List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE); // TODO: Hopefully this FindNearestTarget() can be optimized.... spatial searches even with Octree is slow.
 					
 					// This overloaded version of FindNearestTarget() returns the sorted list of neighbors from closest to furthest along with their distances to the current droid
-					List<EntityNode> tmp = FindNearestTarget(currentBoid, neighbors, out distances);
+					List<EntityNode> tmp = FindNearestTarget(attacker, neighbors, out distances);
 					if (tmp == null || tmp.Count == 0)
 						return;     // NOTE: for parallel.For we use "return"
 						// continue; // NOTE: for regular for() loop we use "continue"
 
 					targets = tmp.OfType<Boid>().ToList();
-					Console.WriteLine("Do_Droid_Logic() - Droid @ Array Index '" + currentArrayIndex.ToString() + "' Found " + targets.Count.ToString() + " targets.");
+					Console.WriteLine("Do_Droid_Logic() - Attacker Droid @ Array Index '" + attackerArrayIndex.ToString() + "' Found " + targets.Count.ToString() + " targets.");
 					
 					try
 					{
@@ -2227,9 +2212,9 @@ namespace HelloBoids
 						
 						if (tacticalStationStruct.Span[0].CanHit(currentTarget))
 						{
-							currentBoid.ShotsFired++;
+							attacker.ShotsFired++;
 							
-							Console.WriteLine("Do_Droid_Logic() - Droid @ Array Index '" + currentArrayIndex.ToString() + "' firing shot # " + currentBoid.ShotsFired.ToString() + " on Droid @ Array Index '" + currentTarget.EntityArrayIndex.ToString() + "'");
+							//Console.WriteLine("Do_Droid_Logic() - Attacker Droid @ Array Index '" + currentArrayIndex.ToString() + "' firing shot # " + currentBoid.ShotsFired.ToString() + " on Droid @ Array Index '" + currentTarget.EntityArrayIndex.ToString() + "'");
 
 							// NOTE: here we assume the Fire() occurs immediately using a lightspeed laser and the damage is instantaneous 
 							//       and does not need any travel time to reach the currentTarget
@@ -2237,13 +2222,13 @@ namespace HelloBoids
 							
 							try 
 							{
-								// todo: change parameter currentBoid to tacticalStation?
-								damages = CalculateDamage(currentBoid, weaponStruct, currentTarget); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
+								// todo: change parameter attacker to tacticalStation?
+								damages = CalculateDamage(attacker, currentTarget, weaponStruct); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
 								int dCount = 0;
 								if (damages != null)
 									dCount = damages.Length;
 								
-								//Console.WriteLine("Do_Droid_Logic() - Damages Produced = " + dCount.ToString());
+								// Console.WriteLine("Do_Droid_Logic() - Damages Produced = " + dCount.ToString());
 							}
 							catch(Exception ex)
 							{
@@ -2401,7 +2386,6 @@ namespace HelloBoids
 				
 				//Console.WriteLine ("2");
 				EntityNode[] sensorEntities = currentBoid.GetSensors(); // todo: we currently do  not have EntityNode allowing adding of child nodes.  This is needed next.
-
 				
 				int sensorsCount = 0;
 				if (sensorEntities != null) sensorsCount = sensorEntities.Length;
@@ -2447,7 +2431,7 @@ namespace HelloBoids
 						
 						double sensorRangeSquared = sensorStruct.Span[0].RangeSquared;
 						
-						Console.WriteLine("CreateContactListFromAdjacents() - Range = " +  sensorRangeSquared.ToString() + " Distance to Contact ==  " + Math.Sqrt(distanceSquared).ToString());
+						//Console.WriteLine("CreateContactListFromAdjacents() - Range = " +  sensorRangeSquared.ToString() + " Distance to Contact ==  " + Math.Sqrt(distanceSquared).ToString());
 						
 						if (sensorRangeSquared >= distanceSquared)
 						{
@@ -2460,13 +2444,13 @@ namespace HelloBoids
 
 							if (!c.Equals(default(SensorContact)))
 							{
-								Console.WriteLine("CreateContactListFromAdjacents() - sensor contact name == " + c.Name);
+								//Console.WriteLine("CreateContactListFromAdjacents() - sensor contact name == " + c.Name);
 								if (c.SensorsIndices == null) 
 									c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices,  sensorArrayIndex); // sensorStructIndex);
 								else
 									c.SensorsIndices.Append(sensorArrayIndex); // sensorStructIndex);
 
-								Console.WriteLine("DoContactListSorting() - Appending SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
+								//Console.WriteLine("DoContactListSorting() - Appending SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
 							}
 							else // contact has not yet already been detected by another Sensor within this same ship during this loop through all sensors on this same ship
 							{
@@ -2509,7 +2493,7 @@ namespace HelloBoids
 
 								c.Add(t);			
 								contacts.Add(c);
-								Console.WriteLine("DoContactListSorting() - Added NEW SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
+								//Console.WriteLine("DoContactListSorting() - Added NEW SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
 							}
 						} // end sensor range check
 					} // end for SensorsCount
@@ -3324,10 +3308,32 @@ namespace HelloBoids
 		/// The resulting damage types and amounts (and duration for damage that can be applied overtime)
 		/// that occur on this successful hit.
 		/// </summary>
-        private object[] CalculateDamage(EntityNode droid, Memory<Weapon> weaponStruct, EntityNode target)
+        private object[] CalculateDamage(EntityNode attacker, EntityNode target, Memory<Weapon> weaponStruct)
         {
 			//Console.WriteLine("CalculateDamage() - Created DamageSystem.Damage.");
 			
+			// TODO: I think we want to have all relevant data on attacker and target
+			// for instance
+			// TacticalStation used
+			// Operator of Tactical Station
+			// time of event
+			// Target Vehicle
+			//  specific sub-location of target aimed at
+			//  specific sub-location of target hit
+			// 
+	
+			// note: this will be different if a MINE or AREA EFFECT damage occurs
+			// and there are multiple targets and multiple sub-locations on the target(s) that are damaged.
+	
+			// todo: so TacticalStation stores the stats correct?
+			//       Well, we have dedicated EntryClass.Statistics now
+	
+			string factionColor = "Red";
+			factionColor = (rand.NextDouble() >= 0.5d) ? "Red" : "Blue";
+			b.BlackBoardData.SetString("faction", factionColor);
+	
+	
+	
 			object[] result = new object[2];
 			
 			/*
@@ -3345,13 +3351,13 @@ namespace HelloBoids
 			
 			DamageSystem.Damage d;
 			d.Amount = 5;  // weaponStruct.BeamOutput;
-			d.EntityIndex = droid.EntityArrayIndex;
+			d.TargetEntityArrayIndex = target.EntityArrayIndex;
 			result[0] = d;
 			
 
 			DamageOverTimeSystem.DamageOverTime dot;
 			dot.Amount = 1;  // weaponStruct.BeamOutput;
-			dot.EntityIndex = droid.EntityArrayIndex;
+			dot.TargetEntityArrayIndex = target.EntityArrayIndex;
 			dot.Duration = 0.05f;
 			result[1] = dot;
 			
@@ -4491,7 +4497,7 @@ namespace HelloBoids
 		{
 			public struct DamageResult
 			{
-				public int EntityIndex;
+				public int TargetEntityArrayIndex;
 				public int Amount;
 			}
 			
@@ -4513,8 +4519,13 @@ namespace HelloBoids
 				{
 					for (int i = 0; i < records.Count; i++)
 					{
-						LifeForm e = (LifeForm)memSpan[records[i].EntityIndex];
-						e.Hitpoints += records[i].Amount;
+						int spanIndex;
+						Memory<LifeForm> lf  = (Memory<LifeForm>)EntryClass.bSim.Boids[records[i].TargetEntityArrayIndex].GetUserStruct(typeof(LifeForm), out spanIndex);
+						//LifeForm lf = (LifeForm)memSpan[records[i].EntityIndex];
+						int prev = lf.Span[0].Hitpoints;
+						lf.Span[0].Hitpoints -= records[i].Amount;
+						Console.WriteLine ("HealthSystem.Apply() -  Entity '" + EntryClass.bSim.Boids[records[i].TargetEntityArrayIndex].EntityKey + " Hitpoints: '" + lf.Span[0].Hitpoints.ToString() + "' Previously was: '" + prev.ToString() + "'");
+						
 					}
 				}
 			}
@@ -4526,19 +4537,16 @@ namespace HelloBoids
 		{
 			public struct Damage
 			{
-				public int EntityIndex;
+				public int TargetEntityArrayIndex;
 				public int Amount;
 			}
 			
 			System.Collections.Concurrent.ConcurrentQueue<Damage> mRecords;
-			
-			//List<Damage> mRecords;
 			List<HealthSystem.DamageResult> mDamageResults;
 			
 			public DamageSystem()
 			{
 				mRecords = new System.Collections.Concurrent.ConcurrentQueue<Damage>();
-				//mRecords = new List<Damage>();
 				mDamageResults = new List<HealthSystem.DamageResult>();
 			}
 			
@@ -4547,9 +4555,6 @@ namespace HelloBoids
 				try
 				{
 					mRecords.Enqueue(d);
-					
-					//mRecords.Add (d);
-				//Console.WriteLine ("DamageSystem.Add() - Record count == " + mRecords.Count.ToString());
 				}
 				catch (Exception ex)
 				{
@@ -4568,8 +4573,6 @@ namespace HelloBoids
 				if (store == null) return;
 				Span<LifeForm> memSpan = store.Span;
 				
-				Clear();
-				
 				if (mRecords != null)
 				{
 					mDamageResults.Clear();
@@ -4580,17 +4583,11 @@ namespace HelloBoids
 						bool result = mRecords.TryDequeue(out d);
 						
 						int amount = d.Amount;
-						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = d.EntityIndex, Amount = amount});
-						
+						mDamageResults.Add (new HealthSystem.DamageResult() {TargetEntityArrayIndex = d.TargetEntityArrayIndex, Amount = amount});
+						Console.WriteLine ("DamageSystem.Add() - Damage of '" + amount.ToString() + "'  being applied to '" + EntryClass.bSim.Boids[d.TargetEntityArrayIndex].EntityKey);
 					}
-					/*
-					for (int i = 0; i < mRecords.Count; i++)
-					{
-						int amount = mRecords[i].Amount;
-						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = mRecords[i].EntityIndex, Amount = amount});
-					}
-					*/
-					// use the same LivingEntityStore as the one passed in, for applying health changes to the Droid
+					
+					// use the same <LifeForm>store as the one passed in, for applying health changes to the Droid
 					BoidSimulation.mHealthSystem.Apply(store, new object[] {mDamageResults}, seed, gt);
 				}
 			}
@@ -4602,20 +4599,18 @@ namespace HelloBoids
 		{
 			public struct DamageOverTime
 			{
-				public int EntityIndex;
+				public int TargetEntityArrayIndex;
 				public int Amount;
 				public float Duration;
 			}
 			
 			System.Collections.Concurrent.ConcurrentQueue<DamageOverTime> mRecords;
-			//List<DamageOverTime> mRecords;
 			List<HealthSystem.DamageResult> mDamageResults;
 			
 			
 			public DamageOverTimeSystem()
 			{
 				mRecords = new System.Collections.Concurrent.ConcurrentQueue<DamageOverTime>();
-				//mRecords = new List<DamageOverTime>();
 				mDamageResults = new List<HealthSystem.DamageResult>();
 			}
 			
@@ -4624,13 +4619,7 @@ namespace HelloBoids
 				try
 				{
 					mRecords.Enqueue(d);
-					
-					// TODO: mRecords.Add() is not threadsafe!
-					//       This is resulting in errors when adding to the List 
-					
-					//if (mRecords == null) mRecords = new List<DamageOverTime>();
-					//mRecords.Add (d);
-					//Console.WriteLine ("DamageSystem.Add() - Record count == " + mRecords.Count.ToString());
+					//Console.WriteLine ("DamageOverTimeSystem.Add() - Record count == " + mRecords.Count.ToString());
 				}
 				catch (Exception ex)
 				{
@@ -4652,9 +4641,7 @@ namespace HelloBoids
 			{
 				if (store == null) return;
 				Span<LifeForm> memSpan = store.Span;
-				
-				Clear();
-				
+							
 				if (mRecords != null)
 				{
 					mDamageResults.Clear();
@@ -4665,17 +4652,11 @@ namespace HelloBoids
 						bool result = mRecords.TryDequeue(out d);
 						
 						int amount = d.Amount;
-						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = d.EntityIndex, Amount = amount});
+						mDamageResults.Add (new HealthSystem.DamageResult() {TargetEntityArrayIndex = d.TargetEntityArrayIndex, Amount = amount});
+						Console.WriteLine ("DamageOverTimeSystem.Add() - Damage of '" + amount.ToString() + "'  being applied to '" + EntryClass.bSim.Boids[d.TargetEntityArrayIndex].EntityKey);
 					}
 					
-					/* for (int i = 0; i < mRecords.Count; i++)
-					{
-						int amount = mRecords[i].Amount; // TODO: * gt.ElapsedSeconds;
-						mDamageResults.Add (new HealthSystem.DamageResult() {EntityIndex = mRecords[i].EntityIndex, Amount = amount});
-					}
-					*/
-					
-					// use the same LivingEntityStore as the one passed in, for applying health changes to the Droid
+					// use the same <LifeForm> store as the one passed in, for applying health changes to the Droid
 					BoidSimulation.mHealthSystem.Apply(store, new object[]{ mDamageResults }, seed, gt);
 				}
 			}
@@ -5985,7 +5966,7 @@ return (0,0);
 		{
 			
 			if (mSensorContacts == null) mSensorContacts = new List<SensorContact>();
-			Console.WriteLine("EntityNode.Add(SensorContact) - 222 SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
+			//Console.WriteLine("EntityNode.Add(SensorContact) - 222 SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
 
 			int found = -1;
 			for (int i = 0; i < mSensorContacts.Count; i++)
@@ -5995,13 +5976,13 @@ return (0,0);
 					break;
 				}
 			
-			Console.WriteLine("EntityNode.Add(SensorContact) - 333 SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
+			//Console.WriteLine("EntityNode.Add(SensorContact) - 333 SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
 			if (found == -1) 
 				mSensorContacts.Add (c);
 			else 
 				mSensorContacts[found].Add(c.Telemetry);
 			
-			Console.WriteLine("EntityNode.Add(SensorContact) - 444 SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
+			//Console.WriteLine("EntityNode.Add(SensorContact) - 444 SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
 		}
 		
 		public void Add (List<SensorContact> contacts)

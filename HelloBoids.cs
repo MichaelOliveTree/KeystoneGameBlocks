@@ -2668,14 +2668,19 @@ namespace HelloBoids
 				
 			Boid B = (Boid)Boids[currentEntityArrayIndex];
 			
-			//EntityNode tactical = B.Children[0];      // tactical station
+			EntityNode tactical = B.GetTacticalStations()[0];    
 			// UserData data = tactical.BlackBoardData; // station operator
 					
 			
 			// the tacticalStation will have it's list of Contacts and Targets 
-			List<SensorContact> contacts = B.GetSensorContacts();
+			List<SensorContact> contacts = tactical.GetSensorContacts();
+			int count = 0;
+			if (contacts != null) 
+				count = contacts.Count;
 			
-			for (int i = 0; i < contacts.Count; i++)
+			Console.WriteLine("IsCombatant() - tacticalStation '" + tactical.EntityKey + "' has '" + count + "' contacts.");
+			
+			for (int i = 0; i < count; i++)
 				if (contacts[i].ContactEntityArrayIndex == targetEntiyArrayIndex)
 				{
 				}

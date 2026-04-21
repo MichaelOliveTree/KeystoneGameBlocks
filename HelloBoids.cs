@@ -529,7 +529,8 @@ namespace HelloBoids
 
                 //HACK - make the elapsedSeconds always equal to fixed step
                 elapsedSeconds = step;
-				gt.Update(elapsedSeconds);
+				TimeSpan ts = TimeSpan.FromSeconds(elapsedSeconds);
+				gt.Update(ts);
 
                 // Update and Render operations
                 Update(gt);
@@ -1773,7 +1774,7 @@ namespace HelloBoids
 				{
 					// NOTE: ProcessOpticalSensors() is added as a mDataProcessor which means our mNeighbors<> Dictionary
 					//       will not be initialized during this first call to Do_Droid_Logic()!
-					Do_Droid_Logic (Seeds.Master, elapsedSeconds);
+					Do_Droid_Logic (Seeds.Master, elapsedSeconds, gt);
 					linePos = 2;
 				}
 				catch (Exception ex)
@@ -2020,7 +2021,7 @@ namespace HelloBoids
 		/// <summary>
 		/// Seed would typically be Seeds.Local_Droid_Logic + mCurrentFrame;
 		/// </summary>
-		private void Do_Droid_Logic(int seed, double maxDistance)
+		private void Do_Droid_Logic(int seed, double maxDistance, GameTime gt)
 		{
 			//Console.WriteLine("Do_Droid_Logic() - BEGIN ");
 			ThreadedRandom random = new ThreadedRandom(seed);
@@ -2223,7 +2224,7 @@ namespace HelloBoids
 							try 
 							{
 								// todo: change parameter attacker to tacticalStation?
-								damages = CalculateDamage(attacker, currentTarget, weaponStruct); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
+								damages = CalculateDamage(attacker, currentTarget, weaponStruct, gt); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
 								int dCount = 0;
 								if (damages != null)
 									dCount = damages.Length;
@@ -2818,6 +2819,7 @@ namespace HelloBoids
 		}
 			
 		
+		// https://github.com/MonoGame/MonoGame/blob/db9e544dfb3f1c1e8bfc2ea08fec31c1c17a9033/MonoGame.Framework/Game.cs#L539
         private void DoLifeCycle(ComponentStore<LifeForm> store, object[] parameters, int seed, GameTime gt)
         {
 			ComponentStore<LifeForm> testLEComp = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
@@ -2850,9 +2852,7 @@ namespace HelloBoids
 				
 				// todo: i think we need to check to see if this record is for
 				//       an Entity that is enabled
-				// todo: i think this needs to use a GameTime not a Tick() because if the simulation pauses
-				//       this result wont be a correct value
-				long age = gt.Ticks - livingEntitySpan[i].CreationDateTime;// Utils.GetAge(memSpan[i].CreationDateTime);
+				double age = gt.ElapsedSeconds - livingEntitySpan[i].CreationDateTime;// Utils.GetAge(memSpan[i].CreationDateTime);
 				livingEntitySpan[i].Age = age;
 				if (age >= maxAge)
 				{
@@ -3308,10 +3308,11 @@ namespace HelloBoids
 		/// The resulting damage types and amounts (and duration for damage that can be applied overtime)
 		/// that occur on this successful hit.
 		/// </summary>
-        private object[] CalculateDamage(EntityNode attacker, EntityNode target, Memory<Weapon> weaponStruct)
+        private object[] CalculateDamage(EntityNode attacker, EntityNode target, Memory<Weapon> weaponStruct, GameTime gt)
         {
 			//Console.WriteLine("CalculateDamage() - Created DamageSystem.Damage.");
-			
+			System.Diagnostics.Debug.Assert (attacker.Configuration == (uint)CONFIGURATION.Intelligent, "CalculateDamage() - Attacker is of incorrect CONFIGURATION.  Should be an Intelligent capable of operating a Tactical Station.");
+											 
 			// TODO: I think we want to have all relevant data on attacker and target
 			// for instance
 			// TacticalStation used
@@ -3328,9 +3329,9 @@ namespace HelloBoids
 			// todo: so TacticalStation stores the stats correct?
 			//       Well, we have dedicated EntryClass.Statistics now
 	
-			string factionColor = "Red";
-			factionColor = (rand.NextDouble() >= 0.5d) ? "Red" : "Blue";
-			b.BlackBoardData.SetString("faction", factionColor);
+			//string factionColor = "Red";
+			//factionColor = (rand.NextDouble() >= 0.5d) ? "Red" : "Blue";
+			//b.BlackBoardData.SetString("faction", factionColor);
 	
 	
 	
@@ -3348,16 +3349,23 @@ namespace HelloBoids
 			
 			result[0] = laserDamage;
 			*/
-			
+					
+			double time = gt.TotalElapsedSeconds;
+	
 			DamageSystem.Damage d;
 			d.Amount = 5;  // weaponStruct.BeamOutput;
+			d.AttackerOperatorEntityArrayIndex = attacker.EntityArrayIndex;
+			d.TimeOfAttack = time;
 			d.TargetEntityArrayIndex = target.EntityArrayIndex;
 			result[0] = d;
 			
 
+		
 			DamageOverTimeSystem.DamageOverTime dot;
 			dot.Amount = 1;  // weaponStruct.BeamOutput;
+			dot.AttackerOperatorEntityArrayIndex = attacker.EntityArrayIndex;
 			dot.TargetEntityArrayIndex = target.EntityArrayIndex;
+			dot.TimeOfAttack = time;
 			dot.Duration = 0.05f;
 			result[1] = dot;
 			
@@ -4537,6 +4545,8 @@ namespace HelloBoids
 		{
 			public struct Damage
 			{
+				public int AttackerOperatorEntityArrayIndex; // always the Operator
+				public double TimeOfAttack;
 				public int TargetEntityArrayIndex;
 				public int Amount;
 			}
@@ -4599,9 +4609,11 @@ namespace HelloBoids
 		{
 			public struct DamageOverTime
 			{
+				public int AttackerOperatorEntityArrayIndex; // always the Operator
+				public double TimeOfAttack;
 				public int TargetEntityArrayIndex;
 				public int Amount;
-				public float Duration;
+				public double Duration;
 			}
 			
 			System.Collections.Concurrent.ConcurrentQueue<DamageOverTime> mRecords;
@@ -7875,8 +7887,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 	public struct Membership
 	{
 		int OrganizationID;  // will lead to organizationType, Name, Description, etc.
-		long JoinDate;
-		long LeaveDate;
+		double JoinDate;
+		double LeaveDate;
 
 		public long GenerateJoinDate (int age)
 		{
@@ -7972,8 +7984,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
 		public struct ContactTelemetry
 		{
-			public long TimeLast; // this can be used to determine how stale a Sensor contact is.  gt.Time - LastDetectionTime == 0 then this is current.  Otherwise it's stale and we should add the previous telemetry to "History"
-			public long TimeAcquired;
+			public double TimeLast; // this can be used to determine how stale a Sensor contact is.  gt.Time - LastDetectionTime == 0 then this is current.  Otherwise it's stale and we should add the previous telemetry to "History"
+			public double TimeAcquired;
 				
 			 // how might Radius be spoofed?  Also, if two or more ships are in very close formation, can this result in the hiding of one or more
 			// of those ships via emergent behavior?  I think we would need to explicitly program this...  it would depend on the closeness of 
@@ -7985,12 +7997,12 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			public float Heading;       // NOTE: Bearing is the direction to fly to get somewhere specific see Google AI Overview notes below
 		
 
-			public int GetStaleAmount(GameTime gt)
+			public double GetStaleAmount(GameTime gt)
 			{
 				// TODO: NowTicks should actually be set to the frequency of the updates for Sensors.
 				//       and NEVER "real-time" NowTicks as used below.  Any "NowTicks()" should result from a DateTimeNow 
 				//       that is manually incremented by the Fixed Time Step.
-				long lag = gt.Ticks - TimeLast;
+				double lag = gt.TotalElapsedSeconds - TimeLast;
 				
 				// CURRENT
 				if (lag == 0)
@@ -8169,8 +8181,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		public string FullName;
 		
 		// These will serve as Station Operators for now
-		public long CreationDateTime;
-		public long Age;            // technically, this probably doesnt need to be stored... we only need the CreationDate?  // assign using Utils.GetAge() and find Age via 'age = Utils.GetAge(entity.CreationDate);'
+		public double CreationDateTime;
+		public double Age;            // technically, this probably doesnt need to be stored... we only need the CreationDate?  // assign using Utils.GetAge() and find Age via 'age = Utils.GetAge(entity.CreationDate);'
 		public double MaxAge;
 		
 		public int Hitpoints; 
@@ -8245,15 +8257,15 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		public int CurrentHP; // HitPoints - Damage == CurrentHP;
 		
 		
-		public float StartTime; // when "Use" began
-		public float Duration;  // if the "Use" is of a set Duration, track how long that Duration is... for instance, a sleep duration might be 6 hours of gameTime
+		public double StartTime; // when "Use" began
+		public double Duration;  // if the "Use" is of a set Duration, track how long that Duration is... for instance, a sleep duration might be 6 hours of gameTime
 		
 		// todo: these bools would go into runtime stats as bitflags
 		// along with isPowered, isFueld, isHealthyEnough, hasSkills, isOperatorStatusOK, isInUse(aka isFiring for weapons), canAct (for tacticalStations),
 		// isReloading, isUnJamming (isFixingMalfunction), 
         public bool InUse;
 		public bool Looping; // Repeating
-		public float CooldownDuration; 
+		public double CooldownDuration; 
 		
 		
         public delegate void OnCreate();  // or OnAddedToScene()
@@ -8604,11 +8616,11 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         // runtime
         public float BreakerCycleDuration;
 		
-		public long TimeStarted;
-		public float Duration;
+		public double TimeStarted;
+		public double Duration;
 		
 		public bool Looping; // Repeating
-		public float CooldownDuration; 
+		public double CooldownDuration; 
 		public bool InCoolDown;
     }
 	
@@ -8619,8 +8631,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 	{
 		public class StationAction
 		{
-			public long TimeStarted;     // time this action started
-			public long Duration;         // time to complete this action
+			public double TimeStarted;     // time this action started
+			public double Duration;         // time to complete this action
 			public int ActionID;         // eg Fire at Target, Lay Mines, Deploy Counter-measures
 		}
 
@@ -19141,45 +19153,51 @@ public abstract class PlanedFrustum
     public class GameTime 
     {        
         public IntervalTimers IntervalTimers;
+		
+		private TimeSpan mTotalElapsedSeconds;
+		private TimeSpan mElapsedSeconds;  
+		private TimeSpan mStartOffset; // instead of our stopwatch starting at 0, advance it by x amount .eg mStarOffset = TimeSpan.FromMinutes(5); then  TimeSpan totalTime = mStopwatch.Elapsed + mStarOffset;
+		private double mElapsedGameTimeSeconds;
 
-        private DateTime _time; //  this is only used for Ticks
-        
         private bool mIsPaused;
         private float _timeScaling;                    // used for FFWD and REVERSE time speed ups and slow downs
         private float mGameSecondsPerEachRealSecond;  // eg. 60 gameSeconds for every real life second means every real life minute results in one hour of game time passing
         
-        private double _totalElapsed; // total elapsed time since the first update
-        private double _elapsedSeconds;
-        private double mElapsedGameTimeSeconds;
+       
         
-		private long mTicksAtStart;
-		private long mTicks;
+        
+		//private long mTicksAtStart;
+		//private long mTicks;
 		private float _julianDay;
 
+		private TimeSpan? START_OFFSET = default(TimeSpan);
+		
         // TODO: use Stopwatch here!!!  
 
         /// <summary>
         /// 
         /// </summary>
         /// <param name="timeScaling">minimum value must be >0.0 unless we want to support reverse time.</param>
-        public GameTime(float timeScaling = 1.0f)
+        public GameTime(float timeScaling = 1.0f, TimeSpan? startOffset = null)
         {
         	// TODO: what if 0.0 == paused/stopped
             if (timeScaling <= 0f) throw new ArgumentOutOfRangeException("GameTime.ctor() - timeScaling must be greater than 0.");
             _timeScaling = timeScaling;
             
-			_time = new DateTime();
-			mTicksAtStart = _time.Ticks;
+			//_time = new DateTime();
+			//mTicksAtStart = _time.Ticks;
 			
+			START_OFFSET = startOffset;
 			
             IntervalTimers = new IntervalTimers();
 
             // http://stackoverflow.com/questions/5248827/convert-datetime-to-julian-date-in-c-sharp-tooadate-safe
 
-            int a = (14 - _time.Month) /12;
-            int y = 1975 + 4800 - a;
-            int m = _time.Month + 12 * a - 3;
-            _julianDay = _time.DayOfYear + (153 * m + 2) / 5 + y * 365 + y / 4 - y / 100 + y / 400 - 32045;
+			// TODO: Fix below
+       //     int a = (14 - _time.Month) /12;
+       //     int y = 1975 + 4800 - a;
+       //     int m = _time.Month + 12 * a - 3;
+       //     _julianDay = _time.DayOfYear + (153 * m + 2) / 5 + y * 365 + y / 4 - y / 100 + y / 400 - 32045;
             _julianDay -= 2442414;
             _julianDay -= 1f / 24f;
         }
@@ -19187,8 +19205,6 @@ public abstract class PlanedFrustum
         public GameTime() : this (1.0f)
         {
         }
-        
-        public DateTime Time {get {return _time;}}
         
         /// <summary>
         /// Equivalent to gameSecondsPerRealLifeSecond.  
@@ -19198,11 +19214,9 @@ public abstract class PlanedFrustum
         public float Scale {get {return _timeScaling;} set{_timeScaling = value;}}
         
 
-        public long Ticks 
-        {
-        	get {return mTicks;}
-        }
-        
+		/// <summary>
+		/// Returns the elapsed seconds for the most recent frame.
+		/// </summary>
         public double ElapsedSeconds
         {
             get
@@ -19212,7 +19226,7 @@ public abstract class PlanedFrustum
                 //double elapsedSeconds = (double)CoreClient._CoreClient.Engine.AccurateTimeElapsed();
                 //elapsedSeconds /= 1000d;
                 //return elapsedSeconds;
-              return _elapsedSeconds; 
+              return mElapsedSeconds.Seconds; 
 			}
         }
         
@@ -19226,31 +19240,38 @@ public abstract class PlanedFrustum
 	
         public double TotalElapsedSeconds
         {
-        	get { return _totalElapsed; }
+        	get 
+			{ 	
+				return mTotalElapsedSeconds.Seconds;
+			}
         }
         
         public double JulianDay // total number of days including fractional days 
         {
         	get 
         	{
-        		return _julianDay + _time.TimeOfDay.TotalDays;
+        		return _julianDay; // TODO: FIX THIS + _time.TimeOfDay.TotalDays;
         	}
         }
 
+		public void Update (TimeSpan ts)
+		{
+			if (_timeScaling == 0.0f) return; 
+        	
+            mElapsedSeconds.Add(ts);
+							
+			mTotalElapsedSeconds += mElapsedSeconds;
+			TimeSpan totalTime = mTotalElapsedSeconds + mStartOffset;
+								
+            mElapsedGameTimeSeconds = mElapsedSeconds.Seconds * _timeScaling;
+		
+            IntervalTimers.Update(ts.Seconds);
+		}
+		
+		
         public void Update(double elapsedSeconds)
         {
-        	if (_timeScaling == 0.0f) return; 
-        	
-            _elapsedSeconds = elapsedSeconds;
-            _totalElapsed += _elapsedSeconds;
-            mElapsedGameTimeSeconds = _elapsedSeconds * _timeScaling;
-			
-            //double elapsedMilliseconds = _elapsedSeconds * 1000d;
-            //_time = _time.Add(new TimeSpan(0, 0, 0, 0, (int)elapsedMilliseconds));
-			_time = _time.AddSeconds(elapsedSeconds);
-            mTicks = _time.Ticks; 
-
-            IntervalTimers.Update(elapsedSeconds);
+        	this.Update(TimeSpan.FromSeconds(elapsedSeconds));
         }
     }
 	
@@ -20384,7 +20405,7 @@ public abstract class PlanedFrustum
 			return DateTime.Now.Ticks;
 		}
 		
-		
+		// https://github.com/MonoGame/MonoGame/blob/db9e544dfb3f1c1e8bfc2ea08fec31c1c17a9033/MonoGame.Framework/Game.cs#L539
 		public static long GetAge (long startingTicks)
 		{
 			long diff = NowTicks() - startingTicks;

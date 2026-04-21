@@ -742,7 +742,7 @@ namespace HelloBoids
 		public static SkillModificationSystem mSkillModificationSystem = new SkillModificationSystem();
 		public static SkillSystem mSkillSystem = new SkillSystem();
 		
-		private const CONFIGURATION HumanOperatorConfiguration = CONFIGURATION.Transform | CONFIGURATION.RigidBody | CONFIGURATION.Sentient | CONFIGURATION.Intelligent | CONFIGURATION.SelfPropelled;
+		private const CONFIGURATION HumanOperatorConfiguration = CONFIGURATION.Transform | CONFIGURATION.RigidBody |  CONFIGURATION.LifeForm | CONFIGURATION.Sentient | CONFIGURATION.Intelligent | CONFIGURATION.SelfPropelled;
 		private const CONFIGURATION BoidConfiguration = CONFIGURATION.Transform | CONFIGURATION.RigidBody | CONFIGURATION.LifeForm | CONFIGURATION.SelfPropelled;
 		private const CONFIGURATION OpticalSensorConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.Sensor;
 		private const CONFIGURATION WingsConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing;
@@ -1121,6 +1121,7 @@ namespace HelloBoids
 			string exLine =  "CreateOpticalSensor 1";
 			string entityKey = "sensor_" + arrayIndex.ToString(); // prefix with "sensor_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!
 			EntityNode opticalSensor = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); // OpticalSensor is the Droid's 'eyes'
+			opticalSensor.Configuration = (uint)OpticalSensorConfiguration;
 			
 			//CONFIGURATION OpticalSensorConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.Sensor;
 	
@@ -1228,6 +1229,7 @@ namespace HelloBoids
 			string entityKey = "wings_" + arrayIndex.ToString(); // prefix with "laser_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!			
 			
 			EntityNode wings = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
+			wings.Configuration = (uint)WingsConfiguration;
 			
 			//CONFIGURATION WingsConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing; // <- CONFIGURATION.Propulsion
 			
@@ -1275,7 +1277,8 @@ namespace HelloBoids
 			string entityKey = "laser_" + arrayIndex.ToString(); // prefix with "laser_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!			
 			
 			EntityNode laser = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
-					
+			laser.Configuration = (uint)LaserConfiguration;
+			
 			mIntervalTimers.Register(entityKey, "droid_canfire", 0.00d);
 			mIntervalTimers.Register(entityKey, "droid_isfiring", 0.06d);
 						
@@ -1390,7 +1393,8 @@ namespace HelloBoids
 			string entityKey = "tacticalstation_" + arrayIndex.ToString(); // prefix with "laser_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!			
 			
 			EntityNode station = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
-							
+			station.Configuration = (uint)TacticalStationConfiguration;
+			
 			//CONFIGURATION TacticalStationConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.TacticalStation;
 
 			// transform struct
@@ -1486,7 +1490,8 @@ namespace HelloBoids
 			string entityKey = "battery_" + arrayIndex.ToString(); // prefix with "laser_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!			
 		
 			EntityNode battery = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
-					
+			battery.Configuration = (uint)BatteryConfiguration;
+			
 			//CONFIGURATION BatteryConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerProducer;
 			
 			// transform struct
@@ -1595,7 +1600,8 @@ namespace HelloBoids
 			string entityKey = "human_operator_" + arrayIndex.ToString(); // prefix with "laser_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!			
 			
 			EntityNode humanOperator = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
-
+			humanOperator.Configuration = (uint)HumanOperatorConfiguration;
+			
 			int transformIndex;
 			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)humanOperator.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
 			transform.Span[0].Configuration = HumanOperatorConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
@@ -2140,9 +2146,15 @@ namespace HelloBoids
 				
 				
 				// get a reference to the Station and determine if it "CanAct()"
+				EntityNode[] operators = attacker.GetTacticalStationOperators();
 				EntityNode[] tacticalStationEnts = attacker.GetTacticalStations();
-				if (tacticalStationEnts == null || tacticalStationEnts.Length == 0) return;
+				if (operators == null || tacticalStationEnts == null || operators.Length == 0 || tacticalStationEnts.Length == 0) return;
 
+				int operatorEntityArrayIndex = operators[0].EntityArrayIndex;  
+				int operatorIndex;
+				Memory<LifeForm> operatorStruct = (Memory<LifeForm>) operators[0].GetUserStruct(typeof(LifeForm), out operatorIndex);
+
+				
 				int stationArrayIndex = tacticalStationEnts[0].EntityArrayIndex;  
 				int tacticalIndex;
 				Memory<TacticalStation> tacticalStationStruct = (Memory<TacticalStation>) tacticalStationEnts[0].GetUserStruct(typeof(TacticalStation), out tacticalIndex);
@@ -2224,7 +2236,10 @@ namespace HelloBoids
 							try 
 							{
 								// todo: change parameter attacker to tacticalStation?
-								damages = CalculateDamage(attacker, currentTarget, weaponStruct, gt); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
+								// todo: randomly choose between 
+								// battery, opticalsensors, wings, laser, overall droid, tacticalstation or operator
+								EntityNode specificSubTarget = currentTarget;
+								damages = CalculateDamage(operators[0], specificSubTarget, weaponStruct, gt); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
 								int dCount = 0;
 								if (damages != null)
 									dCount = damages.Length;
@@ -3311,7 +3326,7 @@ namespace HelloBoids
         private object[] CalculateDamage(EntityNode attacker, EntityNode target, Memory<Weapon> weaponStruct, GameTime gt)
         {
 			//Console.WriteLine("CalculateDamage() - Created DamageSystem.Damage.");
-			System.Diagnostics.Debug.Assert (attacker.Configuration == (uint)CONFIGURATION.Intelligent, "CalculateDamage() - Attacker is of incorrect CONFIGURATION.  Should be an Intelligent capable of operating a Tactical Station.");
+			System.Diagnostics.Debug.Assert (attacker.Configuration == (uint)HumanOperatorConfiguration, "CalculateDamage() - Attacker is of incorrect CONFIGURATION.");
 											 
 			// TODO: I think we want to have all relevant data on attacker and target
 			// for instance
@@ -3353,18 +3368,24 @@ namespace HelloBoids
 			double time = gt.TotalElapsedSeconds;
 	
 			DamageSystem.Damage d;
-			d.Amount = 5;  // weaponStruct.BeamOutput;
 			d.AttackerOperatorEntityArrayIndex = attacker.EntityArrayIndex;
-			d.TimeOfAttack = time;
+			d.WeaponUsedEntityArrayIndex = weaponStruct.Span[0].EntityArrayIndex;
 			d.TargetEntityArrayIndex = target.EntityArrayIndex;
+			d.Amount = 5;  // weaponStruct.BeamOutput;
+			d.TimeOfAttack = time;
 			result[0] = d;
 			
-
 		
+			// TODO: what if we were to make and add multiple DamageSystem.Damage records instead
+			//       and execute them no earlier than their "TimeOfAttack?"  This way we wouldn't 
+			//       need a seperate System for the two,we would just need to only execute them
+			//       when the "TimeOfAttack was <= gt.GetTime();
+			//       
 			DamageOverTimeSystem.DamageOverTime dot;
-			dot.Amount = 1;  // weaponStruct.BeamOutput;
 			dot.AttackerOperatorEntityArrayIndex = attacker.EntityArrayIndex;
+			dot.WeaponUsedEntityArrayIndex = weaponStruct.Span[0].EntityArrayIndex;
 			dot.TargetEntityArrayIndex = target.EntityArrayIndex;
+			dot.Amount = 1;  // weaponStruct.BeamOutput;
 			dot.TimeOfAttack = time;
 			dot.Duration = 0.05f;
 			result[1] = dot;
@@ -3382,7 +3403,6 @@ namespace HelloBoids
 
 			
 			// weapon Hitpoints
-			
 			
 			
 			
@@ -4545,9 +4565,10 @@ namespace HelloBoids
 		{
 			public struct Damage
 			{
-				public int AttackerOperatorEntityArrayIndex; // always the Operator
 				public double TimeOfAttack;
-				public int TargetEntityArrayIndex;
+				public int AttackerOperatorEntityArrayIndex; // always the Operator
+				public int WeaponUsedEntityArrayIndex;
+				public int TargetEntityArrayIndex;           // always the specific Component or Assembly that received damage
 				public int Amount;
 			}
 			
@@ -4609,9 +4630,10 @@ namespace HelloBoids
 		{
 			public struct DamageOverTime
 			{
-				public int AttackerOperatorEntityArrayIndex; // always the Operator
 				public double TimeOfAttack;
-				public int TargetEntityArrayIndex;
+				public int AttackerOperatorEntityArrayIndex; // always the Operator
+				public int WeaponUsedEntityArrayIndex;
+				public int TargetEntityArrayIndex;           // always the specific Component or Assembly that received damage
 				public int Amount;
 				public double Duration;
 			}
@@ -4662,6 +4684,9 @@ namespace HelloBoids
 					{
 						DamageOverTime d;
 						bool result = mRecords.TryDequeue(out d);
+						// TODO: what if our damageOverTime was just adding more instances of the Damage struct to the
+						//       queue and then waiting for the TimeOfAttack to match before executing any of them?
+						//      This seems better than having a seperate DamageOverTime struct from Damage struct...
 						
 						int amount = d.Amount;
 						mDamageResults.Add (new HealthSystem.DamageResult() {TargetEntityArrayIndex = d.TargetEntityArrayIndex, Amount = amount});
@@ -5153,6 +5178,19 @@ namespace HelloBoids
 			if (found.Count == 0) return null;
 			
 			return found.ToArray();
+		}
+		
+		public EntityNode[] GetTacticalStationOperators()
+		{
+			if (EntryClass.bSim.Boids == null) return null;
+			
+			int arrayIndex = this.EntityArrayIndex;
+			
+			int numPartOfKey =  arrayIndex + BoidSimulation.HUMAN_OPERATOR_OFFSET; 
+			string keyForThisBoid = "human_operator_" + numPartOfKey.ToString();
+
+			System.Diagnostics.Debug.Assert(keyForThisBoid == EntryClass.bSim.Boids[numPartOfKey].EntityKey);
+			return new EntityNode[] {EntryClass.bSim.Boids[numPartOfKey]};
 		}
 		
 	#endregion

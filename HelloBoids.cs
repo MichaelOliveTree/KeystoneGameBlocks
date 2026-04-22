@@ -239,9 +239,10 @@ namespace HelloBoids
 		private static uint OctreeMaxDepth = 12;         // NOTE: this is ignored if Octree.EnforceMaxDepth == false in which case the splitthreshHold and radius of the entity being added is the main determinant
 		private static uint OctreeSplitThreshold = 8;
 		
-		public static HelloBoids.UserDataStore mCStoreUserData;
+		public static HelloBoids.UserDataStore mUserDataStore;
         public static HelloBoids.ComponentStoreCollection mCStoreCol;
         public static BoidSimulation bSim;
+		
 		
         public static double step;
         private static double mTotalRuntime;
@@ -485,10 +486,9 @@ namespace HelloBoids
 			mGameLoopLock = new object();
            	
 			mCStoreCol = new HelloBoids.ComponentStoreCollection();
-			mCStoreUserData = new HelloBoids.UserDataStore();
+			mUserDataStore = new HelloBoids.UserDataStore();
 			
            	bSim = new BoidSimulation((int)NUM_ENTRIES, WIDTH, HEIGHT, DEPTH, useOctree);
-			
 			
 			
             CodeProfiler.StartLoop();
@@ -759,6 +759,10 @@ namespace HelloBoids
 		public const int BATTERY_OFFSET = 5;
 		public const int HUMAN_OPERATOR_OFFSET = 6;
 		
+		public static SimulationEventManager mSimEventManager;
+		
+		
+			
 		
 		
         public BoidSimulation(int numBoids, double width, double height, double depth, bool useOctree = false)
@@ -783,7 +787,7 @@ namespace HelloBoids
         	//mConsumption  = new System.Collections.Concurrent.ConcurrentDictionary<uint, List<Consumption>>();
 			mProduction = new System.Collections.Concurrent.ConcurrentDictionary<uint, ComponentStore<Production>>();
         	mConsumption  = new System.Collections.Concurrent.ConcurrentDictionary<uint, ComponentStore<Consumption>>();
-			
+			mSimEventManager = new SimulationEventManager(EntryClass.mUserDataStore);
 			
 #if USE_MEMORY_T
 
@@ -903,14 +907,109 @@ namespace HelloBoids
         {
             Dispose();
         }
-        
-		private EntityNode GetEntity (int index)
+		
+		#region SensorContacts and Target manipulation belongs in SCRIPTS ULTIMATELY		
+		        
+		public EntityNode GetEntity (int entityArrayIndex)
 		{
-			return Boids[index];
+			return Boids[entityArrayIndex];
 		}
 		
+			// NOTE: This is horribly inefficient because it just iterates t hrough all EntityNodes to find the
+			//       one "Sensor" that has the expected EntityKey that starts with "sensor_" and otherwise has same number part as this Droid's mID
+		public EntityNode[] GetSensors(int entityArrayIndex)
+		{
+			if (EntryClass.bSim.Boids == null) return null;
+			
 		
+			//int numPartOfKeyBOID = int.Parse(EntryClass.bSim.Boids[entityArrayIndex].EntityKey.Split("_")[1]);
+			int numPartOfKeyEYES =  entityArrayIndex + BoidSimulation.OPTICAL_SENSOR_OFFSET; // int.Parse(EntryClass.bSim.Boids[entityArrayIndex + 1].EntityKey.Split("_")[1]);
+			
+			string sensorKeyForThisBoid = "sensor_" + numPartOfKeyEYES.ToString();
+
+			System.Diagnostics.Debug.Assert(sensorKeyForThisBoid == EntryClass.bSim.Boids[numPartOfKeyEYES].EntityKey);
+			return new EntityNode[] {EntryClass.bSim.Boids[numPartOfKeyEYES]};
+			
+			// NOTE: the below isn't necessary.  
+			// NOTE: previously when this loop was failing it was because the Key I was searching for "sensor_###" 
+			//       could NEVER possibly exist because the entityArrayIndex for the associated sensor to a given boid is
+			//       always entityArrayIndex + 1.  There is a sensor_111 for example, but never a sensor_110 that is just 1 less.
+			//       They always are in increments of 2, same with the boid's indexArrays too.
+			List<EntityNode> found = new List<EntityNode>();
+			for (int i = 0; i < EntryClass.bSim.Boids.Count; i++)
+			{
+				if (EntryClass.bSim.Boids[i] == null) continue; 
+				Console.WriteLine("looping -- sensor key == " + EntryClass.bSim.Boids[i].EntityKey);
+				if (EntryClass.bSim.Boids[i].EntityKey == sensorKeyForThisBoid)
+				{
+					found.Add(EntryClass.bSim.Boids[i]);
+					System.Diagnostics.Debug.Assert (EntryClass.bSim.Boids[i] == EntryClass.bSim.Boids[numPartOfKeyEYES]);
+				}
+			}
+			
+			Console.WriteLine("GetSensors() - Call Complete.  # of Sensors found == " + found.Count.ToString());
+			if (found.Count == 0) return null;
+			
+			return found.ToArray();
+		}
+
+		public EntityNode[] GetWeapons(int entityArrayIndex)
+		{
+			if (EntryClass.bSim.Boids == null) return null;
+						
+			int numPartOfKey =  entityArrayIndex + BoidSimulation.LASER_OFFSET; 
+			string keyForThisBoid = "laser_" + numPartOfKey.ToString();
+
+			System.Diagnostics.Debug.Assert(keyForThisBoid == EntryClass.bSim.Boids[numPartOfKey].EntityKey);
+			return new EntityNode[] {EntryClass.bSim.Boids[numPartOfKey]};
+		}
 		
+		public EntityNode[] GetTacticalStations(int entityArrayIndex)
+		{
+			if (EntryClass.bSim.Boids == null) return null;
+			
+			int numPartOfKey =  entityArrayIndex + BoidSimulation.TACTICAL_STATION_OFFSET; 
+			string keyForThisBoid = "tacticalstation_" + numPartOfKey.ToString();
+
+			System.Diagnostics.Debug.Assert(keyForThisBoid == EntryClass.bSim.Boids[numPartOfKey].EntityKey);
+			return new EntityNode[] {EntryClass.bSim.Boids[numPartOfKey]};
+			
+			// NOTE: the below isn't necessary.  
+			// NOTE: previously when this loop was failing it was because the Key I was searching for "sensor_###" 
+			//       could NEVER possibly exist because the entityArrayIndex for the associated sensor to a given boid is
+			//       always entityArrayIndex + 1.  There is a sensor_111 for example, but never a sensor_110 that is just 1 less.
+			//       They always are in increments of 2, same with the boid's indexArrays too.
+			List<EntityNode> found = new List<EntityNode>();
+			for (int i = 0; i < EntryClass.bSim.Boids.Count; i++)
+			{
+				if (EntryClass.bSim.Boids[i] == null) continue; 
+				Console.WriteLine("looping -- tactical station key == " + EntryClass.bSim.Boids[i].EntityKey);
+				if (EntryClass.bSim.Boids[i].EntityKey == keyForThisBoid)
+				{
+					found.Add(EntryClass.bSim.Boids[i]);
+					System.Diagnostics.Debug.Assert (EntryClass.bSim.Boids[i] == EntryClass.bSim.Boids[numPartOfKey]);
+				}
+			}
+			
+			Console.WriteLine("GetTacticalStations() - Call Complete.  # of Tactical Stations found == " + found.Count.ToString());
+			if (found.Count == 0) return null;
+			
+			return found.ToArray();
+		}
+		
+		public EntityNode[] GetTacticalStationOperators(int entityArrayIndex)
+		{
+			if (EntryClass.bSim.Boids == null) return null;
+			
+			int numPartOfKey =  entityArrayIndex + BoidSimulation.HUMAN_OPERATOR_OFFSET; 
+			string keyForThisBoid = "human_operator_" + numPartOfKey.ToString();
+
+			System.Diagnostics.Debug.Assert(keyForThisBoid == EntryClass.bSim.Boids[numPartOfKey].EntityKey);
+			return new EntityNode[] {EntryClass.bSim.Boids[numPartOfKey]};
+		}
+		
+	#endregion
+			
 		public Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> Spawn(Random rand, int arrayIndex, double width, double height, double depth)
 		{
 			Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> result;
@@ -947,8 +1046,8 @@ namespace HelloBoids
 				factionColor = (rand.NextDouble() >= 0.5d) ? "Red" : "Blue";
 				b.BlackBoardData.SetString("faction", factionColor);
 
-				//EntryClass.mCStoreUserData[entityKey].SetString("faction", factionColor);
-				System.Diagnostics.Debug.Assert(b.BlackBoardData == EntryClass.mCStoreUserData[entityKey], "Spawn() -- UserData objects do not match.");
+				//EntryClass.mUserDataStore[entityKey].SetString("faction", factionColor);
+				System.Diagnostics.Debug.Assert(b.BlackBoardData == EntryClass.mUserDataStore[entityKey], "Spawn() -- UserData objects do not match.");
 			}
 			catch (Exception ex)
 			{
@@ -1061,8 +1160,7 @@ namespace HelloBoids
 			// HUMAN OPERATOR for the tactical station
 			EntityNode humanOperator = CreateHumanOperator(arrayIndex + HUMAN_OPERATOR_OFFSET);
 			
-			
-			
+						
 			Vector3d pos = new Vector3d(posX, posY, posZ);
 			BoundingBox box = new BoundingBox (pos, 1);
 			
@@ -1779,8 +1877,8 @@ namespace HelloBoids
 				try
 				{
 					// NOTE: ProcessOpticalSensors() is added as a mDataProcessor which means our mNeighbors<> Dictionary
-					//       will not be initialized during this first call to Do_Droid_Logic()!
-					Do_Droid_Logic (Seeds.Master, elapsedSeconds, gt);
+					//       will not be initialized during this first call to Do_Tactical_Logic()!
+					Do_Tactical_Logic (Seeds.Master, elapsedSeconds, gt);
 					linePos = 2;
 				}
 				catch (Exception ex)
@@ -2025,814 +2123,278 @@ namespace HelloBoids
 #if USE_MEMORY_T
 		
 	
-		private static System.Threading.SemaphoreSlim mSort = new System.Threading.SemaphoreSlim(1);
 		
 		/// <summary>
-		/// This is mostly just creating 'SensorContact' from "neighbors" .... based on policies
+		/// Called by UpdateClasses() regardless of whether Octree is used or not.
+		/// Called by Memory<T> ONLY if Octree is NOT used.  Otherwise it uses non-recursive Octree code within the DoFlocking() method.
 		/// </summary>
-		private void CreateContactListFromAdjacents()
-		{
-			if (mNeighbors.Count == 0) return;
-			//Console.WriteLine("DoContactListSorting() - STARTING");
-			
-			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
-			int recordCount = (int)allTacticalStations.Count;
+        private List<int> GetNeighbors(Boid currentBoid, double largestDistance, double largestDistanceSquared)
+        {
+            List<int> neighbors = null;
 
-            System.Threading.Tasks.Parallel.For(0, recordCount, i => 		
-			{
-				// NOTE: problem with the BOOLEAN version of this Configuration test is, we want to test for Boid configuration and ONLY Boid configuration
-				//       and not another Configuration such as HumanOperatorConfiguration which CONTAINS all of BoidConfiguration  but LOGICALLY OR's "|" CONFIGURATION.Sentient as well 
-				//       and so it WILL pass the BOOLEAN version of this test.  Thus solution is a DIRECT == compare.  Duh!
-				if (allTacticalStations.Span[(int)i].Configuration != TacticalStationConfiguration)
-				//if ((allTacticalStations.Span[(int)i].Configuration & BoidConfiguration) != BoidConfiguration)
-				{
-					//Console.WriteLine("configuration = " + allTransforms.Span[(int)i].Configuration.ToString());
-					return;
-				}	
-				
-				int currentStationArrayIndex = allTacticalStations.Span[(int)i].EntityArrayIndex; // current.EntityArrayIndex; //  current.GetUserStructIndex(typeof(Transform.Transform_Struct));
-				//System.Diagnostics.Debug.Assert( (int)i == currentArrayIndex, "DoContactListSorting() - array index does not match...");
-				// the adjacnets that are stored in neighbors from the overall mNeighbors is very much stores Area of Interest for each Droid
-				// but we will only send them things that their sensors can detect (and "eyes" are treated as optical sensors)
-				//Console.WriteLine ("DoContactListSorting() - Key for current == " + Boids[currentArrayIndex].EntityKey);
-				
-				// TODO: Should we be iterating over the 'TacticalStation' struct's and NOT the Boids array? and then getting the SensorContacts from it?
-				//       we could skip any TacticalStation that is not designated as PRIMARY TacticalStation
-				
-				EntityNode currentStation = Boids[currentStationArrayIndex]; // <-- if we can get the Sensors without having to get the current Boid... hmm...
-				System.Diagnostics.Debug.Assert(currentStation.EntityKey.Contains("tactical"), "ProcessOpticalSensors() - Entity is NOT a TacticalStation.");
-				
-				int currentBoidArrayIndex = currentStation.EntityArrayIndex - TACTICAL_STATION_OFFSET;
-				Boid currentBoid = (Boid)Boids[currentBoidArrayIndex];
-				
-				//Console.WriteLine ("2");
-				EntityNode[] sensorEntities = currentBoid.GetSensors(); // todo: we currently do  not have EntityNode allowing adding of child nodes.  This is needed next.
-				
-				int sensorsCount = 0;
-				if (sensorEntities != null) sensorsCount = sensorEntities.Length;
-				//Console.WriteLine("CreateContactListFromAdjacents() - Sensor Count == " + sensorsCount);
-				if (sensorEntities == null) return; 
-				
-				//Console.WriteLine ("4");
-				
-				// grab the neighbors/adjacents for this Droid.  The returned parameter List<Tuple<int, double>> tells us which Droid (int) index was detected and the (double) distance to it  
-				List<Tuple<int, double>> neighbors = null;
-				
-				//Console.WriteLine("CreateContactListFromAdjacents() - Looking for Neighbors at Array Index  == " + currentArrayIndex.ToString());
-				//foreach (int key in mNeighbors.Keys)
-				//	Console.WriteLine ("Key == " + key.ToString());
-				
-				bool success = mNeighbors.TryGetValue(currentBoidArrayIndex, out neighbors);
-								
-				//Console.WriteLine("DoContactListSorting() - Found '" + neighbors.Count.ToString() + "' Adjacents for Droid @ Array Index == '" + currentArrayIndex.ToString() + "' ");
-				List<SensorContact> contacts = new List<SensorContact>();
-				
-				//Console.WriteLine("CreateContactListFromAdjacents - 1");
-				
-				// iterate through all the potential "contacts"
-				for (int j = 0; j < neighbors.Count; j++)
-				{			
-					contacts.Clear();
-					ComponentStore<Transform.Transform_Struct> allTransforms  = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
-					
-					double distanceSquared = neighbors[(int)j].Item2;
-					int potentialContactsInternalTransformIndex = neighbors[(int)j].Item1; 
-					int potentialContactsEntityArrayIndex = allTransforms.Span[potentialContactsInternalTransformIndex].EntityArrayIndex;
-			  
-					//Console.WriteLine("CreateContactListFromAdjacents - 2");
-					// Iterate through all the Sensors the current Droid is using to see which ones might
-					// detect this potential contact.  This is why a "SensorContact" may already exist
-					// in the List<SensorContact> 'contacts'  because multiple Sensors on _the_same_ship_
-					// might detect this adjacent 'contact.'
-					for (int k = 0; k < sensorEntities.Length; k++)
-					{
-						int sensorStructIndex = -1;
-						Memory<Sensor> sensorStruct = (Memory<Sensor>)sensorEntities[k].GetUserStruct(typeof(Sensor), out sensorStructIndex);
-						int sensorArrayIndex = sensorStruct.Span[0].EntityArrayIndex;
-						
-						double sensorRangeSquared = sensorStruct.Span[0].RangeSquared;
-						
-						//Console.WriteLine("CreateContactListFromAdjacents() - Range = " +  sensorRangeSquared.ToString() + " Distance to Contact ==  " + Math.Sqrt(distanceSquared).ToString());
-						
-						if (sensorRangeSquared >= distanceSquared)
-						{
-							SensorContact c;
+#if USE_MEMORY_T
+            /*   Func<int, int, double, Transform.Transform_Struct, Transform.Transform_Struct, bool> findNeighborsFunc = (index, referenceIndex, distanceSquared, boid, referenceBoid) =>
+             {
+                 if (index == referenceIndex)
+                     return false;
 
-							// if another sensor on this same vehicle has detected this potential contact already, append it's Sensor index
-							// to the list of SensorIndices for this contact so we know all sensors that detected it.
-							Predicate<SensorContact> contactExists = contact => contact.ContactEntityArrayIndex == potentialContactsEntityArrayIndex;
-							c = contacts.Find(contactExists);
+                 if (Vector3d.GetDistance3dSquared(boid.Translation, referenceBoid.Translation) < distanceSquared)
+                     return true;
 
-							if (!c.Equals(default(SensorContact)))
-							{
-								//Console.WriteLine("CreateContactListFromAdjacents() - sensor contact name == " + c.Name);
-								if (c.SensorsIndices == null) 
-									c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices,  sensorArrayIndex); // sensorStructIndex);
-								else
-									c.SensorsIndices.Append(sensorArrayIndex); // sensorStructIndex);
+                 return false;
+        };*/
 
-								//Console.WriteLine("DoContactListSorting() - Appending SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
-							}
-							else // contact has not yet already been detected by another Sensor within this same ship during this loop through all sensors on this same ship
-							{
-								c = new SensorContact();
-
-								//Console.WriteLine("DoContactListSorting() - Creating NEW SensorContact of Droid at Array Index = '" + contactsEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
-								Boid bb = null;
-								try 
-								{
-									bb =  (Boid)this.Boids[potentialContactsEntityArrayIndex];
-								}
-								catch (Exception ex)
-								{
-									Console.WriteLine("DoContactListSorting() - ERROR: Boid contact at Array Index == " + c.ContactEntityArrayIndex.ToString() + " not found. " + ex.Message);
-								}
-
-								//Console.WriteLine ("9");
-								//int sensorContactInternalTransformIndex = bb.GetUserStructIndex(typeof(Transform.Transform_Struct));
-								// contact details are needed to find the correct SensorContact to potentially merge with an existing SensorContact for this detected Entity
-								// NOTE: HelloBoids should only have one element within its SensorsIndices
-								//       because each Droid only has one Sensor ('Optical Sensor' == eyes)
-								c.ContactEntityArrayIndex = potentialContactsEntityArrayIndex; // index within the Boid[] array of the detected Droid
-								c.Index = (int)i;
-								c.Name =  "boid_" + potentialContactsEntityArrayIndex.ToString(); // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
-								c.RegistryNumber = c.Name;
-								c.Type = SensorContact.TYPE.Drone;
-								c.ContactStatus = Target.STATUS.Unknown;
-								c.FriendOrFoe = SensorContact.FoF.Unknown;
-								c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices, sensorArrayIndex); //sensorStructIndex);
-								
-								// telemetry
-								SensorContact.ContactTelemetry t;
-								t.Radius = (float)bb.BoundingBox.Radius;    // how might size be spoofed?
-								t.Position = bb.Translation;
-								t.Velocity = bb.Velocity;
-								t.DistanceSquared = distanceSquared;
-								t.Heading = 0;
-								t.TimeAcquired = Utils.NowTicks(); // todo: this needs to eventually just be gt.Ticks <-- which must come from 'gametime fixedstep' and not 'real-time'
-								t.TimeLast = t.TimeAcquired;
-
-								c.Add(t);			
-								contacts.Add(c);
-								//Console.WriteLine("DoContactListSorting() - Added NEW SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
-							}
-						} // end sensor range check
-					} // end for SensorsCount
-				} // end for neihbors Count
-				
-
-				// add all of the SensorContacts to the current TacticalStation, and it will be responsible for
-				// properly merging these SensorContacts with existing ones so as to maintain
-				// proper SensorContact histories for all detected Entities.
-				if (contacts != null)
-					currentStation.Add(contacts); 
-			});
-			
-			//Console.WriteLine("DoContactListSorting() - COMPLETED.");
-		}
-		
-		/// <summary>
-		/// Seed would typically be Seeds.Local_Droid_Logic + mCurrentFrame;
-		/// </summary>
-		private void Do_Droid_Logic(int seed, double maxDistance, GameTime gt)
-		{
-			//Console.WriteLine("Do_Droid_Logic() - BEGIN ");
-			ThreadedRandom random = new ThreadedRandom(seed);
-		
-			// todo: we could pass in an array of store to our Processor functions... rather than just one.
-			//       but it would have to be an array of object[] like parameters and we'd have to cast them
-			// OR, our various processors can just grab the Stores that are needed.  There's no need really to 
-			// grab the stores outside of the processor functions only to just pass them there...  
-	
- 			
-			 // Sensor scan 
-			 //  - spatial searches using Search Radius to find adjacents/neibhors
-			             
-             //  Sensor Scans
-			 //    - atmospheric composition
-			 //    - geological - minerals
-			 //    - archaeological (ground penetrating radars and such)
-			 //
-			 //    - biological life analysis
-			 //    - specific racial signatures 
-			 //    - specific person signatures (much slower if the search area is not very limited)
-			 //    - specific atoms, molecules
-			 //    - specific energy signatures
-			 //    
-			 
-             //    - AreaOfInterest 
-			
-             // Crew/NPC movement (steering)
-             //   linear acceleration / decelaration
-			 // Ship movement - Gravitation / N-Body
-             // Ship movement - Newtonian Physics
-             // Ship movement - Steering
-			 // Ship movement - Lerping to a destination over a specific time period
-             //   SEE https://github.com/vazgriz/PID_Controller
-			 //     - MIT License
-			 //     - specifically has a sample for controlling a Turret
-			 //     - https://github.com/vazgriz/PID_Controller/blob/master/Assets/Scripts/Turret.cs
-			 //     - Also see stage\\projects\\waypointfollower.txt
-			
-			 // Turret aiming - PID controllers
-             // laser / particle cannons - movement
-             // missiles - PID controllers again
-
-             // particle Systems
-             // motion fields
-             // 
-
-			 // Collisions - could benefit from sharing Adjacents / Neighbors from Sensor Scans or vice-versa
-             // collisions (BoundingBox.Min, BoundingBox.Max, and Sphere.Center and Sphere.Radius need to be in a Memory<T> struct)
-             //
-			
-             // Animations (LODs used to prevent animations when too far away?)
-             //   - interpolation Animations
-             //   - spritesheets, atlas texture animations
-             // 
-             
-			 // 
-			 // 
-             //    - storing data on interior Walls for fast iteration of mouse picking
-             //    walls and floors and ceilings.  <-- This is mostly for when our view is such that
-             //    we cannot first determine the closest edge and use that to find any wall on that edge
-             //    For instance, imagine a camera that is more like a FPS view or a bullet or laser hits a Walls
-
-             //    - storing data on interior Walls and Floors and Ceilings "damage"
-
-
-        	//Console.WriteLine("Do_Droid_Logic() - DoDeviceReadyStatus()");
-			DoDeviceReadyStatus();
-						
-			
-			//Console.WriteLine("Do_Droid_Logic() - DoStationCanActStatus()");
-			DoStationCanActStatus();
-			//Console.WriteLine("Do_Droid_Logic() - continuing Do_Droid_Logic()");
-			
-			
-			
-			DoEnableDisableSensors();
-			
-			
-			
-			//Console.WriteLine("Do_Droid_Logic() - CreateContactListFromAdjacents()");
-			CreateContactListFromAdjacents(); // based on policies
-			
-			
-			//Console.WriteLine("Do_Droid_Logic() - DoTargetPrioritization()");
-			DoTargetPrioritization();
-			
-			
-			// todo: if we had a list of all weapons for every ship to pass all at once
-			//       as well as all targets for each ship to pass all at once, we could run this
-			//       processor in a single call from here...
-			//Console.WriteLine("Do_Droid_Logic() - DoWeaponFitnessScores()");
-			DoWeaponFitnessScores(null, null);
-			
-			
-			//Console.WriteLine("Do_Droid_Logic() - DoWeaponsCanFire()");
-			DoWeaponsCanFire();
-			
-			//ComponentStore<LifeForm> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
-			//ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
-			//ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
-						
-			//Console.WriteLine("Do_Droid_Logic() - preparing for loop()");
-			int recordCount = Boids.Count;
-            System.Threading.Tasks.Parallel.For(0, recordCount, i => 				
-			//for (int i = 0; i < Boids.Count; i++)
+            Func<Transform, Transform, double, bool> ff = (boid, referenceBoid, distanceSquared) =>
             {
-				if (Boids[(int)i] is Boid == false) return;
-				
-				Boid attacker = (Boid)Boids[(int)i];
-				// NOTE: Transform_Struct will  host indices for Boids, OpticalSensors and TacticalStations
-				int currentInternalIndex = attacker.GetUserStructIndex(typeof(Transform.Transform_Struct));
-				int attackerArrayIndex = attacker.EntityArrayIndex;
-				System.Diagnostics.Debug.Assert (attackerArrayIndex == i, "Do_Droid_Logic() - i and attackerArrayIndex do not match.");
-				
-				
-				// get a reference to the Station and determine if it "CanAct()"
-				EntityNode[] operators = attacker.GetTacticalStationOperators();
-				EntityNode[] tacticalStationEnts = attacker.GetTacticalStations();
-				if (operators == null || tacticalStationEnts == null || operators.Length == 0 || tacticalStationEnts.Length == 0) return;
+                if (boid == referenceBoid)
+                    return false;
 
-				int operatorEntityArrayIndex = operators[0].EntityArrayIndex;  
-				int operatorIndex;
-				Memory<LifeForm> operatorStruct = (Memory<LifeForm>) operators[0].GetUserStruct(typeof(LifeForm), out operatorIndex);
+                if (Vector3d.GetDistance3dSquared(boid.Translation, referenceBoid.Translation) < distanceSquared)
+                    return true;
 
-				int stationArrayIndex = tacticalStationEnts[0].EntityArrayIndex;  
-				int tacticalIndex;
-				Memory<TacticalStation> tacticalStationStruct = (Memory<TacticalStation>) tacticalStationEnts[0].GetUserStruct(typeof(TacticalStation), out tacticalIndex);
+                return false;
+            };
+#else
+            Func<Transform, Transform, double, bool> ff = (boid, referenceBoid, distanceSquared) =>
+            {
+                if (boid == referenceBoid)
+                    return false;
 
-				string errorReason = null;
-				if (tacticalStationStruct.Span[0].CanAct(out errorReason)) return;
-				//Console.WriteLine("Do_Droid_Logic() - Station CanAct() == TRUE");		
-				
-				// NOTE: The EXE will render Sensor Contact info as necessary.
-				//       The client EXE will have access to those types and the UI elements using them and can update
-				//       those relevant UI elements as necessary
-				
-				
-                //  - are we in a state of COMBAT?
-				//		- direct orders?
-				//      - any Contacts in list marked as FOF.Foe + FOF.Hostile as opposed to just FOF.Foe (note: stale contacts are still treated as available in case of need to persue)
-				//      	- FOF.Withdrawing may be ignored for example if ROE says we don't persue in this circumstance including disabled ships and unarmed ships like freighters
-				
-				EntityNode[] weapons = attacker.GetWeapons();				
-				int weaponIndex;
-				Memory<Weapon>weaponStruct = (Memory<Weapon>) weapons[0].GetUserStruct(typeof(Weapon), out weaponIndex);
-				
-				bool canFire = weaponStruct.Span[0].CanFire(out errorReason);
-				
-				//Console.WriteLine("Do_Droid_Logic() - Weapon CanFire() == " + canFire.ToString());		
-				if (canFire) // TODO: Establish CANFIRE PER WEAPON
-           	 	{  
-					string weaponKey = weapons[0].EntityKey;
-					bool suspend = false;
-					mIntervalTimers.Reset(weaponKey, "droid_canfire", suspend);
-					
-					List<Boid> targets = null;
-					double[] distances = null;				
-					List<Tuple<int, double>> neighbors = null;
+                if (Vector3d.GetDistance3dSquared(boid.Translation, referenceBoid.Translation) < distanceSquared)
+                    return true;
 
-					try
-					{
-						bool success = mNeighbors.TryGetValue(attackerArrayIndex, out neighbors);
-						if (!success) 
-						{
-							//System.Diagnostics.Debug.Assert(mNeighbors.Count > 0, "Do_Droig_Logic() - ASSERTION FAILED - Check that optical Sensors[] list is being filled via Spawn().");
-							//Console.WriteLine("Do_Droid_Logic() -  No neighbors exist in mNeighbors! This usually occurs during the very first frame since Droid Logic occurs before ProcessOpticalSensing()");
-							return;
-						}
-					}
-					catch (Exception ex)
-					{
-						Console.WriteLine("Do_Droid_Logic() -  Attacker Droid Array Index '" + attackerArrayIndex.ToString() + "' does not exist. " + ex.Message);
-					}
-				
-					
-					//List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE); // TODO: Hopefully this FindNearestTarget() can be optimized.... spatial searches even with Octree is slow.
-					
-					// This overloaded version of FindNearestTarget() returns the sorted list of neighbors from closest to furthest along with their distances to the current droid
-					List<EntityNode> tmp = FindNearestTarget(attacker, neighbors, out distances);
-					if (tmp == null || tmp.Count == 0)
-						return;     // NOTE: for parallel.For we use "return"
-						// continue; // NOTE: for regular for() loop we use "continue"
+                return false;
+            };
+#endif
 
-					targets = tmp.OfType<Boid>().ToList();
-					//Console.WriteLine("Do_Droid_Logic() - Attacker Droid @ Array Index '" + attackerArrayIndex.ToString() + "' Found " + targets.Count.ToString() + " targets.");
-					
-					try
-					{
-						// todo: fix.  for now we wont iterate all targets, just the most near one
-						Boid currentTarget = targets[0];
-						double distanceToTargetSquared = distances[0];
-						
-						if (tacticalStationStruct.Span[0].CanHit(currentTarget))
-						{
-							attacker.ShotsFired++;
-							
-							//Console.WriteLine("Do_Droid_Logic() - Attacker Droid @ Array Index '" + currentArrayIndex.ToString() + "' firing shot # " + currentBoid.ShotsFired.ToString() + " on Droid @ Array Index '" + currentTarget.EntityArrayIndex.ToString() + "'");
+            // SPATIAL SEARCH ///////////////////////////////////////////////////////////////////////////////////
+#if SPATIAL_SEARCH
+            //BoundingBox searchArea = new BoundingBox(currentBoid.Translation, largestDistance * 0.5d);
+			BoundingSphere searchSphere = new BoundingSphere(currentBoid.Translation, largestDistance * 0.5d);
+            Func<EntityNode, EntityNode, bool> match = (neighbor, current) =>
+            {
+                if (neighbor == current) return false;
+                // TODO: WE MUST CACHE span<T> and not access neighbor.Translation and current.Translation... we need to directly
+                 //        access the indices of the Span<T> here... otherwise its TOO SLOW
+                if (Vector3d.GetDistance3dSquared(neighbor.Translation, current.Translation) <= largestDistanceSquared) return true;
+                return false;
+            };
 
-							// NOTE: here we assume the Fire() occurs immediately using a lightspeed laser and the damage is instantaneous 
-							//       and does not need any travel time to reach the currentTarget
-							object[] damages = null;
-							
-							try 
-							{
-								// todo: change parameter attacker to tacticalStation?
-								// todo: randomly choose between 
-								// battery, opticalsensors, wings, laser, overall droid, tacticalstation or operator
-								EntityNode specificSubTarget = currentTarget;
-								damages = CalculateDamage(operators[0], specificSubTarget, weaponStruct, gt); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
-								int dCount = 0;
-								if (damages != null)
-									dCount = damages.Length;
-								
-								// Console.WriteLine("Do_Droid_Logic() - Damages Produced = " + dCount.ToString());
-							}
-							catch(Exception ex)
-							{
-								Console.WriteLine ("Do_Droid_Logic() - CaculateDamage ERROR - " + ex.Message);	
-							}
+#if USE_MEMORY_T
+			Console.WriteLine ("GetNeighbors - Memory<T> Using SpatialQueryLocal()");
+            ComponentStore<Transform.Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
+			int currentInternalIndex = currentBoid.GetUserStructIndex(typeof(Transform.Transform_Struct));
+            List<EntityNode> found = SpatialQueryLocal(store.Span, currentBoid.SpatialNode, currentInternalIndex, largestDistanceSquared, true, searchSphere);
 
-							if (damages != null)
-								for (int j = 0; j < damages.Length; j++)
-								{
-									if (damages[j] is DamageSystem.Damage)
-										try
-										{
-											mDamageSystem.Add((DamageSystem.Damage)damages[j]);
-										}
-									catch (Exception ex)
-									{
-										Console.WriteLine("Do_Droid_Logic() - DS.Add() ERROR - " + ex.Message);
-									}
-									else if (damages[j] is DamageOverTimeSystem.DamageOverTime)
+#else
+            List<EntityNode> found = this.Octree.Query(currentBoid, true, searchArea, match);
+#endif
 
-										try
-										{
-											mDamageOverTimeSystem.Add ((DamageOverTimeSystem.DamageOverTime)damages[j]);
-										}
-									catch (Exception ex)
-									{
-										Console.WriteLine("Do_Droid_Logic() - DS_OVER_TIME.Add() ERROR - " + ex.Message);
-									}
-									else 
-										throw new Exception("Do_Droid_Logic() - Unexpected Damge type. " + damages[j].GetType().Name);
-								}
-						}
-					}
-					catch (Exception ex)
-					{
-						Console.WriteLine ("Do_Droid_Logic() - ERROR - " + ex.Message);
-					}
-				}
-			});
-			
-			// see Keystone.Game01.Messages.   public class AttackResults since
-			// we need results going over the network
-		}
-		
-		
-		/// <summary>
-		/// based on policies
-		/// </summary>
-		private void DoTargetPrioritization()
-		{
-			//Console.WriteLine("DoTargetPrioritization");
-			int count = Boids.Count;
-            System.Threading.Tasks.Parallel.For(0, count, i => 		
+            if (found == null || found.Count == 0) return null;
+			//Console.WriteLine("nc = " + found.Count.ToString());
+
+            neighbors = new List<int>(found.Count);
+            for (int j = 0; j < found.Count; j++)
+            {
+                neighbors.Add(found[j].EntityArrayIndex);
+            }
+
+#else      // NON-SPATIAL ASSISTED DISTANCE CHECK  ///////////////////////////////////////////////////////////////////////////////////                     
+			// Console.WriteLine ("GetNeighbors - Memory<T> NON SPATIAL LINQ CALL TO Boid.FindNeighbors() being used.");
+
+#if USE_MEMORY_T
+			//neighbors = Boid.FindNeighbors(store, numBoids, largestDistance, currentIndex, findNeighborsFunc);
+			try 
 			{
-				if (Boids[i] is Boid == false) return;
-				
-				Boid current = (Boid)Boids[i];
-				
-				//int stationID = current.GetTacticalStations()[0]; 
-				EntityNode tacticalStation = current.GetTacticalStations()[0]; //(EntityNode)Boids[stationID];
-				
-				//Console.WriteLine("DoTargetPrioritization - for TacticalStatin '" + tacticalStation.EntityKey + "'");
-				
-				List<SensorContact> contacts = tacticalStation.GetSensorContacts();
-				if (contacts == null || contacts.Count == 0) return;
-								
-				//List<Target> targets = tacticalStation.GetTargets();
-				tacticalStation.ClearTargets();
-								
-				for (int j = 0; j < contacts.Count; j++)
-				{
-					// entityKey will usually be the ID of the target Entity (aka Droid or Ship).  But not always.  Sometimes it may be our own ship.  It depends on the specific rule.			
-					string targetKey = "boid_" + contacts[j].ContactEntityArrayIndex.ToString();
-					string currentKey = "boid_" + i.ToString();
-					
-					Policy roePolicy = new Policy();
-					Query q = new Query(EntryClass.mCStoreUserData);
-
-					Rule r = new Rule("ROE - Friendly Fire", "Earth Alliance Directive 209 states Captains must not fire on Friendly forces.");
-
-					// Condition 1 == in Spawn() we randomly assign each Boid to either 'Red' or 'Blue' factions.
-					string name = "Never fire on Same Faction";
-					string description = "Never fire on any Droid that is a member of our Faction.";
-					 
-					Condition.EVAL_TYPE eval = Condition.EVAL_TYPE.NOT_EQUALS;
-					string operandLeft = "faction";
-					string operandRight = "faction";  
-						
-					Condition condition = new Condition(name, description, currentKey, targetKey, eval, operandLeft, operandRight);
-											
-					r.Add(condition);
-
-					// Condition 2 == This Entity is not currently fighting us or one of our Allies in the arena
-					eval = Condition.EVAL_TYPE.EQUALS;
-					operandRight = "false";
-					
-					object[] delegateArgs = new object[]{currentKey, targetKey};
-					condition = new Condition(name, description, targetKey, currentKey, eval, IsCombatant, operandRight, delegateArgs);
-					r.Add(condition);
-					q.Add(r);
-					roePolicy.Add(q);
-			
-					SensorContact currentContact = contacts[j];
-					
-					//Console.WriteLine("DoTargetPrioritization - PRE- roePolicy.Execute()" );
-					if (roePolicy.Execute())
-					{
-						// Targets are those SensorContacts that friendly forces will potentially fire upon.
-						// Whereas SensorContacts is all contacts regardless of FoF status.
-						Target t = new Target();
-						t = current.GetTarget(currentContact.ContactEntityArrayIndex);
-						if (t.Equals(default(Target)))
-						{
-
-						}
-						else 
-						{
-							t.TargetedBy = Utils.ArrayAppend(t.TargetedBy, (int)i);       // other Ships/Vehciles/Entities, ground radars, factions, etc that are targeting this Target
-						}
-						t.EntityArrayIndex = currentContact.ContactEntityArrayIndex;
-						t.WeaponsAssigned = null;
-						t.Status = Target.STATUS.Active;
-						t.CrewStatus = Target.CREWSTATUS.Alive;
-						t.Hitpoints = 20;        // Boids[c.ContactIndex].Hitpoints; // max hitpoints of target... should a Sensor be able to know this exact number?  It's really just a game thing and maybe we should just use visual observations of condition of ship instead
-						t.CurrentHitPoints = 18; // Boids[c.ContactIndex].CurrentHP ; // used to determine % damage of Target
-
-						tacticalStation.Add(t);
-						Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY PASSED. Target added.");
-						
-					}
-					else
-					{
-						Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY FAILED.");
-					}
-				}
-			});
-			
-			
-			// a carrier with very few fighters remaining might be a low tactical threat
-			// but high strategic threat... 
-			// if a carrier is a primary mission objective that should increase its priority when scoring
-			
-			// a ship that is a primary target, but is not fleeing, can perhaps be scored lower since there will be time
-			// to target it later if there are more dangerous threats to deal with first.
-			// if a primary target is attempting to escape, the ETA that it will reach an escape trajectory should be used
-			// to wieght it's prioritization score
-			
-			// NPC non-jobs 
-			// - read
-			// - study for promotion
-			// - train for promotion
-			// - play cards, board games
-			// - socialize at cantina
-			// - meditate, spirtual seeking/studying
-			// - network with the crew
-			// - listen to music
-			// - play music/instrument
-			// - art (painting, sculpting, writing poetry, 
-			// - excercise, yoga, batleth*,  
-			// - sparring
-			// - theater (performances, orchestras, bands, etc)
-			// - nap/sleep
-			// Console.WriteLine("End target prioritization...");
-		}
-		
-		/// <summary>
-		/// Loop through all Components and set the Runtime flags that determine if this component/device is ready for use
-		/// NOTE: Using Data Oriented Processing takes some getting used to if you are more familiar with OOP where you iterate
-		/// through all Entities and update every aspect of that Entity all in once swoop before moving on to the next.
-		/// Here you will see, we update each Entity piecemeal, but we perform all the same piecemeal updates to each Entity
-		/// in one loop which is VERY cache friendly and yields supperior performance over the typical OOP method.
-		/// </summary>
-		private void DoDeviceReadyStatus()
-		{
-			return;
-			// TODO: fix indices and such
-			
-			ComponentStore<LifeForm> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
-			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
-			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
-				
-			// TODO: Do these .Is****  functions need to be setting mRuntimeFlags?
-			int count = (int)allTacticalStations.Count;
-            System.Threading.Tasks.Parallel.For(0, count, i => 		
-			{
-				
-				Boid droid = (Boid)EntryClass.bSim.Boids[allComponents.Span[(int)i].EntityArrayIndex];
-				
-				string errorReason;
-				if (allComponents.Span[(int)i].DoIsOperatorStatusCheckOK(out errorReason))
-				{
-					//int livingEntIndex;
-					//Memory<LivingEntity> livingEntity = (Memory<LivingEntity>) droid.GetUserStruct(typeof(LivingEntity), out livingEntIndex); //"HelloBoids.LivingEntity"); //();
-
-					if (allComponents.Span[(int)i].DoIsPowered(out errorReason))
-					{
-						if (allComponents.Span[(int)i].DoIsHealthyEnough(out errorReason))
-						{
-						}
-					}
-				}
-			});			
-		}
-		
-		private void DoStationCanActStatus()
-		{
-			ComponentStore<LifeForm> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
-			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
-			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
-			
-			int recordCount = (int)allTacticalStations.Count;
-            System.Threading.Tasks.Parallel.For(0, recordCount, i => 		
-			{
-				string errorReason;
-				if (allTacticalStations.Span[i].CanAct(out errorReason))
-				{
-					// TODO: Do these .Is****  functions need to be setting mRuntimeFlags?
-				
-				}
-			});
-		}
-		
-		
-		/// <summary>
-		/// based on policies
-		/// </summary>
-		private void DoEnableDisableSensors()
-		{
-			// TODO: this comment doesnt belong here, but for now remember
-			// HELM station would be influenced by Orders, Mission and Posture for example
-			// if ordered to defend another ship, helm would try to maneuver such that this ship
-			// is physically located between the ship-to-defend and a threat
-			
-			
-		}
-		
-		/// <summary>
-		/// A callback function for a Rule 'Condition.'
-		/// NOTE: If we need to use a callback function, there is no need to evaluate
-		///       a left and right 'operand' because it can all be done here using
-		///       the passed in object[] args.
-		/// </summary>
-		private bool IsCombatant(object[] args)
-		{
-			// todo: we need both the key of the tacticalstation (currently just the current Droid)
-			//       and the potential target contact key and index
-			Console.WriteLine("IsCombatant() - Begin Parse Keys");
-			string currentKey = (string)args[0];
-			string[] sp = currentKey.Split("_");
-			int currentEntityArrayIndex = int.Parse(sp[1]);
-			Console.WriteLine("IsCombatant() - Parsed Current index == " + currentEntityArrayIndex.ToString());
-			
-			string targetKey = (string)args[1];
-			sp = targetKey.Split("_");
-			int targetEntiyArrayIndex = int.Parse(sp[1]);
-			Console.WriteLine("IsCombatant() - Parsed Target index == " + targetEntiyArrayIndex.ToString());
-				
-			Boid B = (Boid)Boids[currentEntityArrayIndex];
-			
-			EntityNode tactical = B.GetTacticalStations()[0];    
-			// UserData data = tactical.BlackBoardData; // station operator
-					
-			
-			// the tacticalStation will have it's list of Contacts and Targets 
-			List<SensorContact> contacts = tactical.GetSensorContacts();
-			int count = 0;
-			if (contacts != null) 
-				count = contacts.Count;
-			
-			Console.WriteLine("--------------------------------------------------------IsCombatant() - tacticalStation '" + tactical.EntityKey + "' has '" + count + "' contacts.");
-			
-			for (int i = 0; i < count; i++)
-				if (contacts[i].ContactEntityArrayIndex == targetEntiyArrayIndex)
-				{
-				}
-			
-			
-			return false;
-		}
-			
-		/// <summary>
-		/// based on policies
-		/// </summary>	
-		private double[] DoWeaponFitnessScores(EntityNode ship, EntityNode target)
-		{
-			//Console.WriteLine("DoWeaponFitnessScores()");
-			// NOTE: weapon fitness scores of friendlies can be combined into one table to 
-			// determine how to coordinate firepower on various ships during combat
-			
-			// todo: we should estimate min, average, and max damage that each weapon might have against a particular target
-			
-			if (ship == null || target == null) 
-			{
-				//Console.WriteLine("DoWeaponFitnessScores() - paramters 'ship' or 'target' is null.");
-				return null;
+				neighbors = Boid.FindNeighbors(this.Boids, largestDistanceSquared, currentBoid.SpanIndex, ff);
 			}
-			
-			// the different structs used for a "Laser" component 
-			//todo: i should pass the array of Memory<T> and the indices arrays
-			int componentIndex;
-			Memory<Component> component = (Memory<Component>)ship.GetUserStruct(typeof(Component), out componentIndex);
-			int wepIndex;
-			Memory<Weapon> wep = (Memory<Weapon>)ship.GetUserStruct(typeof(Weapon), out wepIndex);
-			int laserIndex; 
-			Memory<Laser_Struct> laser = (Memory<Laser_Struct>)ship.GetUserStruct(typeof(Laser_Struct), out laserIndex);
-			
-			// todo: we need just all the weapons from this particular ship.  
-			// ComponetStore<Weapon> would contain ALL for ALL ships
-			ComponentStore<Weapon> allWeapons = (ComponentStore<Weapon>)EntryClass.mCStoreCol.CheckOut<Weapon>(0);
-			
-			// return just the ones for this ship... maybe add a new function and not just GetView()
-			Memory<Weapon> allWeaponsForThisShip = null; // allWeapons.GetView(ship.SpanIndex); 
-
-			uint numRules = 3;
-			uint numWeapons = (uint)allWeaponsForThisShip.Span.Length;
-			double[] scores =  new double[numWeapons];
-			double[] weights = new double[numRules];
-				
-			weights[0] = 2;
-			weights[1] = 5;
-			weights[2] = 0;
-			
-			for (int i = 0; i < numWeapons; i++)
+			catch (Exception ex)
 			{
-				// todo:  is the weapon available? does it need to aim at target? has it been doing so already? time for turret to rotate towards target
-				if (allWeaponsForThisShip.Span[0].CoolDown_ == 0)  // if coolDown != 0 then the fitness score should just be 0?
-				{
-					scores[i] = 0;
-				}
-				else
-				{
-					scores[i] = (allWeaponsForThisShip.Span[0].Damage * weights[0]) * (laser.Span[0].PowerReqt * weights[1]);
-				}
+				Console.WriteLine ("bSim.GetNeighbors() - Memory<T> - attempted to call Boid.FindNeighbors() - " + ex.Message);	
 			}
-			
-			return scores;
-		}
+#else
+#if USE_MEMORY_T == false
+            List<Boid> found = Boid.FindNeighbors(this.Boids, largestDistance, currentBoid.SpanIndex, ff);
+
+            if (found == null || found.Count == 0) return null;
+            neighbors = new List<int>(found.Count);
+            for (int j = 0; j < found.Count; j++)
+            {
+                neighbors.Add(found[j].Index);
+            }
+#else // DO NOT USE A NEIGHBOR FINDING FUNCTION, JUST BRUTE FORCE ALL BOIDS ///////////////////////////////////////////////////////////////////////////////////                     
+						
+	  // WARNING: iterating through ALL boids
+	  // for each CURRENT boid is O(n^2) and is too expensive
+	  //	neighors = allBoids;
+						
+#endif
+#endif
+#endif
+            // END NEIGHBOR SEARCH
+            return neighbors;
+        }
+
+
 		
-		
-		private void DoWeaponsCanFire()
+		private List<EntityNode> FindNearestTarget (EntityNode source, List<Tuple<int, double>> neighbors, out double[] distances)
 		{
-			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
-			ComponentStore<Weapon> allWeapons  = EntryClass.mCStoreCol.CheckOut<Weapon>(0);
+			distances = null;
+			if (neighbors == null || neighbors.Count == 0) return null;
 			
-			// NOTE: we really want to avoid having to reference a Droid from the array as it 
-			//       impacts our cache coherency
-			//EntityNode ent = (EntityNode)EntryClass.bSim.Boids[droidIndex];
-			int recordCount = (int)allWeapons.Count;
-            System.Threading.Tasks.Parallel.For(0, recordCount, i => 		
+			EntityNode[] tmp = new EntityNode[neighbors.Count];
+			distances = new double[neighbors.Count];
+					
+			ComponentStore<Transform.Transform_Struct> allTransforms = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
+	
+			for (int i = 0; i < neighbors.Count; i++)
 			{
-				string errorReason;
-				// TODO: timerID must consistantly use same LivingEntityID or something else
-				EntityNode boid = Boids[allWeapons.Span[(int)i].EntityArrayIndex - BoidSimulation.LASER_OFFSET];
-				string entityKey = boid.EntityKey;
-				EntityNode weapon = Boids[allWeapons.Span[(int)i].EntityArrayIndex];
-				string weaponKey = weapon.EntityKey;
-				//Console.WriteLine ("DoWeaponsCanFire() - Weapon Entity Key = " + weaponKey);
-				
-				bool canFire = false;
-				
-				uint USER_RUNTIME_FLAG_1 = 1 << 0;
-				uint USER_RUNTIME_FLAG_2 = 1 << 1;
-				uint USER_RUNTIME_FLAG_3 = 1 << 2;
-				uint USER_RUNTIME_FLAG_4 = 1 << 3;
-				uint USER_RUNTIME_FLAG_5 = 1 << 4;
-				uint USER_RUNTIME_FLAG_6 = 1 << 5;
-				uint USER_RUNTIME_FLAG_7 = 1 << 6;
-				uint USER_RUNTIME_FLAG_8 = 1 << 7;
-				
-				uint USER_STRUCT_FLAG_1 = 1 << 0;
-				uint USER_STRUCT_FLAG_2 = 1 << 1;
-				uint USER_STRUCT_FLAG_3 = 1 << 2;
-				uint USER_STRUCT_FLAG_4 = 1 << 3;
-				uint USER_STRUCT_FLAG_5 = 1 << 4;
-				uint USER_STRUCT_FLAG_6 = 1 << 5;
-				uint USER_STRUCT_FLAG_7= 1 << 6;
-				uint USER_STRUCT_FLAG_8 = 1 << 7;
-				
-				bool flagValue = canFire;
-				
-				int componentIndex;
-				Memory<Component> compStruct = (Memory<Component>)weapon.GetUserStruct(typeof(Component), out componentIndex);
-				compStruct.Span[0].SetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
-				bool hasStruct = compStruct.Span[0].GetUserStructFlag(USER_STRUCT_FLAG_1);
-				compStruct.Span[0].SetUserRuntimeFlag(USER_RUNTIME_FLAG_1, flagValue);
-				bool hasRuntimeFlag = compStruct.Span[0].GetUserRuntimeFlag(USER_RUNTIME_FLAG_1);
-				
-				int weaponIndex;
-				Memory<Weapon> weaponStruct = (Memory<Weapon>)weapon.GetUserStruct(typeof(Weapon), out weaponIndex);
-				
-				//weaponStruct.Span[0].SetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
-				//bool hasStruct = weaponStruct.Span[0].GetUserStructFlag(USER_STRUCT_FLAG_1);
-				//weaponStruct.Span[0].SetUserRuntimeFlag(USER_RUNTIME_FLAG_1, flagValue);
-				//bool hasRuntimeFlag = weaponStruct.Span[0].GetUserRuntimeFlag(USER_RUNTIME_FLAG_1);
-				
-				try
-				{
-					// todo: is it better to use mIntervalTimers here than to implement checks elsewhere?
-					canFire = mIntervalTimers.IsReady(weaponKey, "droid_canfire");
-					//Console.WriteLine("DoWeaponsCanFire() - Droid " + weaponKey + " Can Fire = " + canFire.ToString());
-					if (canFire)
-					{	
-						//Console.WriteLine("DoWeaponsCanFire() - Droid " + weaponKey + " FIRING!!!");
-						// set the runtime flag
-						//bool suspend = true;  // we do not want this timer to start over until we start it again. <-- Wait, why?  Is this not just a cooldown?
-                		//mIntervalTimers.Reset(weaponKey, "droid_canfire", suspend);
-						mIntervalTimers.Reset(weaponKey, "droid_canfire");
-					}
-					
-					// set the GAME SPECIFIC runtime flag
-					// the runtime flags can only be in Entity or in Component.  It should not be in the various structs
-					// themselves, because it needs to affect ALL structs and we dont want to manage a copy of those across
-					// every flag OBVIOUSLY.
-					
-				}
-				catch (Exception ex)
-				{
-					Console.WriteLine("DoWeaponsCanFire() - droid_canfire " + weaponKey + " key does not exist");
-				}
-				
-				// TODO: Do these .Is****  functions need to be setting mRuntimeFlags?
-			});
+				int arrayIndex = allTransforms.Span[neighbors[i].Item1].EntityArrayIndex;
+				EntityNode currentTarget = Boids[arrayIndex];
+				distances[i] = Vector3d.GetDistance3dSquared(source.Translation, currentTarget.Translation); // allTransforms.Span[neighbors[i].Item1].Translation);
+				tmp[i] = currentTarget;
+				System.Diagnostics.Debug.Assert(source != currentTarget, "FindNearestTarget() - Target cannot be same as the Current Source Droid!");
+			}
+
+			// Sort 'the keys double[]' (distances) and rearrange associated data 'EntityNode[]' (results) accordingly
+			Array.Sort(distances, tmp);
+
+			return new List<EntityNode>(tmp);
 		}
+		
+		///<summary>
+		/// This is the target that the operator (either crew member or computer) of a Targeting Crew Station
+		/// will be attempting to fire upon.  
+		/// Return value is a List of Tuples containing the EntityNode and Distance to that Entity
+		/// </summary>
+		private List<Tuple<EntityNode, double>> FindNearestTarget (EntityNode source, double maxDistance)
+		{
+			BoundingBox searchArea = new BoundingBox (source.SpatialNode.BoundingBox.Center, maxDistance * 0.5d);
+			double maxDistanceSquared = maxDistance * maxDistance;
+			
+			Func<EntityNode, EntityNode, Tuple<bool, double>> match = (current, neighbor) =>            {
+                
+				if (current == neighbor) return new Tuple<bool, double>(false, -1);
+                double distanceSquared = Vector3d.GetDistance3dSquared(neighbor.Translation, current.Translation);
+				if (distanceSquared <= maxDistanceSquared) return new Tuple<bool, double>(true, distanceSquared);
+                return new Tuple<bool, double>(false, -1);
+            };
+			
+			List<Tuple<EntityNode, double>> found  = this.Octree.Query(source, true, searchArea, match);
+			if (found == null) return null;
+			
+			//Console.WriteLine("FindNearestTarget found count == " + found.Count.ToString());
+			return found;		
+		}
+		
+		///<summary>
+		/// This is the target that the operator (either crew member or computer) of a Targeting Crew Station
+		/// will be attempting to fire upon.  
+		/// Return value is a List of Tuples containing the EntityNode and Distance to that Entity
+		/// </summary>
+		private List<Tuple<EntityNode, double>> FindNearestTarget (EntityNode source, BoundingBox searchArea, Func<EntityNode, EntityNode, Tuple<bool, double>> match = null)
+		{
+			double maxDistanceSquared = searchArea.RadiusSquared; 
+			
+			if (match == null)
+			{
+				match = (current, neighbor) =>            {
+                
+				if (current == neighbor) return new Tuple<bool, double>(false, -1);
+                double distanceSquared = Vector3d.GetDistance3dSquared(neighbor.Translation, current.Translation);
+				if (distanceSquared <= maxDistanceSquared) return new Tuple<bool, double>(true, distanceSquared);
+                return new Tuple<bool, double>(false, -1);
+            	};
+			}
+			List<Tuple<EntityNode, double>> found  = this.Octree.Query(source, true, searchArea, match);
+			if (found == null) return null;
+			
+			//Console.WriteLine("FindNearestTarget found count == " + found.Count.ToString());
+			return found;		
+		}
+		
+		
+#if USE_MEMORY_T
+        private List<EntityNode> SpatialQueryLocal(Span<Transform.Transform_Struct> memSpan, OctreeOctant refSpatialNode, int refIndex, double distance, bool recurse, BoundingSphere searchSphere)
+        {
+            if (refSpatialNode == null) throw new ArgumentNullException("SpatialQueryLocal() - reference Entity cannot be null.");
+            //if (!refSpatialNode.BoundingBox.Intersects(searchArea)) return null; // early exit
+			if (refSpatialNode.BoundingSphere.Intersects(searchSphere) == IntersectResult.OUTSIDE) return null; // early exit
+	
+            List<EntityNode> results = new List<EntityNode>();
+
+            // ITERATIVE DEPTH-FIRST TRAVERSAL
+            Stack<OctreeOctant> stack = new Stack<OctreeOctant>();
+            stack.Push(refSpatialNode);
+
+            while (stack.Count > 0)
+            {
+                OctreeOctant current = stack.Pop();
+
+                if (current.EntityNodes != null)
+                {
+                    for (int i = 0; i < current.EntityNodes.Length; i++)
+                    {
+						int childInternalIndex = current.EntityNodes[i].GetUserStructIndex(typeof(Transform.Transform_Struct));
+						
+                        if (childInternalIndex == refIndex) continue;
+                        // TODO: WE MUST CACHE span<T> and not access neighbor.Translation and current.Translation... we need to directly
+                        //        access the indices of the Span<T> here... otherwise its TOO SLOW
+                        double calc = Vector3d.GetDistance3dSquared(memSpan[childInternalIndex].Translation, memSpan[refIndex].Translation);
+                        //System.Diagnostics.Debug.WriteLine("Calculated distance = " + calc.ToString());
+                        if (calc <= distance)
+                            results.Add(current.EntityNodes[i]);
+                    }
+                }
+
+                if (current.Children != null)
+                {
+                    for (int i = 0; i < current.Children.Length; i++)
+                        // NOTE: Each OctreeOctant's BoundingBox needs to be in World Space.
+						if (current.Children[i].BoundingSphere.Intersects(searchSphere) != IntersectResult.OUTSIDE)
+                        //if (current.Children[i].BoundingBox.Intersects(searchArea))
+                            stack.Push(current.Children[i]);
+                }
+            }
+
+
+
+            /*
+            // RECURSIVE DEPTH-FIRST TRAVERSAL
+            // NOTE: Each OctreeOctant's BoundingBox needs to be in World Space.
+            if (!refSpatialNode.BoundingBox.Intersects(searchArea))
+                return null;
+
+            // compare the distance of all Entities within this Octant
+            if ( refSpatialNode.EntityNodes != null)
+                for (int i = 0; i < refSpatialNode.EntityNodes.Length; i++)
+                {
+                    if (refSpatialNode.EntityNodes[i].SpanIndex == refIndex) continue;
+                    // TODO: WE MUST CACHE span<T> and not access neighbor.Translation and current.Translation... we need to directly
+                    //        access the indices of the Span<T> here... otherwise its TOO SLOW
+                    if (Vector3d.GetDistance3dSquared(memSpan[refSpatialNode.EntityNodes[i].SpanIndex].Translation, memSpan[refIndex].Translation) <= distance) 
+                        results.Add(refSpatialNode.EntityNodes[i]);
+                }
+
+            if (recurse)
+            {
+                if (refSpatialNode.Children != null)
+                {
+                    for (int j = 0; j < refSpatialNode.Children.Length; j++)
+                    {						
+                        List<EntityNode> nestedResults = SpatialQueryLocal(memSpan, refSpatialNode.Children[j], refIndex, distance, recurse, searchArea);
+                        if (nestedResults != null)
+                            results.AddRange(nestedResults);
+                    }
+                }
+            }
+            */
+
+            if (results.Count == 0) return null;
+            return results;
+        }
+#endif
+    
 			
 		
 		// https://github.com/MonoGame/MonoGame/blob/db9e544dfb3f1c1e8bfc2ea08fec31c1c17a9033/MonoGame.Framework/Game.cs#L539
@@ -3320,6 +2882,813 @@ namespace HelloBoids
 #endif
         		
 		
+	
+		private static System.Threading.SemaphoreSlim mSort = new System.Threading.SemaphoreSlim(1);
+		
+		/// <summary>
+		/// This is mostly just creating 'SensorContact' from "neighbors" .... based on policies
+		/// </summary>
+		private void CreateContactListFromAdjacents()
+		{
+			if (mNeighbors.Count == 0) return;
+			//Console.WriteLine("DoContactListSorting() - STARTING");
+			
+			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
+			int recordCount = (int)allTacticalStations.Count;
+
+            System.Threading.Tasks.Parallel.For(0, recordCount, i => 		
+			{
+				// NOTE: problem with the BOOLEAN version of this Configuration test is, we want to test for Boid configuration and ONLY Boid configuration
+				//       and not another Configuration such as HumanOperatorConfiguration which CONTAINS all of BoidConfiguration  but LOGICALLY OR's "|" CONFIGURATION.Sentient as well 
+				//       and so it WILL pass the BOOLEAN version of this test.  Thus solution is a DIRECT == compare.  Duh!
+				if (allTacticalStations.Span[(int)i].Configuration != TacticalStationConfiguration)
+				//if ((allTacticalStations.Span[(int)i].Configuration & BoidConfiguration) != BoidConfiguration)
+				{
+					//Console.WriteLine("configuration = " + allTransforms.Span[(int)i].Configuration.ToString());
+					return;
+				}	
+				
+				int currentStationArrayIndex = allTacticalStations.Span[(int)i].EntityArrayIndex; // current.EntityArrayIndex; //  current.GetUserStructIndex(typeof(Transform.Transform_Struct));
+				//System.Diagnostics.Debug.Assert( (int)i == currentArrayIndex, "DoContactListSorting() - array index does not match...");
+				// the adjacnets that are stored in neighbors from the overall mNeighbors is very much stores Area of Interest for each Droid
+				// but we will only send them things that their sensors can detect (and "eyes" are treated as optical sensors)
+				//Console.WriteLine ("DoContactListSorting() - Key for current == " + Boids[currentArrayIndex].EntityKey);
+				
+				// TODO: Should we be iterating over the 'TacticalStation' struct's and NOT the Boids array? and then getting the SensorContacts from it?
+				//       we could skip any TacticalStation that is not designated as PRIMARY TacticalStation
+				
+				EntityNode currentStation = Boids[currentStationArrayIndex]; // <-- if we can get the Sensors without having to get the current Boid... hmm...
+				System.Diagnostics.Debug.Assert(currentStation.EntityKey.Contains("tactical"), "ProcessOpticalSensors() - Entity is NOT a TacticalStation.");
+				
+				int currentBoidArrayIndex = currentStation.EntityArrayIndex - TACTICAL_STATION_OFFSET;
+				Boid currentBoid = (Boid)Boids[currentBoidArrayIndex];
+				
+				//Console.WriteLine ("2");
+				EntityNode[] sensorEntities = GetSensors(currentBoidArrayIndex); // todo: we currently do  not have EntityNode allowing adding of child nodes.  This is needed next.
+				
+				int sensorsCount = 0;
+				if (sensorEntities != null) sensorsCount = sensorEntities.Length;
+				//Console.WriteLine("CreateContactListFromAdjacents() - Sensor Count == " + sensorsCount);
+				if (sensorEntities == null) return; 
+				
+				//Console.WriteLine ("4");
+				
+				// grab the neighbors/adjacents for this Droid.  The returned parameter List<Tuple<int, double>> tells us which Droid (int) index was detected and the (double) distance to it  
+				List<Tuple<int, double>> neighbors = null;
+				
+				//Console.WriteLine("CreateContactListFromAdjacents() - Looking for Neighbors at Array Index  == " + currentArrayIndex.ToString());
+				//foreach (int key in mNeighbors.Keys)
+				//	Console.WriteLine ("Key == " + key.ToString());
+				
+				bool success = mNeighbors.TryGetValue(currentBoidArrayIndex, out neighbors);
+								
+				//Console.WriteLine("DoContactListSorting() - Found '" + neighbors.Count.ToString() + "' Adjacents for Droid @ Array Index == '" + currentArrayIndex.ToString() + "' ");
+				List<SensorContact> contacts = new List<SensorContact>();
+				
+				//Console.WriteLine("CreateContactListFromAdjacents - 1");
+				
+				// iterate through all the potential "contacts"
+				for (int j = 0; j < neighbors.Count; j++)
+				{			
+					contacts.Clear();
+					ComponentStore<Transform.Transform_Struct> allTransforms  = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
+					
+					double distanceSquared = neighbors[(int)j].Item2;
+					int potentialContactsInternalTransformIndex = neighbors[(int)j].Item1; 
+					int potentialContactsEntityArrayIndex = allTransforms.Span[potentialContactsInternalTransformIndex].EntityArrayIndex;
+			  
+					//Console.WriteLine("CreateContactListFromAdjacents - 2");
+					// Iterate through all the Sensors the current Droid is using to see which ones might
+					// detect this potential contact.  This is why a "SensorContact" may already exist
+					// in the List<SensorContact> 'contacts'  because multiple Sensors on _the_same_ship_
+					// might detect this adjacent 'contact.'
+					for (int k = 0; k < sensorEntities.Length; k++)
+					{
+						int sensorStructIndex = -1;
+						Memory<Sensor> sensorStruct = (Memory<Sensor>)sensorEntities[k].GetUserStruct(typeof(Sensor), out sensorStructIndex);
+						int sensorArrayIndex = sensorStruct.Span[0].EntityArrayIndex;
+						
+						double sensorRangeSquared = sensorStruct.Span[0].RangeSquared;
+						
+						//Console.WriteLine("CreateContactListFromAdjacents() - Range = " +  sensorRangeSquared.ToString() + " Distance to Contact ==  " + Math.Sqrt(distanceSquared).ToString());
+						
+						if (sensorRangeSquared >= distanceSquared)
+						{
+							SensorContact c;
+
+							// if another sensor on this same vehicle has detected this potential contact already, append it's Sensor index
+							// to the list of SensorIndices for this contact so we know all sensors that detected it.
+							Predicate<SensorContact> contactExists = contact => contact.ContactEntityArrayIndex == potentialContactsEntityArrayIndex;
+							c = contacts.Find(contactExists);
+
+							if (!c.Equals(default(SensorContact)))
+							{
+								//Console.WriteLine("CreateContactListFromAdjacents() - sensor contact name == " + c.Name);
+								if (c.SensorsIndices == null) 
+									c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices,  sensorArrayIndex); // sensorStructIndex);
+								else
+									c.SensorsIndices.Append(sensorArrayIndex); // sensorStructIndex);
+
+								//Console.WriteLine("DoContactListSorting() - Appending SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
+							}
+							else // contact has not yet already been detected by another Sensor within this same ship during this loop through all sensors on this same ship
+							{
+								c = new SensorContact();
+
+								//Console.WriteLine("DoContactListSorting() - Creating NEW SensorContact of Droid at Array Index = '" + contactsEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
+								Boid bb = null;
+								try 
+								{
+									bb =  (Boid)this.Boids[potentialContactsEntityArrayIndex];
+								}
+								catch (Exception ex)
+								{
+									Console.WriteLine("DoContactListSorting() - ERROR: Boid contact at Array Index == " + c.ContactEntityArrayIndex.ToString() + " not found. " + ex.Message);
+								}
+
+								//Console.WriteLine ("9");
+								//int sensorContactInternalTransformIndex = bb.GetUserStructIndex(typeof(Transform.Transform_Struct));
+								// contact details are needed to find the correct SensorContact to potentially merge with an existing SensorContact for this detected Entity
+								// NOTE: HelloBoids should only have one element within its SensorsIndices
+								//       because each Droid only has one Sensor ('Optical Sensor' == eyes)
+								c.ContactEntityArrayIndex = potentialContactsEntityArrayIndex; // index within the Boid[] array of the detected Droid
+								c.Index = (int)i;
+								c.Name =  "boid_" + potentialContactsEntityArrayIndex.ToString(); // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
+								c.RegistryNumber = c.Name;
+								c.Type = SensorContact.TYPE.Drone;
+								c.ContactStatus = Target.STATUS.Unknown;
+								c.FriendOrFoe = SensorContact.FoF.Unknown;
+								c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices, sensorArrayIndex); //sensorStructIndex);
+								
+								// telemetry
+								SensorContact.ContactTelemetry t;
+								t.Radius = (float)bb.BoundingBox.Radius;    // how might size be spoofed?
+								t.Position = bb.Translation;
+								t.Velocity = bb.Velocity;
+								t.DistanceSquared = distanceSquared;
+								t.Heading = 0;
+								t.TimeAcquired = Utils.NowTicks(); // todo: this needs to eventually just be gt.Ticks <-- which must come from 'gametime fixedstep' and not 'real-time'
+								t.TimeLast = t.TimeAcquired;
+
+								c.Add(t);			
+								contacts.Add(c);
+								//Console.WriteLine("DoContactListSorting() - Added NEW SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
+							}
+						} // end sensor range check
+					} // end for SensorsCount
+				} // end for neihbors Count
+				
+
+				// add all of the SensorContacts to the current TacticalStation, and it will be responsible for
+				// properly merging these SensorContacts with existing ones so as to maintain
+				// proper SensorContact histories for all detected Entities.
+				if (contacts != null)
+					currentStation.Add(contacts); 
+			});
+			
+			//Console.WriteLine("DoContactListSorting() - COMPLETED.");
+		}
+		
+		/// <summary>
+		/// Seed might typically be Seeds.Local_Droid_Tactical_Logic + mCurrentFrame;
+		/// </summary>
+		private void Do_Tactical_Logic(int seed, double maxDistance, GameTime gt)
+		{
+			//Console.WriteLine("Do_Tactical_Logic() - BEGIN ");
+			ThreadedRandom random = new ThreadedRandom(seed);
+		
+			// todo: we could pass in an array of store to our Processor functions... rather than just one.
+			//       but it would have to be an array of object[] like parameters and we'd have to cast them
+			// OR, our various processors can just grab the Stores that are needed.  There's no need really to 
+			// grab the stores outside of the processor functions only to just pass them there...  
+	
+ 			
+			 // Sensor scan 
+			 //  - spatial searches using Search Radius to find adjacents/neibhors
+			             
+             //  Sensor Scans
+			 //    - atmospheric composition
+			 //    - geological - minerals
+			 //    - archaeological (ground penetrating radars and such)
+			 //
+			 //    - biological life analysis
+			 //    - specific racial signatures 
+			 //    - specific person signatures (much slower if the search area is not very limited)
+			 //    - specific atoms, molecules
+			 //    - specific energy signatures
+			 //    
+			 
+             //    - AreaOfInterest 
+			
+			// https://forum.paradoxplaza.com/forum/threads/the-truth-is-out-there-an-aurora-4x-c-forum-game-version-1-13.1492866/page-11
+			
+             // Crew/NPC movement (steering)
+             //   linear acceleration / decelaration
+			 // Ship movement - Gravitation / N-Body
+             // Ship movement - Newtonian Physics
+             // Ship movement - Steering
+			 // Ship movement - Lerping to a destination over a specific time period
+             //   SEE https://github.com/vazgriz/PID_Controller
+			 //     - MIT License
+			 //     - specifically has a sample for controlling a Turret
+			 //     - https://github.com/vazgriz/PID_Controller/blob/master/Assets/Scripts/Turret.cs
+			 //     - Also see stage\\projects\\waypointfollower.txt
+			
+			 // Turret aiming - PID controllers
+             // laser / particle cannons - movement
+             // missiles - PID controllers again
+
+             // particle Systems
+             // motion fields
+             // 
+
+			 // Collisions - could benefit from sharing Adjacents / Neighbors from Sensor Scans or vice-versa
+             // collisions (BoundingBox.Min, BoundingBox.Max, and Sphere.Center and Sphere.Radius need to be in a Memory<T> struct)
+             //
+			
+             // Animations (LODs used to prevent animations when too far away?)
+             //   - interpolation Animations
+             //   - spritesheets, atlas texture animations
+             // 
+             
+			 // 
+			 // 
+             //    - storing data on interior Walls for fast iteration of mouse picking
+             //    walls and floors and ceilings.  <-- This is mostly for when our view is such that
+             //    we cannot first determine the closest edge and use that to find any wall on that edge
+             //    For instance, imagine a camera that is more like a FPS view or a bullet or laser hits a Walls
+
+             //    - storing data on interior Walls and Floors and Ceilings "damage"
+
+
+        	//Console.WriteLine("Do_Tactical_Logic() - DoDeviceReadyStatus()");
+			DoDeviceReadyStatus();
+						
+			
+			//Console.WriteLine("Do_Tactical_Logic() - DoStationCanActStatus()");
+			DoStationCanActStatus();
+			//Console.WriteLine("Do_Tactical_Logic() - continuing Do_Droid_Logic()");
+			
+			
+			
+			DoEnableDisableSensors();
+			
+			
+			
+			//Console.WriteLine("Do_Tactical_Logic() - CreateContactListFromAdjacents()");
+			CreateContactListFromAdjacents(); // based on policies
+			
+			
+			//Console.WriteLine("Do_Tactical_Logic() - DoTargetPrioritization()");
+			DoTargetPrioritization();
+			
+			
+			// todo: if we had a list of all weapons for every ship to pass all at once
+			//       as well as all targets for each ship to pass all at once, we could run this
+			//       processor in a single call from here...
+			//Console.WriteLine("Do_Tactical_Logic() - DoWeaponFitnessScores()");
+			DoWeaponFitnessScores(null, null);
+			
+			
+			//Console.WriteLine("Do_Tactical_Logic() - DoWeaponsCanFire()");
+			DoWeaponsCanFire();
+			
+			//ComponentStore<LifeForm> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
+			//ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
+			//ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
+						
+			//Console.WriteLine("Do_Tactical_Logic() - preparing for loop()");
+			int recordCount = Boids.Count;
+            System.Threading.Tasks.Parallel.For(0, recordCount, i => 				
+			//for (int i = 0; i < Boids.Count; i++)
+            {
+				if (Boids[(int)i] is Boid == false) return;
+				
+				Boid attacker = (Boid)Boids[(int)i];
+				// NOTE: Transform_Struct will  host indices for Boids, OpticalSensors and TacticalStations
+				int currentInternalIndex = attacker.GetUserStructIndex(typeof(Transform.Transform_Struct));
+				int attackerArrayIndex = attacker.EntityArrayIndex;
+				System.Diagnostics.Debug.Assert (attackerArrayIndex == i, "Do_Droid_Logic() - i and attackerArrayIndex do not match.");
+				
+				
+				// get a reference to the Station and determine if it "CanAct()"
+				EntityNode[] operators = GetTacticalStationOperators(attackerArrayIndex);
+				EntityNode[] tacticalStationEnts = GetTacticalStations(attackerArrayIndex);
+				if (operators == null || tacticalStationEnts == null || operators.Length == 0 || tacticalStationEnts.Length == 0) return;
+
+				int operatorEntityArrayIndex = operators[0].EntityArrayIndex;  
+				int operatorIndex;
+				Memory<LifeForm> operatorStruct = (Memory<LifeForm>) operators[0].GetUserStruct(typeof(LifeForm), out operatorIndex);
+
+				int stationArrayIndex = tacticalStationEnts[0].EntityArrayIndex;  
+				int tacticalIndex;
+				Memory<TacticalStation> tacticalStationStruct = (Memory<TacticalStation>) tacticalStationEnts[0].GetUserStruct(typeof(TacticalStation), out tacticalIndex);
+
+				string errorReason = null;
+				if (tacticalStationStruct.Span[0].CanAct(out errorReason)) return;
+				//Console.WriteLine("Do_Tactical_Logic() - Station CanAct() == TRUE");		
+				
+				// NOTE: The EXE will render Sensor Contact info as necessary.
+				//       The client EXE will have access to those types and the UI elements using them and can update
+				//       those relevant UI elements as necessary
+				
+				
+                //  - are we in a state of COMBAT?
+				//		- direct orders?
+				//      - any Contacts in list marked as FOF.Foe + FOF.Hostile as opposed to just FOF.Foe (note: stale contacts are still treated as available in case of need to persue)
+				//      	- FOF.Withdrawing may be ignored for example if ROE says we don't persue in this circumstance including disabled ships and unarmed ships like freighters
+				
+				EntityNode[] weapons = GetWeapons(attackerArrayIndex);				
+				int weaponIndex;
+				Memory<Weapon>weaponStruct = (Memory<Weapon>) weapons[0].GetUserStruct(typeof(Weapon), out weaponIndex);
+				
+				bool canFire = weaponStruct.Span[0].CanFire(out errorReason);
+				
+				//Console.WriteLine("Do_Tactical_Logic() - Weapon CanFire() == " + canFire.ToString());		
+				if (canFire) // TODO: Establish CANFIRE PER WEAPON
+           	 	{  
+					
+					// TODO: QUEUE ANIMATION TO FIRE THIS WEAPON 
+					// TODO: LOG EVENT
+					//		- OfficerID, StationID, ACTION_ID, WeaponID, TargetID(the lowest resolution part of the target and from that we can GetOwner())
+					// 
+					string weaponKey = weapons[0].EntityKey;
+					bool suspend = false;
+					mIntervalTimers.Reset(weaponKey, "droid_canfire", suspend);
+					
+					List<Boid> targets = null;
+					double[] distances = null;				
+					List<Tuple<int, double>> neighbors = null;
+
+					try
+					{
+						bool success = mNeighbors.TryGetValue(attackerArrayIndex, out neighbors);
+						if (!success) 
+						{
+							//System.Diagnostics.Debug.Assert(mNeighbors.Count > 0, "Do_Tactical_Logic() - ASSERTION FAILED - Check that optical Sensors[] list is being filled via Spawn().");
+							//Console.WriteLine("Do_Tactical_Logic() -  No neighbors exist in mNeighbors! This usually occurs during the very first frame since Droid Logic occurs before ProcessOpticalSensing()");
+							return;
+						}
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine("Do_Tactical_Logic() -  Attacker Droid Array Index '" + attackerArrayIndex.ToString() + "' does not exist. " + ex.Message);
+					}
+				
+					
+					//List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE); // TODO: Hopefully this FindNearestTarget() can be optimized.... spatial searches even with Octree is slow.
+					
+					// This overloaded version of FindNearestTarget() returns the sorted list of neighbors from closest to furthest along with their distances to the current droid
+					List<EntityNode> tmp = FindNearestTarget(attacker, neighbors, out distances);
+					if (tmp == null || tmp.Count == 0)
+						return;     // NOTE: for parallel.For we use "return"
+						// continue; // NOTE: for regular for() loop we use "continue"
+
+					targets = tmp.OfType<Boid>().ToList();
+					//Console.WriteLine("Do_Tactical_Logic() - Attacker Droid @ Array Index '" + attackerArrayIndex.ToString() + "' Found " + targets.Count.ToString() + " targets.");
+					
+					try
+					{
+						// todo: fix.  for now we wont iterate all targets, just the most near one
+						Boid currentTarget = targets[0];
+						double distanceToTargetSquared = distances[0];
+						
+						// NOTE: TacticalStation.CanHit() returns true if a hit WILL RESULT from the fired shot
+						//       even if the HIT is not the expected location on a Target or even on the correct Target!
+						//       Otherwise it is a total MISS.  We log the hit/miss EVENT either way... typically as a 
+						//       COMBAT ACTION INITIATED and a COMBAT ACTION RESULT.  There can be multiple COMBAT ACTION RESULTS
+						//       for instance if a mine field is laid, and some time later, a ship/craft is impacted by it... potentially
+						//       years later!
+						if (tacticalStationStruct.Span[0].CanHit(currentTarget))
+						{
+							attacker.ShotsFired++;
+							
+							//Console.WriteLine("Do_Tactical_Logic() - Attacker Droid @ Array Index '" + currentArrayIndex.ToString() + "' firing shot # " + currentBoid.ShotsFired.ToString() + " on Droid @ Array Index '" + currentTarget.EntityArrayIndex.ToString() + "'");
+
+							// NOTE: here we assume the Fire() occurs immediately using a lightspeed laser and the damage is instantaneous 
+							//       and does not need any travel time to reach the currentTarget
+							object[] damages = null;
+							
+							try 
+							{
+								// todo: change parameter attacker to tacticalStation?
+								// todo: randomly choose between 
+								// battery, opticalsensors, wings, laser, overall droid, tacticalstation or operator
+								EntityNode specificSubTarget = currentTarget;
+								damages = CalculateDamage(operators[0], specificSubTarget, weaponStruct, gt); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
+								int dCount = 0;
+								if (damages != null)
+									dCount = damages.Length;
+								
+								// Console.WriteLine("Do_Tactical_Logic() - Damages Produced = " + dCount.ToString());
+							}
+							catch(Exception ex)
+							{
+								Console.WriteLine ("Do_Tactical_Logic() - CaculateDamage ERROR - " + ex.Message);	
+							}
+
+							if (damages != null)
+								for (int j = 0; j < damages.Length; j++)
+								{
+									if (damages[j] is DamageSystem.Damage)
+											mDamageSystem.Add((DamageSystem.Damage)damages[j]);
+									else if (damages[j] is DamageOverTimeSystem.DamageOverTime)
+											mDamageOverTimeSystem.Add ((DamageOverTimeSystem.DamageOverTime)damages[j]);
+									else 
+										throw new Exception("Do_Tactical_Logic() - Unexpected Damge type. " + damages[j].GetType().Name);
+								}
+						}
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine ("Do_Tactical_Logic() - ERROR - " + ex.Message);
+					}
+				}
+			});
+			
+			// see Keystone.Game01.Messages.   public class AttackResults since
+			// we need results going over the network
+		}
+		
+		
+		/// <summary>
+		/// based on policies
+		/// </summary>
+		private void DoTargetPrioritization()
+		{
+			//Console.WriteLine("DoTargetPrioritization");
+			int count = Boids.Count;
+            System.Threading.Tasks.Parallel.For(0, count, i => 		
+			{
+				if (Boids[i] is Boid == false) return;
+				
+				Boid current = (Boid)Boids[i];
+				
+				//int stationID = GetTacticalStations(i)[0]; 
+				EntityNode tacticalStation = GetTacticalStations(i)[0]; //(EntityNode)Boids[stationID];
+				
+				//Console.WriteLine("DoTargetPrioritization - for TacticalStatin '" + tacticalStation.EntityKey + "'");
+				
+				List<SensorContact> contacts = tacticalStation.GetSensorContacts();
+				if (contacts == null || contacts.Count == 0) return;
+								
+				//List<Target> targets = tacticalStation.GetTargets();
+				tacticalStation.ClearTargets();
+								
+				for (int j = 0; j < contacts.Count; j++)
+				{
+					// entityKey will usually be the ID of the target Entity (aka Droid or Ship).  But not always.  Sometimes it may be our own ship.  It depends on the specific rule.			
+					string targetKey = "boid_" + contacts[j].ContactEntityArrayIndex.ToString();
+					string currentKey = "boid_" + i.ToString();
+					
+					Policy roePolicy = new Policy();
+					Query q = new Query(EntryClass.mUserDataStore);
+
+					Rule r = new Rule("ROE - Friendly Fire", "Earth Alliance Directive 209 states Captains must not fire on Friendly forces.");
+
+					// Condition 1 == in Spawn() we randomly assign each Boid to either 'Red' or 'Blue' factions.
+					string name = "Never fire on Same Faction";
+					string description = "Never fire on any Droid that is a member of our Faction.";
+					 
+					Condition.EVAL_TYPE eval = Condition.EVAL_TYPE.NOT_EQUALS;
+					string operandLeft = "faction";
+					string operandRight = "faction";  
+						
+					Condition condition = new Condition(name, description, currentKey, targetKey, eval, operandLeft, operandRight);
+											
+					r.Add(condition);
+
+					// Condition 2 == This Entity is not currently fighting us or one of our Allies in the arena
+					eval = Condition.EVAL_TYPE.EQUALS;
+					operandRight = "false";
+					
+					object[] delegateArgs = new object[]{currentKey, targetKey};
+					condition = new Condition(name, description, targetKey, currentKey, eval, IsCombatant, operandRight, delegateArgs);
+					r.Add(condition);
+					q.Add(r);
+					roePolicy.Add(q);
+			
+					SensorContact currentContact = contacts[j];
+					
+					//Console.WriteLine("DoTargetPrioritization - PRE- roePolicy.Execute()" );
+					if (roePolicy.Execute())
+					{
+						// Targets are those SensorContacts that friendly forces will potentially fire upon.
+						// Whereas SensorContacts is all contacts regardless of FoF status.
+						Target t = new Target();
+						t = current.GetTarget(currentContact.ContactEntityArrayIndex);
+						if (t.Equals(default(Target)))
+						{
+
+						}
+						else 
+						{
+							t.TargetedBy = Utils.ArrayAppend(t.TargetedBy, (int)i);       // other Ships/Vehciles/Entities, ground radars, factions, etc that are targeting this Target
+						}
+						t.EntityArrayIndex = currentContact.ContactEntityArrayIndex;
+						t.WeaponsAssigned = null;
+						t.Status = Target.STATUS.Active;
+						t.CrewStatus = Target.CREWSTATUS.Alive;
+						t.Hitpoints = 20;        // Boids[c.ContactIndex].Hitpoints; // max hitpoints of target... should a Sensor be able to know this exact number?  It's really just a game thing and maybe we should just use visual observations of condition of ship instead
+						t.CurrentHitPoints = 18; // Boids[c.ContactIndex].CurrentHP ; // used to determine % damage of Target
+
+						tacticalStation.Add(t);
+						Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY PASSED. Target added.");
+						
+					}
+					else
+					{
+						Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY FAILED.");
+					}
+				}
+			});
+			
+			
+			// a carrier with very few fighters remaining might be a low tactical threat
+			// but high strategic threat... 
+			// if a carrier is a primary mission objective that should increase its priority when scoring
+			
+			// a ship that is a primary target, but is not fleeing, can perhaps be scored lower since there will be time
+			// to target it later if there are more dangerous threats to deal with first.
+			// if a primary target is attempting to escape, the ETA that it will reach an escape trajectory should be used
+			// to wieght it's prioritization score
+			
+			// NPC non-jobs 
+			// - read
+			// - study for promotion
+			// - train for promotion
+			// - play cards, board games
+			// - socialize at cantina
+			// - meditate, spirtual seeking/studying
+			// - network with the crew
+			// - listen to music
+			// - play music/instrument
+			// - art (painting, sculpting, writing poetry, 
+			// - excercise, yoga, batleth*,  
+			// - sparring
+			// - theater (performances, orchestras, bands, etc)
+			// - nap/sleep
+			// Console.WriteLine("End target prioritization...");
+		}
+		
+		/// <summary>
+		/// Loop through all Components and set the Runtime flags that determine if this component/device is ready for use
+		/// NOTE: Using Data Oriented Processing takes some getting used to if you are more familiar with OOP where you iterate
+		/// through all Entities and update every aspect of that Entity all in once swoop before moving on to the next.
+		/// Here you will see, we update each Entity piecemeal, but we perform all the same piecemeal updates to each Entity
+		/// in one loop which is VERY cache friendly and yields supperior performance over the typical OOP method.
+		/// </summary>
+		private void DoDeviceReadyStatus()
+		{
+			return;
+			// TODO: fix indices and such
+			
+			ComponentStore<LifeForm> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
+			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
+			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
+				
+			// TODO: Do these .Is****  functions need to be setting mRuntimeFlags?
+			int count = (int)allTacticalStations.Count;
+            System.Threading.Tasks.Parallel.For(0, count, i => 		
+			{
+				
+				Boid droid = (Boid)EntryClass.bSim.Boids[allComponents.Span[(int)i].EntityArrayIndex];
+				
+				string errorReason;
+				if (allComponents.Span[(int)i].DoIsOperatorStatusCheckOK(out errorReason))
+				{
+					//int livingEntIndex;
+					//Memory<LivingEntity> livingEntity = (Memory<LivingEntity>) droid.GetUserStruct(typeof(LivingEntity), out livingEntIndex); //"HelloBoids.LivingEntity"); //();
+
+					if (allComponents.Span[(int)i].DoIsPowered(out errorReason))
+					{
+						if (allComponents.Span[(int)i].DoIsHealthyEnough(out errorReason))
+						{
+						}
+					}
+				}
+			});			
+		}
+		
+		private void DoStationCanActStatus()
+		{
+			ComponentStore<LifeForm> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
+			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
+			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
+			
+			int recordCount = (int)allTacticalStations.Count;
+            System.Threading.Tasks.Parallel.For(0, recordCount, i => 		
+			{
+				string errorReason;
+				if (allTacticalStations.Span[i].CanAct(out errorReason))
+				{
+					// TODO: Do these .Is****  functions need to be setting mRuntimeFlags?
+				
+				}
+			});
+		}
+		
+		
+		/// <summary>
+		/// based on policies
+		/// </summary>
+		private void DoEnableDisableSensors()
+		{
+			// TODO: this comment doesnt belong here, but for now remember
+			// HELM station would be influenced by Orders, Mission and Posture for example
+			// if ordered to defend another ship, helm would try to maneuver such that this ship
+			// is physically located between the ship-to-defend and a threat
+			
+			
+		}
+		
+		/// <summary>
+		/// A callback function for a Rule 'Condition.'
+		/// NOTE: If we need to use a callback function, there is no need to evaluate
+		///       a left and right 'operand' because it can all be done here using
+		///       the passed in object[] args.
+		/// </summary>
+		private bool IsCombatant(object[] args)
+		{
+			// todo: we need both the key of the tacticalstation (currently just the current Droid)
+			//       and the potential target contact key and index
+			Console.WriteLine("IsCombatant() - Begin Parse Keys");
+			string currentKey = (string)args[0];
+			string[] sp = currentKey.Split("_");
+			int currentEntityArrayIndex = int.Parse(sp[1]);
+			Console.WriteLine("IsCombatant() - Parsed Current index == " + currentEntityArrayIndex.ToString());
+			
+			string targetKey = (string)args[1];
+			sp = targetKey.Split("_");
+			int targetEntiyArrayIndex = int.Parse(sp[1]);
+			Console.WriteLine("IsCombatant() - Parsed Target index == " + targetEntiyArrayIndex.ToString());
+				
+			Boid B = (Boid)Boids[currentEntityArrayIndex];
+			
+			EntityNode tactical = GetTacticalStations(currentEntityArrayIndex)[0];    
+			// UserData data = tactical.BlackBoardData; // station operator
+					
+			
+			// the tacticalStation will have it's list of Contacts and Targets 
+			List<SensorContact> contacts = tactical.GetSensorContacts();
+			int count = 0;
+			if (contacts != null) 
+				count = contacts.Count;
+			
+			Console.WriteLine("IsCombatant() - tacticalStation '" + tactical.EntityKey + "' has '" + count + "' contacts.");
+			
+			for (int i = 0; i < count; i++)
+				if (contacts[i].ContactEntityArrayIndex == targetEntiyArrayIndex)
+				{
+				}
+						
+			return false;
+		}
+			
+		/// <summary>
+		/// based on policies
+		/// </summary>	
+		private double[] DoWeaponFitnessScores(EntityNode ship, EntityNode target)
+		{
+			//Console.WriteLine("DoWeaponFitnessScores()");
+			// NOTE: weapon fitness scores of friendlies can be combined into one table to 
+			// determine how to coordinate firepower on various ships during combat
+			
+			// todo: we should estimate min, average, and max damage that each weapon might have against a particular target
+			
+			if (ship == null || target == null) 
+			{
+				//Console.WriteLine("DoWeaponFitnessScores() - paramters 'ship' or 'target' is null.");
+				return null;
+			}
+			
+			// the different structs used for a "Laser" component 
+			//todo: i should pass the array of Memory<T> and the indices arrays
+			int componentIndex;
+			Memory<Component> component = (Memory<Component>)ship.GetUserStruct(typeof(Component), out componentIndex);
+			int wepIndex;
+			Memory<Weapon> wep = (Memory<Weapon>)ship.GetUserStruct(typeof(Weapon), out wepIndex);
+			int laserIndex; 
+			Memory<Laser_Struct> laser = (Memory<Laser_Struct>)ship.GetUserStruct(typeof(Laser_Struct), out laserIndex);
+			
+			// todo: we need just all the weapons from this particular ship.  
+			// ComponetStore<Weapon> would contain ALL for ALL ships
+			ComponentStore<Weapon> allWeapons = (ComponentStore<Weapon>)EntryClass.mCStoreCol.CheckOut<Weapon>(0);
+			
+			// return just the ones for this ship... maybe add a new function and not just GetView()
+			Memory<Weapon> allWeaponsForThisShip = null; // allWeapons.GetView(ship.SpanIndex); 
+
+			uint numRules = 3;
+			uint numWeapons = (uint)allWeaponsForThisShip.Span.Length;
+			double[] scores =  new double[numWeapons];
+			double[] weights = new double[numRules];
+				
+			weights[0] = 2;
+			weights[1] = 5;
+			weights[2] = 0;
+			
+			for (int i = 0; i < numWeapons; i++)
+			{
+				// todo:  is the weapon available? does it need to aim at target? has it been doing so already? time for turret to rotate towards target
+				if (allWeaponsForThisShip.Span[0].CoolDown_ == 0)  // if coolDown != 0 then the fitness score should just be 0?
+				{
+					scores[i] = 0;
+				}
+				else
+				{
+					scores[i] = (allWeaponsForThisShip.Span[0].Damage * weights[0]) * (laser.Span[0].PowerReqt * weights[1]);
+				}
+			}
+			
+			return scores;
+		}
+		
+		
+		private void DoWeaponsCanFire()
+		{
+			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
+			ComponentStore<Weapon> allWeapons  = EntryClass.mCStoreCol.CheckOut<Weapon>(0);
+			
+			// NOTE: we really want to avoid having to reference a Droid from the array as it 
+			//       impacts our cache coherency
+			//EntityNode ent = (EntityNode)EntryClass.bSim.Boids[droidIndex];
+			int recordCount = (int)allWeapons.Count;
+            System.Threading.Tasks.Parallel.For(0, recordCount, i => 		
+			{
+				string errorReason;
+				// TODO: timerID must consistantly use same struct LifeForm id or something else
+				EntityNode boid = Boids[allWeapons.Span[(int)i].EntityArrayIndex - BoidSimulation.LASER_OFFSET];
+				string entityKey = boid.EntityKey;
+				EntityNode weapon = Boids[allWeapons.Span[(int)i].EntityArrayIndex];
+				string weaponKey = weapon.EntityKey;
+				//Console.WriteLine ("DoWeaponsCanFire() - Weapon Entity Key = " + weaponKey);
+				
+				bool canFire = false;
+				
+				uint USER_RUNTIME_FLAG_1 = 1 << 0;
+				uint USER_RUNTIME_FLAG_2 = 1 << 1;
+				uint USER_RUNTIME_FLAG_3 = 1 << 2;
+				uint USER_RUNTIME_FLAG_4 = 1 << 3;
+				uint USER_RUNTIME_FLAG_5 = 1 << 4;
+				uint USER_RUNTIME_FLAG_6 = 1 << 5;
+				uint USER_RUNTIME_FLAG_7 = 1 << 6;
+				uint USER_RUNTIME_FLAG_8 = 1 << 7;
+				
+				uint USER_STRUCT_FLAG_1 = 1 << 0;
+				uint USER_STRUCT_FLAG_2 = 1 << 1;
+				uint USER_STRUCT_FLAG_3 = 1 << 2;
+				uint USER_STRUCT_FLAG_4 = 1 << 3;
+				uint USER_STRUCT_FLAG_5 = 1 << 4;
+				uint USER_STRUCT_FLAG_6 = 1 << 5;
+				uint USER_STRUCT_FLAG_7= 1 << 6;
+				uint USER_STRUCT_FLAG_8 = 1 << 7;
+				
+				bool flagValue = canFire;
+				
+				int componentIndex;
+				Memory<Component> compStruct = (Memory<Component>)weapon.GetUserStruct(typeof(Component), out componentIndex);
+				compStruct.Span[0].SetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
+				bool hasStruct = compStruct.Span[0].GetUserStructFlag(USER_STRUCT_FLAG_1);
+				compStruct.Span[0].SetUserRuntimeFlag(USER_RUNTIME_FLAG_1, flagValue);
+				bool hasRuntimeFlag = compStruct.Span[0].GetUserRuntimeFlag(USER_RUNTIME_FLAG_1);
+				
+				int weaponIndex;
+				Memory<Weapon> weaponStruct = (Memory<Weapon>)weapon.GetUserStruct(typeof(Weapon), out weaponIndex);
+				
+				//weaponStruct.Span[0].SetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
+				//bool hasStruct = weaponStruct.Span[0].GetUserStructFlag(USER_STRUCT_FLAG_1);
+				//weaponStruct.Span[0].SetUserRuntimeFlag(USER_RUNTIME_FLAG_1, flagValue);
+				//bool hasRuntimeFlag = weaponStruct.Span[0].GetUserRuntimeFlag(USER_RUNTIME_FLAG_1);
+				
+				try
+				{
+					// todo: is it better to use mIntervalTimers here than to implement checks elsewhere?
+					canFire = mIntervalTimers.IsReady(weaponKey, "droid_canfire");
+					//Console.WriteLine("DoWeaponsCanFire() - Droid " + weaponKey + " Can Fire = " + canFire.ToString());
+					if (canFire)
+					{	
+						//Console.WriteLine("DoWeaponsCanFire() - Droid " + weaponKey + " FIRING!!!");
+						// set the runtime flag
+						//bool suspend = true;  // we do not want this timer to start over until we start it again. <-- Wait, why?  Is this not just a cooldown?
+                		//mIntervalTimers.Reset(weaponKey, "droid_canfire", suspend);
+						mIntervalTimers.Reset(weaponKey, "droid_canfire");
+					}
+					
+					// set the GAME SPECIFIC runtime flag
+					// the runtime flags can only be in Entity or in Component.  It should not be in the various structs
+					// themselves, because it needs to affect ALL structs and we dont want to manage a copy of those across
+					// every flag OBVIOUSLY.
+					
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("DoWeaponsCanFire() - droid_canfire " + weaponKey + " key does not exist");
+				}
+				
+				// TODO: Do these .Is****  functions need to be setting mRuntimeFlags?
+			});
+		}
+		
 		/// <summary>
 		/// The resulting damage types and amounts (and duration for damage that can be applied overtime)
 		/// that occur on this successful hit.
@@ -3412,589 +3781,9 @@ namespace HelloBoids
 			return result;
         }
 
-		
-		/// <summary>
-		/// Called by UpdateClasses() regardless of whether Octree is used or not.
-		/// Called by Memory<T> ONLY if Octree is NOT used.  Otherwise it uses non-recursive Octree code within the DoFlocking() method.
-		/// </summary>
-        private List<int> GetNeighbors(Boid currentBoid, double largestDistance, double largestDistanceSquared)
-        {
-            List<int> neighbors = null;
-
-#if USE_MEMORY_T
-            /*   Func<int, int, double, Transform.Transform_Struct, Transform.Transform_Struct, bool> findNeighborsFunc = (index, referenceIndex, distanceSquared, boid, referenceBoid) =>
-             {
-                 if (index == referenceIndex)
-                     return false;
-
-                 if (Vector3d.GetDistance3dSquared(boid.Translation, referenceBoid.Translation) < distanceSquared)
-                     return true;
-
-                 return false;
-        };*/
-
-            Func<Transform, Transform, double, bool> ff = (boid, referenceBoid, distanceSquared) =>
-            {
-                if (boid == referenceBoid)
-                    return false;
-
-                if (Vector3d.GetDistance3dSquared(boid.Translation, referenceBoid.Translation) < distanceSquared)
-                    return true;
-
-                return false;
-            };
-#else
-            Func<Transform, Transform, double, bool> ff = (boid, referenceBoid, distanceSquared) =>
-            {
-                if (boid == referenceBoid)
-                    return false;
-
-                if (Vector3d.GetDistance3dSquared(boid.Translation, referenceBoid.Translation) < distanceSquared)
-                    return true;
-
-                return false;
-            };
-#endif
-
-            // SPATIAL SEARCH ///////////////////////////////////////////////////////////////////////////////////
-#if SPATIAL_SEARCH
-            //BoundingBox searchArea = new BoundingBox(currentBoid.Translation, largestDistance * 0.5d);
-			BoundingSphere searchSphere = new BoundingSphere(currentBoid.Translation, largestDistance * 0.5d);
-            Func<EntityNode, EntityNode, bool> match = (neighbor, current) =>
-            {
-                if (neighbor == current) return false;
-                // TODO: WE MUST CACHE span<T> and not access neighbor.Translation and current.Translation... we need to directly
-                 //        access the indices of the Span<T> here... otherwise its TOO SLOW
-                if (Vector3d.GetDistance3dSquared(neighbor.Translation, current.Translation) <= largestDistanceSquared) return true;
-                return false;
-            };
-
-#if USE_MEMORY_T
-			Console.WriteLine ("GetNeighbors - Memory<T> Using SpatialQueryLocal()");
-            ComponentStore<Transform.Transform_Struct> store = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
-			int currentInternalIndex = currentBoid.GetUserStructIndex(typeof(Transform.Transform_Struct));
-            List<EntityNode> found = SpatialQueryLocal(store.Span, currentBoid.SpatialNode, currentInternalIndex, largestDistanceSquared, true, searchSphere);
-
-#else
-            List<EntityNode> found = this.Octree.Query(currentBoid, true, searchArea, match);
-#endif
-
-            if (found == null || found.Count == 0) return null;
-			//Console.WriteLine("nc = " + found.Count.ToString());
-
-            neighbors = new List<int>(found.Count);
-            for (int j = 0; j < found.Count; j++)
-            {
-                neighbors.Add(found[j].EntityArrayIndex);
-            }
-
-#else      // NON-SPATIAL ASSISTED DISTANCE CHECK  ///////////////////////////////////////////////////////////////////////////////////                     
-			// Console.WriteLine ("GetNeighbors - Memory<T> NON SPATIAL LINQ CALL TO Boid.FindNeighbors() being used.");
-
-#if USE_MEMORY_T
-			//neighbors = Boid.FindNeighbors(store, numBoids, largestDistance, currentIndex, findNeighborsFunc);
-			try 
-			{
-				neighbors = Boid.FindNeighbors(this.Boids, largestDistanceSquared, currentBoid.SpanIndex, ff);
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine ("bSim.GetNeighbors() - Memory<T> - attempted to call Boid.FindNeighbors() - " + ex.Message);	
-			}
-#else
-#if USE_MEMORY_T == false
-            List<Boid> found = Boid.FindNeighbors(this.Boids, largestDistance, currentBoid.SpanIndex, ff);
-
-            if (found == null || found.Count == 0) return null;
-            neighbors = new List<int>(found.Count);
-            for (int j = 0; j < found.Count; j++)
-            {
-                neighbors.Add(found[j].Index);
-            }
-#else // DO NOT USE A NEIGHBOR FINDING FUNCTION, JUST BRUTE FORCE ALL BOIDS ///////////////////////////////////////////////////////////////////////////////////                     
-						
-	  // WARNING: iterating through ALL boids
-	  // for each CURRENT boid is O(n^2) and is too expensive
-	  //	neighors = allBoids;
-						
-#endif
-#endif
-#endif
-            // END NEIGHBOR SEARCH
-            return neighbors;
-        }
-
-
-		
-		private List<EntityNode> FindNearestTarget (EntityNode source, List<Tuple<int, double>> neighbors, out double[] distances)
-		{
-			distances = null;
-			if (neighbors == null || neighbors.Count == 0) return null;
-			
-			EntityNode[] tmp = new EntityNode[neighbors.Count];
-			distances = new double[neighbors.Count];
-					
-			ComponentStore<Transform.Transform_Struct> allTransforms = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
-	
-			for (int i = 0; i < neighbors.Count; i++)
-			{
-				int arrayIndex = allTransforms.Span[neighbors[i].Item1].EntityArrayIndex;
-				EntityNode currentTarget = Boids[arrayIndex];
-				distances[i] = Vector3d.GetDistance3dSquared(source.Translation, currentTarget.Translation); // allTransforms.Span[neighbors[i].Item1].Translation);
-				tmp[i] = currentTarget;
-				System.Diagnostics.Debug.Assert(source != currentTarget, "FindNearestTarget() - Target cannot be same as the Current Source Droid!");
-			}
-
-			// Sort 'the keys double[]' (distances) and rearrange associated data 'EntityNode[]' (results) accordingly
-			Array.Sort(distances, tmp);
-
-			return new List<EntityNode>(tmp);
-		}
-		
-		///<summary>
-		/// This is the target that the operator (either crew member or computer) of a Targeting Crew Station
-		/// will be attempting to fire upon.  
-		/// Return value is a List of Tuples containing the EntityNode and Distance to that Entity
-		/// </summary>
-		private List<Tuple<EntityNode, double>> FindNearestTarget (EntityNode source, double maxDistance)
-		{
-			BoundingBox searchArea = new BoundingBox (source.SpatialNode.BoundingBox.Center, maxDistance * 0.5d);
-			double maxDistanceSquared = maxDistance * maxDistance;
-			
-			Func<EntityNode, EntityNode, Tuple<bool, double>> match = (current, neighbor) =>            {
-                
-				if (current == neighbor) return new Tuple<bool, double>(false, -1);
-                double distanceSquared = Vector3d.GetDistance3dSquared(neighbor.Translation, current.Translation);
-				if (distanceSquared <= maxDistanceSquared) return new Tuple<bool, double>(true, distanceSquared);
-                return new Tuple<bool, double>(false, -1);
-            };
-			
-			List<Tuple<EntityNode, double>> found  = this.Octree.Query(source, true, searchArea, match);
-			if (found == null) return null;
-			
-			//Console.WriteLine("FindNearestTarget found count == " + found.Count.ToString());
-			return found;		
-		}
-		
-		///<summary>
-		/// This is the target that the operator (either crew member or computer) of a Targeting Crew Station
-		/// will be attempting to fire upon.  
-		/// Return value is a List of Tuples containing the EntityNode and Distance to that Entity
-		/// </summary>
-		private List<Tuple<EntityNode, double>> FindNearestTarget (EntityNode source, BoundingBox searchArea, Func<EntityNode, EntityNode, Tuple<bool, double>> match = null)
-		{
-			double maxDistanceSquared = searchArea.RadiusSquared; 
-			
-			if (match == null)
-			{
-				match = (current, neighbor) =>            {
-                
-				if (current == neighbor) return new Tuple<bool, double>(false, -1);
-                double distanceSquared = Vector3d.GetDistance3dSquared(neighbor.Translation, current.Translation);
-				if (distanceSquared <= maxDistanceSquared) return new Tuple<bool, double>(true, distanceSquared);
-                return new Tuple<bool, double>(false, -1);
-            	};
-			}
-			List<Tuple<EntityNode, double>> found  = this.Octree.Query(source, true, searchArea, match);
-			if (found == null) return null;
-			
-			//Console.WriteLine("FindNearestTarget found count == " + found.Count.ToString());
-			return found;		
-		}
-		
-		
-#if USE_MEMORY_T
-        private List<EntityNode> SpatialQueryLocal(Span<Transform.Transform_Struct> memSpan, OctreeOctant refSpatialNode, int refIndex, double distance, bool recurse, BoundingSphere searchSphere)
-        {
-            if (refSpatialNode == null) throw new ArgumentNullException("SpatialQueryLocal() - reference Entity cannot be null.");
-            //if (!refSpatialNode.BoundingBox.Intersects(searchArea)) return null; // early exit
-			if (refSpatialNode.BoundingSphere.Intersects(searchSphere) == IntersectResult.OUTSIDE) return null; // early exit
-	
-            List<EntityNode> results = new List<EntityNode>();
-
-            // ITERATIVE DEPTH-FIRST TRAVERSAL
-            Stack<OctreeOctant> stack = new Stack<OctreeOctant>();
-            stack.Push(refSpatialNode);
-
-            while (stack.Count > 0)
-            {
-                OctreeOctant current = stack.Pop();
-
-                if (current.EntityNodes != null)
-                {
-                    for (int i = 0; i < current.EntityNodes.Length; i++)
-                    {
-						int childInternalIndex = current.EntityNodes[i].GetUserStructIndex(typeof(Transform.Transform_Struct));
-						
-                        if (childInternalIndex == refIndex) continue;
-                        // TODO: WE MUST CACHE span<T> and not access neighbor.Translation and current.Translation... we need to directly
-                        //        access the indices of the Span<T> here... otherwise its TOO SLOW
-                        double calc = Vector3d.GetDistance3dSquared(memSpan[childInternalIndex].Translation, memSpan[refIndex].Translation);
-                        //System.Diagnostics.Debug.WriteLine("Calculated distance = " + calc.ToString());
-                        if (calc <= distance)
-                            results.Add(current.EntityNodes[i]);
-                    }
-                }
-
-                if (current.Children != null)
-                {
-                    for (int i = 0; i < current.Children.Length; i++)
-                        // NOTE: Each OctreeOctant's BoundingBox needs to be in World Space.
-						if (current.Children[i].BoundingSphere.Intersects(searchSphere) != IntersectResult.OUTSIDE)
-                        //if (current.Children[i].BoundingBox.Intersects(searchArea))
-                            stack.Push(current.Children[i]);
-                }
-            }
-
-
-
-            /*
-            // RECURSIVE DEPTH-FIRST TRAVERSAL
-            // NOTE: Each OctreeOctant's BoundingBox needs to be in World Space.
-            if (!refSpatialNode.BoundingBox.Intersects(searchArea))
-                return null;
-
-            // compare the distance of all Entities within this Octant
-            if ( refSpatialNode.EntityNodes != null)
-                for (int i = 0; i < refSpatialNode.EntityNodes.Length; i++)
-                {
-                    if (refSpatialNode.EntityNodes[i].SpanIndex == refIndex) continue;
-                    // TODO: WE MUST CACHE span<T> and not access neighbor.Translation and current.Translation... we need to directly
-                    //        access the indices of the Span<T> here... otherwise its TOO SLOW
-                    if (Vector3d.GetDistance3dSquared(memSpan[refSpatialNode.EntityNodes[i].SpanIndex].Translation, memSpan[refIndex].Translation) <= distance) 
-                        results.Add(refSpatialNode.EntityNodes[i]);
-                }
-
-            if (recurse)
-            {
-                if (refSpatialNode.Children != null)
-                {
-                    for (int j = 0; j < refSpatialNode.Children.Length; j++)
-                    {						
-                        List<EntityNode> nestedResults = SpatialQueryLocal(memSpan, refSpatialNode.Children[j], refIndex, distance, recurse, searchArea);
-                        if (nestedResults != null)
-                            results.AddRange(nestedResults);
-                    }
-                }
-            }
-            */
-
-            if (results.Count == 0) return null;
-            return results;
-        }
-#endif
-    
         
 #region Consumption and Production
 		
-		public void RegisterProduction (EntityNode entity, Production[] production)
-		{
-			if (production != null)
-				for (int i = 0; i < production.Length; i++)
-					 RegisterProduction(entity, production[i]);
-		}
-
-		private static System.Threading.SemaphoreSlim mProductionSemaphore = new System.Threading.SemaphoreSlim(1);
-		private static System.Threading.SemaphoreSlim mConsumptionSemaphore = new System.Threading.SemaphoreSlim(1);
-       	
-		public void RegisterProduction(EntityNode entity, Production p)
-        {
-		    try
-			{
-				mProductionSemaphore.Wait(-1);
-				uint productID = p.ProductID; 
-				//Console.WriteLine ("RegisterProduction()  - productID == " + productID.ToString());
-				
-				// NOTE: mLimitedProduction may not be necessary as we now track the NumUses for any given Production and if
-				//       p.NumUses == 0, then we remove that production at the end of UpdateProduction();
-				//if (limited)
-				//{
-				//	List<Production> production = mLimitedProduction.GetOrAdd(productID, (key) => new List<Production>());
-				//	mLimitedProduction[productID].Add(p);
-				//}
-				//else
-				//{
-	            	//List<Production> production = mProduction.GetOrAdd(productID, (key) =>  new List<Production>());
-            		ComponentStore<Production> production = mProduction.GetOrAdd (productID, (key) =>  EntryClass.mCStoreCol.CheckOut<Production>(EntryClass.NUM_ENTRIES, (int)p.ProductID));
-					Predicate<Production> productionForThisEntityAndProductAlreadyExists = x => x.ProductID == p.ProductID && x.ProducerEntityArrayIndex == p.ProducerEntityArrayIndex;
-					Production search = production.Find(productionForThisEntityAndProductAlreadyExists);
-				
-					if (search.Equals(default(Production)))
-					{
-						int index;
-						Memory<Production> mem = production.CheckOut(out index);
-						mem.Span[0] = p;
-						//Console.WriteLine("RegisterProduction() - PRODUCTION '" + ((PRODUCTS)productID).ToString() + "' REGISTERED>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
-						
-					}
-				
-				//}	
-			}
-			finally
-			{
-				mProductionSemaphore.Release();
-			}
-            // todo: ideally this ISimulation implementation should be in the EXE because we need to know the game specific productIDs and what they refer to
-            // todo: how and where is the Hz for each productID defined?  Perhaps its just the job of this Simulation implementation which should be implemented in the EXE, not Keystone.dll
-        }
-
-        public void RegisterConsumption(EntityNode entity, Consumption c)
-        {
-			try
-			{
-				mConsumptionSemaphore.Wait(-1);
-				uint productID = c.ProductID;
-				//Console.WriteLine ("RegisterConsumption()  - productID == " + productID.ToString());
-            	//List<Consumption> consumption = mConsumption.GetOrAdd (productID, (key) =>  new List<Consumption>());
-				ComponentStore<Consumption> consumption = mConsumption.GetOrAdd (productID, (key) =>  EntryClass.mCStoreCol.CheckOut<Consumption>(EntryClass.NUM_ENTRIES, (int)c.ProductID));
-				Predicate<Consumption> consumptionForThisEntityAndProductAlreadyExists = x => x.ProductID == c.ProductID && x.ConsumerEntityArrayIndex == c.ConsumerEntityArrayIndex;
-				Consumption search = consumption.Find(consumptionForThisEntityAndProductAlreadyExists);
-				
-				if (search.Equals(default(Consumption)))
-				{
-					int index;
-					Memory<Consumption> mem = consumption.CheckOut(out index);
-					mem.Span[0] = c;
-				}
-				else 
-					Console.WriteLine("RegisterConsumption() - Consumption '" + ((PRODUCTS)c.ProductID).ToString() + " for Entity " + c.ConsumerEntityArrayIndex + "' already exists.");
-			}
-			finally
-			{
-				mConsumptionSemaphore.Release();
-			}
-            // todo: ideally this ISimulation implementation should be in the EXE because we need to know the game specific productIDs and what they refer to
-            // todo: how and where is the Hz for each productID defined?  Perhaps its just the job of this Simulation implementation which should be implemented in the EXE, not Keystone.dll
-        }
-        
-		public void UnRegisterProduction(uint productID, EntityNode entity)
-        {
-			/*
-			int found = -1;
-			for (int i = 0; i < mProduction.Count; i++)
-				if (mProduction[productID][i].ProducerEntityArrayIndex == entity.EntityArrayIndex)
-				{
-					found = (int)i;
-					break;
-				}
-
-            mProduction[productID].Remove(mProduction[productID][(int)found]);
-			*/
-			
-			
-			
-        }
-
-        // TODO: when an Entity is detached from the Scene, it should be removed as a Consumer
-        public void UnRegisterConsumption(uint productID, EntityNode entity)
-        {
-			/*
-			int found = -1;
-			for (int i = 0; i < mConsumption.Count; i++)
-				if (mConsumption[productID][i].ConsumerEntityArrayIndex == entity.EntityArrayIndex)
-				{
-					found = (int)i;
-					break;
-				}
-
-            mConsumption[productID].Remove(mConsumption[productID][(int)found]);
-			
-			
-			
-			ComponentStore<Consumption> consumption;
-			bool foundf = mConsumption.TryGetValue(productID, out consumption);
-			
-			Predicate<Consumption> consumptionForThisEntityAndProductAlreadyExists = x => x.ProductID == c.ProductID && x.ConsumerEntityArrayIndex == c.ConsumerEntityArrayIndex;
-			Consumption search = consumption.Find(consumptionForThisEntityAndProductAlreadyExists);
-
-			if ()
-			{
-				int index;
-				Memory<Consumption> mem = consumption.CheckOut(out index);
-				mem.Span[0] = c;
-			}
-			else 
-				Console.WriteLine("RegisterConsumption() - Consumption '" + ((PRODUCTS)c.ProductID).ToString() + " for Entity " + c.ConsumerEntityArrayIndex + "' already exists.");
-			*/
-			
-        }
-
-        // TODO: when an Entity is detached from the Scene, it should be removed as a Producer
-        public void UnRegisterProducer(uint productID, EntityNode entity)
-        {
-            //mProducers[productID].Remove(entity);
-        }
-
-        // TODO: when an Entity is detached from the Scene, it should be removed as a Consumer
-        public void UnRegisterConsumer(uint productID, EntityNode entity)
-        {
-            //mConsumers[productID].Remove(entity);
-        }
-
-
-
-        //public KeyCommon.Simulation.Production_Delegate ForceProduction
-        //{
-        //    get { return mForceProduction;}
-        //}
-
-/*
-		public void AssignConsumptionHandler(string productID, Consumption_Delegate consumptionHandler)
-        {
-            if (mUserConsumption == null) mUserConsumption = new Dictionary<uint, Consumption_Delegate>();
-            mUserConsumption.Add(productionTypeFlag, consumptionHandler);
-        }
-
-
-        public void AssignProductionHandler(uint productID, Production_Delegate productionHandler)
-        {
-             // now then, as far as registering, i think that must occur
-            // when the entity is Activated, not here.  The entity itself
-            // can look at it's mProductionTypeFlags and register accordingly. 
-            // But there has to be a point to registering... what is the performance benefit?
-
-            // TODO: but what about production that is per entity?  are we ensuring that production is
-            // running properly based on the specific entity instance this script is attached to?
-
-             if (mUserProduction == null) mUserProduction = new Dictionary<uint, Production_Delegate>();
-             mUserProduction.Add(productID, productionHandler);
-        }
-
-		// TODO: these should be OBSOLETE since these should just be within DataProcessors even
-		//       if we use unique DataProcessors like DataProcessor mUserProduction; and DataProcessor mUserConsumption;
-		//       So during AILogic for instance, if a laser fires, we would produce a FireDamage and BurnDamage struct
-		//       and add those to the ComponentStores for <> affected (eg in range) Consumers of those respective productIDs
-		//       Any particular FireDamage may remain in the list of FireDamage.Records[] if the duration of the fire has not
-		//       expired.  
-		//       Similarly, gravity production of Jupiter would not need to be added to the Gravity.Records every frame 
-		//       
-        public Dictionary<uint, Production_Delegate> UserProduction
-        {
-            get { return mUserProduction; }
-        }
-
-        public Dictionary<uint, Consumption_Delegate> UserConsumption 
-        {
-            get { return mUserConsumption; }
-        }
-
-        //public void AddForceProduction(KeyCommon.Simulation.Production_Delegate productionHandler)
-        //{
-        //    mForceProduction = productionHandler;
-        //}
-*/
-		
-/*
-        private EntityNode[] GetProducers(uint productID)
-        {
-            if (mProducers == null) return null;
-            List<EntityNode> results;
-            mProducers.TryGetValue(productID, out results);
-
-            if (results == null) return null;
-
-            return results.ToArray();
-        }
-
-        private List<EntityNode> FindConsumers(EntityNode sourceEntity, uint productID)
-        {
-
-            return null;
-        }
-		
-*/
-
-		/*
-		// NOTE: mLimitedProduction may not be necessary as we now track the NumUses for any given Production and if
-		//       p.NumUses == 0, then we remove that production at the end of UpdateProduction();
-		private void UpdateLimitedProduction (GameTime gt)
-		{
-			uint productID = (uint)PRODUCTS.TargetingSkillModifier;
-		
-			
-			foreach (KeyValuePair<uint, List<Production>> entry in mLimitedProduction)
-			{	
-				productID = entry.Key;
-				List<Production> production = entry.Value;
-				
-				// March.10.2026 - Production now always occurs automatically without every needing to call Script.OnUpdate()
-				//                 because ALL Production and Consumption must be REGISTERED by the Scripts.  In the future
-				//                 we can always support dynamic insertion of PRODUCTION during a call to Script.OnUpdate() but
-				//                 this should not be used regularly because we do not want to have to force Script.OnUpdate() to
-				//                 be called everyframe since we've switched to using a DATA ORIENTED PROCESSING MODEL.
-				for (int i = 0; i < production.Count; i++)
-				{
-					// 2) Determine consumer distrubtion - find all valid consumers that match the terms of this production result
-					// TODO: FindConsumers is very slow.  I must not run that simulation each period for Zones that are beyond a certain range from player.
-					// TODO:  Verify that we are in fact running Production for entities in every zone we load.  That is a bug.
-					List<Consumption> consumers = mConsumption[productID];
-					if (consumers == null) continue;
-
-					// PRODUCTS.TargetingSkillModifier is generated by the OPERATOR (yes, for now still just a Skill assigned to each Droid, but eventually within KGB, it will apply to a crew member assigned to a Tactical Crew Station)
-					int[] distributionList = production[i].DistributionList;
-					if (distributionList ==  null) continue; // return if using parallel.For
-
-					// verify all Entities in the distribution list match an Entity in the registered consumers of this productID.
-					// NOTE: Just because a consumer is consuming the same ProductID, does NOT mean it's consuming the production of 
-					//       the current sourceEntity.  Consider a reactor that produces POWER, it may only power weapons and the engines
-					//       and a second Reactor or Auxillary power source provides energy for things like computers, sensors, etc even 
-					//       though it's the same PRODUCT ID.
-					try
-					{
-					if (distributionList.Length > 0)
-					{
-						for (int j = 0; j < distributionList.Length; j++)
-						{
-							//bool found = false;
-							//for (int k = 0; k < consumers.Count; k++)
-							//{
-								// NOTE: BEWARE  of using confusing mix of EntityIndex (Span[] index, and EntityArrayIndex which is Boids[] index)
-								//       In KGB this shouldn't be a problem since we wont have them both, but for this test harnass we do
-								//if (consumers[k].EntityIndex == distributionList[j])
-								//{
-									//found = true;
-
-									try
-									{
-										SkillModifier modifier = (SkillModifier)production[i].Value;
-
-										Consumption[] consumptionResult = new Consumption[distributionList.Length];
-										consumptionResult[j].TargetIndex = consumers[j].EntityIndex; // the entity that is consuming a product
-										consumptionResult[j].EntityIndex = production[i].EntityIndex; // the producer of the product that is being consumed by entity.ID == EntityID.
-										consumptionResult[j].ProductID = productID;          // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer.  Actually, I think we've modified this so that "PRODUCTS.HeatSignature" and "Products.HeatDamage" are two seperate products that may or may not both be consumed by any given Consumer.
-										consumptionResult[j].Value = modifier;
-										consumptionResult[j].Amount = modifier.Amount; // obsolete - maybe not? <- MichaelOliveTree Feb.25.2026 - OLD -> we use PropertySpec[] now with intrinsic types. // the Simulation EXE will know how to deal with UnitValue basedon ProductID.  This could also be "damage." 
-
-										mSkillModificationSystem.Add (consumptionResult[j]);
-									}
-									catch (Exception ex)
-									{
-										Console.WriteLine("......");
-									}
-									// the Modifier PRODUCTS.TargetingSkillModifier must be applied to the SKILLS.Targeting of the DROID's 'Crew Station'
-									//continue;
-								//}
-							//}
-							//if (!found) throw new ArgumentOutOfRangeException("Consumer is not registered.");
-						}
-					}	
-					} 
-					catch (Exception ex)
-					{
-						Console.WriteLine("UpdateProduction() - " + ex.Message);
-					}
-
-					// CONSIDER ProcessOpticalSensors()... we are essentially initiating the PRODUCTION
-					// of optical emission by taking all of the optical  producers (each Boid inside Boids[] array)
-					// and then doing a spatial search for all other Droids in range of that emission, we 
-					// create a OPTICAL_SIGNATURE that takes the form of a "contact" item and is transmitted
-					// back to the original emitter Droid's "eye" which  is an optical sensor and currently is stored in
-					// Dictionary<> mNeighbors;
-
-				}
-			}
-		}
-		*/
 	
 		private void ProcessPowerConsumption(ComponentStore<Consumption> consumptionStore, object[] parameters, int seed, GameTime gt)
 		{
@@ -4523,6 +4312,88 @@ namespace HelloBoids
 			}
 		}
 		
+	public interface ISimulationManager
+	{
+		void Subscribe();
+		void UnSubscribe();
+		
+		void Notify();
+		
+	}
+		
+		/// <summary>
+		/// This class should be a concrete implementation of Keystone.ISimulationEventManager that 
+		/// resides in Game01.dll for tracking all of the simulation specific
+		/// (game-play) events that occur during runtime.
+		///
+		/// This class serves three purposes:
+		/// 1) It logs simulation events
+		/// 2) It serves as a 'history' STORE of ALL simulation events
+		/// 3) It notifies subscribers of the EventManager of the various events that happen at runtime
+		///    to which they've subscribed.  For instance, the GUI can subscribe to various events.
+		/// </summary>
+		public class SimulationEventManager : ISimulationManager
+		{
+			// https://softwareengineering.stackexchange.com/questions/401800/c-design-question-about-a-specific-game-combat-implementation-with-a-event-sys
+			// OUR ENTITIES do support custom EVENTS... but those are more for property value changes
+			// and animation events...  This class is for high-level SIMULATION events like FIRING upon
+			// another vessel, a vessel being IMPACTED by a mine...
+			// Do we want to track every SECURITY event such as who accessed what doors and at what time?
+			// Which crew member or passenger passed by which point in this ship at what time...etc? YES ultimately...
+			//
+			// todo: this class should strive to work well with UserObjectStore for AI blackboard data.
+			// TODO: Thus, every event should probably be stored into buckets differentiated by entityKey
+			//       This means we do want to have calls like GetOwner(operatorID) or GetOwner(stationID)
+			//       or GetOwner(assemblyID)  to ultimately return the VEHICLE ID (aka DROID ID).
+			//       Otherwise there are too many EntityKeys potentially?  Hmm...
+			//       Consider if we want to find out if an encountered ship has previously fired upon a 
+			//       friendly ship, if we search for all instances of the SHIP (as owner) to which ANY 
+			//       of it's OPERATORS at ANY STATION using ANY WEAPON attacked a friendly craft, it should
+			//       return those relevant events.  It would be too difficult to search by OPERATOR and TIME
+			//       because the OPERATOR has to have served on the ship in question during the time a friendly
+			//       ship of ours was attacked.
+			public UserDataStore mUserDataStore;
+			
+			public SimulationEventManager(UserDataStore dataStore)
+			{
+				
+				mUserDataStore = dataStore;
+				
+			}
+			
+		#region ISimulationEventManager members
+			public void Subscribe()
+			{
+			}
+			public void UnSubscribe()
+			{
+			}
+			
+			public void Notify()
+			{
+				// notify all subscribers (observers) of those events
+				// that occurred since the previous Notify() and to which
+				// they are specifically subscribed
+				
+			}
+		#endregion
+				
+			//public event EventHandler<CombatEventArgs> CombatLog;
+
+			public void TakeDamage(string attacker, string target, int damage)
+			{
+				// Invoke event with variable arguments
+				//OnCombatLog(new CombatEventArgs("{0} dealt {1} damage to {2}!", attacker, damage, target));
+			}
+
+			//protected virtual void OnCombatLog(CombatEventArgs e)
+			//{
+			//	CombatLog?.Invoke(this, e);
+			//}
+		}
+		
+		
+		
 		public struct HealthSystem
 		{
 			public struct DamageResult
@@ -4704,6 +4575,150 @@ namespace HelloBoids
             // FormMainBase.SendNetMessage(msg)
 		}
 		
+		public void RegisterProduction (EntityNode entity, Production[] production)
+		{
+			if (production != null)
+				for (int i = 0; i < production.Length; i++)
+					 RegisterProduction(entity, production[i]);
+		}
+
+		private static System.Threading.SemaphoreSlim mProductionSemaphore = new System.Threading.SemaphoreSlim(1);
+		private static System.Threading.SemaphoreSlim mConsumptionSemaphore = new System.Threading.SemaphoreSlim(1);
+       	
+		public void RegisterProduction(EntityNode entity, Production p)
+        {
+		    try
+			{
+				mProductionSemaphore.Wait(-1);
+				uint productID = p.ProductID; 
+				//Console.WriteLine ("RegisterProduction()  - productID == " + productID.ToString());
+				
+				// NOTE: mLimitedProduction may not be necessary as we now track the NumUses for any given Production and if
+				//       p.NumUses == 0, then we remove that production at the end of UpdateProduction();
+				//if (limited)
+				//{
+				//	List<Production> production = mLimitedProduction.GetOrAdd(productID, (key) => new List<Production>());
+				//	mLimitedProduction[productID].Add(p);
+				//}
+				//else
+				//{
+	            	//List<Production> production = mProduction.GetOrAdd(productID, (key) =>  new List<Production>());
+            		ComponentStore<Production> production = mProduction.GetOrAdd (productID, (key) =>  EntryClass.mCStoreCol.CheckOut<Production>(EntryClass.NUM_ENTRIES, (int)p.ProductID));
+					Predicate<Production> productionForThisEntityAndProductAlreadyExists = x => x.ProductID == p.ProductID && x.ProducerEntityArrayIndex == p.ProducerEntityArrayIndex;
+					Production search = production.Find(productionForThisEntityAndProductAlreadyExists);
+				
+					if (search.Equals(default(Production)))
+					{
+						int index;
+						Memory<Production> mem = production.CheckOut(out index);
+						mem.Span[0] = p;
+						//Console.WriteLine("RegisterProduction() - PRODUCTION '" + ((PRODUCTS)productID).ToString() + "' REGISTERED>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+						
+					}
+				
+				//}	
+			}
+			finally
+			{
+				mProductionSemaphore.Release();
+			}
+            // todo: ideally this ISimulation implementation should be in the EXE because we need to know the game specific productIDs and what they refer to
+            // todo: how and where is the Hz for each productID defined?  Perhaps its just the job of this Simulation implementation which should be implemented in the EXE, not Keystone.dll
+        }
+
+        public void RegisterConsumption(EntityNode entity, Consumption c)
+        {
+			try
+			{
+				mConsumptionSemaphore.Wait(-1);
+				uint productID = c.ProductID;
+				//Console.WriteLine ("RegisterConsumption()  - productID == " + productID.ToString());
+            	//List<Consumption> consumption = mConsumption.GetOrAdd (productID, (key) =>  new List<Consumption>());
+				ComponentStore<Consumption> consumption = mConsumption.GetOrAdd (productID, (key) =>  EntryClass.mCStoreCol.CheckOut<Consumption>(EntryClass.NUM_ENTRIES, (int)c.ProductID));
+				Predicate<Consumption> consumptionForThisEntityAndProductAlreadyExists = x => x.ProductID == c.ProductID && x.ConsumerEntityArrayIndex == c.ConsumerEntityArrayIndex;
+				Consumption search = consumption.Find(consumptionForThisEntityAndProductAlreadyExists);
+				
+				if (search.Equals(default(Consumption)))
+				{
+					int index;
+					Memory<Consumption> mem = consumption.CheckOut(out index);
+					mem.Span[0] = c;
+				}
+				else 
+					Console.WriteLine("RegisterConsumption() - Consumption '" + ((PRODUCTS)c.ProductID).ToString() + " for Entity " + c.ConsumerEntityArrayIndex + "' already exists.");
+			}
+			finally
+			{
+				mConsumptionSemaphore.Release();
+			}
+            // todo: ideally this ISimulation implementation should be in the EXE because we need to know the game specific productIDs and what they refer to
+            // todo: how and where is the Hz for each productID defined?  Perhaps its just the job of this Simulation implementation which should be implemented in the EXE, not Keystone.dll
+        }
+        
+		public void UnRegisterProduction(uint productID, EntityNode entity)
+        {
+			/*
+			int found = -1;
+			for (int i = 0; i < mProduction.Count; i++)
+				if (mProduction[productID][i].ProducerEntityArrayIndex == entity.EntityArrayIndex)
+				{
+					found = (int)i;
+					break;
+				}
+
+            mProduction[productID].Remove(mProduction[productID][(int)found]);
+			*/
+			
+			
+			
+        }
+
+        // TODO: when an Entity is detached from the Scene, it should be removed as a Consumer
+        public void UnRegisterConsumption(uint productID, EntityNode entity)
+        {
+			/*
+			int found = -1;
+			for (int i = 0; i < mConsumption.Count; i++)
+				if (mConsumption[productID][i].ConsumerEntityArrayIndex == entity.EntityArrayIndex)
+				{
+					found = (int)i;
+					break;
+				}
+
+            mConsumption[productID].Remove(mConsumption[productID][(int)found]);
+			
+			
+			
+			ComponentStore<Consumption> consumption;
+			bool foundf = mConsumption.TryGetValue(productID, out consumption);
+			
+			Predicate<Consumption> consumptionForThisEntityAndProductAlreadyExists = x => x.ProductID == c.ProductID && x.ConsumerEntityArrayIndex == c.ConsumerEntityArrayIndex;
+			Consumption search = consumption.Find(consumptionForThisEntityAndProductAlreadyExists);
+
+			if ()
+			{
+				int index;
+				Memory<Consumption> mem = consumption.CheckOut(out index);
+				mem.Span[0] = c;
+			}
+			else 
+				Console.WriteLine("RegisterConsumption() - Consumption '" + ((PRODUCTS)c.ProductID).ToString() + " for Entity " + c.ConsumerEntityArrayIndex + "' already exists.");
+			*/
+			
+        }
+
+        // TODO: when an Entity is detached from the Scene, it should be removed as a Producer
+        public void UnRegisterProducer(uint productID, EntityNode entity)
+        {
+            //mProducers[productID].Remove(entity);
+        }
+
+        // TODO: when an Entity is detached from the Scene, it should be removed as a Consumer
+        public void UnRegisterConsumer(uint productID, EntityNode entity)
+        {
+            //mConsumers[productID].Remove(entity);
+        }
+
 		
 		#endregion
 
@@ -4733,336 +4748,6 @@ namespace HelloBoids
 	}
 	
 		
-	public enum PRODUCTS
-	{
-		None = 0,
-
-		ElectricalPower,
-
-		// Fuels
-
-
-		// Emissions and Signatures
-		OpticalReflection,    // aka: VisibleLightReflection,  camoflauge can reduce this "reflection" 
-		MicrowaveReflection,
-		MicrowaveEmission,
-		
-		// Damage Types
-		MicrowaveDamage = 1024,
-		FireDamage,
-		PlasmaFireDamage,
-		VaccumDamage,
-		RadiationDamage,
-		PressureDamage,   // eg too deep underwater or within a Gas Giant's atmosphere
-
-		CommandBoost = 2048,
-		MoraleBoost,   // like all modifiers, this too can actually be either negative or positive
-		Fatigue,
-		
-		
-		// Skill Modifiers
-		TacticalOperationsSkillModifier = 4096,
-		TargetingSkillModifier,
-
-		Haggling
-	}
-
-
-			 
-	
-	public enum SKILLS
-	{
-		HelmOperations,
-		TacticalOperations,
-		Piloting,
-		Targeting,
-		Engineering,
-		SensorOperations,
-
-		Command,
-		Morale
-	}
-
-	public enum PRODUCT_DISTRIBUTION_TYPE
-	{
-		SingleItem = 0,
-		List,
-		Region,
-		Zone,
-		BoundingSphere,
-		BoundingBox,
-		BoundingCone,
-		PlanedHull
-	}
-	
-	
-	
-	// TODO: Im not sure I need seperate Consumption and PowerConsumer 
-	//                            and    Production  and PowerProducer
-	//       Mostly I think, its so we can have a general struct for ALL 
-	//       sorts of Production... not just electrical power.
-	//       If we need production of Morale, Fatigue, Heat, Gamma Radiation, etc
-	//       then all of these can use the same struct... 
-		
-		
-	/*
-	Electromigration: The gradual movement of metal atoms in a semiconductor caused by electric current, leading to open or short circuits.
-	Thermal Cycling/Fatigue: Damage caused by expansion and contraction due to heat, leading to cracked solder joints.
-	Capacitor Degradation: Electrolytic capacitors "drying out" or leaking, a very common failure mode.
-	Corrosion: Oxidation of connectors and traces caused by moisture and air.
-	Oxidation: The loss of electrons in metal components, causing degradation.
-	Planned Obsolescence: A strategic design choice for a product to become unusable within a set time. 
-
-	How Electronics Wear Out:
-	Mechanical Wear: Parts that physically move, such as fans, hard drives, or button contacts, degrade due to friction.
-	Chemical Degradation: Capacitors can lose their charge capacity or break down, and battery performance fades over time.
-	Thermal Stress: Excessive heat can cause brittle fractures, warping of boards, or damage to components. 
-
-	Common Indicators of Wear:
-	Performance Reduction: Reduced battery life and slower performance.
-	Cosmetic Issues: Corrosion of metal parts, loosening of connectors, or damage to components.
-	Intermittent Failures: Components failing sporadically before complete breakdown. 
-
-	Relevant Concepts:
-	Bathtub Curve: Describes the likelihood of failures over time, which are high at the beginning ("infant mortality") and high at the end ("wearout period").
-	Software Rot: The gradual decline of software usability over time without modification. 
-	*/
-
-		
-	public struct Production
-    {
-		public uint ProductID;
-		
-		// todo: should i have a frequency or Hz?  Gravitation would be at Physics frequency, but other's should be 1 hz or every 1000 ms
-		// production is not serialized to XML because they are created by the scripts in code
-		public int ProducerEntityArrayIndex;
-		public int ProducerEntityInternalIndex;  
-		 // In turn, the Producing Entity needs an index to this Production's index... and in fact, a list of all the Production indices it has registered.
-		
-		// cached list of Consumers indices from ComponentStore<Consumer> we're sending ProductID to.  
-		// For DistributionMode.List or .Item this array does NOT need to be recomputed as it would if
-		// a Search() was required to find Consumers within a certain range or volume each frame.
-		// Those are typically more used for things like Heat and Radiation from an Explosion prefab
-		// and NOT for ElectricalPower production for instance.
-		public int[] Consumers;  
-		//public int[] DistributionList;  // <-- same as Consumers
-		public bool Breaker;
-		
-		public object Value;  // for Thrust, this would be a 'Vector3d'.  For damage, an 'int', for electrical power a 'double',  for radar echos, UnitValue is a Vector3d position, for SkillModifiers, it can contain a SkillModifier struct.
-		public double Store; // infinite = -1, else number of unit's that are available to be consumed by Consumers this Production will be distributed too
-		
-		public double Duration;
-		public double StartTime;
-		public int NumUses; // a radiation producing bomb may only produce damage for 3 turns before it dissipates.
-		public float CooldownBetweenUses;
-
-		
-		// SingleItem, List, Region, Zone, BoundingSphere, BoundingBox, BoundingCone,  PlanedHull
-		public PRODUCT_DISTRIBUTION_TYPE DistributionMode; 
-		// public Func<Production, string, bool> DistributionFilterFunc; // accepts Production and an EntityID and returns true if the test is passed
-		// used when DistributionType is List.  Contains id of entities consuming this product.  
-		// No searches (spatial or otherwise) reqt. "power links" and other "links" are good examples of their use.
-
-		// can then use SearchReferenceEntity.BoundingBox, .BoundingSphere, BoundingCone with DistributionMode is a spatial search of some kind.
-		public object SearchReferenceEntity;   // since this struct is stored in ComponentStore<Production> we do NOT have to worry about boxing when casting the Memory<T> to a struct
-		//[obsolete] public Vector3d Position; // Position of Primitive where this production occurred (eg. explosion, heat signature, etc)?  A radiation bomb or any explosion will need it's Position(Location) set so we can determine the falloff/attenuation of the damage, 
-		//[obsolete] public Vector3d Size;        // taken from SearchReferenceEntity.BoundingBox/Sphere
-		//[obsolete] public Vector3d Velocity;    // taken from SearchReferenceEntity.Velocity 
-		//[obsolete] public Vector3d Acceleration;
-		
-		
-		// PrimitiveTransformBehavior - none (stay the same), expand (positive scaling), contract (negative scaling), translate, rotate
-		// PrimitiveStrengthBehavior - fade, intensify
-		
-		// BehaviorGradient/Attenuation/Falloff
-	}
-		
-	
-	// consumption is more charged with the algorithm for computing how much consumption
-	// of the particular product the Entity will use.  This includes everything from 
-	// consuming damage or gravity to consuming electricity, water or fuel.
-	// It will take into account modifiers such as "stealth" to determine consumption if any. 
-	// For instance, a "microwaves" consumption could result in 0 consumption if the distance between
-	// producer and consumer is too great or there is an applicable "stealth" modifier
-
-	//  It will also take into account modifiers from the crew operator at a station for example.
-
-	// TODO: should our Consumption_Delegate return "ConsumptionResult" so that these changes
-	// can be sent to other players over the network?
-
-	// details information about how much this device will consume.  This is returned
-	// when Consumption delegate is invoked in a script for a particular entity.
-	// todo: maybe we should think of this as ConsumptionResults and host all the changes that need to be applied to the target entities
-	//       so we could include an array of PropertySpec and corresponding nodeIDs
-
-		
-		
-	public struct Consumption // todo: rename this to ConsumptionResult
-	{
-		public uint ProductID;     // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer
-		
-		// Consumption here is really PRODUCT CONSUMPTION RESULT struct that gets filled so that
-		// other players in the networked game can receive the "results" of 
-		// having consumed a product
-		// NOTE: There is no reference to which Enity provided the PRODUCTION... is this ok?  If during a Data Oriented Processor
-		//       pass multiple Producers contributed to the Conumption result, then we would need an array of Producers...
-		//       I think it's best to not worry about this yet.  This is NOT really ConsumptionResult, it's Consumption 
-		//       "Value" and "Amount" settings for how much to receive from a Producer, assuming the producer can supply the entire amount.
-		public int ConsumerEntityArrayIndex; // in KGB this would be the Entity.ID or GUID of the Consuming Entity
-		public int ConsumerInternalIndex; // the index into the Memory<T> of the entity that is consuming a product.
-		                                  // In turn, the Consuming Entity needs an index to this Consumption's index... and in fact, a list of all the Consumption indices it has registered.
-		
-		// public int[] Producers;  // list of Producers indices from ComponentStore<Producer> we're receiving ProductID from.
-			
-		public bool Breaker;
-		
-		public object Value;  // for Thrust, this would be a 'Vector3d'.  For damage, an 'int', for electrical power a 'double', 
-		public int Amount; // the number of Units to draw from the relevant Producer.  The Simulation EXE will know how to deal with UnitValue based on ProductID.  This could also be "damage." 
-		
-		//public string TargetID; // NOTE: this does mean that an entity performing consumption can change properties of other nodes and not just itself. Typically though, its only for entities within a single ship hierarchy from Exterior to Interior components
-		public PropertyOperation[] Operations; // <-- operation is how to apply the Value and Amount... eg... do we add, subtract, multiply, divide... etc
-		
-		
-		
-		// PROPERTIES is probably obsolete because the DataProcessors we assign will know exactly what properties to edit.  
-		//   These DataProcessors can be assigned to methods in Scripts or methods in Game01.dll 
-		
-		
-//       public Settings.PropertySpec[] Properties; // todo: what about HelmState and TacticalState properties? Well, "tacticalstate" and "helmstate" are properties in the ship.css and they are serializable over the wire.
-		// todo: do we need to be able to send this over the wire with NetBuffer Read and Write?
-		// todo: we should probably need to know whether the property values are meant to replace, increment, or decrement the existing value.  "store" is a good example. If we're multithreaded, we might need to lock each node before we apply changes
-		//       I could include an array of int[] operation; that is same length and specifiy 0=replace, 1=increment and 2= decrement, 3 = add array element, 4 = remove array element
-		// todo: maybe instead of seperate objects like HelmState and NavPoints we just use regular custompropertyspec for each member.  This will make it easier for ConsumptionResult handling without keystone.dll needing to know anything about those custom types.
-		// todo: well first, lets just use PropertySpec with intrinsic types.  
-		
-	}
-
-	
-		
-	// a producer that if providing continuous electrical power, IF it registers a Production item
-	// it must replenish that item at the beginning of every tick correct?
-		
-	// an item that is "used" and creates a Production like an LightEmission from a laser
-	// then, that Production is not continuous and only needs to be enabled/disabled... does 
-	// it need a refeence to the Laser?  Or does the "production" have all the data it needs
-	// maybe it has a reference to the PowerProducer?
-	// What about a LightEmission?  That clearly has no dependancy to the Laser except maybe
-	// the distance between the laser and the target it hits.
-	//
-	
-		
-		public enum ModificationEffect // equivalent to distributionMode for Production
-		{
-			Individual,
-			List,
-			Party,
-			Area,
-			Region,
-			Faction
-		}
-
-	
-	public struct SkillModifier
-	{ 
-		public int ProducerEntityArrayIndex; 
-		public PRODUCTS Product;  // modifiers are a type of PRODUCT for instance PRODUCT.MoraleBoost
-		public SKILLS SkillToTarget;      // the skill that will be affected eg Skill.Morale
-		public bool Enabled;
-		public int Amount;         // can be negative or positive e.g  +1 Morale
-		public int NumUses;
-		public float CooldownBetweenUses;
-	}
-	
-	// TODO: an Operator that has for example a targeting skill, (see struct LivingEntity)
-	//       will "PRODUCE" a bonus for that crew station every update.  It does not require
-	//       an "Update()" function within a script, it only needs the type of PRODUCTION defined
-	//       and registered via the Scripting API.  
-	public struct Skill
-	{
-		public SKILLS SkillType;
-		public int Level;     			// the level of this skill
-		public int BaseValue; 
-		public int EffectiveValue;
-		
-		// These are modifiers that this Skill struct naturally PRODUCES 
-		// (as in PRODUCTION and as in, modifiers that are built in to this specific Skill). 
-		// These are NOT external modifiers that are added to this Skill!
-	//	public SkillModifier[] Modifiers; 
-		public SkillModifier[] Production;
-		
-		
-		//public int Value()
-		//{
-		//	int result = BaseValue;
-			
-			//if (Modifiers != null)
-		//}
-		
-		/*
-		public void AddModifier(int producerIndex, PRODUCTS product, int amount, bool enabled = true, int numUses = -1)
-		{
-			SkillModifier m;
-			m.EntityIndex = producerIndex;
-			m.SkillToTarget = SkillType;
-			m.Enabled = enabled;
-			m.Product = product;
-			m.Amount = amount;
-			m.NumUses = numUses;
-			
-			AddModifier(m);
-		}
-		
-		public void AddModifier(SkillModifier modifier)
-		{
-			int length = 0;
-			
-			if (Modifiers == null)
-				Modifiers = new SkillModifier[1];
-			else
-			{
-				length = Modifiers.Length;
-				SkillModifier[] tmp = Modifiers;
-				Modifiers.CopyTo(tmp, 0);
-				
-				Modifiers = new SkillModifier[length];
-			}
-			
-			Modifiers[length] = modifier;
-		}
-		*/
-		
-		public void AddProduction(int producerEntityArrayIndex, PRODUCTS product, int amount, bool enabled = true, int numUses = -1)
-		{
-			SkillModifier m;
-			m.ProducerEntityArrayIndex = producerEntityArrayIndex;
-			m.SkillToTarget = SkillType;
-			m.Enabled = enabled;
-			m.Product = product;
-			m.Amount = amount;
-			m.NumUses = numUses;
-			m.CooldownBetweenUses = 1; // 1 second
-			AddProduction(m);
-		}
-		
-		public void AddProduction(SkillModifier modifier)
-		{
-			int length = 0;
-			
-			if (Production == null)
-				Production = new SkillModifier[1];
-			else
-			{
-				length = Production.Length;
-				SkillModifier[] tmp = Production;
-				Production.CopyTo(tmp, 0);
-				
-				Production = new SkillModifier[length];
-			}
-			
-			Production[length] = modifier;
-		}
-	}
-	
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // BEGIN BOIDS
 	// The Boid class is influenced by the Boid code from the following GitHub repository.  Primarily, the 
@@ -5091,112 +4776,7 @@ namespace HelloBoids
 			// bounding box in World Space which is probably not what we want for KGB Entity but only for KGB EntityNode (which is derived from SceneNode and used for hierarchical bbox structure)
             _box = new BoundingBox(Translation,  BOID_WIDTH);
         }
-		
-		
-		#region SensorContacts and Target manipulation belongs in SCRIPTS ULTIMATELY
-			
-			// NOTE: This is horribly inefficient because it just iterates t hrough all EntityNodes to find the
-			//       one "Sensor" that has the expected EntityKey that starts with "sensor_" and otherwise has same number part as this Droid's mID
-		public EntityNode[] GetSensors()
-		{
-			if (EntryClass.bSim.Boids == null) return null;
-			
-			int arrayIndex = this.EntityArrayIndex;
-			
-			//int numPartOfKeyBOID = int.Parse(EntryClass.bSim.Boids[arrayIndex].EntityKey.Split("_")[1]);
-			int numPartOfKeyEYES =  arrayIndex + BoidSimulation.OPTICAL_SENSOR_OFFSET; // int.Parse(EntryClass.bSim.Boids[arrayIndex + 1].EntityKey.Split("_")[1]);
-			
-			string sensorKeyForThisBoid = "sensor_" + numPartOfKeyEYES.ToString();
-
-			System.Diagnostics.Debug.Assert(sensorKeyForThisBoid == EntryClass.bSim.Boids[numPartOfKeyEYES].EntityKey);
-			return new EntityNode[] {EntryClass.bSim.Boids[numPartOfKeyEYES]};
-			
-			// NOTE: the below isn't necessary.  
-			// NOTE: previously when this loop was failing it was because the Key I was searching for "sensor_###" 
-			//       could NEVER possibly exist because the arrayIndex for the associated sensor to a given boid is
-			//       always arrayIndex + 1.  There is a sensor_111 for example, but never a sensor_110 that is just 1 less.
-			//       They always are in increments of 2, same with the boid's indexArrays too.
-			List<EntityNode> found = new List<EntityNode>();
-			for (int i = 0; i < EntryClass.bSim.Boids.Count; i++)
-			{
-				if (EntryClass.bSim.Boids[i] == null) continue; 
-				Console.WriteLine("looping -- sensor key == " + EntryClass.bSim.Boids[i].EntityKey);
-				if (EntryClass.bSim.Boids[i].EntityKey == sensorKeyForThisBoid)
-				{
-					found.Add(EntryClass.bSim.Boids[i]);
-					System.Diagnostics.Debug.Assert (EntryClass.bSim.Boids[i] == EntryClass.bSim.Boids[numPartOfKeyEYES]);
-				}
-			}
-			
-			Console.WriteLine("GetSensors() - Call Complete.  # of Sensors found == " + found.Count.ToString());
-			if (found.Count == 0) return null;
-			
-			return found.ToArray();
-		}
-		
-		public EntityNode[] GetWeapons()
-		{
-			if (EntryClass.bSim.Boids == null) return null;
-			
-			int arrayIndex = this.EntityArrayIndex;
-			
-			int numPartOfKey =  arrayIndex + BoidSimulation.LASER_OFFSET; 
-			string keyForThisBoid = "laser_" + numPartOfKey.ToString();
-
-			System.Diagnostics.Debug.Assert(keyForThisBoid == EntryClass.bSim.Boids[numPartOfKey].EntityKey);
-			return new EntityNode[] {EntryClass.bSim.Boids[numPartOfKey]};
-		}
-		
-		public EntityNode[] GetTacticalStations()
-		{
-			if (EntryClass.bSim.Boids == null) return null;
-			
-			int arrayIndex = this.EntityArrayIndex;
-			
-			int numPartOfKey =  arrayIndex + BoidSimulation.TACTICAL_STATION_OFFSET; 
-			string keyForThisBoid = "tacticalstation_" + numPartOfKey.ToString();
-
-			System.Diagnostics.Debug.Assert(keyForThisBoid == EntryClass.bSim.Boids[numPartOfKey].EntityKey);
-			return new EntityNode[] {EntryClass.bSim.Boids[numPartOfKey]};
-			
-			// NOTE: the below isn't necessary.  
-			// NOTE: previously when this loop was failing it was because the Key I was searching for "sensor_###" 
-			//       could NEVER possibly exist because the arrayIndex for the associated sensor to a given boid is
-			//       always arrayIndex + 1.  There is a sensor_111 for example, but never a sensor_110 that is just 1 less.
-			//       They always are in increments of 2, same with the boid's indexArrays too.
-			List<EntityNode> found = new List<EntityNode>();
-			for (int i = 0; i < EntryClass.bSim.Boids.Count; i++)
-			{
-				if (EntryClass.bSim.Boids[i] == null) continue; 
-				Console.WriteLine("looping -- tactical station key == " + EntryClass.bSim.Boids[i].EntityKey);
-				if (EntryClass.bSim.Boids[i].EntityKey == keyForThisBoid)
-				{
-					found.Add(EntryClass.bSim.Boids[i]);
-					System.Diagnostics.Debug.Assert (EntryClass.bSim.Boids[i] == EntryClass.bSim.Boids[numPartOfKey]);
-				}
-			}
-			
-			Console.WriteLine("GetTacticalStations() - Call Complete.  # of Tactical Stations found == " + found.Count.ToString());
-			if (found.Count == 0) return null;
-			
-			return found.ToArray();
-		}
-		
-		public EntityNode[] GetTacticalStationOperators()
-		{
-			if (EntryClass.bSim.Boids == null) return null;
-			
-			int arrayIndex = this.EntityArrayIndex;
-			
-			int numPartOfKey =  arrayIndex + BoidSimulation.HUMAN_OPERATOR_OFFSET; 
-			string keyForThisBoid = "human_operator_" + numPartOfKey.ToString();
-
-			System.Diagnostics.Debug.Assert(keyForThisBoid == EntryClass.bSim.Boids[numPartOfKey].EntityKey);
-			return new EntityNode[] {EntryClass.bSim.Boids[numPartOfKey]};
-		}
-		
-	#endregion
-			
+	
 			
 	#region ShouldBeInEntityScript_NotHERE_ButCantRunScriptsFromWebCSharpCompiler
 		private void OnInitializeEntity()
@@ -5916,7 +5496,7 @@ return (0,0);
         {
             mArrayIndex = arrayIndex;				
 			mID = entityKey;
-			mUserData = EntryClass.mCStoreUserData.CheckOut(mID);
+			mUserData = EntryClass.mUserDataStore.CheckOut(mID);
 				
 			Skills = new Dictionary<SKILLS, Skill>();		
         }
@@ -6058,7 +5638,7 @@ return (0,0);
 			   
 			   // todo: verify this.Index should not be this.ID (a string) in KGB Entity.cs since
 			   //       maintaining the "Index" within a ComponentStore<> will be needlessly complicated
-			   EntryClass.mCStoreUserData.CheckIn(this.mID, mUserData);
+			   EntryClass.mUserDataStore.CheckIn(this.mID, mUserData);
 			   mIsDisposed = true;
 		   }   
         }
@@ -7222,15 +6802,15 @@ return (0,0);
 
         #endregion
     }
-	////////////////////////////////////////////////////////////////////////////////////////////////
-    // END NODES
-	
+////////////////////////////////////////////////////////////////////////////////////////////////
+// END NODES
+////////////////////////////////////////////////////////////////////////////////////////////////	
 
 	
 	
 ////////////////////////////////////////////////////////////////////////////////////////////////
 #region Policy Rules
-	
+////////////////////////////////////////////////////////////////////////////////////////////////	
 			
 		// POLICIES AND RULES 
 		// todo: the ai captain needs a "mission" or "objectives" for each mission
@@ -7791,7 +7371,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
 		public Statistics(string key)
 		{
-			mBlackboardData = EntryClass.mCStoreUserData.CheckOut(key);
+			mBlackboardData = EntryClass.mUserDataStore.CheckOut(key);
 			
 			// lets say a Ship is detected and we want to check if it has fired upon any friendly 
 			// recently.  Friendly means any Ship that is of the same "faction."
@@ -7849,11 +7429,350 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			}
 		}
 	}
-			
+////////////////////////////////////////////////////////////////////////////////////////////////
 #endregion   //Rules, Queries, Policies, Conditions
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
+	
+	
+////////////////////////////////////////////////////////////////////////////////////////////////
+#region PRODUCTION AND CONSUMPTION
+	////////////////////////////////////////////////////////////////////////////////////////////////
+	public enum PRODUCTS
+	{
+		None = 0,
 
+		ElectricalPower,
+
+		// Fuels
+
+
+		// Emissions and Signatures
+		OpticalReflection,    // aka: VisibleLightReflection,  camoflauge can reduce this "reflection" 
+		MicrowaveReflection,
+		MicrowaveEmission,
+		
+		// Damage Types
+		MicrowaveDamage = 1024,
+		FireDamage,
+		PlasmaFireDamage,
+		VaccumDamage,
+		RadiationDamage,
+		PressureDamage,   // eg too deep underwater or within a Gas Giant's atmosphere
+
+		CommandBoost = 2048,
+		MoraleBoost,   // like all modifiers, this too can actually be either negative or positive
+		Fatigue,
+		
+		
+		// Skill Modifiers
+		TacticalOperationsSkillModifier = 4096,
+		TargetingSkillModifier,
+
+		Haggling
+	}
+
+
+			 
+	
+	public enum SKILLS
+	{
+		HelmOperations,
+		TacticalOperations,
+		Piloting,
+		Targeting,
+		Engineering,
+		SensorOperations,
+
+		Command,
+		Morale
+	}
+
+	public enum PRODUCT_DISTRIBUTION_TYPE
+	{
+		SingleItem = 0,
+		List,
+		Region,
+		Zone,
+		BoundingSphere,
+		BoundingBox,
+		BoundingCone,
+		PlanedHull
+	}
+	
+	
+	
+	// TODO: Im not sure I need seperate Consumption and PowerConsumer 
+	//                            and    Production  and PowerProducer
+	//       Mostly I think, its so we can have a general struct for ALL 
+	//       sorts of Production... not just electrical power.
+	//       If we need production of Morale, Fatigue, Heat, Gamma Radiation, etc
+	//       then all of these can use the same struct... 
+		
+		
+	/*
+	Electromigration: The gradual movement of metal atoms in a semiconductor caused by electric current, leading to open or short circuits.
+	Thermal Cycling/Fatigue: Damage caused by expansion and contraction due to heat, leading to cracked solder joints.
+	Capacitor Degradation: Electrolytic capacitors "drying out" or leaking, a very common failure mode.
+	Corrosion: Oxidation of connectors and traces caused by moisture and air.
+	Oxidation: The loss of electrons in metal components, causing degradation.
+	Planned Obsolescence: A strategic design choice for a product to become unusable within a set time. 
+
+	How Electronics Wear Out:
+	Mechanical Wear: Parts that physically move, such as fans, hard drives, or button contacts, degrade due to friction.
+	Chemical Degradation: Capacitors can lose their charge capacity or break down, and battery performance fades over time.
+	Thermal Stress: Excessive heat can cause brittle fractures, warping of boards, or damage to components. 
+
+	Common Indicators of Wear:
+	Performance Reduction: Reduced battery life and slower performance.
+	Cosmetic Issues: Corrosion of metal parts, loosening of connectors, or damage to components.
+	Intermittent Failures: Components failing sporadically before complete breakdown. 
+
+	Relevant Concepts:
+	Bathtub Curve: Describes the likelihood of failures over time, which are high at the beginning ("infant mortality") and high at the end ("wearout period").
+	Software Rot: The gradual decline of software usability over time without modification. 
+	*/
+
+		
+	public struct Production
+    {
+		public uint ProductID;
+		
+		// todo: should i have a frequency or Hz?  Gravitation would be at Physics frequency, but other's should be 1 hz or every 1000 ms
+		// production is not serialized to XML because they are created by the scripts in code
+		public int ProducerEntityArrayIndex;
+		public int ProducerEntityInternalIndex;  
+		 // In turn, the Producing Entity needs an index to this Production's index... and in fact, a list of all the Production indices it has registered.
+		
+		// cached list of Consumers indices from ComponentStore<Consumer> we're sending ProductID to.  
+		// For DistributionMode.List or .Item this array does NOT need to be recomputed as it would if
+		// a Search() was required to find Consumers within a certain range or volume each frame.
+		// Those are typically more used for things like Heat and Radiation from an Explosion prefab
+		// and NOT for ElectricalPower production for instance.
+		public int[] Consumers;  
+		//public int[] DistributionList;  // <-- same as Consumers
+		public bool Breaker;
+		
+		public object Value;  // for Thrust, this would be a 'Vector3d'.  For damage, an 'int', for electrical power a 'double',  for radar echos, UnitValue is a Vector3d position, for SkillModifiers, it can contain a SkillModifier struct.
+		public double Store; // infinite = -1, else number of unit's that are available to be consumed by Consumers this Production will be distributed too
+		
+		public double Duration;
+		public double StartTime;
+		public int NumUses; // a radiation producing bomb may only produce damage for 3 turns before it dissipates.
+		public float CooldownBetweenUses;
+
+		
+		// SingleItem, List, Region, Zone, BoundingSphere, BoundingBox, BoundingCone,  PlanedHull
+		public PRODUCT_DISTRIBUTION_TYPE DistributionMode; 
+		// public Func<Production, string, bool> DistributionFilterFunc; // accepts Production and an EntityID and returns true if the test is passed
+		// used when DistributionType is List.  Contains id of entities consuming this product.  
+		// No searches (spatial or otherwise) reqt. "power links" and other "links" are good examples of their use.
+
+		// can then use SearchReferenceEntity.BoundingBox, .BoundingSphere, BoundingCone with DistributionMode is a spatial search of some kind.
+		public object SearchReferenceEntity;   // since this struct is stored in ComponentStore<Production> we do NOT have to worry about boxing when casting the Memory<T> to a struct
+		//[obsolete] public Vector3d Position; // Position of Primitive where this production occurred (eg. explosion, heat signature, etc)?  A radiation bomb or any explosion will need it's Position(Location) set so we can determine the falloff/attenuation of the damage, 
+		//[obsolete] public Vector3d Size;        // taken from SearchReferenceEntity.BoundingBox/Sphere
+		//[obsolete] public Vector3d Velocity;    // taken from SearchReferenceEntity.Velocity 
+		//[obsolete] public Vector3d Acceleration;
+		
+		
+		// PrimitiveTransformBehavior - none (stay the same), expand (positive scaling), contract (negative scaling), translate, rotate
+		// PrimitiveStrengthBehavior - fade, intensify
+		
+		// BehaviorGradient/Attenuation/Falloff
+	}
+		
+	
+	// consumption is more charged with the algorithm for computing how much consumption
+	// of the particular product the Entity will use.  This includes everything from 
+	// consuming damage or gravity to consuming electricity, water or fuel.
+	// It will take into account modifiers such as "stealth" to determine consumption if any. 
+	// For instance, a "microwaves" consumption could result in 0 consumption if the distance between
+	// producer and consumer is too great or there is an applicable "stealth" modifier
+
+	//  It will also take into account modifiers from the crew operator at a station for example.
+
+	// TODO: should our Consumption_Delegate return "ConsumptionResult" so that these changes
+	// can be sent to other players over the network?
+
+	// details information about how much this device will consume.  This is returned
+	// when Consumption delegate is invoked in a script for a particular entity.
+	// todo: maybe we should think of this as ConsumptionResults and host all the changes that need to be applied to the target entities
+	//       so we could include an array of PropertySpec and corresponding nodeIDs
+
+		
+		
+	public struct Consumption // todo: rename this to ConsumptionResult
+	{
+		public uint ProductID;     // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer
+		
+		// Consumption here is really PRODUCT CONSUMPTION RESULT struct that gets filled so that
+		// other players in the networked game can receive the "results" of 
+		// having consumed a product
+		// NOTE: There is no reference to which Enity provided the PRODUCTION... is this ok?  If during a Data Oriented Processor
+		//       pass multiple Producers contributed to the Conumption result, then we would need an array of Producers...
+		//       I think it's best to not worry about this yet.  This is NOT really ConsumptionResult, it's Consumption 
+		//       "Value" and "Amount" settings for how much to receive from a Producer, assuming the producer can supply the entire amount.
+		public int ConsumerEntityArrayIndex; // in KGB this would be the Entity.ID or GUID of the Consuming Entity
+		public int ConsumerInternalIndex; // the index into the Memory<T> of the entity that is consuming a product.
+		                                  // In turn, the Consuming Entity needs an index to this Consumption's index... and in fact, a list of all the Consumption indices it has registered.
+		
+		// public int[] Producers;  // list of Producers indices from ComponentStore<Producer> we're receiving ProductID from.
+			
+		public bool Breaker;
+		
+		public object Value;  // for Thrust, this would be a 'Vector3d'.  For damage, an 'int', for electrical power a 'double', 
+		public int Amount; // the number of Units to draw from the relevant Producer.  The Simulation EXE will know how to deal with UnitValue based on ProductID.  This could also be "damage." 
+		
+		//public string TargetID; // NOTE: this does mean that an entity performing consumption can change properties of other nodes and not just itself. Typically though, its only for entities within a single ship hierarchy from Exterior to Interior components
+		public PropertyOperation[] Operations; // <-- operation is how to apply the Value and Amount... eg... do we add, subtract, multiply, divide... etc
+		
+		
+		
+		// PROPERTIES is probably obsolete because the DataProcessors we assign will know exactly what properties to edit.  
+		//   These DataProcessors can be assigned to methods in Scripts or methods in Game01.dll 
+		
+		
+//       public Settings.PropertySpec[] Properties; // todo: what about HelmState and TacticalState properties? Well, "tacticalstate" and "helmstate" are properties in the ship.css and they are serializable over the wire.
+		// todo: do we need to be able to send this over the wire with NetBuffer Read and Write?
+		// todo: we should probably need to know whether the property values are meant to replace, increment, or decrement the existing value.  "store" is a good example. If we're multithreaded, we might need to lock each node before we apply changes
+		//       I could include an array of int[] operation; that is same length and specifiy 0=replace, 1=increment and 2= decrement, 3 = add array element, 4 = remove array element
+		// todo: maybe instead of seperate objects like HelmState and NavPoints we just use regular custompropertyspec for each member.  This will make it easier for ConsumptionResult handling without keystone.dll needing to know anything about those custom types.
+		// todo: well first, lets just use PropertySpec with intrinsic types.  
+		
+	}
+
+	
+		
+	// a producer that if providing continuous electrical power, IF it registers a Production item
+	// it must replenish that item at the beginning of every tick correct?
+		
+	// an item that is "used" and creates a Production like an LightEmission from a laser
+	// then, that Production is not continuous and only needs to be enabled/disabled... does 
+	// it need a refeence to the Laser?  Or does the "production" have all the data it needs
+	// maybe it has a reference to the PowerProducer?
+	// What about a LightEmission?  That clearly has no dependancy to the Laser except maybe
+	// the distance between the laser and the target it hits.
+	//
+	
+		
+		public enum ModificationEffect // equivalent to distributionMode for Production
+		{
+			Individual,
+			List,
+			Party,
+			Area,
+			Region,
+			Faction
+		}
+
+	
+	public struct SkillModifier
+	{ 
+		public int ProducerEntityArrayIndex; 
+		public PRODUCTS Product;  // modifiers are a type of PRODUCT for instance PRODUCT.MoraleBoost
+		public SKILLS SkillToTarget;      // the skill that will be affected eg Skill.Morale
+		public bool Enabled;
+		public int Amount;         // can be negative or positive e.g  +1 Morale
+		public int NumUses;
+		public float CooldownBetweenUses;
+	}
+	
+	// TODO: an Operator that has for example a targeting skill, (see struct LivingEntity)
+	//       will "PRODUCE" a bonus for that crew station every update.  It does not require
+	//       an "Update()" function within a script, it only needs the type of PRODUCTION defined
+	//       and registered via the Scripting API.  
+	public struct Skill
+	{
+		public SKILLS SkillType;
+		public int Level;     			// the level of this skill
+		public int BaseValue; 
+		public int EffectiveValue;
+		
+		// These are modifiers that this Skill struct naturally PRODUCES 
+		// (as in PRODUCTION and as in, modifiers that are built in to this specific Skill). 
+		// These are NOT external modifiers that are added to this Skill!
+	//	public SkillModifier[] Modifiers; 
+		public SkillModifier[] Production;
+		
+		
+		//public int Value()
+		//{
+		//	int result = BaseValue;
+			
+			//if (Modifiers != null)
+		//}
+		
+		/*
+		public void AddModifier(int producerIndex, PRODUCTS product, int amount, bool enabled = true, int numUses = -1)
+		{
+			SkillModifier m;
+			m.EntityIndex = producerIndex;
+			m.SkillToTarget = SkillType;
+			m.Enabled = enabled;
+			m.Product = product;
+			m.Amount = amount;
+			m.NumUses = numUses;
+			
+			AddModifier(m);
+		}
+		
+		public void AddModifier(SkillModifier modifier)
+		{
+			int length = 0;
+			
+			if (Modifiers == null)
+				Modifiers = new SkillModifier[1];
+			else
+			{
+				length = Modifiers.Length;
+				SkillModifier[] tmp = Modifiers;
+				Modifiers.CopyTo(tmp, 0);
+				
+				Modifiers = new SkillModifier[length];
+			}
+			
+			Modifiers[length] = modifier;
+		}
+		*/
+		
+		public void AddProduction(int producerEntityArrayIndex, PRODUCTS product, int amount, bool enabled = true, int numUses = -1)
+		{
+			SkillModifier m;
+			m.ProducerEntityArrayIndex = producerEntityArrayIndex;
+			m.SkillToTarget = SkillType;
+			m.Enabled = enabled;
+			m.Product = product;
+			m.Amount = amount;
+			m.NumUses = numUses;
+			m.CooldownBetweenUses = 1; // 1 second
+			AddProduction(m);
+		}
+		
+		public void AddProduction(SkillModifier modifier)
+		{
+			int length = 0;
+			
+			if (Production == null)
+				Production = new SkillModifier[1];
+			else
+			{
+				length = Production.Length;
+				SkillModifier[] tmp = Production;
+				Production.CopyTo(tmp, 0);
+				
+				Production = new SkillModifier[length];
+			}
+			
+			Production[length] = modifier;
+		}
+	}
+	#endregion // PRODUCTION AND CONSUMPTION
+	////////////////////////////////////////////////////////////////////////////////////////////////
+	
+	
+	
+	
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// STRUCTS AND IENTITYSYSTEMS
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -8173,9 +8092,12 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		Fine,
 		VeryFine				
 	}
-		
-	
-	
+#endregion  // Game01.GameObjects
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+#region USER STRUCTS
+////////////////////////////////////////////////////////////////////////////////////////////////
 	[Flags]
 	public enum CONFIGURATION : uint
 	{
@@ -9006,10 +8928,13 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
 		public bool CanFire(out string errorReason)
 		{
-			EntityNode weapoon = EntryClass.bSim.Boids[this.EntityArrayIndex]; // an actual Boid but for now, we think of it as dedicated Station Component Entity
+			EntityNode weapoon = EntryClass.bSim.Boids[this.EntityArrayIndex]; 
 			errorReason = null;
 			bool result = true;
 
+			
+			
+			
 			return true;
 		}
     }
@@ -9270,7 +9195,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 
     }
 
-	#endregion // Game01.GameObjects
+	#endregion // USER STRUCTS 
 
     public interface IEntitySystem
     {
@@ -20324,7 +20249,6 @@ public abstract class PlanedFrustum
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // BEGIN MEMORY STORES
 
-
 	public class Seeds
 	{
 		private int mMaster;
@@ -20595,8 +20519,6 @@ public abstract class PlanedFrustum
 
             return tmp;
         }
-
-		
     }
 
 

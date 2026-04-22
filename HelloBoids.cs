@@ -7610,7 +7610,7 @@ return (0,0);
 					System.Diagnostics.Debug.Assert (context != null, "Context is not null.");
 					left = context[mConditions[i].LeftEntityKey].GetString(mConditions[i].OperandLeft);
 					right = context[mConditions[i].RightEntityKey].GetString(mConditions[i].OperandRight);  
-					Console.WriteLine("Condition.Evaluate() - LEFT IS A DELEGATE --> LEFT == " + left + " RIGHT == " + right);
+					//Console.WriteLine("Condition.Evaluate() - LEFT ENTITY '" + mConditions[i].LeftEntityKey + "' KEY == " + left + " RIGHT ENTITY '" + mConditions[i].RightEntityKey + "' KEY == " + right);
 				}
 				
 				switch (mConditions[i].mEvalType)

@@ -2024,6 +2024,173 @@ namespace HelloBoids
 
 #if USE_MEMORY_T
 		
+	
+		private static System.Threading.SemaphoreSlim mSort = new System.Threading.SemaphoreSlim(1);
+		
+		/// <summary>
+		/// This is mostly just creating 'SensorContact' from "neighbors" .... based on policies
+		/// </summary>
+		private void CreateContactListFromAdjacents()
+		{
+			if (mNeighbors.Count == 0) return;
+			//Console.WriteLine("DoContactListSorting() - STARTING");
+			
+			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
+			int recordCount = (int)allTacticalStations.Count;
+
+            System.Threading.Tasks.Parallel.For(0, recordCount, i => 		
+			{
+				// NOTE: problem with the BOOLEAN version of this Configuration test is, we want to test for Boid configuration and ONLY Boid configuration
+				//       and not another Configuration such as HumanOperatorConfiguration which CONTAINS all of BoidConfiguration  but LOGICALLY OR's "|" CONFIGURATION.Sentient as well 
+				//       and so it WILL pass the BOOLEAN version of this test.  Thus solution is a DIRECT == compare.  Duh!
+				if (allTacticalStations.Span[(int)i].Configuration != TacticalStationConfiguration)
+				//if ((allTacticalStations.Span[(int)i].Configuration & BoidConfiguration) != BoidConfiguration)
+				{
+					//Console.WriteLine("configuration = " + allTransforms.Span[(int)i].Configuration.ToString());
+					return;
+				}	
+				
+				int currentStationArrayIndex = allTacticalStations.Span[(int)i].EntityArrayIndex; // current.EntityArrayIndex; //  current.GetUserStructIndex(typeof(Transform.Transform_Struct));
+				//System.Diagnostics.Debug.Assert( (int)i == currentArrayIndex, "DoContactListSorting() - array index does not match...");
+				// the adjacnets that are stored in neighbors from the overall mNeighbors is very much stores Area of Interest for each Droid
+				// but we will only send them things that their sensors can detect (and "eyes" are treated as optical sensors)
+				//Console.WriteLine ("DoContactListSorting() - Key for current == " + Boids[currentArrayIndex].EntityKey);
+				
+				// TODO: Should we be iterating over the 'TacticalStation' struct's and NOT the Boids array? and then getting the SensorContacts from it?
+				//       we could skip any TacticalStation that is not designated as PRIMARY TacticalStation
+				
+				EntityNode currentStation = Boids[currentStationArrayIndex]; // <-- if we can get the Sensors without having to get the current Boid... hmm...
+				System.Diagnostics.Debug.Assert(currentStation.EntityKey.Contains("tactical"), "ProcessOpticalSensors() - Entity is NOT a TacticalStation.");
+				
+				int currentBoidArrayIndex = currentStation.EntityArrayIndex - TACTICAL_STATION_OFFSET;
+				Boid currentBoid = (Boid)Boids[currentBoidArrayIndex];
+				
+				//Console.WriteLine ("2");
+				EntityNode[] sensorEntities = currentBoid.GetSensors(); // todo: we currently do  not have EntityNode allowing adding of child nodes.  This is needed next.
+				
+				int sensorsCount = 0;
+				if (sensorEntities != null) sensorsCount = sensorEntities.Length;
+				//Console.WriteLine("CreateContactListFromAdjacents() - Sensor Count == " + sensorsCount);
+				if (sensorEntities == null) return; 
+				
+				//Console.WriteLine ("4");
+				
+				// grab the neighbors/adjacents for this Droid.  The returned parameter List<Tuple<int, double>> tells us which Droid (int) index was detected and the (double) distance to it  
+				List<Tuple<int, double>> neighbors = null;
+				
+				//Console.WriteLine("CreateContactListFromAdjacents() - Looking for Neighbors at Array Index  == " + currentArrayIndex.ToString());
+				//foreach (int key in mNeighbors.Keys)
+				//	Console.WriteLine ("Key == " + key.ToString());
+				
+				bool success = mNeighbors.TryGetValue(currentBoidArrayIndex, out neighbors);
+								
+				//Console.WriteLine("DoContactListSorting() - Found '" + neighbors.Count.ToString() + "' Adjacents for Droid @ Array Index == '" + currentArrayIndex.ToString() + "' ");
+				List<SensorContact> contacts = new List<SensorContact>();
+				
+				//Console.WriteLine("CreateContactListFromAdjacents - 1");
+				
+				// iterate through all the potential "contacts"
+				for (int j = 0; j < neighbors.Count; j++)
+				{			
+					contacts.Clear();
+					ComponentStore<Transform.Transform_Struct> allTransforms  = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
+					
+					double distanceSquared = neighbors[(int)j].Item2;
+					int potentialContactsInternalTransformIndex = neighbors[(int)j].Item1; 
+					int potentialContactsEntityArrayIndex = allTransforms.Span[potentialContactsInternalTransformIndex].EntityArrayIndex;
+			  
+					//Console.WriteLine("CreateContactListFromAdjacents - 2");
+					// Iterate through all the Sensors the current Droid is using to see which ones might
+					// detect this potential contact.  This is why a "SensorContact" may already exist
+					// in the List<SensorContact> 'contacts'  because multiple Sensors on _the_same_ship_
+					// might detect this adjacent 'contact.'
+					for (int k = 0; k < sensorEntities.Length; k++)
+					{
+						int sensorStructIndex = -1;
+						Memory<Sensor> sensorStruct = (Memory<Sensor>)sensorEntities[k].GetUserStruct(typeof(Sensor), out sensorStructIndex);
+						int sensorArrayIndex = sensorStruct.Span[0].EntityArrayIndex;
+						
+						double sensorRangeSquared = sensorStruct.Span[0].RangeSquared;
+						
+						//Console.WriteLine("CreateContactListFromAdjacents() - Range = " +  sensorRangeSquared.ToString() + " Distance to Contact ==  " + Math.Sqrt(distanceSquared).ToString());
+						
+						if (sensorRangeSquared >= distanceSquared)
+						{
+							SensorContact c;
+
+							// if another sensor on this same vehicle has detected this potential contact already, append it's Sensor index
+							// to the list of SensorIndices for this contact so we know all sensors that detected it.
+							Predicate<SensorContact> contactExists = contact => contact.ContactEntityArrayIndex == potentialContactsEntityArrayIndex;
+							c = contacts.Find(contactExists);
+
+							if (!c.Equals(default(SensorContact)))
+							{
+								//Console.WriteLine("CreateContactListFromAdjacents() - sensor contact name == " + c.Name);
+								if (c.SensorsIndices == null) 
+									c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices,  sensorArrayIndex); // sensorStructIndex);
+								else
+									c.SensorsIndices.Append(sensorArrayIndex); // sensorStructIndex);
+
+								//Console.WriteLine("DoContactListSorting() - Appending SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
+							}
+							else // contact has not yet already been detected by another Sensor within this same ship during this loop through all sensors on this same ship
+							{
+								c = new SensorContact();
+
+								//Console.WriteLine("DoContactListSorting() - Creating NEW SensorContact of Droid at Array Index = '" + contactsEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
+								Boid bb = null;
+								try 
+								{
+									bb =  (Boid)this.Boids[potentialContactsEntityArrayIndex];
+								}
+								catch (Exception ex)
+								{
+									Console.WriteLine("DoContactListSorting() - ERROR: Boid contact at Array Index == " + c.ContactEntityArrayIndex.ToString() + " not found. " + ex.Message);
+								}
+
+								//Console.WriteLine ("9");
+								//int sensorContactInternalTransformIndex = bb.GetUserStructIndex(typeof(Transform.Transform_Struct));
+								// contact details are needed to find the correct SensorContact to potentially merge with an existing SensorContact for this detected Entity
+								// NOTE: HelloBoids should only have one element within its SensorsIndices
+								//       because each Droid only has one Sensor ('Optical Sensor' == eyes)
+								c.ContactEntityArrayIndex = potentialContactsEntityArrayIndex; // index within the Boid[] array of the detected Droid
+								c.Index = (int)i;
+								c.Name =  "boid_" + potentialContactsEntityArrayIndex.ToString(); // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
+								c.RegistryNumber = c.Name;
+								c.Type = SensorContact.TYPE.Drone;
+								c.ContactStatus = Target.STATUS.Unknown;
+								c.FriendOrFoe = SensorContact.FoF.Unknown;
+								c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices, sensorArrayIndex); //sensorStructIndex);
+								
+								// telemetry
+								SensorContact.ContactTelemetry t;
+								t.Radius = (float)bb.BoundingBox.Radius;    // how might size be spoofed?
+								t.Position = bb.Translation;
+								t.Velocity = bb.Velocity;
+								t.DistanceSquared = distanceSquared;
+								t.Heading = 0;
+								t.TimeAcquired = Utils.NowTicks(); // todo: this needs to eventually just be gt.Ticks <-- which must come from 'gametime fixedstep' and not 'real-time'
+								t.TimeLast = t.TimeAcquired;
+
+								c.Add(t);			
+								contacts.Add(c);
+								//Console.WriteLine("DoContactListSorting() - Added NEW SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
+							}
+						} // end sensor range check
+					} // end for SensorsCount
+				} // end for neihbors Count
+				
+
+				// add all of the SensorContacts to the current TacticalStation, and it will be responsible for
+				// properly merging these SensorContacts with existing ones so as to maintain
+				// proper SensorContact histories for all detected Entities.
+				if (contacts != null)
+					currentStation.Add(contacts); 
+			});
+			
+			//Console.WriteLine("DoContactListSorting() - COMPLETED.");
+		}
+		
 		/// <summary>
 		/// Seed would typically be Seeds.Local_Droid_Logic + mCurrentFrame;
 		/// </summary>
@@ -2031,8 +2198,7 @@ namespace HelloBoids
 		{
 			//Console.WriteLine("Do_Droid_Logic() - BEGIN ");
 			ThreadedRandom random = new ThreadedRandom(seed);
-			
-	
+		
 			// todo: we could pass in an array of store to our Processor functions... rather than just one.
 			//       but it would have to be an array of object[] like parameters and we'd have to cast them
 			// OR, our various processors can just grab the Stores that are needed.  There's no need really to 
@@ -2289,6 +2455,127 @@ namespace HelloBoids
 			// we need results going over the network
 		}
 		
+		
+		/// <summary>
+		/// based on policies
+		/// </summary>
+		private void DoTargetPrioritization()
+		{
+			//Console.WriteLine("DoTargetPrioritization");
+			int count = Boids.Count;
+            System.Threading.Tasks.Parallel.For(0, count, i => 		
+			{
+				if (Boids[i] is Boid == false) return;
+				
+				Boid current = (Boid)Boids[i];
+				
+				//int stationID = current.GetTacticalStations()[0]; 
+				EntityNode tacticalStation = current.GetTacticalStations()[0]; //(EntityNode)Boids[stationID];
+				
+				//Console.WriteLine("DoTargetPrioritization - for TacticalStatin '" + tacticalStation.EntityKey + "'");
+				
+				List<SensorContact> contacts = tacticalStation.GetSensorContacts();
+				if (contacts == null || contacts.Count == 0) return;
+								
+				//List<Target> targets = tacticalStation.GetTargets();
+				tacticalStation.ClearTargets();
+								
+				for (int j = 0; j < contacts.Count; j++)
+				{
+					// entityKey will usually be the ID of the target Entity (aka Droid or Ship).  But not always.  Sometimes it may be our own ship.  It depends on the specific rule.			
+					string targetKey = "boid_" + contacts[j].ContactEntityArrayIndex.ToString();
+					string currentKey = "boid_" + i.ToString();
+					
+					Policy roePolicy = new Policy();
+					Query q = new Query(EntryClass.mCStoreUserData);
+
+					Rule r = new Rule("ROE - Friendly Fire", "Earth Alliance Directive 209 states Captains must not fire on Friendly forces.");
+
+					// Condition 1 == in Spawn() we randomly assign each Boid to either 'Red' or 'Blue' factions.
+					string name = "Never fire on Same Faction";
+					string description = "Never fire on any Droid that is a member of our Faction.";
+					 
+					Condition.EVAL_TYPE eval = Condition.EVAL_TYPE.NOT_EQUALS;
+					string operandLeft = "faction";
+					string operandRight = "faction";  
+						
+					Condition condition = new Condition(name, description, targetKey, eval, operandLeft, operandRight);
+											
+					r.Add(condition);
+
+					// Condition 2 == This Entity is not currently fighting us or one of our Allies in the arena
+					eval = Condition.EVAL_TYPE.EQUALS;
+					operandRight = "false";
+					
+					object[] delegateArgs = new object[]{currentKey, targetKey};
+					condition = new Condition(name, description, targetKey, eval, IsCombatant, operandRight, delegateArgs);
+					r.Add(condition);
+					q.Add(r);
+					roePolicy.Add(q);
+			
+					SensorContact currentContact = contacts[j];
+					
+					//Console.WriteLine("DoTargetPrioritization - PRE- roePolicy.Execute()" );
+					if (roePolicy.Execute())
+					{
+						Console.WriteLine("DoTargetPrioritization() - Rules of Engagement execute completed... preparing to add Target.");
+						// Targets are those SensorContacts that friendly forces will potentially fire upon.
+						// Whereas SensorContacts is all contacts regardless of FoF status.
+						Target t = new Target();
+						t = current.GetTarget(currentContact.ContactEntityArrayIndex);
+						if (t.Equals(default(Target)))
+						{
+
+						}
+						else 
+						{
+							t.TargetedBy = Utils.ArrayAppend(t.TargetedBy, (int)i);       // other Ships/Vehciles/Entities, ground radars, factions, etc that are targeting this Target
+						}
+						t.EntityArrayIndex = currentContact.ContactEntityArrayIndex;
+						t.WeaponsAssigned = null;
+						t.Status = Target.STATUS.Active;
+						t.CrewStatus = Target.CREWSTATUS.Alive;
+						t.Hitpoints = 20;        // Boids[c.ContactIndex].Hitpoints; // max hitpoints of target... should a Sensor be able to know this exact number?  It's really just a game thing and maybe we should just use visual observations of condition of ship instead
+						t.CurrentHitPoints = 18; // Boids[c.ContactIndex].CurrentHP ; // used to determine % damage of Target
+
+						tacticalStation.Add(t);
+						Console.WriteLine("DoTargetPrioritization() - Rules of Engagement execute completed... Target added.");
+					}
+					else
+					{
+						Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY FAILED.");
+					}
+				}
+			});
+			
+			
+			// a carrier with very few fighters remaining might be a low tactical threat
+			// but high strategic threat... 
+			// if a carrier is a primary mission objective that should increase its priority when scoring
+			
+			// a ship that is a primary target, but is not fleeing, can perhaps be scored lower since there will be time
+			// to target it later if there are more dangerous threats to deal with first.
+			// if a primary target is attempting to escape, the ETA that it will reach an escape trajectory should be used
+			// to wieght it's prioritization score
+			
+			// NPC non-jobs 
+			// - read
+			// - study for promotion
+			// - train for promotion
+			// - play cards, board games
+			// - socialize at cantina
+			// - meditate, spirtual seeking/studying
+			// - network with the crew
+			// - listen to music
+			// - play music/instrument
+			// - art (painting, sculpting, writing poetry, 
+			// - excercise, yoga, batleth*,  
+			// - sparring
+			// - theater (performances, orchestras, bands, etc)
+			// - nap/sleep
+			// Console.WriteLine("End target prioritization...");
+		}
+		
 		/// <summary>
 		/// Loop through all Components and set the Runtime flags that determine if this component/device is ready for use
 		/// NOTE: Using Data Oriented Processing takes some getting used to if you are more familiar with OOP where you iterate
@@ -2360,291 +2647,6 @@ namespace HelloBoids
 			
 		}
 		
-		private static System.Threading.SemaphoreSlim mSort = new System.Threading.SemaphoreSlim(1);
-		
-		/// <summary>
-		/// This is mostly just creating 'SensorContact' from "neighbors" .... based on policies
-		/// </summary>
-		private void CreateContactListFromAdjacents()
-		{
-			if (mNeighbors.Count == 0) return;
-			//Console.WriteLine("DoContactListSorting() - STARTING");
-			
-			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
-			int recordCount = (int)allTacticalStations.Count;
-
-            System.Threading.Tasks.Parallel.For(0, recordCount, i => 		
-			{
-				// NOTE: problem with the BOOLEAN version of this Configuration test is, we want to test for Boid configuration and ONLY Boid configuration
-				//       and not another Configuration such as HumanOperatorConfiguration which CONTAINS all of BoidConfiguration  but LOGICALLY OR's "|" CONFIGURATION.Sentient as well 
-				//       and so it WILL pass the BOOLEAN version of this test.  Thus solution is a DIRECT == compare.  Duh!
-				if (allTacticalStations.Span[(int)i].Configuration != TacticalStationConfiguration)
-				//if ((allTacticalStations.Span[(int)i].Configuration & BoidConfiguration) != BoidConfiguration)
-				{
-					//Console.WriteLine("configuration = " + allTransforms.Span[(int)i].Configuration.ToString());
-					return;
-				}	
-				
-				int currentStationArrayIndex = allTacticalStations.Span[(int)i].EntityArrayIndex; // current.EntityArrayIndex; //  current.GetUserStructIndex(typeof(Transform.Transform_Struct));
-				//System.Diagnostics.Debug.Assert( (int)i == currentArrayIndex, "DoContactListSorting() - array index does not match...");
-				// the adjacnets that are stored in neighbors from the overall mNeighbors is very much stores Area of Interest for each Droid
-				// but we will only send them things that their sensors can detect (and "eyes" are treated as optical sensors)
-				//Console.WriteLine ("DoContactListSorting() - Key for current == " + Boids[currentArrayIndex].EntityKey);
-				
-				// TODO: Should we be iterating over the 'TacticalStation' struct's and NOT the Boids array? and then getting the SensorContacts from it?
-				//       we could skip any TacticalStation that is not designated as PRIMARY TacticalStation
-				
-				EntityNode currentStation = Boids[currentStationArrayIndex]; // <-- if we can get the Sensors without having to get the current Boid... hmm...
-				System.Diagnostics.Debug.Assert(currentStation.EntityKey.Contains("tactical"), "ProcessOpticalSensors() - Entity is NOT a TacticalStation.");
-				
-				int currentBoidArrayIndex = currentStation.EntityArrayIndex - TACTICAL_STATION_OFFSET;
-				Boid currentBoid = (Boid)Boids[currentBoidArrayIndex];
-				
-				//Console.WriteLine ("2");
-				EntityNode[] sensorEntities = currentBoid.GetSensors(); // todo: we currently do  not have EntityNode allowing adding of child nodes.  This is needed next.
-				
-				int sensorsCount = 0;
-				if (sensorEntities != null) sensorsCount = sensorEntities.Length;
-				//Console.WriteLine("CreateContactListFromAdjacents() - Sensor Count == " + sensorsCount);
-				if (sensorEntities == null) return; 
-				
-				//Console.WriteLine ("4");
-				
-				// grab the neighbors/adjacents for this Droid.  The returned parameter List<Tuple<int, double>> tells us which Droid (int) index was detected and the (double) distance to it  
-				List<Tuple<int, double>> neighbors = null;
-				
-				//Console.WriteLine("CreateContactListFromAdjacents() - Looking for Neighbors at Array Index  == " + currentArrayIndex.ToString());
-				//foreach (int key in mNeighbors.Keys)
-				//	Console.WriteLine ("Key == " + key.ToString());
-				
-				bool success = mNeighbors.TryGetValue(currentBoidArrayIndex, out neighbors);
-								
-				//Console.WriteLine("DoContactListSorting() - Found '" + neighbors.Count.ToString() + "' Adjacents for Droid @ Array Index == '" + currentArrayIndex.ToString() + "' ");
-				List<SensorContact> contacts = new List<SensorContact>();
-				
-				//Console.WriteLine("CreateContactListFromAdjacents - 1");
-				
-				// iterate through all the potential "contacts"
-				for (int j = 0; j < neighbors.Count; j++)
-				{			
-					contacts.Clear();
-					ComponentStore<Transform.Transform_Struct> allTransforms  = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
-					
-					double distanceSquared = neighbors[(int)j].Item2;
-					int potentialContactsInternalTransformIndex = neighbors[(int)j].Item1; 
-					int potentialContactsEntityArrayIndex = allTransforms.Span[potentialContactsInternalTransformIndex].EntityArrayIndex;
-			  
-					//Console.WriteLine("CreateContactListFromAdjacents - 2");
-					// Iterate through all the Sensors the current Droid is using to see which ones might
-					// detect this potential contact.  This is why a "SensorContact" may already exist
-					// in the List<SensorContact> 'contacts'  because multiple Sensors on _the_same_ship_
-					// might detect this adjacent 'contact.'
-					for (int k = 0; k < sensorEntities.Length; k++)
-					{
-						int sensorStructIndex = -1;
-						Memory<Sensor> sensorStruct = (Memory<Sensor>)sensorEntities[k].GetUserStruct(typeof(Sensor), out sensorStructIndex);
-						int sensorArrayIndex = sensorStruct.Span[0].EntityArrayIndex;
-						
-						double sensorRangeSquared = sensorStruct.Span[0].RangeSquared;
-						
-						//Console.WriteLine("CreateContactListFromAdjacents() - Range = " +  sensorRangeSquared.ToString() + " Distance to Contact ==  " + Math.Sqrt(distanceSquared).ToString());
-						
-						if (sensorRangeSquared >= distanceSquared)
-						{
-							SensorContact c;
-
-							// if another sensor on this same vehicle has detected this potential contact already, append it's Sensor index
-							// to the list of SensorIndices for this contact so we know all sensors that detected it.
-							Predicate<SensorContact> contactExists = contact => contact.ContactEntityArrayIndex == potentialContactsEntityArrayIndex;
-							c = contacts.Find(contactExists);
-
-							if (!c.Equals(default(SensorContact)))
-							{
-								//Console.WriteLine("CreateContactListFromAdjacents() - sensor contact name == " + c.Name);
-								if (c.SensorsIndices == null) 
-									c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices,  sensorArrayIndex); // sensorStructIndex);
-								else
-									c.SensorsIndices.Append(sensorArrayIndex); // sensorStructIndex);
-
-								//Console.WriteLine("DoContactListSorting() - Appending SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
-							}
-							else // contact has not yet already been detected by another Sensor within this same ship during this loop through all sensors on this same ship
-							{
-								c = new SensorContact();
-
-								//Console.WriteLine("DoContactListSorting() - Creating NEW SensorContact of Droid at Array Index = '" + contactsEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
-								Boid bb = null;
-								try 
-								{
-									bb =  (Boid)this.Boids[potentialContactsEntityArrayIndex];
-								}
-								catch (Exception ex)
-								{
-									Console.WriteLine("DoContactListSorting() - ERROR: Boid contact at Array Index == " + c.ContactEntityArrayIndex.ToString() + " not found. " + ex.Message);
-								}
-
-								//Console.WriteLine ("9");
-								//int sensorContactInternalTransformIndex = bb.GetUserStructIndex(typeof(Transform.Transform_Struct));
-								// contact details are needed to find the correct SensorContact to potentially merge with an existing SensorContact for this detected Entity
-								// NOTE: HelloBoids should only have one element within its SensorsIndices
-								//       because each Droid only has one Sensor ('Optical Sensor' == eyes)
-								c.ContactEntityArrayIndex = potentialContactsEntityArrayIndex; // index within the Boid[] array of the detected Droid
-								c.Index = (int)i;
-								c.Name =  "boid_" + potentialContactsEntityArrayIndex.ToString(); // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
-								c.RegistryNumber = c.Name;
-								c.Type = SensorContact.TYPE.Drone;
-								c.ContactStatus = Target.STATUS.Unknown;
-								c.FriendOrFoe = SensorContact.FoF.Unknown;
-								c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices, sensorArrayIndex); //sensorStructIndex);
-								
-								// telemetry
-								SensorContact.ContactTelemetry t;
-								t.Radius = (float)bb.BoundingBox.Radius;    // how might size be spoofed?
-								t.Position = bb.Translation;
-								t.Velocity = bb.Velocity;
-								t.DistanceSquared = distanceSquared;
-								t.Heading = 0;
-								t.TimeAcquired = Utils.NowTicks(); // todo: this needs to eventually just be gt.Ticks <-- which must come from 'gametime fixedstep' and not 'real-time'
-								t.TimeLast = t.TimeAcquired;
-
-								c.Add(t);			
-								contacts.Add(c);
-								//Console.WriteLine("DoContactListSorting() - Added NEW SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
-							}
-						} // end sensor range check
-					} // end for SensorsCount
-				} // end for neihbors Count
-				
-
-				// add all of the SensorContacts to the current TacticalStation, and it will be responsible for
-				// properly merging these SensorContacts with existing ones so as to maintain
-				// proper SensorContact histories for all detected Entities.
-				if (contacts != null)
-					currentStation.Add(contacts); 
-			});
-			
-			//Console.WriteLine("DoContactListSorting() - COMPLETED.");
-		}
-		
-		
-		/// <summary>
-		/// based on policies
-		/// </summary>
-		private void DoTargetPrioritization()
-		{
-			//Console.WriteLine("DoTargetPrioritization");
-			int count = Boids.Count;
-            System.Threading.Tasks.Parallel.For(0, count, i => 		
-			{
-				if (Boids[i] is Boid == false) return;
-				
-				Boid current = (Boid)Boids[i];
-				
-				//int stationID = current.GetTacticalStations()[0]; 
-				EntityNode tacticalStation = current.GetTacticalStations()[0]; //(EntityNode)Boids[stationID];
-				
-				//Console.WriteLine("DoTargetPrioritization - for TacticalStatin '" + tacticalStation.EntityKey + "'");
-				
-				List<SensorContact> contacts = tacticalStation.GetSensorContacts();
-				if (contacts == null || contacts.Count == 0) return;
-				//Console.WriteLine("DoTargetPrioritization - Contacts Count == " + contacts.Count.ToString());
-				
-				//List<Target> targets = tacticalStation.GetTargets();
-				tacticalStation.ClearTargets();
-								
-				for (int j = 0; j < contacts.Count; j++)
-				{
-					// entityKey will usually be the ID of the target Entity (aka Droid or Ship).  But not always.  Sometimes it may be our own ship.  It depends on the specific rule.			
-					string targetKey = "boid_" + contacts[j].ContactEntityArrayIndex.ToString();
-					string currentKey = "boid_" + i.ToString();
-					
-					Policy roePolicy = new Policy();
-					Query q = new Query(EntryClass.mCStoreUserData);
-
-					Rule r = new Rule("ROE - Friendly Fire", "Earth Alliance Directive 209 states Captains must not fire on Friendly forces.");
-
-					// Condition 1 == in Spawn() we randomly assign each Boid to either 'Red' or 'Blue' factions.
-					string name = "Never fire on Same Faction";
-					string description = "Never fire on any Droid that is a member of our Faction.";
-					 
-					Condition.EVAL_TYPE eval = Condition.EVAL_TYPE.NOT_EQUALS;
-					string operandLeft = "faction";
-					string operandRight = "faction";  
-						
-					Condition condition = new Condition(name, description, targetKey, eval, operandLeft, operandRight);
-											
-					r.Add(condition);
-
-					// Condition 2 == This Entity is not currently fighting us or one of our Allies in the arena
-					eval = Condition.EVAL_TYPE.EQUALS;
-					operandRight = "false";
-					
-					object[] delegateArgs = new object[]{currentKey, targetKey};
-					condition = new Condition(name, description, targetKey, eval, IsCombatant, operandRight, delegateArgs);
-					r.Add(condition);
-					q.Add(r);
-					roePolicy.Add(q);
-			
-					SensorContact currentContact = contacts[j];
-					
-					//Console.WriteLine("DoTargetPrioritization - PRE- roePolicy.Execute()" );
-					if (roePolicy.Execute())
-					{
-						Console.WriteLine("DoTargetPrioritization() - Rules of Engagement execute completed... preparing to add Target.");
-						// Targets are those SensorContacts that friendly forces will potentially fire upon.
-						// Whereas SensorContacts is all contacts regardless of FoF status.
-						Target t = new Target();
-						t = current.GetTarget(currentContact.ContactEntityArrayIndex);
-						if (t.Equals(default(Target)))
-						{
-
-						}
-						else 
-						{
-							t.TargetedBy = Utils.ArrayAppend(t.TargetedBy, (int)i);       // other Ships/Vehciles/Entities, ground radars, factions, etc that are targeting this Target
-						}
-						t.EntityArrayIndex = currentContact.ContactEntityArrayIndex;
-						t.WeaponsAssigned = null;
-						t.Status = Target.STATUS.Active;
-						t.CrewStatus = Target.CREWSTATUS.Alive;
-						t.Hitpoints = 20;        // Boids[c.ContactIndex].Hitpoints; // max hitpoints of target... should a Sensor be able to know this exact number?  It's really just a game thing and maybe we should just use visual observations of condition of ship instead
-						t.CurrentHitPoints = 18; // Boids[c.ContactIndex].CurrentHP ; // used to determine % damage of Target
-
-						tacticalStation.Add(t);
-						Console.WriteLine("DoTargetPrioritization() - Rules of Engagement execute completed... Target added.");
-					}
-				}
-			});
-			
-			
-			// a carrier with very few fighters remaining might be a low tactical threat
-			// but high strategic threat... 
-			// if a carrier is a primary mission objective that should increase its priority when scoring
-			
-			// a ship that is a primary target, but is not fleeing, can perhaps be scored lower since there will be time
-			// to target it later if there are more dangerous threats to deal with first.
-			// if a primary target is attempting to escape, the ETA that it will reach an escape trajectory should be used
-			// to wieght it's prioritization score
-			
-			// NPC non-jobs 
-			// -read
-			// - study for promotion
-			// - train for promotion
-			// - play cards, board games
-			// - socialize at cantina
-			// - meditate, spirtual seeking/studying
-			// - network with the crew
-			// - listen to music
-			// - play music/instrument
-			// - art (painting, sculpting, writing poetry, 
-			// - excercise, yoga, batleth*,  
-			// - sparring
-			// - theater (performances, orchestras, bands, etc)
-			// - nap/sleep
-			//Console.WriteLine("End target prioritization...");
-		}
-		
-
 		/// <summary>
 		/// A callback function for a Rule 'Condition.'
 		/// NOTE: If we need to use a callback function, there is no need to evaluate
@@ -2655,16 +2657,16 @@ namespace HelloBoids
 		{
 			// todo: we need both the key of the tacticalstation (currently just the current Droid)
 			//       and the potential target contact key and index
-			
+			Console.WriteLine("IsCombatant() - Begin Parse Keys");
 			string currentKey = (string)args[0];
 			string[] sp = currentKey.Split("_");
 			int currentEntityArrayIndex = int.Parse(sp[1]);
-			//Console.WriteLine("Parsed Current index == " + currentIndex.ToString());
+			Console.WriteLine("IsCombatant() - Parsed Current index == " + currentEntityArrayIndex.ToString());
 			
 			string targetKey = (string)args[1];
 			sp = targetKey.Split("_");
 			int targetEntiyArrayIndex = int.Parse(sp[1]);
-			//Console.WriteLine("Parsed Target index == " + targetIndex.ToString());
+			Console.WriteLine("IsCombatant() - Parsed Target index == " + targetEntiyArrayIndex.ToString());
 				
 			Boid B = (Boid)Boids[currentEntityArrayIndex];
 			
@@ -2678,7 +2680,7 @@ namespace HelloBoids
 			if (contacts != null) 
 				count = contacts.Count;
 			
-			Console.WriteLine("IsCombatant() - tacticalStation '" + tactical.EntityKey + "' has '" + count + "' contacts.");
+			Console.WriteLine("--------------------------------------------------------IsCombatant() - tacticalStation '" + tactical.EntityKey + "' has '" + count + "' contacts.");
 			
 			for (int i = 0; i < count; i++)
 				if (contacts[i].ContactEntityArrayIndex == targetEntiyArrayIndex)
@@ -7585,19 +7587,21 @@ return (0,0);
 		{
 			if (mConditions == null || mConditions.Length == 0) return true;
 			
-			
+			Console.WriteLine("Condition.Evaluate() - Conditions Count == " + mConditions.Length.ToString());
 			for (int i = 0; i < mConditions.Length; i++)
 			{
 				string left = null;
 				string right = null;
+				System.Diagnostics.Debug.Assert(mConditions[i] != null, "Condition.Evaluate() - Condition is NULL");
+				Console.WriteLine("Condition.Evaluate() - Condition Has Delegate == " + mConditions[i].LeftOperandIsDelegate.ToString());
 				if (mConditions[i].LeftOperandIsDelegate)
 				{
 					// the LEFT operand delegate to invoke.  The RIGHT operand is what we want to compare it against 
+					Console.WriteLine("Condition.Evaluate() ...");
 					bool result = mConditions[i].OperandLeftDelegate(mConditions[i].DelegateArgs);
-					//right = context[mConditions[i].EntityKey].GetString(mConditions[i].OperandRight);  	// mConditions[i].OperandRight;
-					if (result) continue;
-					return false;
-					
+					left = result.ToString().ToUpper();
+					right =  mConditions[i].OperandRight.ToUpper(); // NOTE: We do not need anything more than a "true" or "false" for the rightOperand.  We DO NOT NEED A DICTIONARY KEY BECAUSE WE COULD SOLVE FOR THAT WITHIN THE DELEGATE 
+					System.Diagnostics.Debug.Assert(right == "FALSE" || right == "TRUE", "Evaluate() - When using a Delegate, a CONDITION must always evaluate against TRUE or FALSE.");
 					Console.WriteLine("Condition.Evaluate() - LEFT IS A DELEGATE --> LEFT == " + left + " RIGHT == " + right);
 				}
 				else
@@ -7606,16 +7610,20 @@ return (0,0);
 					System.Diagnostics.Debug.Assert (context != null, "Context is not null.");
 					left = context[mConditions[i].EntityKey].GetString(mConditions[i].OperandLeft);
 					
-					right = context[mConditions[i].EntityKey].GetString(mConditions[i].OperandRight);  		
+					//right = context[mConditions[i].TargetKey].GetString(mConditions[i].OperandRight);  
+					right = mConditions[i].OperandRight;
+					Console.WriteLine("Condition.Evaluate() - LEFT IS A DELEGATE --> LEFT == " + left + " RIGHT == " + right);
 				}
 				
 				switch (mConditions[i].mEvalType)
 				{
 					case Condition.EVAL_TYPE.EQUALS:
+						Console.WriteLine("Condition.Evaluate() - EQUALS TEST");
 						if (left != right) return false; // todo: ErrorReason = 
 						break;
 
 					case Condition.EVAL_TYPE.NOT_EQUALS:
+						Console.WriteLine("Condition.Evaluate() - NOT EQUALS TEST");
 						if (left == right) return false; // todo: ErrorReason = 
 						break;
 
@@ -7689,6 +7697,7 @@ return (0,0);
 			mEvalType = eval;
 			EntityKey = entityKey; // our UserDataStore holds a Dictionary<string, UserData> with the string 'key' being the EntityID the UserData belongs too. 
 			LeftOperandIsDelegate = true;
+			Console.WriteLine("Condition.ctor() - left operand is delegate");
 		}
 	}
 	

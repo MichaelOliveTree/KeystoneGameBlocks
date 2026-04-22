@@ -2320,7 +2320,6 @@ namespace HelloBoids
 				int operatorIndex;
 				Memory<LifeForm> operatorStruct = (Memory<LifeForm>) operators[0].GetUserStruct(typeof(LifeForm), out operatorIndex);
 
-				
 				int stationArrayIndex = tacticalStationEnts[0].EntityArrayIndex;  
 				int tacticalIndex;
 				Memory<TacticalStation> tacticalStationStruct = (Memory<TacticalStation>) tacticalStationEnts[0].GetUserStruct(typeof(TacticalStation), out tacticalIndex);
@@ -2381,7 +2380,7 @@ namespace HelloBoids
 						// continue; // NOTE: for regular for() loop we use "continue"
 
 					targets = tmp.OfType<Boid>().ToList();
-					Console.WriteLine("Do_Droid_Logic() - Attacker Droid @ Array Index '" + attackerArrayIndex.ToString() + "' Found " + targets.Count.ToString() + " targets.");
+					//Console.WriteLine("Do_Droid_Logic() - Attacker Droid @ Array Index '" + attackerArrayIndex.ToString() + "' Found " + targets.Count.ToString() + " targets.");
 					
 					try
 					{
@@ -2499,7 +2498,7 @@ namespace HelloBoids
 					string operandLeft = "faction";
 					string operandRight = "faction";  
 						
-					Condition condition = new Condition(name, description, targetKey, eval, operandLeft, operandRight);
+					Condition condition = new Condition(name, description, currentKey, targetKey, eval, operandLeft, operandRight);
 											
 					r.Add(condition);
 
@@ -2508,7 +2507,7 @@ namespace HelloBoids
 					operandRight = "false";
 					
 					object[] delegateArgs = new object[]{currentKey, targetKey};
-					condition = new Condition(name, description, targetKey, eval, IsCombatant, operandRight, delegateArgs);
+					condition = new Condition(name, description, targetKey, currentKey, eval, IsCombatant, operandRight, delegateArgs);
 					r.Add(condition);
 					q.Add(r);
 					roePolicy.Add(q);
@@ -2518,7 +2517,6 @@ namespace HelloBoids
 					//Console.WriteLine("DoTargetPrioritization - PRE- roePolicy.Execute()" );
 					if (roePolicy.Execute())
 					{
-						Console.WriteLine("DoTargetPrioritization() - Rules of Engagement execute completed... preparing to add Target.");
 						// Targets are those SensorContacts that friendly forces will potentially fire upon.
 						// Whereas SensorContacts is all contacts regardless of FoF status.
 						Target t = new Target();
@@ -2539,7 +2537,8 @@ namespace HelloBoids
 						t.CurrentHitPoints = 18; // Boids[c.ContactIndex].CurrentHP ; // used to determine % damage of Target
 
 						tacticalStation.Add(t);
-						Console.WriteLine("DoTargetPrioritization() - Rules of Engagement execute completed... Target added.");
+						Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY PASSED. Target added.");
+						
 					}
 					else
 					{
@@ -4240,7 +4239,8 @@ namespace HelloBoids
 		private void UpdateProduction(GameTime gt)
         {
             uint productID = (uint)PRODUCTS.TargetingSkillModifier;
-
+			
+			
 			/*
 			foreach (KeyValuePair<uint, List<Production>> entry in mProduction)
 			{	
@@ -7587,43 +7587,41 @@ return (0,0);
 		{
 			if (mConditions == null || mConditions.Length == 0) return true;
 			
-			Console.WriteLine("Condition.Evaluate() - Conditions Count == " + mConditions.Length.ToString());
+			//Console.WriteLine("Condition.Evaluate() - Conditions Count == " + mConditions.Length.ToString());
 			for (int i = 0; i < mConditions.Length; i++)
 			{
 				string left = null;
 				string right = null;
 				System.Diagnostics.Debug.Assert(mConditions[i] != null, "Condition.Evaluate() - Condition is NULL");
-				Console.WriteLine("Condition.Evaluate() - Condition Has Delegate == " + mConditions[i].LeftOperandIsDelegate.ToString());
+				//Console.WriteLine("Condition.Evaluate() - Condition Has Delegate == " + mConditions[i].LeftOperandIsDelegate.ToString());
+				
 				if (mConditions[i].LeftOperandIsDelegate)
 				{
 					// the LEFT operand delegate to invoke.  The RIGHT operand is what we want to compare it against 
-					Console.WriteLine("Condition.Evaluate() ...");
 					bool result = mConditions[i].OperandLeftDelegate(mConditions[i].DelegateArgs);
 					left = result.ToString().ToUpper();
 					right =  mConditions[i].OperandRight.ToUpper(); // NOTE: We do not need anything more than a "true" or "false" for the rightOperand.  We DO NOT NEED A DICTIONARY KEY BECAUSE WE COULD SOLVE FOR THAT WITHIN THE DELEGATE 
 					System.Diagnostics.Debug.Assert(right == "FALSE" || right == "TRUE", "Evaluate() - When using a Delegate, a CONDITION must always evaluate against TRUE or FALSE.");
-					Console.WriteLine("Condition.Evaluate() - LEFT IS A DELEGATE --> LEFT == " + left + " RIGHT == " + right);
+					//Console.WriteLine("Condition.Evaluate() - LEFT IS A DELEGATE --> LEFT == " + left + " RIGHT == " + right);
 				}
 				else
 				{	
 					// left is the KVP to look up.  right is what we want to compare it against 
 					System.Diagnostics.Debug.Assert (context != null, "Context is not null.");
-					left = context[mConditions[i].EntityKey].GetString(mConditions[i].OperandLeft);
-					
-					//right = context[mConditions[i].TargetKey].GetString(mConditions[i].OperandRight);  
-					right = mConditions[i].OperandRight;
+					left = context[mConditions[i].LeftEntityKey].GetString(mConditions[i].OperandLeft);
+					right = context[mConditions[i].RightEntityKey].GetString(mConditions[i].OperandRight);  
 					Console.WriteLine("Condition.Evaluate() - LEFT IS A DELEGATE --> LEFT == " + left + " RIGHT == " + right);
 				}
 				
 				switch (mConditions[i].mEvalType)
 				{
 					case Condition.EVAL_TYPE.EQUALS:
-						Console.WriteLine("Condition.Evaluate() - EQUALS TEST");
+						//Console.WriteLine("Condition.Evaluate() - EQUALS TEST");
 						if (left != right) return false; // todo: ErrorReason = 
 						break;
 
 					case Condition.EVAL_TYPE.NOT_EQUALS:
-						Console.WriteLine("Condition.Evaluate() - NOT EQUALS TEST");
+						//Console.WriteLine("Condition.Evaluate() - NOT EQUALS TEST");
 						if (left == right) return false; // todo: ErrorReason = 
 						break;
 
@@ -7671,22 +7669,23 @@ return (0,0);
 		public string OperandRight;
 		public EVAL_TYPE mEvalType;
 		
+		public string LeftEntityKey;
+		public string RightEntityKey;
 		
-		public string EntityKey;
 		
-		
-		public Condition (string name, string description, string entityKey, EVAL_TYPE eval, string operandLeft, string operandRight)
+		public Condition (string name, string description, string leftEntityKey, string rightEntityKey, EVAL_TYPE eval, string operandLeft, string operandRight)
 		{
 			Name = name;
 			Description = description;
 			OperandLeft = operandLeft;
 			OperandRight = operandRight;
 			mEvalType = eval;
-			EntityKey = entityKey; // our UserDataStore holds a Dictionary<string, UserData> with the string 'key' being the EntityID the UserData belongs too. 
+			LeftEntityKey = leftEntityKey; // our UserDataStore holds a Dictionary<string, UserData> with the string 'key' being the EntityID the UserData belongs too. 
+			RightEntityKey = rightEntityKey;
 			LeftOperandIsDelegate = false;
 		}
 		
-		public Condition (string name, string description, string entityKey, EVAL_TYPE eval, Func<object[], bool> operandLeft, string operandRight, object[] delegateArgs)
+		public Condition (string name, string description, string leftEntityKey, string rightEntityKey, EVAL_TYPE eval, Func<object[], bool> operandLeft, string operandRight, object[] delegateArgs)
 		{
 			Name = name;
 			Description = description;
@@ -7695,9 +7694,10 @@ return (0,0);
 			OperandLeftDelegate = operandLeft;
 			OperandRight = operandRight;
 			mEvalType = eval;
-			EntityKey = entityKey; // our UserDataStore holds a Dictionary<string, UserData> with the string 'key' being the EntityID the UserData belongs too. 
+			LeftEntityKey = leftEntityKey;     // our UserDataStore holds a Dictionary<string, UserData> with the string 'key' being the EntityID the UserData belongs too. 
+			RightEntityKey = rightEntityKey;   // 
 			LeftOperandIsDelegate = true;
-			Console.WriteLine("Condition.ctor() - left operand is delegate");
+			//Console.WriteLine("Condition.ctor() - left operand is delegate");
 		}
 	}
 	

@@ -711,8 +711,8 @@ namespace HelloBoids
 		
 		
 		private System.Collections.Concurrent.ConcurrentDictionary<int, List<Tuple<int, double>>> mNeighbors = new System.Collections.Concurrent.ConcurrentDictionary<int, List<Tuple<int, double>>>();
-		internal System.Collections.Concurrent.ConcurrentDictionary<uint, ComponentStore<Production>> mProduction;
-        internal System.Collections.Concurrent.ConcurrentDictionary<uint, ComponentStore<Consumption>> mConsumption;
+		internal System.Collections.Concurrent.ConcurrentDictionary<int, ComponentStore<Production>> mProduction;
+        internal System.Collections.Concurrent.ConcurrentDictionary<int, ComponentStore<Consumption>> mConsumption;
 		
 		
         public Seeds Seeds { get; set; }
@@ -785,8 +785,8 @@ namespace HelloBoids
 			//mLimitedProduction = new System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>>();
 			//mProduction = new System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>>();
         	//mConsumption  = new System.Collections.Concurrent.ConcurrentDictionary<uint, List<Consumption>>();
-			mProduction = new System.Collections.Concurrent.ConcurrentDictionary<uint, ComponentStore<Production>>();
-        	mConsumption  = new System.Collections.Concurrent.ConcurrentDictionary<uint, ComponentStore<Consumption>>();
+			mProduction = new System.Collections.Concurrent.ConcurrentDictionary<int, ComponentStore<Production>>();
+        	mConsumption  = new System.Collections.Concurrent.ConcurrentDictionary<int, ComponentStore<Consumption>>();
 			mSimEventManager = new SimulationEventManager(EntryClass.mUserDataStore);
 			
 #if USE_MEMORY_T
@@ -910,9 +910,98 @@ namespace HelloBoids
 		
 		#region SensorContacts and Target manipulation belongs in SCRIPTS ULTIMATELY		
 		        
+		public int[] GetOwner(int[] entityArrayIndices)
+		{
+			EntityNode[] owners = new EntityNode[entityArrayIndices.Length];
+			int[] indices = new int[entityArrayIndices.Length];
+			
+			for (int i = 0; i < owners.Length; i++)
+			{
+				owners[i] = GetOwner(entityArrayIndices[i]);
+				if (owners[i] != null)
+					indices[i] = owners[i].EntityArrayIndex;
+				else
+					indices[i] = entityArrayIndices[i]; // the entity is already the overall Vehicle and has no "owner."
+			}
+			
+			return indices;
+		}
+		
+		
+		//NOTE: This implementation of GetOwner() is a hack. In KGB we have nested Child entities and finding the "owner"
+		//      is just a matter of recursing upwards through the tree until the Starship/Container is found.
+		public EntityNode GetOwner (int entityArrayIndex)
+		{
+			uint config = (uint)Boids[entityArrayIndex].Configuration;
+			EntityNode owner; 
+			int index = entityArrayIndex;
+			
+			if (config == (uint)TacticalStationConfiguration)
+			{
+				index -= BoidSimulation.TACTICAL_STATION_OFFSET;
+			}
+			else if (config == (uint)LaserConfiguration)
+			{
+				index -= BoidSimulation.LASER_OFFSET;
+			}
+			else if (config == (uint)WingsConfiguration)
+			{
+				index -= BoidSimulation.WINGS_OFFSET;
+			}
+			else if (config == (uint)BatteryConfiguration)
+			{
+				index -= BoidSimulation.BATTERY_OFFSET;
+			}
+			else if (config == (uint)OpticalSensorConfiguration)
+			{
+				index = index - BoidSimulation.OPTICAL_SENSOR_OFFSET; ;
+			}
+			else if (config == (uint)BoidConfiguration)
+			{
+				return null;
+			}
+			
+			owner = Boids[index];
+			return owner;
+		}
+		
+		
+		public EntityNode GetOwner (EntityNode entity)
+		{
+			return GetOwner(entity.EntityArrayIndex);
+		}
+		
 		public EntityNode GetEntity (int entityArrayIndex)
 		{
 			return Boids[entityArrayIndex];
+		}
+		
+		public HitPoints[] GetHitPoints(int[] entityArrayIndices)
+		{
+			HitPoints[] hitpoints = new HitPoints[entityArrayIndices.Length];
+			
+			for (int i = 0; i <  hitpoints.Length; i++)
+				hitpoints[i] = GetHitPoints(entityArrayIndices[i]);
+			
+			return hitpoints;
+		}
+		
+		public HitPoints GetHitPoints(int entityArrayIndex)
+		{
+			EntityNode e = Boids[entityArrayIndex];
+			int index;
+			
+			if ((e.Configuration & (uint)CONFIGURATION.LifeForm) != 0)
+			{
+				Memory<LifeForm> lf = (Memory<LifeForm>)e.GetUserStruct(typeof(LifeForm), out index);
+				return lf.Span[0].HitPoints;
+			}
+			else
+			{
+				System.Diagnostics.Debug.Assert((e.Configuration & (uint)CONFIGURATION.Component) != 0, "GetHitPoints() - Unexpected Entity CONFIGURATION");
+				Memory<Component> comp = (Memory<Component>)e.GetUserStruct(typeof(Component), out index);
+				return comp.Span[0].HitPoints;
+			}
 		}
 		
 			// NOTE: This is horribly inefficient because it just iterates t hrough all EntityNodes to find the
@@ -1103,7 +1192,7 @@ namespace HelloBoids
 			b.AddUserStruct(typeof(LifeForm), memLivingEnt, livingEntityID);
 			
 			storeLivingEntity.Span[livingEntityID].Age = 1;
-			storeLivingEntity.Span[livingEntityID].Hitpoints = 20;
+			storeLivingEntity.Span[livingEntityID].HitPoints = new HitPoints(){ Base = 250};
 			storeLivingEntity.Span[livingEntityID].Configuration = BoidConfiguration;
 			
 			
@@ -1273,7 +1362,7 @@ namespace HelloBoids
 			p.ProducerEntityArrayIndex = opticalSensor.EntityArrayIndex;
 			p.ProducerEntityInternalIndex = opticalSensor.GetUserStructIndex(typeof(Transform.Transform_Struct));
 			//p.Consumers = null; <-- same as DistributionList?  what if we only are using a different DistributionMode that requires a search?
-			p.ProductID = 	(uint)PRODUCTS.OpticalReflection;
+			p.ProductID = 	(int)PRODUCTS.OpticalReflection;
 			p.Breaker = true;
 			
 			p.Value = 1;
@@ -1297,7 +1386,7 @@ namespace HelloBoids
 			Consumption c;
 			c.ConsumerEntityArrayIndex = opticalSensor.EntityArrayIndex;
 			c.ConsumerInternalIndex = sensorInternalIndex;
-			c.ProductID = (uint)PRODUCTS.OpticalReflection;
+			c.ProductID = (int)PRODUCTS.OpticalReflection;
 			c.Breaker = true;
 			c.Value =  null;
 			c.Amount = 1;
@@ -1310,7 +1399,7 @@ namespace HelloBoids
 			// each OpticalSensor CONSUMES PRODUCT.ElectricalPower from our Battery (a Producer)
 			c.ConsumerEntityArrayIndex = opticalSensor.EntityArrayIndex;
 			c.ConsumerInternalIndex = transformIndex;
-			c.ProductID = (uint)PRODUCTS.ElectricalPower;
+			c.ProductID = (int)PRODUCTS.ElectricalPower;
 			c.Breaker = true;
 			c.Value =  2;  // 10 kW/h
 			c.Amount = 1;
@@ -1357,7 +1446,7 @@ namespace HelloBoids
 			Consumption c;
 			c.ConsumerEntityArrayIndex = wings.EntityArrayIndex;
 			c.ConsumerInternalIndex = transformIndex;
-			c.ProductID = (uint)PRODUCTS.ElectricalPower;
+			c.ProductID = (int)PRODUCTS.ElectricalPower;
 			c.Breaker = true;
 			c.Value =  5;  // 5 kW/h
 			c.Amount = 1;
@@ -1474,7 +1563,7 @@ namespace HelloBoids
 			Consumption c;
 			c.ConsumerEntityArrayIndex = laser.EntityArrayIndex;
 			c.ConsumerInternalIndex = transformIndex;
-			c.ProductID = (uint)PRODUCTS.ElectricalPower;
+			c.ProductID = (int)PRODUCTS.ElectricalPower;
 			c.Breaker = true;
 			c.Value =  25;  // 10 kW/h
 			c.Amount = 1;
@@ -1558,7 +1647,7 @@ namespace HelloBoids
 			Consumption c;
 			c.ConsumerEntityArrayIndex = station.EntityArrayIndex;
 			c.ConsumerInternalIndex = transformIndex;
-			c.ProductID = (uint)PRODUCTS.ElectricalPower;
+			c.ProductID = (int)PRODUCTS.ElectricalPower;
 			c.Breaker = true;
 			c.Value =  1;   
 			c.Amount = 10; // 10 kW/h
@@ -1570,7 +1659,7 @@ namespace HelloBoids
 			// each Station can Consume a TargetingSkillModifier as if it had a TACTICAL CREW STATION from an Operator
 			c.ConsumerEntityArrayIndex = station.EntityArrayIndex;
 			c.ConsumerInternalIndex = transformIndex;
-			c.ProductID = (uint)PRODUCTS.TargetingSkillModifier;
+			c.ProductID = (int)PRODUCTS.TargetingSkillModifier;
 			c.Breaker = true;   // for SkillModifiers, this is just whether the Skill Modifier is currently enabled or not.
 			c.Value =  null;
 			c.Amount = 1;
@@ -1646,7 +1735,7 @@ namespace HelloBoids
 			Production p;
 			p.ProducerEntityArrayIndex = battery.EntityArrayIndex;
 			p.ProducerEntityInternalIndex = powerProducerInternalIndex;
-			p.ProductID = 	(uint)PRODUCTS.ElectricalPower;
+			p.ProductID = 	(int)PRODUCTS.ElectricalPower;
 			p.Breaker = true;
 			
 			p.Value = 1;  // the UNIT value... in this case it's a DOUBLE
@@ -1712,7 +1801,7 @@ namespace HelloBoids
 			humanOperator.AddUserStruct(typeof(LifeForm), memLivingEnt, livingEntityID);
 			
 			storeLivingEntity.Span[livingEntityID].Age = 1;
-			storeLivingEntity.Span[livingEntityID].Hitpoints = 20;
+			storeLivingEntity.Span[livingEntityID].HitPoints =  new HitPoints(){ Base = 100};
 			storeLivingEntity.Span[livingEntityID].Configuration = HumanOperatorConfiguration;
 			
 						
@@ -1737,7 +1826,7 @@ namespace HelloBoids
 			Production p;
 			p.ProducerEntityArrayIndex = humanOperator.EntityArrayIndex;
 			p.ProducerEntityInternalIndex = livingEntityID;
-			p.ProductID = 	(uint)targetingSkill.Production[0].Product;  // TargetingSkillModifier
+			p.ProductID = 	(int)targetingSkill.Production[0].Product;  // TargetingSkillModifier
 			p.Breaker = true;
 			
 			p.Value = targetingSkill.Production[0];  // ??
@@ -1765,7 +1854,7 @@ namespace HelloBoids
 		
 		private object mLock = new object();
 		
-		private int GetConsumerIndex (uint productID, int entityArrayIndex)
+		private int GetConsumerIndex (int productID, int entityArrayIndex)
 		{
 			//List<Consumption> consumption = mConsumption[productID];
 			ComponentStore<Consumption> consumption = mConsumption[productID];
@@ -3157,7 +3246,7 @@ namespace HelloBoids
 			//ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			//ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 						
-			//Console.WriteLine("Do_Tactical_Logic() - preparing for loop()");
+			Console.WriteLine("Do_Tactical_Logic() - preparing for loop()");
 			int recordCount = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, recordCount, i => 				
 			//for (int i = 0; i < Boids.Count; i++)
@@ -3198,7 +3287,8 @@ namespace HelloBoids
 				//      - any Contacts in list marked as FOF.Foe + FOF.Hostile as opposed to just FOF.Foe (note: stale contacts are still treated as available in case of need to persue)
 				//      	- FOF.Withdrawing may be ignored for example if ROE says we don't persue in this circumstance including disabled ships and unarmed ships like freighters
 				
-				EntityNode[] weapons = GetWeapons(attackerArrayIndex);				
+				EntityNode[] weapons = GetWeapons(attackerArrayIndex);	
+				int weaponArrayIndex = weapons[0].EntityArrayIndex; // todo: hack -  we know all droids have one weapon but this will fail otherwise
 				int weaponIndex;
 				Memory<Weapon>weaponStruct = (Memory<Weapon>) weapons[0].GetUserStruct(typeof(Weapon), out weaponIndex);
 				
@@ -3207,11 +3297,7 @@ namespace HelloBoids
 				//Console.WriteLine("Do_Tactical_Logic() - Weapon CanFire() == " + canFire.ToString());		
 				if (canFire) // TODO: Establish CANFIRE PER WEAPON
            	 	{  
-					
-					// TODO: QUEUE ANIMATION TO FIRE THIS WEAPON 
-					// TODO: LOG EVENT
-					//		- OfficerID, StationID, ACTION_ID, WeaponID, TargetID(the lowest resolution part of the target and from that we can GetOwner())
-					// 
+
 					string weaponKey = weapons[0].EntityKey;
 					bool suspend = false;
 					mIntervalTimers.Reset(weaponKey, "droid_canfire", suspend);
@@ -3245,13 +3331,39 @@ namespace HelloBoids
 						// continue; // NOTE: for regular for() loop we use "continue"
 
 					targets = tmp.OfType<Boid>().ToList();
-					//Console.WriteLine("Do_Tactical_Logic() - Attacker Droid @ Array Index '" + attackerArrayIndex.ToString() + "' Found " + targets.Count.ToString() + " targets.");
+					Console.WriteLine("Do_Tactical_Logic() - Attacker Droid @ Array Index '" + attackerArrayIndex.ToString() + "' Found " + targets.Count.ToString() + " targets.");
 					
+					
+					// WE HAVE A TARGET AND A WEAPON THAT CAN FIRE
 					try
 					{
 						// todo: fix.  for now we wont iterate all targets, just the most near one
 						Boid currentTarget = targets[0];
 						double distanceToTargetSquared = distances[0];
+						
+						// TODO: QUEUE ANIMATION TO FIRE THIS WEAPON 
+						// Publish Event for this Weapon Fire At Target Attempt
+						int actionID = (int)ACTIONS.FiringAt;
+						CombatEventRecord r; //= new CombatEventRecord();
+						r = default(CombatEventRecord);
+						r.ActionID = actionID;
+						
+						//Console.WriteLine ("Do_Tactical_Logic() - Publishing FiringAt 1");	
+						r.Time = gt.TotalElapsedSeconds;
+						r.OfficerArrayIndex = operatorEntityArrayIndex;    // Attacking vessel's acting Tactical Officer
+						r.StationArrayIndex = stationArrayIndex;    // Attacking vessel Tactical Station
+						r.ShipArrayIndex = attackerArrayIndex;       // Attacking vessel
+						r.WeaponArrayIndex = weaponArrayIndex;     // Attacking vessel's weapon used
+						
+						r.TargetArrayIndices = new int[]{currentTarget.EntityArrayIndex};
+						//Console.WriteLine ("Do_Tactical_Logic() - Publishing FiringAt 1b");	
+						r.TargetOwnerArrayIndices = GetOwner(r.TargetArrayIndices);
+						//Console.WriteLine ("Do_Tactical_Logic() - Publishing FiringAt 2");	
+						r.HitPoints = GetHitPoints(r.TargetArrayIndices);
+						//Console.WriteLine ("Do_Tactical_Logic() - Publishing FiringAt 3");	
+						r.Damage = null;
+						
+						mSimEventManager.PublishEvent(attacker, actionID, r);
 						
 						// NOTE: TacticalStation.CanHit() returns true if a hit WILL RESULT from the fired shot
 						//       even if the HIT is not the expected location on a Target or even on the correct Target!
@@ -3280,6 +3392,11 @@ namespace HelloBoids
 								if (damages != null)
 									dCount = damages.Length;
 								
+								
+								//TODO: IF 0 Damage occurs because the Target was able to resist the attack with armor or passive defenses
+								//      the result of damage should return 0 and not NULL or anything because resisting an attack is valid information to know in an event log
+								
+								
 								// Console.WriteLine("Do_Tactical_Logic() - Damages Produced = " + dCount.ToString());
 							}
 							catch(Exception ex)
@@ -3288,15 +3405,47 @@ namespace HelloBoids
 							}
 
 							if (damages != null)
+							{
+								int[] damageAmounts = new int[damages.Length];
+								
 								for (int j = 0; j < damages.Length; j++)
 								{
 									if (damages[j] is DamageSystem.Damage)
-											mDamageSystem.Add((DamageSystem.Damage)damages[j]);
+									{
+										mDamageSystem.Add((DamageSystem.Damage)damages[j]);
+										damageAmounts[j] = ((DamageSystem.Damage)damages[j]).Amount;
+									}
 									else if (damages[j] is DamageOverTimeSystem.DamageOverTime)
-											mDamageOverTimeSystem.Add ((DamageOverTimeSystem.DamageOverTime)damages[j]);
+									{
+										mDamageOverTimeSystem.Add ((DamageOverTimeSystem.DamageOverTime)damages[j]);
+										damageAmounts[j] = ((DamageOverTimeSystem.DamageOverTime)damages[j]).Amount;
+										
+									}
 									else 
 										throw new Exception("Do_Tactical_Logic() - Unexpected Damge type. " + damages[j].GetType().Name);
 								}
+								
+								//Console.WriteLine ("Do_Tactical_Logic() - Publishing HIT RESULTS 1");	
+								// Publish event with the Hit Results
+								actionID = (int)ACTIONS.TargetHit;
+								
+								r = default(CombatEventRecord);
+								r.ActionID = actionID;
+								r.Time = gt.TotalElapsedSeconds;
+								r.OfficerArrayIndex = operatorEntityArrayIndex;  // Attacking vessel's acting Tactical Officer
+								r.StationArrayIndex = stationArrayIndex;         // Attacking vessel Tactical Station
+								r.ShipArrayIndex = attackerArrayIndex;           // Attacking vessel
+
+								r.WeaponArrayIndex = weaponArrayIndex;           // Attacking vessel's weapon used
+								//Console.WriteLine ("Do_Tactical_Logic() - Publishing HIT RESULTS 2");	
+								r.TargetArrayIndices = new int[]{currentTarget.EntityArrayIndex};
+								r.TargetOwnerArrayIndices = GetOwner(r.TargetArrayIndices);
+								//Console.WriteLine ("Do_Tactical_Logic() - Publishing HIT RESULTS 4");	
+								r.HitPoints = GetHitPoints(r.TargetArrayIndices);
+								Console.WriteLine ("Do_Tactical_Logic() - Publishing HIT RESULTS 5");	
+								r.Damage = damageAmounts;
+								mSimEventManager.PublishEvent(attacker, actionID, r);
+							}
 						}
 					}
 					catch (Exception ex)
@@ -3512,16 +3661,16 @@ namespace HelloBoids
 		{
 			// todo: we need both the key of the tacticalstation (currently just the current Droid)
 			//       and the potential target contact key and index
-			Console.WriteLine("IsCombatant() - Begin Parse Keys");
+			//Console.WriteLine("IsCombatant() - Begin Parse Keys");
 			string currentKey = (string)args[0];
 			string[] sp = currentKey.Split("_");
 			int currentEntityArrayIndex = int.Parse(sp[1]);
-			Console.WriteLine("IsCombatant() - Parsed Current index == " + currentEntityArrayIndex.ToString());
+			//Console.WriteLine("IsCombatant() - Parsed Current index == " + currentEntityArrayIndex.ToString());
 			
 			string targetKey = (string)args[1];
 			sp = targetKey.Split("_");
 			int targetEntiyArrayIndex = int.Parse(sp[1]);
-			Console.WriteLine("IsCombatant() - Parsed Target index == " + targetEntiyArrayIndex.ToString());
+			//Console.WriteLine("IsCombatant() - Parsed Target index == " + targetEntiyArrayIndex.ToString());
 				
 			Boid B = (Boid)Boids[currentEntityArrayIndex];
 			
@@ -3706,7 +3855,7 @@ namespace HelloBoids
 			// Target Vehicle
 			//  specific sub-location of target aimed at
 			//  specific sub-location of target hit
-			// 
+			
 	
 			// note: this will be different if a MINE or AREA EFFECT damage occurs
 			// and there are multiple targets and multiple sub-locations on the target(s) that are damaged.
@@ -3728,7 +3877,7 @@ namespace HelloBoids
 			laserDamage.DistributionList = null;
 			laserDamage.EntityID = droid.Index;
 			laserDamage.Location = Vector3d.Zero();
-			laserDamage.ProductID = (uint)PRODUCTS.MicrowaveDamage;
+			laserDamage.ProductID = (int)PRODUCTS.MicrowaveDamage;
 			laserDamage.SearchPrimitive = null;
 			laserDamage.Value = 1;
 			
@@ -4027,7 +4176,7 @@ namespace HelloBoids
 		
 		private void UpdateProduction(GameTime gt)
         {
-            uint productID = (uint)PRODUCTS.TargetingSkillModifier;
+            int productID = (int)PRODUCTS.TargetingSkillModifier;
 			
 			
 			/*
@@ -4160,7 +4309,7 @@ namespace HelloBoids
 					// back to the original emitter Droid's "eye" which  is an optical sensor and currently is stored in
 					// Dictionary<> mNeighbors;
 			
-			uint productID = production.ProductID;				
+			int productID = production.ProductID;				
 			switch (productID)
 			{
 				case (int)PRODUCTS.ElectricalPower:
@@ -4312,14 +4461,57 @@ namespace HelloBoids
 			}
 		}
 		
-	public interface ISimulationManager
-	{
-		void Subscribe();
-		void UnSubscribe();
 		
-		void Notify();
+		public enum ACTIONS : int
+		{
+			None = 0,
+			FiringAt,
+			TargetHit,
+			DeployMine,
+			DeployProbe
+		}
 		
-	}
+		public interface ISimulationEventManager
+		{
+			void Subscribe();
+			void UnSubscribe();
+
+			void Notify();
+			void PublishEvent(EntityNode owner, int actionID, ISimEventRecord r);
+			
+		}
+
+		public interface ISimEventRecord
+		{
+			public int ActionID {get; set;}
+			public double Time {get; set;}
+		}
+		
+		public struct CombatEventRecord : ISimEventRecord
+		{
+			public int ActionID {get; set;}
+			public double Time {get; set;}
+			
+			public int OfficerArrayIndex;    // Attacking vessel's acting Tactical Officer
+			public int StationArrayIndex;    // Attacking vessel Tactical Station
+			public int ShipArrayIndex;       // Attacking vessel
+			
+			public int WeaponArrayIndex;     // Attacking vessel's weapon used
+			
+			// TODO: a problem here is, what if we wanted to query for all Ships that have been attacked within X timeframe... here
+			//       the targets are in an array and some are components (not owners) and it would be extremely slow to search for these.
+			//       I think at the very least, all componets and assemblies need to track something like "int[] TargetOwnersArrayIndices" 
+			public int[] TargetArrayIndices;  // the lowest resolution Components or parts of one or more Targets. A missile for example might cause damage to multiple targets (i.e splash damage or proximity damage)
+			public int[] TargetOwnerArrayIndices; // if the owner and target are the same, then the overall "hull" was targeted/hit.
+			
+			// NOTE: The following fields may not be necessary for all ActionID types.  For now we'll just keep them in this one struct til we learn more about the different record types we'll need and how we'll be storing them
+			public int[] Damage;             // amount of damage inflicted during this event
+			public HitPoints[] HitPoints;    // Target operator(s), component(s), assembly(s) or ship(s) hitpoint at the end of this event 
+		}
+		
+		
+		
+	
 		
 		/// <summary>
 		/// This class should be a concrete implementation of Keystone.ISimulationEventManager that 
@@ -4332,7 +4524,7 @@ namespace HelloBoids
 		/// 3) It notifies subscribers of the EventManager of the various events that happen at runtime
 		///    to which they've subscribed.  For instance, the GUI can subscribe to various events.
 		/// </summary>
-		public class SimulationEventManager : ISimulationManager
+		public class SimulationEventManager : ISimulationEventManager
 		{
 			// https://softwareengineering.stackexchange.com/questions/401800/c-design-question-about-a-specific-game-combat-implementation-with-a-event-sys
 			// OUR ENTITIES do support custom EVENTS... but those are more for property value changes
@@ -4374,6 +4566,11 @@ namespace HelloBoids
 				// notify all subscribers (observers) of those events
 				// that occurred since the previous Notify() and to which
 				// they are specifically subscribed
+				
+			}
+			
+			public void PublishEvent(EntityNode owner, int actionID, ISimEventRecord r)
+			{
 				
 			}
 		#endregion
@@ -4423,9 +4620,9 @@ namespace HelloBoids
 						int spanIndex;
 						Memory<LifeForm> lf  = (Memory<LifeForm>)EntryClass.bSim.Boids[records[i].TargetEntityArrayIndex].GetUserStruct(typeof(LifeForm), out spanIndex);
 						//LifeForm lf = (LifeForm)memSpan[records[i].EntityIndex];
-						int prev = lf.Span[0].Hitpoints;
-						lf.Span[0].Hitpoints -= records[i].Amount;
-						Console.WriteLine ("HealthSystem.Apply() -  Entity '" + EntryClass.bSim.Boids[records[i].TargetEntityArrayIndex].EntityKey + " Hitpoints: '" + lf.Span[0].Hitpoints.ToString() + "' Previously was: '" + prev.ToString() + "'");
+						HitPoints prev = lf.Span[0].HitPoints;
+						lf.Span[0].HitPoints.Current -= records[i].Amount;
+						Console.WriteLine ("HealthSystem.Apply() -  Entity '" + EntryClass.bSim.Boids[records[i].TargetEntityArrayIndex].EntityKey + " Hitpoints: '" + lf.Span[0].HitPoints.ToString() + "' Previously was: '" + prev.ToString() + "'");
 						
 					}
 				}
@@ -4590,7 +4787,7 @@ namespace HelloBoids
 		    try
 			{
 				mProductionSemaphore.Wait(-1);
-				uint productID = p.ProductID; 
+				int productID = p.ProductID; 
 				//Console.WriteLine ("RegisterProduction()  - productID == " + productID.ToString());
 				
 				// NOTE: mLimitedProduction may not be necessary as we now track the NumUses for any given Production and if
@@ -4631,7 +4828,7 @@ namespace HelloBoids
 			try
 			{
 				mConsumptionSemaphore.Wait(-1);
-				uint productID = c.ProductID;
+				int productID = c.ProductID;
 				//Console.WriteLine ("RegisterConsumption()  - productID == " + productID.ToString());
             	//List<Consumption> consumption = mConsumption.GetOrAdd (productID, (key) =>  new List<Consumption>());
 				ComponentStore<Consumption> consumption = mConsumption.GetOrAdd (productID, (key) =>  EntryClass.mCStoreCol.CheckOut<Consumption>(EntryClass.NUM_ENTRIES, (int)c.ProductID));
@@ -7436,9 +7633,9 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 	
 	
 ////////////////////////////////////////////////////////////////////////////////////////////////
-#region PRODUCTION AND CONSUMPTION
+#region PRODUCTION AND CONSUMPTION //  NOTE: These all belong in Game01.dll
 	////////////////////////////////////////////////////////////////////////////////////////////////
-	public enum PRODUCTS
+	public enum PRODUCTS : int
 	{
 		None = 0,
 
@@ -7473,9 +7670,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 	}
 
 
-			 
 	
-	public enum SKILLS
+	public enum SKILLS : int
 	{
 		HelmOperations,
 		TacticalOperations,
@@ -7536,7 +7732,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
 	public struct Production
     {
-		public uint ProductID;
+		public int ProductID;
 		
 		// todo: should i have a frequency or Hz?  Gravitation would be at Physics frequency, but other's should be 1 hz or every 1000 ms
 		// production is not serialized to XML because they are created by the scripts in code
@@ -7604,7 +7800,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
 	public struct Consumption // todo: rename this to ConsumptionResult
 	{
-		public uint ProductID;     // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer
+		public int ProductID;     // todo: i think the productID can be different than what the consumption handler is passed in. For instance, "heat" can be passed in and result in "damage" to be applied to the consumer
 		
 		// Consumption here is really PRODUCT CONSUMPTION RESULT struct that gets filled so that
 		// other players in the networked game can receive the "results" of 
@@ -8141,6 +8337,18 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		IsUnJamming =        1 << 8 // denotes a quick fix in the field requiring less than 1 minute to resolve (isFixingMinorMalfunction), 
 	}
 	
+	public struct HitPoints // TODO: This may be renamed to "RPGStat" or something in the future and used for all stats that are modifiable (in one way or another.. eg an item buf or from damage taken)
+	{
+		public int Base;
+		public int Current;
+		
+		public override string ToString()
+		{
+			return "HP: " + Base.ToString() + "//" + Current.ToString();
+		}
+	}
+		
+	
 	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
 	public struct LifeForm
 	{
@@ -8154,8 +8362,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		public double Age;            // technically, this probably doesnt need to be stored... we only need the CreationDate?  // assign using Utils.GetAge() and find Age via 'age = Utils.GetAge(entity.CreationDate);'
 		public double MaxAge;
 		
-		public int Hitpoints; 
-		public int CurrentHP;
+		public HitPoints HitPoints; 
 		
 		public Membership[] Memberships;
 		public Skill[] Skills;
@@ -8210,7 +8417,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         public InternalStructure Internals; 	
 		
         // stats
-        public int Hitpoints;        
+        public HitPoints HitPoints; 
         public float Cost;
         public float Weight;
         public float Volume;
@@ -8222,9 +8429,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		// - this could conceivably change in the future if for instance a Cyborg or Robot was also a "Character" that was needed the LivingEntity struct. 
 		public uint mUserRuntimeFlags;
 		public uint mUserStructFlags;
-		
-		public int CurrentHP; // HitPoints - Damage == CurrentHP;
-		
 		
 		public double StartTime; // when "Use" began
 		public double Duration;  // if the "Use" is of a set Duration, track how long that Duration is... for instance, a sleep duration might be 6 hours of gameTime
@@ -8320,7 +8524,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 					{
 						int index = this.OperatorIDs[i];
 						
-						float percentage = allLivingEntities.Span[index].CurrentHP / allLivingEntities.Span[index].Hitpoints;
+						float percentage = allLivingEntities.Span[index].HitPoints.Current / allLivingEntities.Span[index].HitPoints.Base;
 						if (percentage <= DAMAGE_PERCENT_THRESHOLD)
 						{
 							errorReason = "Operator '" + allLivingEntities.Span[index].FullName + "' is not Healthy enough to operate this Component.";
@@ -9568,8 +9772,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			// based on the CONFIGURATION, retreive the Properties for the various structs used by this CONFIGURATION
 			
 			
-			
-			
 			// Capacity (Watt hours / kJ)
 			// Output (aka Max Discharge Rate)
 			// Duration (max duration in seconds at Max Discharge Rate)
@@ -10099,7 +10301,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 				case "POWER_CONSUMPTION": 
 					result = new object[2];
 					result[0] = (uint)PRODUCTS.ElectricalPower;
-					result[1] = EntryClass.bSim.mProduction[(uint)PRODUCTS.ElectricalPower];  // dictionary key into mProduction[key] returns a ComponentStore<Production>
+					result[1] = EntryClass.bSim.mProduction[(int)PRODUCTS.ElectricalPower];  // dictionary key into mProduction[key] returns a ComponentStore<Production>
 					
 					break;
 					

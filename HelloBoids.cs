@@ -3246,7 +3246,7 @@ namespace HelloBoids
 			//ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			//ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 						
-			Console.WriteLine("Do_Tactical_Logic() - preparing for loop()");
+			//Console.WriteLine("Do_Tactical_Logic() - preparing for loop()");
 			int recordCount = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, recordCount, i => 				
 			//for (int i = 0; i < Boids.Count; i++)
@@ -3331,7 +3331,7 @@ namespace HelloBoids
 						// continue; // NOTE: for regular for() loop we use "continue"
 
 					targets = tmp.OfType<Boid>().ToList();
-					Console.WriteLine("Do_Tactical_Logic() - Attacker Droid @ Array Index '" + attackerArrayIndex.ToString() + "' Found " + targets.Count.ToString() + " targets.");
+					//Console.WriteLine("Do_Tactical_Logic() - Attacker Droid @ Array Index '" + attackerArrayIndex.ToString() + "' Found " + targets.Count.ToString() + " targets.");
 					
 					
 					// WE HAVE A TARGET AND A WEAPON THAT CAN FIRE
@@ -3351,9 +3351,9 @@ namespace HelloBoids
 						//Console.WriteLine ("Do_Tactical_Logic() - Publishing FiringAt 1");	
 						r.Time = gt.TotalElapsedSeconds;
 						r.OfficerArrayIndex = operatorEntityArrayIndex;    // Attacking vessel's acting Tactical Officer
-						r.StationArrayIndex = stationArrayIndex;    // Attacking vessel Tactical Station
+						r.StationArrayIndex = stationArrayIndex;     // Attacking vessel Tactical Station
 						r.ShipArrayIndex = attackerArrayIndex;       // Attacking vessel
-						r.WeaponArrayIndex = weaponArrayIndex;     // Attacking vessel's weapon used
+						r.WeaponArrayIndex = weaponArrayIndex;       // Attacking vessel's weapon used
 						
 						r.TargetArrayIndices = new int[]{currentTarget.EntityArrayIndex};
 						//Console.WriteLine ("Do_Tactical_Logic() - Publishing FiringAt 1b");	
@@ -3373,9 +3373,8 @@ namespace HelloBoids
 						//       years later!
 						if (tacticalStationStruct.Span[0].CanHit(currentTarget))
 						{
-							attacker.ShotsFired++;
-							
-							//Console.WriteLine("Do_Tactical_Logic() - Attacker Droid @ Array Index '" + currentArrayIndex.ToString() + "' firing shot # " + currentBoid.ShotsFired.ToString() + " on Droid @ Array Index '" + currentTarget.EntityArrayIndex.ToString() + "'");
+							EntryClass.mUserDataStore[attacker.EntityKey].IncrementInteger("shotsfired");
+							//Console.WriteLine("Do_Tactical_Logic() - Attacker Droid @ Array Index '" + currentArrayIndex.ToString() + "' firing shot # " + EntryClass.mUserDataStore[attacker.EntityKey].IncrementInteger("shotsfired").ToString() + " on Droid @ Array Index '" + currentTarget.EntityArrayIndex.ToString() + "'");
 
 							// NOTE: here we assume the Fire() occurs immediately using a lightspeed laser and the damage is instantaneous 
 							//       and does not need any travel time to reach the currentTarget
@@ -3425,7 +3424,7 @@ namespace HelloBoids
 										throw new Exception("Do_Tactical_Logic() - Unexpected Damge type. " + damages[j].GetType().Name);
 								}
 								
-								//Console.WriteLine ("Do_Tactical_Logic() - Publishing HIT RESULTS 1");	
+								// Console.WriteLine ("Do_Tactical_Logic() - Publishing HIT RESULTS - 1");	
 								// Publish event with the Hit Results
 								actionID = (int)ACTIONS.TargetHit;
 								
@@ -3437,12 +3436,10 @@ namespace HelloBoids
 								r.ShipArrayIndex = attackerArrayIndex;           // Attacking vessel
 
 								r.WeaponArrayIndex = weaponArrayIndex;           // Attacking vessel's weapon used
-								//Console.WriteLine ("Do_Tactical_Logic() - Publishing HIT RESULTS 2");	
 								r.TargetArrayIndices = new int[]{currentTarget.EntityArrayIndex};
-								r.TargetOwnerArrayIndices = GetOwner(r.TargetArrayIndices);
-								//Console.WriteLine ("Do_Tactical_Logic() - Publishing HIT RESULTS 4");	
+								r.TargetOwnerArrayIndices = GetOwner(r.TargetArrayIndices);	
 								r.HitPoints = GetHitPoints(r.TargetArrayIndices);
-								Console.WriteLine ("Do_Tactical_Logic() - Publishing HIT RESULTS 5");	
+								Console.WriteLine ("Do_Tactical_Logic() - Publishing HIT RESULTS - 2");	
 								r.Damage = damageAmounts;
 								mSimEventManager.PublishEvent(attacker, actionID, r);
 							}
@@ -3846,7 +3843,7 @@ namespace HelloBoids
         {
 			//Console.WriteLine("CalculateDamage() - Created DamageSystem.Damage.");
 			System.Diagnostics.Debug.Assert (attacker.Configuration == (uint)HumanOperatorConfiguration, "CalculateDamage() - Attacker is of incorrect CONFIGURATION.");
-											 
+										 
 			// TODO: I think we want to have all relevant data on attacker and target
 			// for instance
 			// TacticalStation used
@@ -3866,9 +3863,9 @@ namespace HelloBoids
 			//string factionColor = "Red";
 			//factionColor = (rand.NextDouble() >= 0.5d) ? "Red" : "Blue";
 			//b.BlackBoardData.SetString("faction", factionColor);
-	
-	
-	
+			
+			
+			
 			object[] result = new object[2];
 			
 			/*
@@ -3883,14 +3880,23 @@ namespace HelloBoids
 			
 			result[0] = laserDamage;
 			*/
+			
+			int componentIndex = -1;
+			Memory<Component> targetComponent = (Memory<Component>)target.GetUserStruct(typeof(Component), out componentIndex);
 					
+			// todo: the weapon's actual damage needs to be a result along a bell curve of the average Damage
+			long damageAmount = weaponStruct.Span[0].Damage;
+			
+			damageAmount -= targetComponent.Span[0].Defense.Defense;
+			Console.WriteLine ("CalculateDamage() - " targetComponent.Span[0].Defense.Defense.ToString());
+			
 			double time = gt.TotalElapsedSeconds;
 	
 			DamageSystem.Damage d;
 			d.AttackerOperatorEntityArrayIndex = attacker.EntityArrayIndex;
 			d.WeaponUsedEntityArrayIndex = weaponStruct.Span[0].EntityArrayIndex;
 			d.TargetEntityArrayIndex = target.EntityArrayIndex;
-			d.Amount = 5;  // weaponStruct.BeamOutput;
+			d.Amount = (int)damageAmount;
 			d.TimeOfAttack = time;
 			result[0] = d;
 			
@@ -3919,7 +3925,7 @@ namespace HelloBoids
 			
 			
 			// weapon %power of maxpower being used vs weapon output
-
+			
 			
 			// weapon Hitpoints
 			
@@ -5676,15 +5682,12 @@ return (0,0);
     public class EntityNode : Transform
     {
         protected string mID; // entityKey
-        
 		protected int mArrayIndex; // index within a List<Boids> or List<Sensors> etc.
 		
         protected BoundingBox _box;
         protected OctreeOctant _octant;
 		
 		protected UserData mUserData;
-		
-		public uint ShotsFired = 0; // todo: belongs in TacticalStation 
 		public Dictionary<SKILLS, Skill> Skills;
 		
 		
@@ -8344,11 +8347,10 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
 		public override string ToString()
 		{
-			return "HP: " + Base.ToString() + "//" + Current.ToString();
+			return "HP: " + Current.ToString() + "/" + Base.ToString();
 		}
 	}
 		
-	
 	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
 	public struct LifeForm
 	{
@@ -11378,6 +11380,28 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 				Integers.Add (name, value);
 		}
 		
+		public void IncrementInteger (string name)
+		{
+			if (Integers == null)
+				Integers = new Dictionary<string, int> ();
+			
+			if (Integers.ContainsKey(name))
+				Integers [name] += 1;
+			else   				
+				Integers.Add (name, 1); // it doesnt exist would mean it's 0, so increment it  to 1, yes?
+		}
+		
+		public void DecrementInteger (string name)
+		{
+			if (Integers == null)
+				Integers = new Dictionary<string, int> ();
+			
+			if (Integers.ContainsKey(name))
+				Integers [name] -= 1;
+			else   				
+				Integers.Add (name, -1); // it doesnt exist would mean it's 0, so decrement it  to -1, yes?
+		}
+			
 		public double GetDouble (string name)
 		{
 			return Doubles[name];

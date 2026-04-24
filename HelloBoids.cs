@@ -1534,7 +1534,7 @@ namespace HelloBoids
 			// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
 //			storeWeapon.Span[checkOutIndex].TypeDamage = DAMAGE_TYPE.Burning;     // TOOD: Need an ENUM
 			//public string Damage;         // this is dice of damage, but often contains a multiplier like (100) afterwards.  We don't need the multiplier since we just compute a min/max damage range or maybe we compute a single damage that then gets modified based on the target evasive maneuvers and such
-			storeWeapon.Span[checkOutIndex].AverageDamage = 3;       
+			storeWeapon.Span[checkOutIndex].AverageDamage = 32;       
 //			public double KEDamage = 3.0d;
 //			public double HalfDamage; 
 //			public double VacuumHalfDamage;
@@ -1706,6 +1706,7 @@ namespace HelloBoids
 			//storeComp.Span[compInternalIndex].Weight = 2.5d;
 			//storeComp.Span[compInternalIndex].SurfaceArea = 1d;
 			//storeComp.Span[compInternalIndex].Volume = 0.2d;
+			
 			
 			// powerProducer struct
 			double BATTERY_POWER_STARTING_AMOUNT = 1000d;
@@ -3144,8 +3145,11 @@ namespace HelloBoids
 		private void Do_Tactical_Logic(int seed, double maxDistance, GameTime gt)
 		{
 			//Console.WriteLine("Do_Tactical_Logic() - BEGIN ");
-			ThreadedRandom random = new ThreadedRandom(seed);
-		
+			//ThreadedRandom random = new ThreadedRandom(seed);
+			
+			
+			
+			
 			// todo: we could pass in an array of store to our Processor functions... rather than just one.
 			//       but it would have to be an array of object[] like parameters and we'd have to cast them
 			// OR, our various processors can just grab the Stores that are needed.  There's no need really to 
@@ -3252,6 +3256,8 @@ namespace HelloBoids
 			//for (int i = 0; i < Boids.Count; i++)
             {
 				if (Boids[(int)i] is Boid == false) return;
+				
+				Random random = ThreadedRandom.Instance;
 				
 				Boid attacker = (Boid)Boids[(int)i];
 				// NOTE: Transform_Struct will  host indices for Boids, OpticalSensors and TacticalStations
@@ -3386,7 +3392,7 @@ namespace HelloBoids
 								// todo: randomly choose between 
 								// battery, opticalsensors, wings, laser, overall droid, tacticalstation or operator
 								EntityNode specificSubTarget = currentTarget;
-								damages = CalculateDamage(operators[0], specificSubTarget, weaponStruct, gt); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
+								damages = CalculateDamage(operators[0], specificSubTarget, weaponStruct, gt, random); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
 								int dCount = 0;
 								if (damages != null)
 									dCount = damages.Length;
@@ -3839,10 +3845,10 @@ namespace HelloBoids
 		/// The resulting damage types and amounts (and duration for damage that can be applied overtime)
 		/// that occur on this successful hit.
 		/// </summary>
-        private object[] CalculateDamage(EntityNode attacker, EntityNode target, Memory<Weapon> weaponStruct, GameTime gt)
+        private object[] CalculateDamage(EntityNode attackerOperator, EntityNode target, Memory<Weapon> weaponStruct, GameTime gt, Random rand)
         {
-			//Console.WriteLine("CalculateDamage() - Created DamageSystem.Damage.");
-			System.Diagnostics.Debug.Assert (attacker.Configuration == (uint)HumanOperatorConfiguration, "CalculateDamage() - Attacker is of incorrect CONFIGURATION.");
+			Console.WriteLine("CalculateDamage() - Begin.");
+			System.Diagnostics.Debug.Assert (attackerOperator.Configuration == (uint)HumanOperatorConfiguration, "CalculateDamage() - AttackerOperator is of incorrect CONFIGURATION.");
 										 
 			// TODO: I think we want to have all relevant data on attacker and target
 			// for instance
@@ -3882,21 +3888,43 @@ namespace HelloBoids
 			*/
 			
 			int componentIndex = -1;
-			Memory<Component> targetComponent = (Memory<Component>)target.GetUserStruct(typeof(Component), out componentIndex);
-					
-			// todo: the weapon's actual damage needs to be a result along a bell curve of the average Damage
-			long damageAmount = weaponStruct.Span[0].Damage;
+			Memory<LifeForm> targetLF = (Memory<LifeForm>)target.GetUserStruct(typeof(LifeForm), out componentIndex);
+			Console.WriteLine (targetLF.Equals(default).ToString());
 			
-			damageAmount -= targetComponent.Span[0].Defense.Defense;
-			Console.WriteLine ("CalculateDamage() - " targetComponent.Span[0].Defense.Defense.ToString());
+			
+			// todo: the weapon's actual damage needs to be a result along a bell curve of the average Damage
+			// https://gamedev.stackexchange.com/questions/198751/how-to-calculate-player-damage-in-a-game
+			// https://gamedev.stackexchange.com/questions/154920/browser-rpg-fight-calculation-formula/154927#154927  <- one user's opinion on why the 'luck' mechanic shouldn't be used
+			double damageAmount = weaponStruct.Span[0].AverageDamage;
+			
+			double variancePercentage = 0.10; // 10%
+
+			double min = damageAmount * (1 - variancePercentage);
+			double max = damageAmount * (1 + variancePercentage);
+			double damageAmountWithVariance = rand.NextDouble() * (max - min) + min;
+							   
+												   
+			double critMultiplier = 2;
+			double luck = 2;
+			double factor = 2.71; // you can mess with this factor to change how quickly it diminishes
+			bool isCriticalHit = rand.NextDouble() > System.Math.Pow(factor, -luck); // assuming random is in the range [0.0, 1.0]
+			
+			if (isCriticalHit)
+				damageAmountWithVariance *= critMultiplier;
+			
+			double defense = 10; //targetLF.Span[0].Defense.Defense
+			double finalDamageAmount = damageAmountWithVariance - defense; 
+									
+			// NOTE: Damage amount generated. 
+			Console.WriteLine ("CalculateDamage() - Result == " + finalDamageAmount.ToString() + " (Target DR == " + defense.ToString() + " Weapon Attack Value == " + damageAmountWithVariance.ToString() + "Critical Hit == " + isCriticalHit.ToString() + ")");
 			
 			double time = gt.TotalElapsedSeconds;
 	
 			DamageSystem.Damage d;
-			d.AttackerOperatorEntityArrayIndex = attacker.EntityArrayIndex;
+			d.AttackerOperatorEntityArrayIndex = attackerOperator.EntityArrayIndex;
 			d.WeaponUsedEntityArrayIndex = weaponStruct.Span[0].EntityArrayIndex;
 			d.TargetEntityArrayIndex = target.EntityArrayIndex;
-			d.Amount = (int)damageAmount;
+			d.Amount = (int)finalDamageAmount;
 			d.TimeOfAttack = time;
 			result[0] = d;
 			
@@ -3907,7 +3935,7 @@ namespace HelloBoids
 			//       when the "TimeOfAttack was <= gt.GetTime();
 			//       
 			DamageOverTimeSystem.DamageOverTime dot;
-			dot.AttackerOperatorEntityArrayIndex = attacker.EntityArrayIndex;
+			dot.AttackerOperatorEntityArrayIndex = attackerOperator.EntityArrayIndex;
 			dot.WeaponUsedEntityArrayIndex = weaponStruct.Span[0].EntityArrayIndex;
 			dot.TargetEntityArrayIndex = target.EntityArrayIndex;
 			dot.Amount = 1;  // weaponStruct.BeamOutput;

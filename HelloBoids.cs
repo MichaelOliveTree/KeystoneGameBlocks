@@ -9391,8 +9391,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 	
     public struct ArmorLayer
     {
-        public string Material;   // material type e.g metal // todo; need enums
-        public string Quality;    // material quality e.g. "cheap"  // todo:  need enums or perhaps a coefficient value instead AND THE GUI can interpet this coefficient into a string if desired
+        public string Material;   // material type e.g metal // TODO: need enums
+        public string Quality;    // material quality e.g. "cheap"  // todo:  make a coefficient value AND THE GUI can interpet this coefficient into a string if desired
         public int DR;
         public float Weight;
         public float Cost;   

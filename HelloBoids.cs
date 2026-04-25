@@ -1192,7 +1192,7 @@ namespace HelloBoids
 			b.AddUserStruct(typeof(LifeForm), memLivingEnt, livingEntityID);
 			
 			storeLivingEntity.Span[livingEntityID].Age = 1;
-			storeLivingEntity.Span[livingEntityID].HitPoints = new HitPoints(){ Base = 250};
+			storeLivingEntity.Span[livingEntityID].HitPoints = new HitPoints(){ Base = 250, Current = 250};
 			storeLivingEntity.Span[livingEntityID].Configuration = BoidConfiguration;
 			
 			
@@ -1797,15 +1797,19 @@ namespace HelloBoids
 		
 			// LIVING ENTITY
 			ComponentStore<LifeForm> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LifeForm>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-            int livingEntityID = -1;
-            Memory<LifeForm> memLivingEnt = storeLivingEntity.CheckOut(out livingEntityID);
-			humanOperator.AddUserStruct(typeof(LifeForm), memLivingEnt, livingEntityID);
+            int lfID = -1;
+            Memory<LifeForm> memLivingEnt = storeLivingEntity.CheckOut(out lfID);
+			humanOperator.AddUserStruct(typeof(LifeForm), memLivingEnt, lfID);
 			
-			storeLivingEntity.Span[livingEntityID].Age = 1;
-			storeLivingEntity.Span[livingEntityID].HitPoints =  new HitPoints(){ Base = 100};
-			storeLivingEntity.Span[livingEntityID].Configuration = HumanOperatorConfiguration;
+			storeLivingEntity.Span[lfID].Age = 1;
+			storeLivingEntity.Span[lfID].HitPoints =  new HitPoints(){ Base = 100, Current = 100};
+			storeLivingEntity.Span[lfID].Configuration = HumanOperatorConfiguration;
 			
-						
+			storeLivingEntity.Span[lfID].Armor.Defense = 50; // this is 'passive defense'
+					
+			// Armor
+			//		
+			//Console.WriteLine ("CREATING DEFENSE == " + memLivingEnt.Span[0].Armor.Defense.ToString());
 			
 			Skill targetingSkill;
 			targetingSkill.SkillType = SKILLS.Targeting;
@@ -1817,7 +1821,7 @@ namespace HelloBoids
 			
 			// add the modifier(s) to this skill.  Recall that modifiers behave just like any other type of PRODUCTION and must be registered as PRODUCTION 
 			// at the appropriate time (eg On USE of the Skill, or on EQUIP of an Item, etc.)
-			targetingSkill.AddProduction(livingEntityID, PRODUCTS.TargetingSkillModifier, 1, true, -1);
+			targetingSkill.AddProduction(lfID, PRODUCTS.TargetingSkillModifier, 1, true, -1);
 
 
 			// add the skill to the DROID as if it was being added to an OPERATOR for a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
@@ -1826,7 +1830,7 @@ namespace HelloBoids
 			// each Operator can Produce a TargetingSkillModifier
 			Production p;
 			p.ProducerEntityArrayIndex = humanOperator.EntityArrayIndex;
-			p.ProducerEntityInternalIndex = livingEntityID;
+			p.ProducerEntityInternalIndex = lfID;
 			p.ProductID = 	(int)targetingSkill.Production[0].Product;  // TargetingSkillModifier
 			p.Breaker = true;
 			
@@ -3445,7 +3449,7 @@ namespace HelloBoids
 								r.TargetArrayIndices = new int[]{currentTarget.EntityArrayIndex};
 								r.TargetOwnerArrayIndices = GetOwner(r.TargetArrayIndices);	
 								r.HitPoints = GetHitPoints(r.TargetArrayIndices);
-								Console.WriteLine ("Do_Tactical_Logic() - Publishing HIT RESULTS - 2");	
+								//Console.WriteLine ("Do_Tactical_Logic() - Publishing HIT RESULTS - 2");	
 								r.Damage = damageAmounts;
 								mSimEventManager.PublishEvent(attacker, actionID, r);
 							}
@@ -3687,13 +3691,15 @@ namespace HelloBoids
 			if (contacts != null) 
 				count = contacts.Count;
 			
-			Console.WriteLine("IsCombatant() - tacticalStation '" + tactical.EntityKey + "' has '" + count + "' contacts.");
+			//Console.WriteLine("IsCombatant() - tacticalStation '" + tactical.EntityKey + "' has '" + count + "' contacts.");
 			
 			for (int i = 0; i < count; i++)
 				if (contacts[i].ContactEntityArrayIndex == targetEntiyArrayIndex)
 				{
 				}
-						
+			
+			
+			
 			return false;
 		}
 			
@@ -3847,7 +3853,11 @@ namespace HelloBoids
 		/// </summary>
         private object[] CalculateDamage(EntityNode attackerOperator, EntityNode target, Memory<Weapon> weaponStruct, GameTime gt, Random rand)
         {
-			Console.WriteLine("CalculateDamage() - Begin.");
+			
+			// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
+			// https://gamedev.stackexchange.com/questions/148961/how-to-design-a-damage-formula-in-an-rpg-which-keeps-weapons-with-different-atta
+			
+			//Console.WriteLine("CalculateDamage() - Begin.");
 			System.Diagnostics.Debug.Assert (attackerOperator.Configuration == (uint)HumanOperatorConfiguration, "CalculateDamage() - AttackerOperator is of incorrect CONFIGURATION.");
 										 
 			// TODO: I think we want to have all relevant data on attacker and target
@@ -3887,10 +3897,9 @@ namespace HelloBoids
 			result[0] = laserDamage;
 			*/
 			
-			int componentIndex = -1;
-			Memory<LifeForm> targetLF = (Memory<LifeForm>)target.GetUserStruct(typeof(LifeForm), out componentIndex);
-			Console.WriteLine (targetLF.Equals(default).ToString());
-			
+			int lfIndex = -1;
+			Memory<LifeForm> targetLF = (Memory<LifeForm>)attackerOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
+
 			
 			// todo: the weapon's actual damage needs to be a result along a bell curve of the average Damage
 			// https://gamedev.stackexchange.com/questions/198751/how-to-calculate-player-damage-in-a-game
@@ -3902,22 +3911,32 @@ namespace HelloBoids
 			double min = damageAmount * (1 - variancePercentage);
 			double max = damageAmount * (1 + variancePercentage);
 			double damageAmountWithVariance = rand.NextDouble() * (max - min) + min;
-							   
-												   
-			double critMultiplier = 2;
-			double luck = 2;
-			double factor = 2.71; // you can mess with this factor to change how quickly it diminishes
-			bool isCriticalHit = rand.NextDouble() > System.Math.Pow(factor, -luck); // assuming random is in the range [0.0, 1.0]
 			
+			
+			// critChance is variable based on operator skill, factor is tweakable.
+			// the higher the "factor" and "critChance" (exponent), the smaller the resulting
+			// Pow() expression will result which will make rand.NextDouble() increasingly
+			// MORE LIKELY to be a higher value thus resuling in a CRITICAL HIT.
+			double critChance = 2.0d; // todo: this should be based on the weapon and the skill of the operator
+			double factor = 1.25d; // factor of 1 or less will result in there NEVER being a critical hit
+			
+			// 0% at luck = 0 and approaches 100% as luck goes to infinity.
+			bool isCriticalHit = rand.NextDouble() > System.Math.Pow(factor, -critChance); // rand.NextDouble() will be in range [0.0, 1.0]
+			// Math.Pow(2.71, -2) == 1/2.71^2  ==  1/7.344 == 0.13616371099249738
+			
+			
+			double critMultiplier = 2;
 			if (isCriticalHit)
 				damageAmountWithVariance *= critMultiplier;
 			
-			double defense = 10; //targetLF.Span[0].Defense.Defense
-			double finalDamageAmount = damageAmountWithVariance - defense; 
+			//targetFL.Span[0].Armor.Armor[side].
+			
+			int defense = targetLF.Span[0].Armor.Defense;
+			// if the defense is higher than the damage, then 0 damage gets through.  Math.Max() will prevent any "negative" damage in that case.
+			double finalDamageAmount = Math.Max(0, damageAmountWithVariance - defense); 
 									
 			// NOTE: Damage amount generated. 
-			Console.WriteLine ("CalculateDamage() - Result == " + finalDamageAmount.ToString() + " (Target DR == " + defense.ToString() + " Weapon Attack Value == " + damageAmountWithVariance.ToString() + "Critical Hit == " + isCriticalHit.ToString() + ")");
-			
+			Console.WriteLine ("CalculateDamage() - Result == " + finalDamageAmount.ToString() + " (Target Passive Defense == " + defense.ToString() + " Weapon Attack Value == " + damageAmountWithVariance.ToString() + " Critical Hit == " + isCriticalHit.ToString() + ")");
 			double time = gt.TotalElapsedSeconds;
 	
 			DamageSystem.Damage d;
@@ -3956,6 +3975,8 @@ namespace HelloBoids
 			
 			
 			// weapon Hitpoints
+			
+			
 			
 			
 			
@@ -8393,6 +8414,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		public double MaxAge;
 		
 		public HitPoints HitPoints; 
+		public Armor Armor;
 		
 		public Membership[] Memberships;
 		public Skill[] Skills;
@@ -8443,7 +8465,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		// 'Defense' is Armor (Armor Faces with Armor Layers and DR and PD)
 		// TODO: i think these simply need to be part of the Component 
 		// https://www.google.com/search?q=memory%3CT%3E+and+span%3CT%3E+from+a+struct+with+nested+structs&rlz=1C1GCPF_enUS1162US1162&oq=memory%3CT%3E+and+span%3CT%3E+from+a+struct+with+nested+structs&gs_lcrp=EgZjaHJvbWUyBggAEEUYOdIBCTExMDEzajBqMagCALACAA&sourceid=chrome&ie=UTF-8
-        public ExternalArmor Defense; 
+        public Armor Armor; 
         public InternalStructure Internals; 	
 		
         // stats
@@ -9210,39 +9232,72 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		//			public int PowerCellQuantity;
 		//			public double PowerCellWeight;
 
-		// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
-		// https://gamedev.stackexchange.com/questions/148961/how-to-design-a-damage-formula-in-an-rpg-which-keeps-weapons-with-different-atta
 
 	}
+
+	public Armor CreateArmor(uint numFaces = 6, uint numLayers = 1)
+	{
+		
+		Armor result = new Armor (numFaces, numLayers);
+		
+		return result;
+	}
+	
 	
 	public struct Armor
     {
         public const int MAX_ARMOR_LAYERS = 5;
-        public const int NUM_ARMOR_FACES = 6; //4 = front, back, left, right.  6 adds top, back.
+        public const int NUM_ARMOR_FACES = 6; //4 = front, back, left, right.  6 adds 'top' and 'back'.
 
-		public Armor(uint numFaces)
+		// can be init with 5 or 6 sides, with each side having arbitrary number of layers with NO MINIMUM either... so one or more sides can be completely UN-ARMORED
+		public Armor(uint numFaces = 6, uint numLayers = 1)
 		{
 			if (numFaces != NUM_ARMOR_FACES) throw new ArgumentOutOfRangeException();
 			
-			mSlopes = new byte[numFaces];
+			Slopes = new byte[numFaces];
 			Faces = new ArmorFace[numFaces];
-		}
-		
-		private byte[] mSlopes;
-        public ArmorFace[] Faces;
-		public byte[] Slopes 
-		{
-			get 
+			
+			for (int i = 0; i < numFaces; i++)
 			{
-				return mSlopes;
+				Faces[i] = new ArmorFace();
+				Faces[i].Layers = new ArmorLayer[numLayers];
+					for (int j = 0; j < numLayers; j++)
+					{
+						ArmorLayer layer;
+						layer.Cost = 100;
+						layer.Weight = 2000;
+						layer.DR = 50;
+						layer.Material = "metal";
+						layer.Quality = "average";
+						Faces[i].Layers[j] = layer;		
+					}
+				
+				Faces[i].SurfaceAttributes = ArmorFace.SURFACE_ATTRIBUTES.None;
+				
+				Faces[i].DR = 10;
+				Faces[i].Defense = 50;
+				
+				Slopes[i] = 0; // new byte(); \\ 0, 30,  45
+				
 			}
 		}
+		
+		/* 
+		Common armor slopes, particularly in armored fighting vehicle (AFV) design, typically range from 30 to over 80 degrees back from the vertical to increase the effective line-of-sight thickness and improve deflection chances. The most iconic design is the 60-degree slope, which doubles the effective thickness of the armour compared to its nominal thickness. 
+		Common Armor Slope Angles (from Vertical)
+            60 Degrees: The standard "optimal" slope for WWII-era vehicles, such as the T-34's glacis plate, which provides 2x the effective thickness ( 45mm / cos(60 degrees) = 90mm  ).
+			45–55 Degrees: Frequently used on intermediate armored vehicle designs, such as the Panzer V Panther (approx. 55°), which offers a roughly effectiveness multiplier to the line-of-sight thickness, depending on the research source.
+            75–82+ Degrees: Highly sloped, nearly horizontal angles found on "pike nose" designs (IS-3) or the front glacis of modern main battle tanks like the M1 Abrams, which can reach 80+ degrees, making the armor extremely effective against horizontal fire
+	*/
+		public byte[] Slopes;
+        public ArmorFace[] Faces;
+		public int Defense;           // shortcut overall Passive Defense // Passive Defense is a type of defense that requires no active trying to defeat an attack against it
     }
     
     public struct ArmorFace
     {
 		[Flags]
-		public enum SURFACE_ATTRBITUES : byte
+		public enum SURFACE_ATTRIBUTES : byte
 		{
 			None = 0,                // 0
     		RAP = 1 << 0,            // 1
@@ -9258,14 +9313,14 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         //public bool ThermalCoating;
         //public bool RadShielding;
         //public string ReflectiveCoating;  // todo: what types are there? see gvd // todo:  need enums or perhaps a coefficient value instead AND THE GUI can interpet this coefficient into a string if desired
-		public SURFACE_ATTRBITUES SurfaceAttributes;
-		
+		public SURFACE_ATTRIBUTES SurfaceAttributes;
+		public ArmorLayer[] Layers;
 				
 		                    // Armor, PD and DR is redundant with "Defense"
 		                    // This is additional to component DR, specialized defensive material added to the component to increase its protection (e.g., bolted-on steel plates, Kevlar blankets, or composite ceramic armor).
                                           // See Google AI Overview in Game01.Components.Armor.cs 
 		public int DR;                  // Defense Resistance - natural protection provided by the material and structure of the vehicle component itself (e.g., the 1-inch thick steel hull, the aluminum skin of an aircraft, or the glass of a windshield).
-        public int PD;                  // Passive Defense - see Google AI Overview in Game01.Components.Armor.cs Definition: PD acts as a bonus to the vehicle's evasion roll (Active Defense). Component PD is used when a specific part (like a turret, rotor, or sensor array) is targeted rather than the vehicle as a whole.
+        public int Defense;                  // Passive Defense - see Google AI Overview in Game01.Components.Armor.cs Definition: PD acts as a bonus to the vehicle's evasion roll (Active Defense). Component PD is used when a specific part (like a turret, rotor, or sensor array) is targeted rather than the vehicle as a whole.
  
         public float SurfaceArea {get;}
         public float Weight {get;}
@@ -9274,65 +9329,66 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
 		public bool RAP 
 		{
-			get {return (SurfaceAttributes & SURFACE_ATTRBITUES.RAP) == SURFACE_ATTRBITUES.RAP;}
+			get {return (SurfaceAttributes & SURFACE_ATTRIBUTES.RAP) == SURFACE_ATTRIBUTES.RAP;}
 			set 
 			{
 				if (value)
-                	SurfaceAttributes |= SURFACE_ATTRBITUES.RAP;
+                	SurfaceAttributes |= SURFACE_ATTRIBUTES.RAP;
                 else
-                    SurfaceAttributes &= ~SURFACE_ATTRBITUES.RAP;
+                    SurfaceAttributes &= ~SURFACE_ATTRIBUTES.RAP;
 			}
 		}
 		
 		public bool Electrified 
 		{
-			get {return (SurfaceAttributes & SURFACE_ATTRBITUES.Electrified) == SURFACE_ATTRBITUES.Electrified;}
+			get {return (SurfaceAttributes & SURFACE_ATTRIBUTES.Electrified) == SURFACE_ATTRIBUTES.Electrified;}
 			set 
 			{
 				if (value)
-                	SurfaceAttributes |= SURFACE_ATTRBITUES.Electrified;
+                	SurfaceAttributes |= SURFACE_ATTRIBUTES.Electrified;
                 else
-                    SurfaceAttributes &= ~SURFACE_ATTRBITUES.Electrified;
+                    SurfaceAttributes &= ~SURFACE_ATTRIBUTES.Electrified;
 			}
 		}
 		
 		public bool ThermalCoating 
 		{
-			get {return (SurfaceAttributes & SURFACE_ATTRBITUES.ThermalCoating) == SURFACE_ATTRBITUES.ThermalCoating;}
+			get {return (SurfaceAttributes & SURFACE_ATTRIBUTES.ThermalCoating) == SURFACE_ATTRIBUTES.ThermalCoating;}
 			set 
 			{
 				if (value)
-                	SurfaceAttributes |= SURFACE_ATTRBITUES.ThermalCoating;
+                	SurfaceAttributes |= SURFACE_ATTRIBUTES.ThermalCoating;
                 else
-                    SurfaceAttributes &= ~SURFACE_ATTRBITUES.ThermalCoating;
+                    SurfaceAttributes &= ~SURFACE_ATTRIBUTES.ThermalCoating;
 			}
 		}
 		
 		public bool RadShielding 
 		{
-			get {return (SurfaceAttributes & SURFACE_ATTRBITUES.RadShielding) == SURFACE_ATTRBITUES.RadShielding;}
+			get {return (SurfaceAttributes & SURFACE_ATTRIBUTES.RadShielding) == SURFACE_ATTRIBUTES.RadShielding;}
 			set 
 			{
 				if (value)
-                	SurfaceAttributes |= SURFACE_ATTRBITUES.RadShielding;
+                	SurfaceAttributes |= SURFACE_ATTRIBUTES.RadShielding;
                 else
-                    SurfaceAttributes &= ~SURFACE_ATTRBITUES.RadShielding;
+                    SurfaceAttributes &= ~SURFACE_ATTRIBUTES.RadShielding;
 			}
 		}
 		
 		public bool ReflectiveCoating 
 		{
-			get {return (SurfaceAttributes & SURFACE_ATTRBITUES.ReflectiveCoating) == SURFACE_ATTRBITUES.ReflectiveCoating;}
+			get {return (SurfaceAttributes & SURFACE_ATTRIBUTES.ReflectiveCoating) == SURFACE_ATTRIBUTES.ReflectiveCoating;}
 			set 
 			{
 				if (value)
-                	SurfaceAttributes |= SURFACE_ATTRBITUES.ReflectiveCoating;
+                	SurfaceAttributes |= SURFACE_ATTRIBUTES.ReflectiveCoating;
                 else
-                    SurfaceAttributes &= ~SURFACE_ATTRBITUES.ReflectiveCoating;
+                    SurfaceAttributes &= ~SURFACE_ATTRIBUTES.ReflectiveCoating;
 			}
 		}
     }
     
+	
     public struct ArmorLayer
     {
         public string Material;   // material type e.g metal // todo; need enums
@@ -9342,12 +9398,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         public float Cost;   
     }
 	
-	public struct ExternalArmor
-    {
-        public Armor[] Armor;   // can be init with 5 or 6 sides, with each side having arbitrary number of layers with NO MINIMUM either... so one or more sides can be completely UN-ARMORED
-        public int Defense;     // Passive Defense is a type of defense that requires no active trying to defeat an attack against it
-    }
-    
+
     public struct InternalStructure
     {
 		[Flags]
@@ -9375,9 +9426,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         // NOTE: hitpoints I think is fine for inanimate objects,
         //       but not good for living things. 
         //       https://www.youtube.com/watch?v=sMWMB9bjFGo
-        public int HitPoints; 
-        public int CurrentHP; // HitPoints - Damage == CurrentHP
-		
+        public HitPoints HitPoints;		
 		
 		public bool Robotic 
 		{

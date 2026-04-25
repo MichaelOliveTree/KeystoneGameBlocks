@@ -761,6 +761,7 @@ namespace HelloBoids
 		
 		public static SimulationEventManager mSimEventManager;
 		
+		private object mLock = new object();
 		
 			
 		
@@ -1857,15 +1858,14 @@ namespace HelloBoids
 			return humanOperator;
 		}
 		
-		public Armor CreateArmor(uint numFaces = 6, uint numLayers = 1)
+		public Armor CreateArmor(BoundingBox bbox, uint numFaces = 6, uint numLayers = 1)
 		{
-			Armor result = new Armor (numFaces, numLayers);
+			Armor result = new Armor (bbox, numFaces, numLayers);
 
 			return result;
 		}
 	
 		
-		private object mLock = new object();
 		
 		private int GetConsumerIndex (int productID, int entityArrayIndex)
 		{
@@ -9248,25 +9248,59 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         public const int MAX_ARMOR_LAYERS = 5;
         public const int NUM_ARMOR_FACES = 6; //4 = front, back, left, right.  6 adds 'top' and 'back'.
 
+		public double SurfaceArea 
+		{
+			get
+			{
+				// todo: to compute the surface area of each face, we should pass in a 
+				// box primitive where surfaceArea = 2 * (WH + DH + WD)  
+				///double D = box.Depth;
+				//double W = box.Width;
+				//double H = box.Height;
+
+				//this.SurfaceArea = 2 * ((W * H) + (D * H) + (W * D));
+				double result = 0;
+				for (int i = 0; i < Faces.Length; i++)
+					result += Faces[i].SurfaceArea;
+				
+				return result;
+			}
+		}
+		
+		public double Cost;
+		public double Weight;
+		public int AverageDR ; // average DR of all layers on all Faces
+		
+		public byte[] Slopes;
+        public ArmorFace[] Faces;
+		public int Defense;           // shortcut overall Passive Defense // Passive Defense is a type of defense that requires no active trying to defeat an attack against it
+		
+		private enum BOX_FACE_INDICES
+		{
+			FRONT = 0,
+			BACK = 1,
+			RIGHT = 2, 
+			LEFT = 3,
+			TOP = 4,
+			BOTTOM = 5
+		}
+		
 		// can be init with 5 or 6 sides, with each side having arbitrary number of layers with NO MINIMUM either... so one or more sides can be completely UN-ARMORED
-		public Armor(BoundingBox volume, uint numFaces = 6, uint numLayers = 1)
+		public Armor(BoundingBox box, uint numFaces = 6, uint numLayers = 1)
 		{
 			if (numFaces != NUM_ARMOR_FACES) throw new ArgumentOutOfRangeException();
 			
 			Slopes = new byte[numFaces];
 			Faces = new ArmorFace[numFaces];
 			
-			// TODO: make sure our ArmorFace[] array indices match those of our BoundingBox
-			// 
-				
-			// todo: to compute the surface area of each face, we should pass in a 
-			// box primitive where surfaceArea = 2 * (LW + LH + WH)  
-			// and for any given one side surfaceArea = LW or surfaceArea = LH or surfaceArea = WH 
-			// or a 
-			// volume in cubic meters where surfaceArea = 6 x (cube root of (volume))^2 
 			for (int i = 0; i < numFaces; i++)
 			{
+				double surfaceArea = GetArmorFaceSurfaceArea (i, box);
+				
 				Faces[i] = new ArmorFace();
+				Faces[i].SurfaceArea = surfaceArea;
+				
+						
 				
 				Faces[i].Layers = new ArmorLayer[numLayers];
 					for (int j = 0; j < numLayers; j++)
@@ -9295,26 +9329,126 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 				Slopes[i] = 0; // new byte(); \\ 0, 30,  45
 				
 			}
-			
 		}
-		public float GetArmorWeight (int damageResistance, double surfaceArea, string material, float quality)
+		
+		public double GetArmorFaceSurfaceArea (int side, BoundingBox box)
 		{
-			float result = 0;
+			double result = 0;
+			
+						// TODO: make sure our ArmorFace[] array indices match those of our BoundingBox
+			// Face0 (the end that points +z from camera) = FRONT = WIDTH * HEIGHT
+			// Face1 (the end that points -z toward camera) = BACK = WIDTH * HEIGHT
+			// Face2 = (the end that points +x to right of camera) = RIGHT = DEPTH * HEIGHT
+			// Face3 = (the end that points -x to left of camera) = LEFT = DEPTH * HEIGHT
+			// Face4 = top +y = TOP = WIDTH * DEPTH
+			// Face5 = bottom -y = BOTTOM = WIDTH * DEPTH
+			
+			BOX_FACE_INDICES eSide = (BOX_FACE_INDICES)side;
+			
+			switch (eSide)
+			{
+				case BOX_FACE_INDICES.FRONT:
+				case BOX_FACE_INDICES.BACK:
+					result = box.Width * box.Height;
+					break;
+				case BOX_FACE_INDICES.RIGHT:
+				case BOX_FACE_INDICES.LEFT:
+					result = box.Depth * box.Height;
+					break;
+				case BOX_FACE_INDICES.TOP:
+				case BOX_FACE_INDICES.BOTTOM:
+					result = box.Width * box.Depth;
+					break;
+			}
+				
+			
 
+			
+			// and for any given one side surfaceArea = LW or surfaceArea = LH or surfaceArea = WH 
+			// or a 
+			// volume in cubic meters where surfaceArea = 6 x (cube root of (volume))^2 
+			
+			return result;
+		}
+		
+		/// <summary>
+		/// surfaceAreaCubicMeters
+		/// </summary>
+		public double GetArmorWeight (int damageResistance, double surfaceArea, string material, float quality)
+		{
+			double result = 0;
 
+			switch (material)
+			{
+				/*  https://www.quora.com/What-is-the-cost-of-one-cubic-meter-of-low-carbon-steel
+				I don’t know of any steel plant that could cast 1 cubic metre in a single block
+				(and I know the industry very well). However, if the 1 cubic metre were made up 
+				of 4 slabs, each 250mm (1/4 meter) thick, then you could have a “block” 1 cubic metre thick. 
+				This block would weigh 7,850kg = 7.85 tonnes. The current price of slabs – Brazil,
+				FOB port – is $US490 to $US505 per tonne, so your 1 cubic metre would cost 
+				approximately $US3,905.
+				*/
+					
+				/*  https://www.quora.com/What-is-the-cost-of-one-cubic-meter-of-low-carbon-steel
+				Price of one cubic meter of low‑carbon steel varies by grade, form, market and region. As of mid‑2024 typical ranges and how to compute cost:
+
+				Key inputs
+
+				Density (approximate): 7,850 kg/m³ (commonly used value for mild/low‑carbon steels).
+				Price basis: usually quoted in currency per tonne (metric ton = 1,000 kg).
+				Conversion: 1 m³ ≈ 7.85 tonnes, so multiply price per tonne by 7.85.
+				Typical market price examples (approximate, mid‑2024 observations)
+
+				Commodity mild/low‑carbon steel (rolled coil, bulk domestic): US$600–1,000 per tonne → US$4,700–7,850 per m³.
+				Structural/plate mild steel (common commercial grades): US$700–1,200 per tonne → US$5,500–9,420 per m³.
+				Low‑carbon specialty or alloyed variants: higher; US$1,200–2,000+ per tonne → US$9,420–15,700+ per m³.
+				How to get an exact current cost
+
+				Identify the exact grade and product form (sheet, plate, ingot, billet) — processing and yield affect price.
+				Check spot prices on commodity services (Metal Bulletin, Fastmarkets, Platts) or regional steel distributors.
+				Convert by multiplying quoted price per tonne by 7.85 to get per‑m³ cost.
+				Add applicable extras: freight, customs/duties, cutting/processing, taxes, and volume discounts.
+				Example calculation
+
+				If supplier quote = US$850/tonne for mild steel: 850 × 7.85 = US$6,672.50 per m³ (plus logistics and processing).
+				Regional note
+
+				Prices fluctuate with scrap/iron ore markets, energy costs and local trade policy; use local supplier quotes for procurement decisions.
+				If a precise, up‑to‑date number is required for budgeting, obtain current per‑tonne quotes from local mills or distributors and apply the 7.85 multiplier.
+				*/
+					
+				case "iron":
+					// DR = 2.75 per 1mm of IRON thickness.  
+					//      So we can let the user type in the thickness of the armor and we can compute the DR ourselves
+					//      and frankly just forget about using DR at all.  We'll only deal in "thickness".. well... 
+					//      the reason for a 'DR' is so that we can roughly compare (conceptually) different material types... like... 
+					//      1 mm of IRON == 1 meter of CARDBOARD == 2.75DR
+					//
+					result = 5000d * surfaceArea * damageResistance;
+					break;
+				default:
+					break;
+			}
 
 			return result;
 		}
 
-		public float GetArmorCost (int damageResistance, double surfaceArea, string material, float quality)
+		public double GetArmorCost (int damageResistance, double surfaceArea, string material, float quality)
 		{
-			float result = 0;
+			double result = 0;
 
-
+			switch (material)
+			{
+				case "iron":
+					break;
+				default:
+					break;
+			}
 
 			return result;
 		}
 	
+		
 		
 		/* 
 		Common armor slopes, particularly in armored fighting vehicle (AFV) design, typically range from 30 to over 80 degrees back from the vertical to increase the effective line-of-sight thickness and improve deflection chances. The most iconic design is the 60-degree slope, which doubles the effective thickness of the armour compared to its nominal thickness. 
@@ -9323,9 +9457,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			45–55 Degrees: Frequently used on intermediate armored vehicle designs, such as the Panzer V Panther (approx. 55°), which offers a roughly effectiveness multiplier to the line-of-sight thickness, depending on the research source.
             75–82+ Degrees: Highly sloped, nearly horizontal angles found on "pike nose" designs (IS-3) or the front glacis of modern main battle tanks like the M1 Abrams, which can reach 80+ degrees, making the armor extremely effective against horizontal fire
 	*/
-		public byte[] Slopes;
-        public ArmorFace[] Faces;
-		public int Defense;           // shortcut overall Passive Defense // Passive Defense is a type of defense that requires no active trying to defeat an attack against it
+		
     }
     
     public struct ArmorFace
@@ -9356,7 +9488,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		public int DR;                  //  Defense Resistance - natural protection provided by the material and structure of the vehicle component itself (e.g., the 1-inch thick steel hull, the aluminum skin of an aircraft, or the glass of a windshield).
         public int Defense;                  // Passive Defense - see Google AI Overview in Game01.Components.Armor.cs Definition: PD acts as a bonus to the vehicle's evasion roll (Active Defense). Component PD is used when a specific part (like a turret, rotor, or sensor array) is targeted rather than the vehicle as a whole.
  
-        public float SurfaceArea {get;}
+        public double SurfaceArea;
         public float Weight {get;}
         public float Cost {get;}
 		

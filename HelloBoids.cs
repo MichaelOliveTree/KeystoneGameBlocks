@@ -1806,7 +1806,8 @@ namespace HelloBoids
 			storeLivingEntity.Span[lfID].HitPoints =  new HitPoints(){ Base = 100, Current = 100};
 			storeLivingEntity.Span[lfID].Configuration = HumanOperatorConfiguration;
 			
-			storeLivingEntity.Span[lfID].Armor.Defense = 50; // this is 'passive defense'
+			BoundingBox box = new BoundingBox (Vector3d.Zero(), 1);
+			storeLivingEntity.Span[lfID].Armor = new Armor(box);
 					
 			// Armor
 			//		
@@ -3937,12 +3938,12 @@ namespace HelloBoids
 			
 			//targetFL.Span[0].Armor.Armor[side].
 			
-			int defense = targetLF.Span[0].Armor.Defense;
+			int defense = targetLF.Span[0].Armor.AverageDR;
 			// if the defense is higher than the damage, then 0 damage gets through.  Math.Max() will prevent any "negative" damage in that case.
 			double finalDamageAmount = Math.Max(0, damageAmountWithVariance - defense); 
 									
 			// NOTE: Damage amount generated. 
-			Console.WriteLine ("CalculateDamage() - Result == " + finalDamageAmount.ToString() + " (Target Passive Defense == " + defense.ToString() + " Weapon Attack Value == " + damageAmountWithVariance.ToString() + " Critical Hit == " + isCriticalHit.ToString() + ")");
+			Console.WriteLine ("CalculateDamage() - Result == " + finalDamageAmount.ToString() + " (Target Average Defense == " + defense.ToString() + " Weapon Attack Value == " + damageAmountWithVariance.ToString() + " Critical Hit == " + isCriticalHit.ToString() + ")");
 			double time = gt.TotalElapsedSeconds;
 	
 			DamageSystem.Damage d;
@@ -9245,9 +9246,20 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 	
 	public struct Armor
     {
+		private enum BOX_FACE_INDICES
+		{
+			FRONT = 0,
+			BACK = 1,
+			RIGHT = 2, 
+			LEFT = 3,
+			TOP = 4,
+			BOTTOM = 5
+		}
+		
         public const int MAX_ARMOR_LAYERS = 5;
         public const int NUM_ARMOR_FACES = 6; //4 = front, back, left, right.  6 adds 'top' and 'back'.
-
+        public ArmorFace[] Faces;
+		
 		public double SurfaceArea 
 		{
 			get
@@ -9267,30 +9279,34 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			}
 		}
 		
+
 		public double Cost;
 		public double Weight;
-		public int AverageDR ; // average DR of all layers on all Faces
 		
-		public byte[] Slopes;
-        public ArmorFace[] Faces;
-		public int Defense;           // shortcut overall Passive Defense // Passive Defense is a type of defense that requires no active trying to defeat an attack against it
-		
-		private enum BOX_FACE_INDICES
+		// average DR of all layers on all Faces
+		public int AverageDR 
 		{
-			FRONT = 0,
-			BACK = 1,
-			RIGHT = 2, 
-			LEFT = 3,
-			TOP = 4,
-			BOTTOM = 5
+			get
+			{
+				if (Faces == null || Faces.Length == 0) return 0;
+				
+				int result = 0;
+				for (int i = 0; i < Faces.Length; i++)
+					// recall that the DR per Face is the combined DR of all Layers.DR of that Face
+					result += Faces[i].DR;
+				
+				// average for each Face is totaly DRs of all Layers divided by the number of Faces
+				return result / Faces.Length;
+			}
 		}
+		
+		//public int Defense;           // shortcut overall Passive Defense // Passive Defense is a type of defense that requires no active trying to defeat an attack against it
 		
 		// can be init with 5 or 6 sides, with each side having arbitrary number of layers with NO MINIMUM either... so one or more sides can be completely UN-ARMORED
 		public Armor(BoundingBox box, uint numFaces = 6, uint numLayers = 1)
 		{
 			if (numFaces != NUM_ARMOR_FACES) throw new ArgumentOutOfRangeException();
 			
-			Slopes = new byte[numFaces];
 			Faces = new ArmorFace[numFaces];
 			
 			for (int i = 0; i < numFaces; i++)
@@ -9299,17 +9315,17 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 				
 				Faces[i] = new ArmorFace();
 				Faces[i].SurfaceArea = surfaceArea;
-				
-						
-				
+				Faces[i].SurfaceAttributes = ArmorFace.SURFACE_ATTRIBUTES.None;
+				    
+				Faces[i].Defense = 50; // passive defense... 
 				Faces[i].Layers = new ArmorLayer[numLayers];
 					for (int j = 0; j < numLayers; j++)
 					{
-						int DR = 50;
+						int DR = 50
 						string material = "iron";
 						float quality = 0.5f;  // 0.1 is very poor/cheap,  0.5 is average quality, 0.9 is Space-Grade, 1.0 is Advanced-Spec
-						float cost = GetArmorCost (DR, Faces[i].SurfaceArea, material, quality); // 100;
-						float weight = GetArmorWeight(DR, Faces[i].SurfaceArea, material, quality); // 2000
+						double cost = GetArmorCost (DR, Faces[i].SurfaceArea, material, quality); // 100;
+						double weight = GetArmorWeight(DR, Faces[i].SurfaceArea, material, quality); // 2000
 						
 						ArmorLayer layer;
 						layer.Cost = cost;
@@ -9320,14 +9336,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 						
 						Faces[i].Layers[j] = layer;		
 					}
-				
-				Faces[i].SurfaceAttributes = ArmorFace.SURFACE_ATTRIBUTES.None;
-				
-				Faces[i].DR = 10; // todo: should this be the combined value of all layers?
-				Faces[i].Defense = 50; // passive defense... 
-				
-				Slopes[i] = 0; // new byte(); \\ 0, 30,  45
-				
 			}
 		}
 		
@@ -9335,7 +9343,11 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		{
 			double result = 0;
 			
-						// TODO: make sure our ArmorFace[] array indices match those of our BoundingBox
+			
+			// TODO: make sure our ArmorFace[] array indices match those of our BoundingBox
+			//       WARNING: See BoundingBox.GetQuadFaceVertices()  because i think
+			//       there we grab the vertices for each face and we are using different
+			//       indices for each Face.  They need to be the same.
 			// Face0 (the end that points +z from camera) = FRONT = WIDTH * HEIGHT
 			// Face1 (the end that points -z toward camera) = BACK = WIDTH * HEIGHT
 			// Face2 = (the end that points +x to right of camera) = RIGHT = DEPTH * HEIGHT
@@ -9361,8 +9373,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 					break;
 			}
 				
-			
-
 			
 			// and for any given one side surfaceArea = LW or surfaceArea = LH or surfaceArea = WH 
 			// or a 
@@ -9418,13 +9428,14 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 				*/
 					
 				case "iron":
-					// DR = 2.75 per 1mm of IRON thickness.  
+					// DR = 2.75DR per 1mm of IRON thickness.  1 meter by 1 meter by 1mm thick iron plate = 7.85 kilograms
+					//
 					//      So we can let the user type in the thickness of the armor and we can compute the DR ourselves
 					//      and frankly just forget about using DR at all.  We'll only deal in "thickness".. well... 
 					//      the reason for a 'DR' is so that we can roughly compare (conceptually) different material types... like... 
-					//      1 mm of IRON == 1 meter of CARDBOARD == 2.75DR
+					//      1mm thick of IRON == 1 meter thick of CARDBOARD == 2.75DR
 					//
-					result = 5000d * surfaceArea * damageResistance;
+					result = 500d * surfaceArea * damageResistance;
 					break;
 				default:
 					break;
@@ -9440,6 +9451,10 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			switch (material)
 			{
 				case "iron":
+					double thickness = damageResistance / 2.75d;
+					double pricePerKG = 0.70d; // 3.00 per kg for high-carbon/alloyed
+					// so we'd like quality (0.0 - 1.0) to map linearly from 0.70 scrap to 3.00 highcarbon/alloyed  
+					result = pricePerKG * GetArmorWeight (damageResistance, surfaceArea, material, quality);
 					break;
 				default:
 					break;
@@ -9447,17 +9462,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 
 			return result;
 		}
-	
-		
-		
-		/* 
-		Common armor slopes, particularly in armored fighting vehicle (AFV) design, typically range from 30 to over 80 degrees back from the vertical to increase the effective line-of-sight thickness and improve deflection chances. The most iconic design is the 60-degree slope, which doubles the effective thickness of the armour compared to its nominal thickness. 
-		Common Armor Slope Angles (from Vertical)
-            60 Degrees: The standard "optimal" slope for WWII-era vehicles, such as the T-34's glacis plate, which provides 2x the effective thickness ( 45mm / cos(60 degrees) = 90mm  ).
-			45–55 Degrees: Frequently used on intermediate armored vehicle designs, such as the Panzer V Panther (approx. 55°), which offers a roughly effectiveness multiplier to the line-of-sight thickness, depending on the research source.
-            75–82+ Degrees: Highly sloped, nearly horizontal angles found on "pike nose" designs (IS-3) or the front glacis of modern main battle tanks like the M1 Abrams, which can reach 80+ degrees, making the armor extremely effective against horizontal fire
-	*/
-		
     }
     
     public struct ArmorFace
@@ -9481,17 +9485,62 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         //public string ReflectiveCoating;  // todo: what types are there? see gvd // todo:  need enums or perhaps a coefficient value instead AND THE GUI can interpet this coefficient into a string if desired
 		public SURFACE_ATTRIBUTES SurfaceAttributes;
 		public ArmorLayer[] Layers;
+		
+		/* 
+			Common armor slopes, particularly in armored fighting vehicle (AFV) design, typically range from 30 to over 80 degrees back from the vertical to increase the effective line-of-sight thickness and improve deflection chances. The most iconic design is the 60-degree slope, which doubles the effective thickness of the armour compared to its nominal thickness. 
+			Common Armor Slope Angles (from Vertical)
+            	60 Degrees: The standard "optimal" slope for WWII-era vehicles, such as the T-34's glacis plate, which provides 2x the effective thickness ( 45mm / cos(60 degrees) = 90mm  ).
+				45–55 Degrees: Frequently used on intermediate armored vehicle designs, such as the Panzer V Panther (approx. 55°), which offers a roughly effectiveness multiplier to the line-of-sight thickness, depending on the research source.
+            	75–82+ Degrees: Highly sloped, nearly horizontal angles found on "pike nose" designs (IS-3) or the front glacis of modern main battle tanks like the M1 Abrams, which can reach 80+ degrees, making the armor extremely effective against horizontal fire
+		*/
+		public byte Slope;
+		                    
+		// Armor DR and Passive Defense is additional to component DR, specialized defensive material added to the component to increase its protection (e.g., bolted-on steel plates, Kevlar blankets, or composite ceramic armor).
+         		//    See Google AI Overview in Game01.Components.Armor.cs 
+		// Defense Resistance - natural protection provided by the material and structure of the vehicle
+		// component itself (e.g., the 1-inch thick steel hull, the aluminum skin of an aircraft, or 
+		// the glass of a windshield).
+		public int DR
+		{
+			get
+			{
+				if (Layers == null || Layers.Length == 0) return 0;
+				int result = 0;
+				for (int i = 0; i < Layers.Length; i++)
+					result += Layers[i].DR;
 				
-		                    // Armor, PD and DR is redundant with "Defense"
-		                    // This is additional to component DR, specialized defensive material added to the component to increase its protection (e.g., bolted-on steel plates, Kevlar blankets, or composite ceramic armor).
-                                          // See Google AI Overview in Game01.Components.Armor.cs 
-		public int DR;                  //  Defense Resistance - natural protection provided by the material and structure of the vehicle component itself (e.g., the 1-inch thick steel hull, the aluminum skin of an aircraft, or the glass of a windshield).
+				return result;
+			}
+		}      						
         public int Defense;                  // Passive Defense - see Google AI Overview in Game01.Components.Armor.cs Definition: PD acts as a bonus to the vehicle's evasion roll (Active Defense). Component PD is used when a specific part (like a turret, rotor, or sensor array) is targeted rather than the vehicle as a whole.
  
         public double SurfaceArea;
-        public float Weight {get;}
-        public float Cost {get;}
 		
+        public double Weight 
+		{
+			get
+			{
+				if (Layers == null || Layers.Length == 0) return 0;
+				double result = 0;
+				for (int i = 0; i < Layers.Length; i++)
+					result += Layers[i].Weight;
+				
+				return result;
+			}
+		}
+		
+        public double Cost
+		{
+			get
+			{
+				if (Layers == null || Layers.Length == 0) return 0;
+				double result = 0;
+				for (int i = 0; i < Layers.Length; i++)
+					result += Layers[i].Cost;
+				
+				return result;
+			}
+		}
 		
 		public bool RAP 
 		{
@@ -9559,8 +9608,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
     {
         public string Material;   // material type e.g metal // TODO: need enums
         public float Quality;    
-        public float Weight;
-        public float Cost; 
+        public double Weight;
+        public double Cost; 
 		public int DR;
     }
 	

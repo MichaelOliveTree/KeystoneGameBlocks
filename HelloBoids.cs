@@ -1857,6 +1857,14 @@ namespace HelloBoids
 			return humanOperator;
 		}
 		
+		public Armor CreateArmor(uint numFaces = 6, uint numLayers = 1)
+		{
+			Armor result = new Armor (numFaces, numLayers);
+
+			return result;
+		}
+	
+		
 		private object mLock = new object();
 		
 		private int GetConsumerIndex (int productID, int entityArrayIndex)
@@ -1866,7 +1874,6 @@ namespace HelloBoids
 			if (consumption == null || consumption.Count == 0) return -1;
 
 			Predicate<Consumption> match = c => c.ConsumerEntityArrayIndex == entityArrayIndex ;
-			
 			
 			return consumption.FindIndex(match);
 		}
@@ -1881,7 +1888,6 @@ namespace HelloBoids
 			//			RemoveProduction(e)
 			//	        RemoveConsumption(e);
 			//       }
-				
 
 			// remove from Octree
 			this.Octree.OnEntityNode_Removed(entity);
@@ -9235,14 +9241,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 
 	}
 
-	public Armor CreateArmor(uint numFaces = 6, uint numLayers = 1)
-	{
-		
-		Armor result = new Armor (numFaces, numLayers);
-		
-		return result;
-	}
-	
+
 	
 	public struct Armor
     {
@@ -9250,37 +9249,72 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         public const int NUM_ARMOR_FACES = 6; //4 = front, back, left, right.  6 adds 'top' and 'back'.
 
 		// can be init with 5 or 6 sides, with each side having arbitrary number of layers with NO MINIMUM either... so one or more sides can be completely UN-ARMORED
-		public Armor(uint numFaces = 6, uint numLayers = 1)
+		public Armor(BoundingBox volume, uint numFaces = 6, uint numLayers = 1)
 		{
 			if (numFaces != NUM_ARMOR_FACES) throw new ArgumentOutOfRangeException();
 			
 			Slopes = new byte[numFaces];
 			Faces = new ArmorFace[numFaces];
 			
+			// TODO: make sure our ArmorFace[] array indices match those of our BoundingBox
+			// 
+				
+			// todo: to compute the surface area of each face, we should pass in a 
+			// box primitive where surfaceArea = 2 * (LW + LH + WH)  
+			// and for any given one side surfaceArea = LW or surfaceArea = LH or surfaceArea = WH 
+			// or a 
+			// volume in cubic meters where surfaceArea = 6 x (cube root of (volume))^2 
 			for (int i = 0; i < numFaces; i++)
 			{
 				Faces[i] = new ArmorFace();
+				
 				Faces[i].Layers = new ArmorLayer[numLayers];
 					for (int j = 0; j < numLayers; j++)
 					{
+						int DR = 50;
+						string material = "iron";
+						float quality = 0.5f;  // 0.1 is very poor/cheap,  0.5 is average quality, 0.9 is Space-Grade, 1.0 is Advanced-Spec
+						float cost = GetArmorCost (DR, Faces[i].SurfaceArea, material, quality); // 100;
+						float weight = GetArmorWeight(DR, Faces[i].SurfaceArea, material, quality); // 2000
+						
 						ArmorLayer layer;
-						layer.Cost = 100;
-						layer.Weight = 2000;
-						layer.DR = 50;
-						layer.Material = "metal";
-						layer.Quality = "average";
+						layer.Cost = cost;
+						layer.Weight = weight;
+						layer.DR = DR;
+						layer.Material = material; // type of material should be enum (wood, metal, non-rigid, ablative, fireproof-ablative, composite, laminate
+						layer.Quality = quality; //  a coefficient with 1.0 being the highest possible quality material
+						
 						Faces[i].Layers[j] = layer;		
 					}
 				
 				Faces[i].SurfaceAttributes = ArmorFace.SURFACE_ATTRIBUTES.None;
 				
-				Faces[i].DR = 10;
-				Faces[i].Defense = 50;
+				Faces[i].DR = 10; // todo: should this be the combined value of all layers?
+				Faces[i].Defense = 50; // passive defense... 
 				
 				Slopes[i] = 0; // new byte(); \\ 0, 30,  45
 				
 			}
+			
 		}
+		public float GetArmorWeight (int damageResistance, double surfaceArea, string material, float quality)
+		{
+			float result = 0;
+
+
+
+			return result;
+		}
+
+		public float GetArmorCost (int damageResistance, double surfaceArea, string material, float quality)
+		{
+			float result = 0;
+
+
+
+			return result;
+		}
+	
 		
 		/* 
 		Common armor slopes, particularly in armored fighting vehicle (AFV) design, typically range from 30 to over 80 degrees back from the vertical to increase the effective line-of-sight thickness and improve deflection chances. The most iconic design is the 60-degree slope, which doubles the effective thickness of the armour compared to its nominal thickness. 
@@ -9319,7 +9353,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		                    // Armor, PD and DR is redundant with "Defense"
 		                    // This is additional to component DR, specialized defensive material added to the component to increase its protection (e.g., bolted-on steel plates, Kevlar blankets, or composite ceramic armor).
                                           // See Google AI Overview in Game01.Components.Armor.cs 
-		public int DR;                  // Defense Resistance - natural protection provided by the material and structure of the vehicle component itself (e.g., the 1-inch thick steel hull, the aluminum skin of an aircraft, or the glass of a windshield).
+		public int DR;                  //  Defense Resistance - natural protection provided by the material and structure of the vehicle component itself (e.g., the 1-inch thick steel hull, the aluminum skin of an aircraft, or the glass of a windshield).
         public int Defense;                  // Passive Defense - see Google AI Overview in Game01.Components.Armor.cs Definition: PD acts as a bonus to the vehicle's evasion roll (Active Defense). Component PD is used when a specific part (like a turret, rotor, or sensor array) is targeted rather than the vehicle as a whole.
  
         public float SurfaceArea {get;}
@@ -9392,10 +9426,10 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
     public struct ArmorLayer
     {
         public string Material;   // material type e.g metal // TODO: need enums
-        public string Quality;    // material quality e.g. "cheap"  // todo:  make a coefficient value AND THE GUI can interpet this coefficient into a string if desired
-        public int DR;
+        public float Quality;    
         public float Weight;
-        public float Cost;   
+        public float Cost; 
+		public int DR;
     }
 	
 

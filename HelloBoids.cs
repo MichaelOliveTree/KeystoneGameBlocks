@@ -3269,13 +3269,12 @@ namespace HelloBoids
 				if (Boids[(int)i] is Boid == false) return;
 				
 				Random random = ThreadedRandom.Instance;
-				
 				Boid attacker = (Boid)Boids[(int)i];
+				
 				// NOTE: Transform_Struct will  host indices for Boids, OpticalSensors and TacticalStations
 				int currentInternalIndex = attacker.GetUserStructIndex(typeof(Transform.Transform_Struct));
 				int attackerArrayIndex = attacker.EntityArrayIndex;
 				System.Diagnostics.Debug.Assert (attackerArrayIndex == i, "Do_Droid_Logic() - i and attackerArrayIndex do not match.");
-				
 				
 				// get a reference to the Station and determine if it "CanAct()"
 				EntityNode[] operators = GetTacticalStationOperators(attackerArrayIndex);
@@ -3860,6 +3859,19 @@ namespace HelloBoids
 		/// </summary>
         private object[] CalculateDamage(EntityNode attackerOperator, EntityNode target, Memory<Weapon> weaponStruct, GameTime gt, Random rand)
         {
+			// 1 - Calc Malfunction
+			// 2 - Make sure GetQuadFaceVertices matches those vertices for GetBoundingBoxVertices()
+			// 5 - Distance effect on Damage (laser attenuation/falloff)
+			// 6 - variances for spawned Droid Size
+			// 8 - randomness of skills of operators
+			// 9 - armor of the Droid randomness based on the size of the Droid
+			// 10 - armor option for Operators
+			// 7 - destruction of Droids upon lose of hitpoints
+			
+
+			// 3- double buffering of Data
+			// 4 - finish Statistics and Policies
+			// 5 - class Builder 
 			
 			// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
 			// https://gamedev.stackexchange.com/questions/148961/how-to-design-a-damage-formula-in-an-rpg-which-keeps-weapons-with-different-atta
@@ -9244,6 +9256,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 
 
 	
+	
 	public struct Armor
     {
 		private enum BOX_FACE_INDICES
@@ -9264,13 +9277,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		{
 			get
 			{
-				// todo: to compute the surface area of each face, we should pass in a 
-				// box primitive where surfaceArea = 2 * (WH + DH + WD)  
-				///double D = box.Depth;
-				//double W = box.Width;
-				//double H = box.Height;
-
-				//this.SurfaceArea = 2 * ((W * H) + (D * H) + (W * D));
 				double result = 0;
 				for (int i = 0; i < Faces.Length; i++)
 					result += Faces[i].SurfaceArea;
@@ -9313,15 +9319,14 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			{
 				double surfaceArea = GetArmorFaceSurfaceArea (i, box);
 				
-				Faces[i] = new ArmorFace();
-				Faces[i].SurfaceArea = surfaceArea;
+				Faces[i] = new ArmorFace(box, i);
 				Faces[i].SurfaceAttributes = ArmorFace.SURFACE_ATTRIBUTES.None;
 				    
 				Faces[i].Defense = 50; // passive defense... 
 				Faces[i].Layers = new ArmorLayer[numLayers];
 					for (int j = 0; j < numLayers; j++)
 					{
-						int DR = 50
+						int DR = 50;
 						string material = "iron";
 						float quality = 0.5f;  // 0.1 is very poor/cheap,  0.5 is average quality, 0.9 is Space-Grade, 1.0 is Advanced-Spec
 						double cost = GetArmorCost (DR, Faces[i].SurfaceArea, material, quality); // 100;
@@ -9484,6 +9489,17 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         //public bool RadShielding;
         //public string ReflectiveCoating;  // todo: what types are there? see gvd // todo:  need enums or perhaps a coefficient value instead AND THE GUI can interpet this coefficient into a string if desired
 		public SURFACE_ATTRIBUTES SurfaceAttributes;
+		
+		private int mFaceIndex; // from BoundingBox
+		private BoundingBox mBox;
+		public ArmorFace(BoundingBox box, int faceIndex)
+		{
+			mBox = box;
+			mFaceIndex = faceIndex; // the faceIndex of the BoundingBox (see BoundingBox.GetFaceVertices())
+			
+			Vertices = BoundingBox.GetQuadFaceVertices(mBox);
+		}
+		
 		public ArmorLayer[] Layers;
 		
 		/* 
@@ -9493,8 +9509,11 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 				45–55 Degrees: Frequently used on intermediate armored vehicle designs, such as the Panzer V Panther (approx. 55°), which offers a roughly effectiveness multiplier to the line-of-sight thickness, depending on the research source.
             	75–82+ Degrees: Highly sloped, nearly horizontal angles found on "pike nose" designs (IS-3) or the front glacis of modern main battle tanks like the M1 Abrams, which can reach 80+ degrees, making the armor extremely effective against horizontal fire
 		*/
+		
 		public byte Slope;
-		                    
+		       
+		
+	     
 		// Armor DR and Passive Defense is additional to component DR, specialized defensive material added to the component to increase its protection (e.g., bolted-on steel plates, Kevlar blankets, or composite ceramic armor).
          		//    See Google AI Overview in Game01.Components.Armor.cs 
 		// Defense Resistance - natural protection provided by the material and structure of the vehicle
@@ -9512,9 +9531,65 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 				return result;
 			}
 		}      						
-        public int Defense;                  // Passive Defense - see Google AI Overview in Game01.Components.Armor.cs Definition: PD acts as a bonus to the vehicle's evasion roll (Active Defense). Component PD is used when a specific part (like a turret, rotor, or sensor array) is targeted rather than the vehicle as a whole.
+        
+		public int Defense;  // Passive Defense - see Google AI Overview in Game01.Components.Armor.cs Definition: PD acts as a bonus to the vehicle's evasion roll (Active Defense). Component PD is used when a specific part (like a turret, rotor, or sensor array) is targeted rather than the vehicle as a whole.
  
-        public double SurfaceArea;
+		public Vector3d[,] Vertices;
+
+		public double Width 
+		{
+			get 
+			{
+				double result = 0d;
+				//Vector3d min = Vector3d.Min(Vertices[0], Vertices[1]);
+				//min = Vector3d.Min(min, Vertices[2]);
+				
+				return result;
+			}
+		}        
+
+		public double Height
+		{
+			get 
+			{
+				double result = 0d;
+				return result;
+			}
+		}        
+
+        public double SurfaceArea 
+		{
+			get 
+			{
+				double result = 0;
+				// todo: to compute the surface area of each face, we should pass in a 
+				// box primitive where surfaceArea = 2 * (WH + DH + WD)  
+				double D = mBox.Depth;
+				double W = mBox.Width;
+				double H = mBox.Height;
+
+				// the face indices match those of BoundingBox.GetQuadFaceVerices()
+				switch (mFaceIndex)
+				{
+					case 0: // right +x
+					case 1: // left -x
+						result = D * H;
+						break;
+					
+					case 2: // top +y
+					case 3: // bottom -y
+						result = W*D;
+						break;
+						
+					case 4: // back +z
+					case 5: // front -z
+						result = W*H;
+						break;
+				}
+			
+				return result;
+			}
+		}
 		
         public double Weight 
 		{
@@ -9690,7 +9765,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
                     StructureAttributes &= ~STRUCTURE_ATTRIBUTES.LivingMetal;
 			}
 		}
-
     }
 
 	#endregion // USER STRUCTS 

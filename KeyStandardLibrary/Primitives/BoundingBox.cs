@@ -805,13 +805,13 @@ namespace Keystone.Types
             // face 4 is the PositiveZ
             // face 5 is the NegativeZ
 
-            // the top quad (PositiveY)
+            // TOP quad (PositiveY)
             vertices[2, 0] = new Vector3d(box.Min.x, box.Max.y, box.Min.z);
             vertices[2, 1] = new Vector3d(box.Max.x, box.Max.y, box.Min.z);
             vertices[2, 2] = new Vector3d(box.Min.x, box.Max.y, box.Max.z);
             vertices[2, 3] = new Vector3d(box.Max.x, box.Max.y, box.Max.z);
 
-            // the bottom quad (NegativeY)
+            // BOTTOM quad (NegativeY)
             vertices[3, 0] = new Vector3d(box.Min.x, box.Min.y, box.Min.z);
             vertices[3, 1] = new Vector3d(box.Max.x, box.Min.y, box.Min.z);
             vertices[3, 2] = new Vector3d(box.Min.x, box.Min.y, box.Max.z);
@@ -819,25 +819,26 @@ namespace Keystone.Types
 
 
             // the side quads consist of existing top and bottom vertices 
-            // PostiveX
+            
+            // PostiveX (RIGHT)
             vertices[0, 0] = vertices[3, 1];
             vertices[0, 1] = vertices[3, 3];
             vertices[0, 2] = vertices[2, 3];
             vertices[0, 3] = vertices[2, 1];
 
-            // NegativeX
+            // NegativeX (LEFT)
             vertices[1, 0] = vertices[3, 2];
             vertices[1, 1] = vertices[3, 0];
             vertices[1, 2] = vertices[2, 0];
             vertices[1, 3] = vertices[2, 2];
 
-            // PositiveZ
+            // PositiveZ (FRONT)
             vertices[4, 0] = vertices[3, 3];
             vertices[4, 1] = vertices[3, 2];
             vertices[4, 2] = vertices[2, 2];
             vertices[4, 3] = vertices[2, 3];
 
-            // NegativeZ
+            // NegativeZ (BACK)
             vertices[5, 0] = vertices[3, 0];
             vertices[5, 1] = vertices[3, 1];
             vertices[5, 2] = vertices[2, 1];

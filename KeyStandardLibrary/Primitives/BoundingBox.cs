@@ -792,60 +792,79 @@ namespace Keystone.Types
             return new BoundingBox(min, max);
         }
 
-        //TODO: I really should make these regular NON static methods
+        ///<summary>
+        /// Returns all the Vertices of each QuadFace of the BoundingBox.
+        /// IMPORTANT: The order of these faces matches the enumeration for 
+        /// faces of CUBEMAP_FACE
+        /// </summary>
         public static Vector3d[,] GetQuadFaceVertices(BoundingBox box)
         {
             Vector3d[,] vertices = new Vector3d[6, 4];
             // NOTE: for AABB the first subscript 0 to 5 indices correspond with 
             //the CUBEMAP_FACE enumeration such that
-            // face 0 is the PositiveX = 0
-            // face 1 is the NegativeX 
-            // face 2 is the PositiveY 
-            // face 3 is the NegativeY
-            // face 4 is the PositiveZ
-            // face 5 is the NegativeZ
+            // face 0 is the PositiveX (RIGHT)
+            // face 1 is the NegativeX (LEFT)
+            // face 2 is the PositiveY  (TOP)
+            // face 3 is the NegativeY (BOTTOM)
+            // face 4 is the PositiveZ (BACK)
+            // face 5 is the NegativeZ (FRONT)
+
+            // NOTE: Default DirectX winding order is CLOCKWISE vertices for
+            // front (outward) facing.  XNA also uses clockwise for front facing.
+            // THUS 
+            // 6 ___ 7
+            // |    |         TOP
+            // 4 ___ 5
+            //     
+            //   2 ___ 3
+            //   |    |        BOTTOM  (0, 1, 3, 2 is CLOCKWISE _IF_ looking from outside of the bottom (eg underneath it looking up at it)
+            //   0 ___ 1
+            // is our layout     
 
             // TOP quad (PositiveY)
-            vertices[2, 0] = new Vector3d(box.Min.x, box.Max.y, box.Min.z);
-            vertices[2, 1] = new Vector3d(box.Max.x, box.Max.y, box.Min.z);
-            vertices[2, 2] = new Vector3d(box.Min.x, box.Max.y, box.Max.z);
-            vertices[2, 3] = new Vector3d(box.Max.x, box.Max.y, box.Max.z);
+            vertices[2, 0] = new Vector3d(box.Min.x, box.Max.y, box.Min.z);  // v4
+            vertices[2, 1] = new Vector3d(box.Max.x, box.Max.y, box.Min.z);  // v5
+            vertices[2, 2] = new Vector3d(box.Min.x, box.Max.y, box.Max.z);  // v6
+            vertices[2, 3] = new Vector3d(box.Max.x, box.Max.y, box.Max.z);  // v7
 
             // BOTTOM quad (NegativeY)
-            vertices[3, 0] = new Vector3d(box.Min.x, box.Min.y, box.Min.z);
-            vertices[3, 1] = new Vector3d(box.Max.x, box.Min.y, box.Min.z);
-            vertices[3, 2] = new Vector3d(box.Min.x, box.Min.y, box.Max.z);
-            vertices[3, 3] = new Vector3d(box.Max.x, box.Min.y, box.Max.z);
+            vertices[3, 0] = new Vector3d(box.Min.x, box.Min.y, box.Min.z);   // v0
+            vertices[3, 1] = new Vector3d(box.Max.x, box.Min.y, box.Min.z);   // v1
+            vertices[3, 2] = new Vector3d(box.Min.x, box.Min.y, box.Max.z);   // v2
+            vertices[3, 3] = new Vector3d(box.Max.x, box.Min.y, box.Max.z);   // v3
 
 
-            // the side quads consist of existing top and bottom vertices 
+            // the 4 remaining quads use a combination of the previous top and bottom vertices 
             
             // PostiveX (RIGHT)
-            vertices[0, 0] = vertices[3, 1];
-            vertices[0, 1] = vertices[3, 3];
-            vertices[0, 2] = vertices[2, 3];
-            vertices[0, 3] = vertices[2, 1];
+            vertices[0, 0] = vertices[3, 1];   // v1
+            vertices[0, 1] = vertices[3, 3];   // v3
+            vertices[0, 2] = vertices[2, 3];   // v7
+            vertices[0, 3] = vertices[2, 1];   // v5
 
             // NegativeX (LEFT)
-            vertices[1, 0] = vertices[3, 2];
-            vertices[1, 1] = vertices[3, 0];
-            vertices[1, 2] = vertices[2, 0];
-            vertices[1, 3] = vertices[2, 2];
+            vertices[1, 0] = vertices[3, 2];   // v2
+            vertices[1, 1] = vertices[3, 0];   // v0
+            vertices[1, 2] = vertices[2, 0];   // v4
+            vertices[1, 3] = vertices[2, 2];   // v6
 
             // PositiveZ (FRONT)
-            vertices[4, 0] = vertices[3, 3];
-            vertices[4, 1] = vertices[3, 2];
-            vertices[4, 2] = vertices[2, 2];
-            vertices[4, 3] = vertices[2, 3];
+            vertices[4, 0] = vertices[3, 3];   // v3
+            vertices[4, 1] = vertices[3, 2];   // v2
+            vertices[4, 2] = vertices[2, 2];   // v6
+            vertices[4, 3] = vertices[2, 3];   // v7
 
             // NegativeZ (BACK)
-            vertices[5, 0] = vertices[3, 0];
-            vertices[5, 1] = vertices[3, 1];
-            vertices[5, 2] = vertices[2, 1];
-            vertices[5, 3] = vertices[2, 0];
+            vertices[5, 0] = vertices[3, 0];   // v0
+            vertices[5, 1] = vertices[3, 1];   // v1
+            vertices[5, 2] = vertices[2, 1];   // v5
+            vertices[5, 3] = vertices[2, 0];   // v4
             return vertices;
         }
 
+        ///<summary>
+        /// If we only need the vertices of the BoundingBox, use this method.
+        /// </summary>
         public static Vector3d[] GetVertices(BoundingBox box)
         {
            //Console.WriteLine("Get Vertices");
@@ -853,37 +872,53 @@ namespace Keystone.Types
 
             // NOTE: Default DirectX winding order is CLOCKWISE vertices for
             // front (outward) facing.  XNA also uses clockwise for front facing.
-            // THIS 
+            // THUS 
             // 6 ___ 7
-            // |    |
+            // |    |         TOP
             // 4 ___ 5
-            //  \    \
+            //     
             //   2 ___ 3
-            //   |    |
+            //   |    |        BOTTOM  (0, 1, 3, 2 is CLOCKWISE _IF_ looking from outside of the bottom (eg underneath it looking up at it)
             //   0 ___ 1
-            // is our layout
-
+            // is our layout      
+            
+            // BOTTOM v0
             vertices[0].x = box.Min.x;
             vertices[0].y = box.Min.y;
             vertices[0].z = box.Min.z;
+
+            // BOTTOM v1
             vertices[1].x = box.Max.x;
             vertices[1].y = box.Min.y;
             vertices[1].z = box.Min.z;
+            
+            // BOTTOM v2
             vertices[2].x = box.Min.x;
             vertices[2].y = box.Min.y;
             vertices[2].z = box.Max.z;
+            
+            // BOTTOM v3
             vertices[3].x = box.Max.x;
             vertices[3].y = box.Min.y;
             vertices[3].z = box.Max.z;
+
+            // ------------------------
+            // TOP v4
             vertices[4].x = box.Min.x;
             vertices[4].y = box.Max.y;
             vertices[4].z = box.Min.z;
+            
+            // TOP v5
             vertices[5].x = box.Max.x;
             vertices[5].y = box.Max.y;
             vertices[5].z = box.Min.z;
+            
+            // TOP v6
             vertices[6].x = box.Min.x;
             vertices[6].y = box.Max.y;
             vertices[6].z = box.Max.z;
+            
+            // TOP v7
             vertices[7].x = box.Max.x;
             vertices[7].y = box.Max.y;
             vertices[7].z = box.Max.z;
@@ -926,13 +961,13 @@ namespace Keystone.Types
             // front (outward) facing.  XNA also uses clockwise for front facing.
             // THUS 
             // 6 ___ 7
-            // |    |
+            // |    |         TOP
             // 4 ___ 5
-            //  \    \
+            //     
             //   2 ___ 3
-            //   |    |
+            //   |    |        BOTTOM  (0, 1, 3, 2 is CLOCKWISE _IF_ looking from outside of the bottom (eg underneath it looking up at it)
             //   0 ___ 1
-            // is our layout     
+            // is our layout      
             Triangle[] tris = new Triangle[12];
             Vector3d[] v = box.Vertices;
 
@@ -944,18 +979,22 @@ namespace Keystone.Types
             tris[10] = new Triangle(v[4], v[6], v[7]);
             tris[11] = new Triangle(v[4], v[7], v[5]);
 
-            // the side faces
-            tris[2] = new Triangle(v[0], v[4], v[1]); // front
-            tris[3] = new Triangle(v[1], v[4], v[5]);
+            // right 2 faces
+            tris[8] = new Triangle(v[1], v[7], v[3]);
+            tris[9] = new Triangle(v[7], v[1], v[5]); 
 
-            tris[4] = new Triangle(v[2], v[6], v[0]); // left
+            // left 2 faces
+            tris[4] = new Triangle(v[2], v[6], v[0]); 
             tris[5] = new Triangle(v[2], v[4], v[0]);
 
-            tris[6] = new Triangle(v[3], v[6], v[2]); // back
+            // back 2 faces
+            tris[6] = new Triangle(v[3], v[6], v[2]); 
             tris[7] = new Triangle(v[3], v[7], v[6]);
 
-            tris[8] = new Triangle(v[1], v[7], v[3]);
-            tris[9] = new Triangle(v[7], v[1], v[5]); // right
+            // front 2 faces
+            tris[2] = new Triangle(v[0], v[4], v[1]); 
+            tris[3] = new Triangle(v[1], v[4], v[5]);
+
             return tris;
         }
 
@@ -965,11 +1004,11 @@ namespace Keystone.Types
             // front (outward) facing.  XNA also uses clockwise for front facing.
             // THUS 
             // 6 ___ 7
-            // |    |
+            // |    |         TOP
             // 4 ___ 5
-            //  \    \
+            //     
             //   2 ___ 3
-            //   |    |
+            //   |    |        BOTTOM  (0, 1, 3, 2 is CLOCKWISE _IF_ looking from outside of the bottom (eg underneath it looking up at it)
             //   0 ___ 1
             // is our layout      
 

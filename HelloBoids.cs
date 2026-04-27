@@ -3861,6 +3861,10 @@ namespace HelloBoids
         {
 			// 1 - Calc Malfunction
 			// 2 - Make sure GetQuadFaceVertices matches those vertices for GetBoundingBoxVertices()
+			//		- well sure the vertices match, but the enum indices for ArmorFace is what we need to match with
+			//        where 0 = TOP, 1 = BOTTOM, 2 = RIGHT, 3 = LEFT, 4 = BACK, 5 = FRONT
+			
+			
 			// 5 - Distance effect on Damage (laser attenuation/falloff)
 			// 6 - variances for spawned Droid Size
 			// 8 - randomness of skills of operators
@@ -3901,7 +3905,7 @@ namespace HelloBoids
 			
 			
 			
-			object[] result = new object[2];
+			
 			
 			/*
 			Production laserDamage;
@@ -3915,6 +3919,9 @@ namespace HelloBoids
 			
 			result[0] = laserDamage;
 			*/
+			
+			bool malfunction = CalculateMalfunction(weaponStruct, rand);
+			
 			
 			int lfIndex = -1;
 			Memory<LifeForm> targetLF = (Memory<LifeForm>)attackerOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
@@ -3936,7 +3943,7 @@ namespace HelloBoids
 			// the higher the "factor" and "critChance" (exponent), the smaller the resulting
 			// Pow() expression will result which will make rand.NextDouble() increasingly
 			// MORE LIKELY to be a higher value thus resuling in a CRITICAL HIT.
-			double critChance = 2.0d; // todo: this should be based on the weapon and the skill of the operator
+			double critChance = 2.0d; // EXPONENT - todo: this should be based on the weapon and the skill of the operator
 			double factor = 1.25d; // factor of 1 or less will result in there NEVER being a critical hit
 			
 			// 0% at luck = 0 and approaches 100% as luck goes to infinity.
@@ -3950,6 +3957,22 @@ namespace HelloBoids
 			
 			//targetFL.Span[0].Armor.Armor[side].
 			
+			
+			
+			// target distance
+			
+			
+			
+			// weapon %power of maxpower being used vs weapon output
+			
+			
+			// weapon Hitpoints - damage percent to weapon determines if increased malfunction and decreased accuracy
+			
+			
+			
+			
+			
+			// target Armor
 			int defense = targetLF.Span[0].Armor.AverageDR;
 			// if the defense is higher than the damage, then 0 damage gets through.  Math.Max() will prevent any "negative" damage in that case.
 			double finalDamageAmount = Math.Max(0, damageAmountWithVariance - defense); 
@@ -3958,6 +3981,12 @@ namespace HelloBoids
 			Console.WriteLine ("CalculateDamage() - Result == " + finalDamageAmount.ToString() + " (Target Average Defense == " + defense.ToString() + " Weapon Attack Value == " + damageAmountWithVariance.ToString() + " Critical Hit == " + isCriticalHit.ToString() + ")");
 			double time = gt.TotalElapsedSeconds;
 	
+			
+			
+			
+			// ------------------------------------------
+			object[] result = new object[2];
+			
 			DamageSystem.Damage d;
 			d.AttackerOperatorEntityArrayIndex = attackerOperator.EntityArrayIndex;
 			d.WeaponUsedEntityArrayIndex = weaponStruct.Span[0].EntityArrayIndex;
@@ -3981,19 +4010,7 @@ namespace HelloBoids
 			dot.Duration = 0.05f;
 			result[1] = dot;
 			
-			
-			// target Armor
-			
-			
-			
-			// target distance
-			
-			
-			
-			// weapon %power of maxpower being used vs weapon output
-			
-			
-			// weapon Hitpoints
+
 			
 			
 			
@@ -4004,7 +4021,55 @@ namespace HelloBoids
 			return result;
         }
 
-        
+        private bool CalculateMalfunction(Memory<Weapon> weaponStruct, Random rand)
+		{
+			/*
+			In GURPS Vehicles 2nd Edition, weapon malfunction (Malf) rates are primarily determined 
+			by the weapon's Tech Level (TL) and construction quality, with most standard weapons 
+			having a Malf of 16 or 17. A failure (roll > skill) triggers a Malf check if the roll 
+			also exceeds the weapon's Malf number (e.g., 17 or 18).
+			
+			Standard Reliability: Most modern 
+			(TL7-8) weapons have a Malf of 17, meaning a malfunction occurs on a 17 or 18.
+			
+			High Reliability: Very reliable weapons (e.g., some TL8) might only malfunction on a 18, 
+			or only during a critical failure.Poor Conditions: Lack of maintenance, mud, or water can 
+			reduce a weapon's Malf number (e.g., to 15 or 16), making jams more frequent.
+			
+			Quality Modifiers: Fine-quality weapons can improve reliability by 1 or more, while cheap
+			weapons may see it reduced.Vehicle-Mounted Weapon Malf: Generally, vehicle weapons use 
+			these same standard Malf numbers, often interpreted as needing a 17+ or 18 to fail on a 
+			sustained fire roll, especially for high-volume weapons like autocannons.A malfunction 
+			usually requires a "Ready" maneuver to clear (stoppage) or more severe repairs for a 
+			broken weapon
+			*/
+			
+			
+			// malfChance is variable based on weapon craftsmanship, factor is tweakable.
+			// the higher the "factor" and "malfChance" (exponent), the smaller the resulting
+			// Pow() expression result which will make rand.NextDouble() increasingly
+			// MORE LIKELY to be a higher value thus resuling in a MALFUNCTION.
+			double weaponQualityCoefficient = 0.75d;
+			double malfChance = 1.0 - weaponQualityCoefficient;  // EXPONENT - todo: this should be based on the weapon Level and craftsmenship of the of the Weapon
+			double factor = 0.9d; // factor of 1 OR LESS will result in there NEVER being a malfunction
+
+			bool malfunctionOccurred = rand.NextDouble() > System.Math.Pow(factor, -malfChance); // rand.NextDouble() should always be in range [0.0, 1.0]
+			// Math.Pow(factor, -malfChance) == Math.Pow(2.71, -(2)) == 1 / (2.71^2)  ==  1 / 7.344 == 0.13616371099249738
+			
+			// (factor raised to the malfChance) totaling 1.0 or less, will make a MALFUNCTION impossible
+			// the higher the resulting factor raised to the malfChance, the more probably a MALFUNCTION occurs
+			
+			
+			// has this malfunction resulted in a crtical malfunction such as an explosion of the ammunition which
+			// may result in damage to the weapon and/or operator?
+			double critMultiplier = 2;
+			if (isCriticalMalfunction)
+				damageAmountWithVariance *= critMultiplier;
+			
+			
+			return malfunctionOccurred;
+		}
+		
 #region Consumption and Production
 		
 	
@@ -9569,20 +9634,23 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 				double H = mBox.Height;
 
 				// the face indices match those of BoundingBox.GetQuadFaceVerices()
+				// This also matches enums for TV3D CUBEMAP faces.
+				// 0: Positive X (Right)1: Negative X (Left)2: Positive Y (Top)3: Negative Y (Bottom)4: Positive Z (Front)5: Negative Z (Back)
+					
 				switch (mFaceIndex)
 				{
-					case 0: // right +x
-					case 1: // left -x
-						result = D * H;
+					case 0: // RIGHT (+x)
+					case 1: // LEFT (-x)
+						result = W * D;
 						break;
 					
-					case 2: // top +y
-					case 3: // bottom -y
-						result = W*D;
+					case 2: // TOP (+y)
+					case 3: // BOTTOM (-y)
+						result = H * D;
 						break;
 						
-					case 4: // back +z
-					case 5: // front -z
+					case 4: // BACK (+z)
+					case 5: // FRONT (-z)
 						result = W*H;
 						break;
 				}
@@ -16551,6 +16619,16 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         private Vector3d _min;
         private Vector3d _max;
 
+		public enum BOX_FACES
+		{
+			RIGHT = 0, // +x
+			LEFT = 1,  // -x
+			TOP = 2,   // +y
+			BOTTOM = 3,// -y
+			BACK = 4,  // +z
+			FRONT = 5  // -z
+		}
+		
         public static BoundingBox Parse(string delimitedString)
         {
             if (string.IsNullOrEmpty(delimitedString)) throw new ArgumentNullException();
@@ -17326,97 +17404,137 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
             return new BoundingBox(min, max);
         }
 
-        //TODO: I really should make these regular NON static methods
+		
+        ///<summary>
+        /// Returns all the Vertices of each QuadFace of the BoundingBox.
+        /// IMPORTANT: ArmorFace indices match those this BoundingBox.GetQuadFaceVerices()
+		// Both also matches enums for TV3D CUBEMAP faces.
+		// 0: Positive X (Right)1: Negative X (Left)2: Positive Y (Top)3: Negative Y (Bottom)4: Positive Z (Front)5: Negative Z (Back)
+        /// </summary>
         public static Vector3d[,] GetQuadFaceVertices(BoundingBox box)
         {
             Vector3d[,] vertices = new Vector3d[6, 4];
             // NOTE: for AABB the first subscript 0 to 5 indices correspond with 
             //the CUBEMAP_FACE enumeration such that
-            // face 0 is the PositiveX = 0
-            // face 1 is the NegativeX 
-            // face 2 is the PositiveY 
-            // face 3 is the NegativeY
-            // face 4 is the PositiveZ
-            // face 5 is the NegativeZ
-
-            // the top quad (PositiveY)
-            vertices[2, 0] = new Vector3d(box.Min.x, box.Max.y, box.Min.z);
-            vertices[2, 1] = new Vector3d(box.Max.x, box.Max.y, box.Min.z);
-            vertices[2, 2] = new Vector3d(box.Min.x, box.Max.y, box.Max.z);
-            vertices[2, 3] = new Vector3d(box.Max.x, box.Max.y, box.Max.z);
-
-            // the bottom quad (NegativeY)
-            vertices[3, 0] = new Vector3d(box.Min.x, box.Min.y, box.Min.z);
-            vertices[3, 1] = new Vector3d(box.Max.x, box.Min.y, box.Min.z);
-            vertices[3, 2] = new Vector3d(box.Min.x, box.Min.y, box.Max.z);
-            vertices[3, 3] = new Vector3d(box.Max.x, box.Min.y, box.Max.z);
-
-
-            // the side quads consist of existing top and bottom vertices 
-            // PostiveX
-            vertices[0, 0] = vertices[3, 1];
-            vertices[0, 1] = vertices[3, 3];
-            vertices[0, 2] = vertices[2, 3];
-            vertices[0, 3] = vertices[2, 1];
-
-            // NegativeX
-            vertices[1, 0] = vertices[3, 2];
-            vertices[1, 1] = vertices[3, 0];
-            vertices[1, 2] = vertices[2, 0];
-            vertices[1, 3] = vertices[2, 2];
-
-            // PositiveZ
-            vertices[4, 0] = vertices[3, 3];
-            vertices[4, 1] = vertices[3, 2];
-            vertices[4, 2] = vertices[2, 2];
-            vertices[4, 3] = vertices[2, 3];
-
-            // NegativeZ
-            vertices[5, 0] = vertices[3, 0];
-            vertices[5, 1] = vertices[3, 1];
-            vertices[5, 2] = vertices[2, 1];
-            vertices[5, 3] = vertices[2, 0];
-            return vertices;
-        }
-
-        public static Vector3d[] GetVertices(BoundingBox box)
-        {
-            //Console.WriteLine("Get Vertices");
-            Vector3d[] vertices = new Vector3d[8];
+            // face 0 is the PositiveX (RIGHT)
+            // face 1 is the NegativeX (LEFT)
+            // face 2 is the PositiveY  (TOP)
+            // face 3 is the NegativeY (BOTTOM)
+            // face 4 is the PositiveZ (BACK)
+            // face 5 is the NegativeZ (FRONT)
 
             // NOTE: Default DirectX winding order is CLOCKWISE vertices for
             // front (outward) facing.  XNA also uses clockwise for front facing.
-            // THIS 
+            // THUS 
             // 6 ___ 7
-            // |    |
+            // |    |         TOP - as seen from OUTSIDE the box looking down at it
             // 4 ___ 5
-            //  \    \
+            //     
             //   2 ___ 3
-            //   |    |
+            //   |    |        BOTTOM - as seen from INSIDE the box looking down at it.  (NOTE: 0, 1, 3, 2 is CLOCKWISE _IF_ looking from OUTSIDE of the box (eg underneath it looking up at it)
             //   0 ___ 1
-            // is our layout
+            // is our layout     
 
+            // TOP quad (PositiveY)
+            vertices[(int)BOX_FACES.TOP, 0] = new Vector3d(box.Min.x, box.Max.y, box.Min.z);  // v4
+            vertices[(int)BOX_FACES.TOP, 1] = new Vector3d(box.Max.x, box.Max.y, box.Min.z);  // v5
+            vertices[(int)BOX_FACES.TOP, 2] = new Vector3d(box.Min.x, box.Max.y, box.Max.z);  // v6
+            vertices[(int)BOX_FACES.TOP, 3] = new Vector3d(box.Max.x, box.Max.y, box.Max.z);  // v7
+
+            // BOTTOM quad (NegativeY)
+            vertices[(int)BOX_FACES.BOTTOM, 0] = new Vector3d(box.Min.x, box.Min.y, box.Min.z);   // v0
+            vertices[(int)BOX_FACES.BOTTOM, 1] = new Vector3d(box.Max.x, box.Min.y, box.Min.z);   // v1
+            vertices[(int)BOX_FACES.BOTTOM, 2] = new Vector3d(box.Min.x, box.Min.y, box.Max.z);   // v2
+            vertices[(int)BOX_FACES.BOTTOM, 3] = new Vector3d(box.Max.x, box.Min.y, box.Max.z);   // v3
+
+			// --
+            // the other 4 quads use a combination of the previous top and bottom vertices 
+            
+            // PostiveX (RIGHT) 
+            vertices[(int)BOX_FACES.RIGHT, 0] = vertices[(int)BOX_FACES.BOTTOM, 1];   // v1
+            vertices[(int)BOX_FACES.RIGHT, 1] = vertices[(int)BOX_FACES.BOTTOM, 3];   // v3
+            vertices[(int)BOX_FACES.RIGHT, 2] = vertices[(int)BOX_FACES.TOP, 3];   // v7
+            vertices[(int)BOX_FACES.RIGHT, 3] = vertices[(int)BOX_FACES.TOP, 1];   // v5
+
+            // NegativeX (LEFT)
+            vertices[(int)BOX_FACES.LEFT, 0] = vertices[(int)BOX_FACES.BOTTOM, 2];   // v2
+            vertices[(int)BOX_FACES.LEFT, 1] = vertices[(int)BOX_FACES.BOTTOM, 0];   // v0
+            vertices[(int)BOX_FACES.LEFT, 2] = vertices[(int)BOX_FACES.TOP, 0];   // v4
+            vertices[(int)BOX_FACES.LEFT, 3] = vertices[(int)BOX_FACES.TOP, 2];   // v6
+
+            // PositiveZ (FRONT)
+            vertices[(int)BOX_FACES.FRONT, 0] = vertices[(int)BOX_FACES.BOTTOM, 3];   // v3
+            vertices[(int)BOX_FACES.FRONT, 1] = vertices[(int)BOX_FACES.BOTTOM, 2];   // v2
+            vertices[(int)BOX_FACES.FRONT, 2] = vertices[(int)BOX_FACES.TOP, 2];   // v6
+            vertices[(int)BOX_FACES.FRONT, 3] = vertices[(int)BOX_FACES.TOP, 3];   // v7
+
+            // NegativeZ (BACK)
+            vertices[(int)BOX_FACES.BACK, 0] = vertices[(int)BOX_FACES.BOTTOM, 0];   // v0
+            vertices[(int)BOX_FACES.BACK, 1] = vertices[(int)BOX_FACES.BOTTOM, 1];   // v1
+            vertices[(int)BOX_FACES.BACK, 2] = vertices[(int)BOX_FACES.TOP, 1];   // v5
+            vertices[(int)BOX_FACES.BACK, 3] = vertices[(int)BOX_FACES.TOP, 0];   // v4
+			
+            return vertices;
+        }
+
+        ///<summary>
+        /// If we only need the vertices of the BoundingBox, use this method.
+        /// </summary>
+        public static Vector3d[] GetVertices(BoundingBox box)
+        {
+           //Console.WriteLine("Get Vertices");
+            Vector3d[] vertices = new Vector3d[8];
+
+            
+            // NOTE: Default DirectX winding order is CLOCKWISE vertices for
+            // front (outward) facing.  XNA also uses clockwise for front facing.
+            // THUS 
+            // 6 ___ 7
+            // |    |         TOP - as seen from OUTSIDE the box looking down at it
+            // 4 ___ 5
+            //     
+            //   2 ___ 3
+            //   |    |        BOTTOM - as seen from INSIDE the box looking down at it.  (NOTE: 0, 1, 3, 2 is CLOCKWISE _IF_ looking from OUTSIDE of the box (eg underneath it looking up at it)
+            //   0 ___ 1
+            // is our layout   
+            
+            // BOTTOM v0
             vertices[0].x = box.Min.x;
             vertices[0].y = box.Min.y;
             vertices[0].z = box.Min.z;
+
+            // BOTTOM v1
             vertices[1].x = box.Max.x;
             vertices[1].y = box.Min.y;
             vertices[1].z = box.Min.z;
+            
+            // BOTTOM v2
             vertices[2].x = box.Min.x;
             vertices[2].y = box.Min.y;
             vertices[2].z = box.Max.z;
+            
+            // BOTTOM v3
             vertices[3].x = box.Max.x;
             vertices[3].y = box.Min.y;
             vertices[3].z = box.Max.z;
+
+            // ------------------------
+            // TOP v4
             vertices[4].x = box.Min.x;
             vertices[4].y = box.Max.y;
             vertices[4].z = box.Min.z;
+            
+            // TOP v5
             vertices[5].x = box.Max.x;
             vertices[5].y = box.Max.y;
             vertices[5].z = box.Min.z;
+            
+            // TOP v6
             vertices[6].x = box.Min.x;
             vertices[6].y = box.Max.y;
             vertices[6].z = box.Max.z;
+            
+            // TOP v7
             vertices[7].x = box.Max.x;
             vertices[7].y = box.Max.y;
             vertices[7].z = box.Max.z;
@@ -17424,105 +17542,112 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         }
 
         
-		/// <summary>
-		/// Constructs the 12 edges of the bouding box
-		/// </summary>
-		public static Line3d[] GetEdges(BoundingBox box)
-		{
-			Vector3d[] vertices = box.Vertices;
-			Line3d[] edges = new Line3d[12];
-			// X-aligned lines on both sides, both heights
-			edges[0] = new Line3d(vertices[0], vertices[1]);
-			edges[1] = new Line3d(vertices[2], vertices[3]);
-			edges[2] = new Line3d(vertices[4], vertices[5]);
-			edges[3] = new Line3d(vertices[6], vertices[7]);
+        /// <summary>
+        /// Constructs the 12 edges of the bouding box
+        /// </summary>
+        public static Line3d[] GetEdges(BoundingBox box)
+        {
+            Vector3d[] vertices = box.Vertices;
+            Line3d[] edges = new Line3d[12];
+            // X-aligned lines on both sides, both heights
+            edges[0] = new Line3d(vertices[0], vertices[1]);
+            edges[1] = new Line3d(vertices[2], vertices[3]);
+            edges[2] = new Line3d(vertices[4], vertices[5]);
+            edges[3] = new Line3d(vertices[6], vertices[7]);
 
-			// Y-aligned lines at each corner
-			edges[4] = new Line3d(vertices[0], vertices[4]);
-			edges[5] = new Line3d(vertices[2], vertices[6]);
-			edges[6] = new Line3d(vertices[1], vertices[5]);
-			edges[7] = new Line3d(vertices[3], vertices[7]);
+            // Y-aligned lines at each corner
+            edges[4] = new Line3d(vertices[0], vertices[4]);
+            edges[5] = new Line3d(vertices[2], vertices[6]);
+            edges[6] = new Line3d(vertices[1], vertices[5]);
+            edges[7] = new Line3d(vertices[3], vertices[7]);
 
-			// Z-aligned lines on both sides, both heights
-			edges[8] = new Line3d(vertices[0], vertices[2]);
-			edges[9] = new Line3d(vertices[1], vertices[3]);
-			edges[10] = new Line3d(vertices[4], vertices[6]);
-			edges[11] = new Line3d(vertices[5], vertices[7]);
+            // Z-aligned lines on both sides, both heights
+            edges[8] = new Line3d(vertices[0], vertices[2]);
+            edges[9] = new Line3d(vertices[1], vertices[3]);
+            edges[10] = new Line3d(vertices[4], vertices[6]);
+            edges[11] = new Line3d(vertices[5], vertices[7]);
 
-			return edges;
-		}
+            return edges;
+        }
 
-		public static Triangle[] GetTriangleFaces(BoundingBox box)
-		{
-			// construct 12 triangles from our bounding box vertices.  
-			// NOTE: Default DirectX winding order is CLOCKWISE vertices for
-			// front (outward) facing.  XNA also uses clockwise for front facing.
-			// THUS 
-			// 6 ___ 7
-			// |    |
-			// 4 ___ 5
-			//  \    \
-			//   2 ___ 3
-			//   |    |
-			//   0 ___ 1
-			// is our layout     
-			Triangle[] tris = new Triangle[12];
-			Vector3d[] v = box.Vertices;
+        public static Triangle[] GetTriangleFaces(BoundingBox box)
+        {
+            // construct 12 triangles from our bounding box vertices.  
+            
+            // NOTE: Default DirectX winding order is CLOCKWISE vertices for
+            // front (outward) facing.  XNA also uses clockwise for front facing.
+            // THUS 
+            // 6 ___ 7
+            // |    |         TOP - as seen from OUTSIDE the box looking down at it
+            // 4 ___ 5
+            //     
+            //   2 ___ 3
+            //   |    |        BOTTOM - as seen from INSIDE the box looking down at it.  (NOTE: 0, 1, 3, 2 is CLOCKWISE _IF_ looking from OUTSIDE of the box (eg underneath it looking up at it)
+            //   0 ___ 1
+            // is our layout   
+            Triangle[] tris = new Triangle[12];
+            Vector3d[] v = box.Vertices;
 
-			// bottom 2 faces
-			tris[0] = new Triangle(v[0], v[1], v[3]);
-			tris[1] = new Triangle(v[0], v[3], v[2]);
+            // bottom 2 faces
+            tris[0] = new Triangle(v[0], v[1], v[3]);
+            tris[1] = new Triangle(v[0], v[3], v[2]);
 
-			// top 2 faces
-			tris[10] = new Triangle(v[4], v[6], v[7]);
-			tris[11] = new Triangle(v[4], v[7], v[5]);
+            // top 2 faces
+            tris[10] = new Triangle(v[4], v[6], v[7]);
+            tris[11] = new Triangle(v[4], v[7], v[5]);
 
-			// the side faces
-			tris[2] = new Triangle(v[0], v[4], v[1]); // front
-			tris[3] = new Triangle(v[1], v[4], v[5]);
+            // right 2 faces
+            tris[8] = new Triangle(v[1], v[7], v[3]);
+            tris[9] = new Triangle(v[7], v[1], v[5]); 
 
-			tris[4] = new Triangle(v[2], v[6], v[0]); // left
-			tris[5] = new Triangle(v[2], v[4], v[0]);
+            // left 2 faces
+            tris[4] = new Triangle(v[2], v[6], v[0]); 
+            tris[5] = new Triangle(v[2], v[4], v[0]);
 
-			tris[6] = new Triangle(v[3], v[6], v[2]); // back
-			tris[7] = new Triangle(v[3], v[7], v[6]);
+            // back 2 faces
+            tris[6] = new Triangle(v[3], v[6], v[2]); 
+            tris[7] = new Triangle(v[3], v[7], v[6]);
 
-			tris[8] = new Triangle(v[1], v[7], v[3]);
-			tris[9] = new Triangle(v[7], v[1], v[5]); // right
-			return tris;
-		}
+            // front 2 faces
+            tris[2] = new Triangle(v[0], v[4], v[1]); 
+            tris[3] = new Triangle(v[1], v[4], v[5]);
 
-		public static Polygon[] GetPolyFaces(BoundingBox box)
-		{
-			// NOTE: Default DirectX winding order is CLOCKWISE vertices for
-			// front (outward) facing.  XNA also uses clockwise for front facing.
-			// THUS 
-			// 6 ___ 7
-			// |    |
-			// 4 ___ 5
-			//  \    \
-			//   2 ___ 3
-			//   |    |
-			//   0 ___ 1
-			// is our layout      
+            return tris;
+        }
 
-			Polygon[] polys = new Polygon[6];
-			Vector3d[] v = box.Vertices;
+        public static Polygon[] GetPolyFaces(BoundingBox box)
+        {
+            
+            // NOTE: Default DirectX winding order is CLOCKWISE vertices for
+            // front (outward) facing.  XNA also uses clockwise for front facing.
+            // THUS 
+            // 6 ___ 7
+            // |    |         TOP - as seen from OUTSIDE the box looking down at it
+            // 4 ___ 5
+            //     
+            //   2 ___ 3
+            //   |    |        BOTTOM - as seen from INSIDE the box looking down at it.  (NOTE: 0, 1, 3, 2 is CLOCKWISE _IF_ looking from OUTSIDE of the box (eg underneath it looking up at it)
+            //   0 ___ 1
+            // is our layout   
+			
+            Polygon[] polys = new Polygon[6];
+            Vector3d[] v = box.Vertices;
 
-			// bottom face
-			polys[0] = new Polygon(v[0], v[1], v[3], v[2]);
+            // bottom face
+            polys[0] = new Polygon(v[0], v[1], v[3], v[2]);
 
-			// top face
-			polys[5] = new Polygon(v[4], v[6], v[7], v[5]);
+            // top face
+            polys[5] = new Polygon(v[4], v[6], v[7], v[5]);
 
-			// the side faces
-			polys[1] = new Polygon(v[0], v[2], v[6], v[4]); // left 
-			polys[2] = new Polygon(v[1], v[5], v[7], v[3]); // right
-			polys[3] = new Polygon(v[0], v[4], v[5], v[1]); // front
-			polys[4] = new Polygon(v[3], v[7], v[6], v[2]); // back
+            // the side faces
+            polys[1] = new Polygon(v[0], v[2], v[6], v[4]); // left 
+            polys[2] = new Polygon(v[1], v[5], v[7], v[3]); // right
+            polys[3] = new Polygon(v[0], v[4], v[5], v[1]); // front
+            polys[4] = new Polygon(v[3], v[7], v[6], v[2]); // back
 
-			return polys;
-		}
+            return polys;
+        }
+
 
 		// one good thing is this code can be used for our imposter code too
 		// find the minimum and maximum distance needed to enclose that box on the supplied axis.

@@ -3860,9 +3860,6 @@ namespace HelloBoids
         private object[] CalculateDamage(EntityNode attackerOperator, EntityNode target, Memory<Weapon> weaponStruct, GameTime gt, Random rand)
         {
 			// 1 - Calc Malfunction
-			// 2 - Make sure GetQuadFaceVertices matches those vertices for GetBoundingBoxVertices()
-			//		- well sure the vertices match, but the enum indices for ArmorFace is what we need to match with
-			//        where 0 = TOP, 1 = BOTTOM, 2 = RIGHT, 3 = LEFT, 4 = BACK, 5 = FRONT
 			
 			
 			// 5 - Distance effect on Damage (laser attenuation/falloff)
@@ -9324,15 +9321,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 	
 	public struct Armor
     {
-		private enum BOX_FACE_INDICES
-		{
-			FRONT = 0,
-			BACK = 1,
-			RIGHT = 2, 
-			LEFT = 3,
-			TOP = 4,
-			BOTTOM = 5
-		}
+	
 		
         public const int MAX_ARMOR_LAYERS = 5;
         public const int NUM_ARMOR_FACES = 6; //4 = front, back, left, right.  6 adds 'top' and 'back'.
@@ -9409,7 +9398,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			}
 		}
 		
-		public double GetArmorFaceSurfaceArea (int side, BoundingBox box)
+		public double GetArmorFaceSurfaceArea (BoundingBox.BOX_FACES side, BoundingBox box)
 		{
 			double result = 0;
 			
@@ -9425,21 +9414,21 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			// Face4 = top +y = TOP = WIDTH * DEPTH
 			// Face5 = bottom -y = BOTTOM = WIDTH * DEPTH
 			
-			BOX_FACE_INDICES eSide = (BOX_FACE_INDICES)side;
+			BoundingBox.BOX_FACES eSide = (BoundingBox.BOX_FACES)side;
 			
 			switch (eSide)
 			{
-				case BOX_FACE_INDICES.FRONT:
-				case BOX_FACE_INDICES.BACK:
-					result = box.Width * box.Height;
+				case BoundingBox.BOX_FACES.RIGHT:
+				case BoundingBox.BOX_FACES.LEFT:
+					result = box.Height * box.Depth;
 					break;
-				case BOX_FACE_INDICES.RIGHT:
-				case BOX_FACE_INDICES.LEFT:
-					result = box.Depth * box.Height;
-					break;
-				case BOX_FACE_INDICES.TOP:
-				case BOX_FACE_INDICES.BOTTOM:
+				case BoundingBox.BOX_FACES.TOP:
+				case BoundingBox.BOX_FACES.BOTTOM:
 					result = box.Width * box.Depth;
+					break;
+				case BoundingBox.BOX_FACES.FRONT: // <--NOTE: "FRONT" (+z) denotes facing INTO the camera.  So if you place an Actor into the scene, the eyes of that actor will be facing away from you and into the Camera unless you apply a 180 y axis rotation in the assetplacementtgool logic
+				case BoundingBox.BOX_FACES.BACK:
+					result = box.Width * box.Height;
 					break;
 			}
 				
@@ -9649,8 +9638,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 						result = H * D;
 						break;
 						
-					case 4: // BACK (+z)
-					case 5: // FRONT (-z)
+					case 4: // FRONT (+z) <--NOTE: "FRONT" (+z) denotes facing INTO the camera.  So if you place an Actor into the scene, the eyes of that actor will be facing away from you and into the Camera unless you apply a 180 y axis rotation in the assetplacementtgool logic
+					case 5: // BACK (-z)
 						result = W*H;
 						break;
 				}
@@ -16625,8 +16614,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			LEFT = 1,  // -x
 			TOP = 2,   // +y
 			BOTTOM = 3,// -y
-			BACK = 4,  // +z
-			FRONT = 5  // -z
+			FRONT = 4,  // +z // FRONT (+z) <--NOTE: "FRONT" (+z) denotes facing INTO the camera.  So if you place an Actor into the scene, the eyes of that actor will be facing away from you and into the Camera unless you apply a 180 y axis rotation in the assetplacementtgool logic
+			BACK = 5  // -z
 		}
 		
         public static BoundingBox Parse(string delimitedString)
@@ -17634,17 +17623,18 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
             Vector3d[] v = box.Vertices;
 
             // bottom face
-            polys[0] = new Polygon(v[0], v[1], v[3], v[2]);
+            polys[(int)BOX_FACES.BOTTOM] = new Polygon(v[0], v[1], v[3], v[2]);
 
             // top face
-            polys[5] = new Polygon(v[4], v[6], v[7], v[5]);
+            polys[(int)BOX_FACES.TOP] = new Polygon(v[4], v[6], v[7], v[5]);
 
             // the side faces
-            polys[1] = new Polygon(v[0], v[2], v[6], v[4]); // left 
-            polys[2] = new Polygon(v[1], v[5], v[7], v[3]); // right
-            polys[3] = new Polygon(v[0], v[4], v[5], v[1]); // front
-            polys[4] = new Polygon(v[3], v[7], v[6], v[2]); // back
+            polys[(int)BOX_FACES.LEFT] = new Polygon(v[0], v[2], v[6], v[4]); // left 
+            polys[(int)BOX_FACES.RIGHT] = new Polygon(v[1], v[5], v[7], v[3]); // right
+			polys[(int)BOX_FACES.FRONT] = new Polygon(v[3], v[7], v[6], v[2]); // front // FRONT (+z) <--NOTE: "FRONT" (+z) denotes facing INTO the camera.  So if you place an Actor into the scene, the eyes of that actor will be facing away from you and into the Camera unless you apply a 180 y axis rotation in the assetplacementtgool logic
 
+            polys[(int)BOX_FACES.BACK] = new Polygon(v[0], v[4], v[5], v[1]); // back
+            
             return polys;
         }
 

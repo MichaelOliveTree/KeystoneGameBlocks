@@ -4070,7 +4070,7 @@ namespace HelloBoids
 			if (isCriticalMalfunction)
 				damageAmountWithVariance *= critMultiplier;
 			
-			
+			// todo: we need to return whether a criticcal malfunction occurred if any malfunction has occurred... as well as whether NONE occurred
 			return malfunctionOccurred;
 		}
 		

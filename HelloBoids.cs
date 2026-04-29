@@ -1514,7 +1514,7 @@ namespace HelloBoids
 			storeWeapon.Span[checkOutIndex].Compact = true;
 			storeWeapon.Span[checkOutIndex].Accuracy = 10;
 			storeWeapon.Span[checkOutIndex].SnapShot = 2;
-			storeWeapon.Span[checkOutIndex].Malfunction_ = 0.2f; // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
+			storeWeapon.Span[checkOutIndex].Malfunction = 0.2f; // todo: this may be not needed if Malfunction is calculated at runtime to include Damage to the weapon when firing) // range 0.0 - 1.0, Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
 			//public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
 			
 //			public string Shots;
@@ -3307,6 +3307,8 @@ namespace HelloBoids
 				int weaponArrayIndex = weapons[0].EntityArrayIndex; // todo: hack -  we know all droids have one weapon but this will fail otherwise
 				int weaponIndex;
 				Memory<Weapon>weaponStruct = (Memory<Weapon>) weapons[0].GetUserStruct(typeof(Weapon), out weaponIndex);
+				int componentIndex;
+				Memory<Component>componentStructForWeaponEntity = (Memory<Component>)weapons[0].GetUserStruct(typeof(Weapon), out componentIndex);
 				
 				bool canFire = weaponStruct.Span[0].CanFire(out errorReason);
 				
@@ -3402,7 +3404,7 @@ namespace HelloBoids
 								// todo: randomly choose between 
 								// battery, opticalsensors, wings, laser, overall droid, tacticalstation or operator
 								EntityNode specificSubTarget = currentTarget;
-								damages = CalculateDamage(operators[0], specificSubTarget, weaponStruct, gt, random); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
+								damages = CalculateDamage(operators[0], specificSubTarget, componentStructForWeaponEntity, weaponStruct, gt, random); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
 								int dCount = 0;
 								if (damages != null)
 									dCount = damages.Length;
@@ -3857,7 +3859,7 @@ namespace HelloBoids
 		/// The resulting damage types and amounts (and duration for damage that can be applied overtime)
 		/// that occur on this successful hit.
 		/// </summary>
-        private object[] CalculateDamage(EntityNode attackerOperator, EntityNode target, Memory<Weapon> weaponStruct, GameTime gt, Random rand)
+        private object[] CalculateDamage(EntityNode attackerOperator, EntityNode target, Memory<Component> componentStruct, Memory<Weapon> weaponStruct, GameTime gt, Random rand)
         {
 			// 1 - Calc Malfunction
 			
@@ -3917,7 +3919,7 @@ namespace HelloBoids
 			result[0] = laserDamage;
 			*/
 			
-			bool malfunction = CalculateMalfunction(weaponStruct, rand);
+			bool malfunction = CalculateMalfunction(componentStruct, weaponStruct, rand);
 			
 			
 			int lfIndex = -1;
@@ -4018,7 +4020,7 @@ namespace HelloBoids
 			return result;
         }
 
-        private bool CalculateMalfunction(Memory<Weapon> weaponStruct, Random rand)
+        private bool CalculateMalfunction(Memory<Component> componentStruct, Memory<Weapon> weaponStruct, Random rand)
 		{
 			/*
 			In GURPS Vehicles 2nd Edition, weapon malfunction (Malf) rates are primarily determined 
@@ -4046,20 +4048,25 @@ namespace HelloBoids
 			// the higher the "factor" and "malfChance" (exponent), the smaller the resulting
 			// Pow() expression result which will make rand.NextDouble() increasingly
 			// MORE LIKELY to be a higher value thus resuling in a MALFUNCTION.
-			double weaponQualityCoefficient = 0.75d;
+			double weaponQualityCoefficient = 1.0 - componentStruct.Span[0].MaterialQuality;   
+			double weaponDamageCoefficient = 1.0 - componentStruct.Span[0].HitPoints.Current / componentStruct.Span[0].HitPoints.Base;
+			double weaponLevelCoefficient = componentStruct.Span[0].Level / 10d;
+			double weaponCraftsmenshipCoefficient = 1.0 - componentStruct.Span[0].Craftsmanship;
+			
+			// range [0.001 - 1.0]  the greater the value, the more likely like a malfunction will occur 
 			double malfChance = 1.0 - weaponQualityCoefficient;  // EXPONENT - todo: this should be based on the weapon Level and craftsmenship of the of the Weapon
-			double factor = 0.9d; // factor of 1 OR LESS will result in there NEVER being a malfunction
+			
+			// range [0.01 - 1.00]
+			double factor = 0.9d; // the lower the value, the greater the chance of a malfunction
 
 			bool malfunctionOccurred = rand.NextDouble() > System.Math.Pow(factor, -malfChance); // rand.NextDouble() should always be in range [0.0, 1.0]
-			// Math.Pow(factor, -malfChance) == Math.Pow(2.71, -(2)) == 1 / (2.71^2)  ==  1 / 7.344 == 0.13616371099249738
-			
-			// (factor raised to the malfChance) totaling 1.0 or less, will make a MALFUNCTION impossible
-			// the higher the resulting factor raised to the malfChance, the more probably a MALFUNCTION occurs
-			
-			
+			// Math.Pow(factor, -malfChance) == Math.Pow(0.9 -(.25)) == 1 / (0.9^0.25)  ==  1 / 0.97400374642529676442270619639968 ==  1.0266900960803409723972392556152
+
 			// has this malfunction resulted in a crtical malfunction such as an explosion of the ammunition which
 			// may result in damage to the weapon and/or operator?
+			bool isCriticalMalfunction = false;
 			double critMultiplier = 2;
+			
 			if (isCriticalMalfunction)
 				damageAmountWithVariance *= critMultiplier;
 			
@@ -9207,7 +9214,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
     {
 		public int EntityArrayIndex;
 		public CONFIGURATION Configuration;
-		//public int Index; // from this we can get the EntityIndex
 		
         // kinetic energy type weapons build parameters 
         public float Bore;
@@ -9217,19 +9223,21 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
         // stats
         public int RoF;
-        
+        public float CoolDown_;    // RoF expressed as a cooldown value.  For instance, a RoF = 1/5 means once shot per 5 turns (eg 1 per every 5 seconds == 5 second cooldown) RoF = 1 means one shot per one second = 1 second cooldown.  
+		//			public string RoF;
+		
         public double RangeSquared;
         public float Accuracy;
 		public int SnapShot;
-        //public float Malfunction; // 0.0 - 1.0f coefficient for tendancy to malfunction. MaterialQuality and Craftsmanship have impact
-        
-		//	public string Shots;
-		public float Malfunction_ ; // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
-		//public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
-
+        //	public string Shots;
 		
-		public float CoolDown_;    // RoF expressed as a cooldown value.  For instance, a RoF = 1/5 means once shot per 5 turns (eg 1 per every 5 seconds == 5 second cooldown) RoF = 1 means one shot per one second = 1 second cooldown.  
-		//			public string RoF;
+		// 0.0 - 1.0f coefficient for tendancy to malfunction. MaterialQuality and Craftsmanship have impact
+        public float Malfunction;    // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
+		                             // Malfunction is determined from Level, Craftsmenship, MaterialQuality and currentHitpoints
+		
+		
+		
+		
 
 		public DAMAGE_TYPE DamageType;
         public int Damage; // amount of damage it can inflict
@@ -9269,12 +9277,10 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			errorReason = null;
 			bool result = true;
 
-			
-			
-			
 			return true;
 		}
     }
+	
 	
 	/*
 	ref struct ComponentLaserStruct
@@ -9371,7 +9377,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			
 			for (int i = 0; i < numFaces; i++)
 			{
-				double surfaceArea = GetArmorFaceSurfaceArea (i, box);
+				double surfaceArea = GetArmorFaceSurfaceArea ((BoundingBox.BOX_FACES)i, box);
 				
 				Faces[i] = new ArmorFace(box, i);
 				Faces[i].SurfaceAttributes = ArmorFace.SURFACE_ATTRIBUTES.None;
@@ -17593,11 +17599,11 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
             tris[4] = new Triangle(v[2], v[6], v[0]); 
             tris[5] = new Triangle(v[2], v[4], v[0]);
 
-            // back 2 faces
+            // FRONT 2 faces (+z, facing into the camera.  In fact if this were not so, the RIGHT 2 faces above would not be correct (but they are correct)
             tris[6] = new Triangle(v[3], v[6], v[2]); 
             tris[7] = new Triangle(v[3], v[7], v[6]);
 
-            // front 2 faces
+            // back 2 faces (-z , closest to camera)
             tris[2] = new Triangle(v[0], v[4], v[1]); 
             tris[3] = new Triangle(v[1], v[4], v[5]);
 
@@ -17631,9 +17637,9 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
             // the side faces
             polys[(int)BOX_FACES.LEFT] = new Polygon(v[0], v[2], v[6], v[4]); // left 
             polys[(int)BOX_FACES.RIGHT] = new Polygon(v[1], v[5], v[7], v[3]); // right
+			
 			polys[(int)BOX_FACES.FRONT] = new Polygon(v[3], v[7], v[6], v[2]); // front // FRONT (+z) <--NOTE: "FRONT" (+z) denotes facing INTO the camera.  So if you place an Actor into the scene, the eyes of that actor will be facing away from you and into the Camera unless you apply a 180 y axis rotation in the assetplacementtgool logic
-
-            polys[(int)BOX_FACES.BACK] = new Polygon(v[0], v[4], v[5], v[1]); // back
+            polys[(int)BOX_FACES.BACK] = new Polygon(v[0], v[4], v[5], v[1]); // back // -z, face closest to the camera.
             
             return polys;
         }

@@ -3859,7 +3859,7 @@ namespace HelloBoids
 		/// The resulting damage types and amounts (and duration for damage that can be applied overtime)
 		/// that occur on this successful hit.
 		/// </summary>
-        private object[] CalculateDamage(EntityNode attackerOperator, EntityNode target, Memory<Component> componentStruct, Memory<Weapon> weaponStruct, GameTime gt, Random rand)
+        private object[] CalculateDamage(EntityNode attackerOperator, EntityNode target, Memory<Component> componentStruct, Memory<Weapon> weaponStruct, GameTime gt, Random rand, out bool criticalMalfunctionHasOccurred)
         {
 			// 1 - Calc Malfunction
 			
@@ -3919,7 +3919,28 @@ namespace HelloBoids
 			result[0] = laserDamage;
 			*/
 			
-			bool malfunction = CalculateMalfunction(componentStruct, weaponStruct, rand);
+			criticalMalfunctionHasOccurred = false;
+			bool malfunction = CalculateMalfunction(componentStruct, weaponStruct, rand, out criticalMalfunctionHasOccurred);
+			
+			if (criticalMalfunctionHasOccurred)
+			{
+				// the weapon has failed in a critical way.  Damage may occur to the operator (if the weapon is handheld or loaders are nearby)
+				// or it may cause damage to any assemblies or components near it.
+				
+				return null;
+			}
+			
+			
+			
+			// target distance... check halfDamage amount
+			
+			
+			
+			// weapon %power of maxpower being used vs weapon output
+			
+			
+			// weapon Hitpoints - damage percent to weapon determines if increased malfunction and decreased accuracy
+			
 			
 			
 			int lfIndex = -1;
@@ -3930,12 +3951,8 @@ namespace HelloBoids
 			// https://gamedev.stackexchange.com/questions/198751/how-to-calculate-player-damage-in-a-game
 			// https://gamedev.stackexchange.com/questions/154920/browser-rpg-fight-calculation-formula/154927#154927  <- one user's opinion on why the 'luck' mechanic shouldn't be used
 			double damageAmount = weaponStruct.Span[0].AverageDamage;
-			
 			double variancePercentage = 0.10; // 10%
-
-			double min = damageAmount * (1 - variancePercentage);
-			double max = damageAmount * (1 + variancePercentage);
-			double damageAmountWithVariance = rand.NextDouble() * (max - min) + min;
+			double damageAmountWithVariance = Utils.RandomWithVariance(rand, damageAmount, variancePercentage);
 			
 			
 			// critChance is variable based on operator skill, factor is tweakable.
@@ -3954,24 +3971,9 @@ namespace HelloBoids
 			if (isCriticalHit)
 				damageAmountWithVariance *= critMultiplier;
 			
-			//targetFL.Span[0].Armor.Armor[side].
+		
 			
-			
-			
-			// target distance
-			
-			
-			
-			// weapon %power of maxpower being used vs weapon output
-			
-			
-			// weapon Hitpoints - damage percent to weapon determines if increased malfunction and decreased accuracy
-			
-			
-			
-			
-			
-			// target Armor
+			// target Armor  //targetFL.Span[0].Armor.Armor[side].
 			int defense = targetLF.Span[0].Armor.AverageDR;
 			// if the defense is higher than the damage, then 0 damage gets through.  Math.Max() will prevent any "negative" damage in that case.
 			double finalDamageAmount = Math.Max(0, damageAmountWithVariance - defense); 
@@ -3981,8 +3983,7 @@ namespace HelloBoids
 			double time = gt.TotalElapsedSeconds;
 	
 			
-			
-			
+						
 			// ------------------------------------------
 			object[] result = new object[2];
 			
@@ -4020,7 +4021,7 @@ namespace HelloBoids
 			return result;
         }
 
-        private bool CalculateMalfunction(Memory<Component> componentStruct, Memory<Weapon> weaponStruct, Random rand)
+        private bool CalculateMalfunction (Memory<Component> componentStruct, Memory<Weapon> weaponStruct, Random rand, out bool criticalMalfunctionHasOccurred)
 		{
 			/*
 			In GURPS Vehicles 2nd Edition, weapon malfunction (Malf) rates are primarily determined 
@@ -4043,15 +4044,23 @@ namespace HelloBoids
 			broken weapon
 			*/
 			
+			criticalMalfunctionHasOccurred = false;
 			
+			// our LEVELs will be floating points and allow for 0.1, 0.2, ... 2.5...etc -> 10.0
+			const double MAX_LEVEL = 10d;
 			// malfChance is variable based on weapon craftsmanship, factor is tweakable.
 			// the higher the "factor" and "malfChance" (exponent), the smaller the resulting
 			// Pow() expression result which will make rand.NextDouble() increasingly
 			// MORE LIKELY to be a higher value thus resuling in a MALFUNCTION.
-			double weaponQualityCoefficient = 1.0 - componentStruct.Span[0].MaterialQuality;   
-			double weaponDamageCoefficient = 1.0 - componentStruct.Span[0].HitPoints.Current / componentStruct.Span[0].HitPoints.Base;
-			double weaponLevelCoefficient = componentStruct.Span[0].Level / 10d;
-			double weaponCraftsmenshipCoefficient = 1.0 - componentStruct.Span[0].Craftsmanship;
+			double weaponQualityCoefficient = componentStruct.Span[0].MaterialQuality;   
+			double weaponDamageCoefficient = componentStruct.Span[0].HitPoints.Current / componentStruct.Span[0].HitPoints.Base;
+			double weaponLevelCoefficient = componentStruct.Span[0].Level / MAX_LEVEL;
+			double weaponCraftsmanshipCoefficient = componentStruct.Span[0].Craftsmanship;
+			
+			// multiply all coefficients together
+			double combined = weaponQualityCoefficient * weaponDamageCoefficient * weaponLevelCoefficient * weaponCraftsmanshipCoefficient;
+			
+			
 			
 			// range [0.001 - 1.0]  the greater the value, the more likely like a malfunction will occur 
 			double malfChance = 1.0 - weaponQualityCoefficient;  // EXPONENT - todo: this should be based on the weapon Level and craftsmenship of the of the Weapon
@@ -4062,15 +4071,16 @@ namespace HelloBoids
 			bool malfunctionOccurred = rand.NextDouble() > System.Math.Pow(factor, -malfChance); // rand.NextDouble() should always be in range [0.0, 1.0]
 			// Math.Pow(factor, -malfChance) == Math.Pow(0.9 -(.25)) == 1 / (0.9^0.25)  ==  1 / 0.97400374642529676442270619639968 ==  1.0266900960803409723972392556152
 
-			// has this malfunction resulted in a crtical malfunction such as an explosion of the ammunition which
-			// may result in damage to the weapon and/or operator?
-			bool isCriticalMalfunction = false;
-			double critMultiplier = 2;
-			
-			if (isCriticalMalfunction)
-				damageAmountWithVariance *= critMultiplier;
-			
-			// todo: we need to return whether a criticcal malfunction occurred if any malfunction has occurred... as well as whether NONE occurred
+			if (malfunctionOccurred)
+			{
+				double criticalMalfunctionThreshold = 0.91d;
+				double variancePercentage = 0.05; // 5%
+				criticalMalfunctionThreshold = Utils.RandomWithVariance(rand, criticalMalfunctionThreshold, variancePercentage);
+				
+				if (rand.NextDouble() > criticalMalfunctionThreshold)
+					criticalMalfunctionHasOccurred = true;
+			}			
+
 			return malfunctionOccurred;
 		}
 		
@@ -21184,6 +21194,15 @@ public abstract class PlanedFrustum
 			return result;
 		}
 		
+		public static double RandomWithVariance(Random rand, double baseValue, double variancePercentage)
+		{
+			double min = baseValue * (1 - variancePercentage);
+			double max = baseValue * (1 + variancePercentage);
+			double damageAmountWithVariance = rand.NextDouble() * (max - min) + min;
+			
+			return damageAmountWithVariance;
+		}
+		
 		public static byte[] CompressWithBrotli(byte[] inputBytes)
 		{
 			using var outputStream = new MemoryStream();
@@ -23082,5 +23101,5 @@ public abstract class PlanedFrustum
 		}
 	}
    #endregion  */
-   
+
 }

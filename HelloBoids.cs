@@ -3359,8 +3359,6 @@ namespace HelloBoids
 						Boid currentTarget = targets[0];
 						double distanceToTargetSquared = distances[0];
 						
-						
-						
 						// NOTE: TacticalStation.CanHit() returns true if a hit WILL RESULT from the fired shot
 						//       even if the HIT is not the expected location on a Target or even on the correct Target!
 						//       Otherwise it is a total MISS.  We log the hit/miss EVENT either way... typically as a 
@@ -3368,10 +3366,10 @@ namespace HelloBoids
 						//       for instance if a mine field is laid, and some time later, a ship/craft is impacted by it... potentially
 						//       years later!
 						HIT[] hits;
-						if (HitHasOccurred(currentTarget, gt, random, out hits))
+						
+						if (HitHasOccurred(currentTarget, weapons[0], gt, random, out hits))
 						{
-							
-							ProcessHits(hits, gt, random);
+							ProcessHits(hits, operatorEntityArrayIndex, stationArrayIndex, attackerArrayIndex, weaponArrayIndex, gt, random);
 						}
 					}
 					catch (Exception ex)
@@ -3774,106 +3772,9 @@ namespace HelloBoids
 			public Vector3d Location;
 		}
 		
-		public void ProcessHits(HIT[] hits, GameTime gt, Random random)
-		{
-			EntryClass.mUserDataStore[attacker.EntityKey].IncrementInteger("shotsfired");
-			//Console.WriteLine("ProcessHits() - Attacker Droid @ Array Index '" + currentArrayIndex.ToString() + "' firing shot # " + EntryClass.mUserDataStore[attacker.EntityKey].IncrementInteger("shotsfired").ToString() + " on Droid @ Array Index '" + currentTarget.EntityArrayIndex.ToString() + "'");
-
-			// TODO: QUEUE ANIMATION TO FIRE THIS WEAPON 
-			// Publish Event for this Weapon Fire At Target Attempt
-			int actionID = (int)ACTIONS.FiringAt;
-			CombatEventRecord r; //= new CombatEventRecord();
-			r = default(CombatEventRecord);
-			r.ActionID = actionID;
-
-			//Console.WriteLine ("ProcessHits() - Publishing FiringAt 1");	
-			r.Time = gt.TotalElapsedSeconds;
-			r.OfficerArrayIndex = operatorEntityArrayIndex;    // Attacking vessel's acting Tactical Officer
-			r.StationArrayIndex = stationArrayIndex;     // Attacking vessel Tactical Station
-			r.ShipArrayIndex = attackerArrayIndex;       // Attacking vessel
-			r.WeaponArrayIndex = weaponArrayIndex;       // Attacking vessel's weapon used
-
-			r.TargetArrayIndices = new int[]{currentTarget.EntityArrayIndex};
-			//Console.WriteLine ("ProcessHits() - Publishing FiringAt 1b");	
-			r.TargetOwnerArrayIndices = GetOwner(r.TargetArrayIndices);
-			//Console.WriteLine ("ProcessHits() - Publishing FiringAt 2");	
-			r.HitPoints = GetHitPoints(r.TargetArrayIndices);
-			//Console.WriteLine ("ProcessHits() - Publishing FiringAt 3");	
-			r.Damage = null;
-
-			mSimEventManager.PublishEvent(attacker, actionID, r);
-
-			// NOTE: here we assume the Fire() occurs immediately using a lightspeed laser and the damage is instantaneous 
-			//       and does not need any travel time to reach the currentTarget
-			object[] damages = null;
-
-			try 
-			{
-				// todo: change parameter attacker to tacticalStation?
-				// todo: randomly choose between 
-				// battery, opticalsensors, wings, laser, overall droid, tacticalstation or operator
-				EntityNode specificSubTarget = currentTarget;
-				bool critMalfunctionHasOccurred;
-				damages = CalculateDamage(operators[0], specificSubTarget, componentStructForWeaponEntity, weaponStruct, gt, random, out critMalfunctionHasOccurred); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
-
-				//TODO: IF 0 Damage occurs because the Target was able to resist the attack with armor or passive defenses
-				//      the result of damage should return 0 and not NULL or anything because resisting an attack is valid information to know in an event log
-				//
-				//int dCount = 0;
-				//if (damages != null)
-				//	dCount = damages.Length;
-				//
-				// Console.WriteLine("ProcessHits() - Damages Produced = " + dCount.ToString());
-			}
-			catch(Exception ex)
-			{
-				Console.WriteLine ("ProcessHits() - CaculateDamage ERROR - " + ex.Message);	
-			}
-
-			if (damages != null)
-			{
-				int[] damageAmounts = new int[damages.Length];
-
-				for (int j = 0; j < damages.Length; j++)
-				{
-					if (damages[j] is DamageSystem.Damage)
-					{
-						mDamageSystem.Add((DamageSystem.Damage)damages[j]);
-						damageAmounts[j] = ((DamageSystem.Damage)damages[j]).Amount;
-					}
-					else if (damages[j] is DamageOverTimeSystem.DamageOverTime)
-					{
-						mDamageOverTimeSystem.Add ((DamageOverTimeSystem.DamageOverTime)damages[j]);
-						damageAmounts[j] = ((DamageOverTimeSystem.DamageOverTime)damages[j]).Amount;
-
-					}
-					else 
-						throw new Exception("ProcessHits() - Unexpected Damge type. " + damages[j].GetType().Name);
-				}
-
-				// Console.WriteLine ("ProcessHits() - Publishing HIT RESULTS - 1");	
-				// Publish event with the Hit Results
-				actionID = (int)ACTIONS.TargetHit;
-
-				r = default(CombatEventRecord);
-				r.ActionID = actionID;
-				r.Time = gt.TotalElapsedSeconds;
-				r.OfficerArrayIndex = operatorEntityArrayIndex;  // Attacking vessel's acting Tactical Officer
-				r.StationArrayIndex = stationArrayIndex;         // Attacking vessel Tactical Station
-				r.ShipArrayIndex = attackerArrayIndex;           // Attacking vessel
-
-				r.WeaponArrayIndex = weaponArrayIndex;           // Attacking vessel's weapon used
-				r.TargetArrayIndices = new int[]{currentTarget.EntityArrayIndex};
-				r.TargetOwnerArrayIndices = GetOwner(r.TargetArrayIndices);	
-				r.HitPoints = GetHitPoints(r.TargetArrayIndices);
-				//Console.WriteLine ("ProcessHits() - Publishing HIT RESULTS - 2");	
-				r.Damage = damageAmounts;
-				mSimEventManager.PublishEvent(attacker, actionID, r);
-			}
-		}
 		
 		// NOTE: This only applies for FTL weapons... "CanHit()" must be different for Missiles, Kinetic Energy Weapons and Particle Weapons that are slower than light
-		public bool HitHasOccurred(EntityNode target, Memory<Weapon> weaponStruct, GameTime gt, Random rand, out HIT[] hits)
+		public bool HitHasOccurred(EntityNode target, EntityNode weaponEntity, GameTime gt, Random rand, out HIT[] hits)
 		{
 			bool result = false;
 			Vector3d vec = Vector3d.Zero();
@@ -3881,7 +3782,7 @@ namespace HelloBoids
 			hits = new HIT[1];
 			hits[0].Target = target;
 			hits[0].Owner = null;
-			hits[0].WeaponUsed = weaponEntity;
+			hits[0].WeaponUsed = weaponEntity; // how does this work if its an explosion or fire or radiation volume?
 			hits[0].Location = vec;
 				
 			// todo: for tactical station, the logic for determining hit+damage should rely on the crew station.css script and not the operator.  Instead, we just grab bonuses or minuses from the operator crew member.
@@ -3914,6 +3815,109 @@ namespace HelloBoids
 			
 			result = true;
 			return result;
+		}
+		
+		
+		public void ProcessHits(HIT[] hits, int operatorEntityArrayIndex, int stationEntityArrayIndex, int attackingShipEntityArrayIndex, int weaponEntityArrayIndex, GameTime gt, Random random)
+		{
+			
+			for (int currentHitIndex = 0;  currentHitIndex < hits.Length; currentHitIndex++)
+			{
+				EntryClass.mUserDataStore[attacker.EntityKey].IncrementInteger("shotsfired");
+				//Console.WriteLine("ProcessHits() - Attacker Droid @ Array Index '" + currentArrayIndex.ToString() + "' firing shot # " + EntryClass.mUserDataStore[attacker.EntityKey].IncrementInteger("shotsfired").ToString() + " on Droid @ Array Index '" + currentTarget.EntityArrayIndex.ToString() + "'");
+
+				// TODO: QUEUE ANIMATION TO FIRE THIS WEAPON 
+				// Publish Event for this Weapon Fire At Target Attempt
+				int actionID = (int)ACTIONS.FiringAt;
+				CombatEventRecord r; //= new CombatEventRecord();
+				r = default(CombatEventRecord);
+				r.ActionID = actionID;
+
+				//Console.WriteLine ("ProcessHits() - Publishing FiringAt 1");	
+				r.Time = gt.TotalElapsedSeconds;
+				r.OfficerArrayIndex = operatorEntityArrayIndex;    // Attacking vessel's acting Tactical Officer
+				r.StationArrayIndex = stationEntityArrayIndex;     // Attacking vessel Tactical Station
+				r.ShipArrayIndex = attackingShipEntityArrayIndex;       // Attacking vessel
+				r.WeaponArrayIndex = weaponEntityArrayIndex;       // Attacking vessel's weapon used
+
+				r.TargetArrayIndices = new int[]{currentTarget.EntityArrayIndex};
+				//Console.WriteLine ("ProcessHits() - Publishing FiringAt 1b");	
+				r.TargetOwnerArrayIndices = GetOwner(r.TargetArrayIndices);
+				//Console.WriteLine ("ProcessHits() - Publishing FiringAt 2");	
+				r.HitPoints = GetHitPoints(r.TargetArrayIndices);
+				//Console.WriteLine ("ProcessHits() - Publishing FiringAt 3");	
+				r.Damage = null;
+
+				mSimEventManager.PublishEvent(attacker, actionID, r);
+
+				// NOTE: here we assume the Fire() occurs immediately using a lightspeed laser and the damage is instantaneous 
+				//       and does not need any travel time to reach the currentTarget
+				object[] damages = null;
+
+				try 
+				{
+					// todo: change parameter attacker to tacticalStation?
+					// todo: randomly choose between 
+					// battery, opticalsensors, wings, laser, overall droid, tacticalstation or operator
+					EntityNode specificSubTarget = currentTarget;
+					bool critMalfunctionHasOccurred;
+					damages = CalculateDamage(operators[0], specificSubTarget, componentStructForWeaponEntity, weaponStruct, gt, random, out critMalfunctionHasOccurred); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
+
+					//TODO: IF 0 Damage occurs because the Target was able to resist the attack with armor or passive defenses
+					//      the result of damage should return 0 and not NULL or anything because resisting an attack is valid information to know in an event log
+					//
+					//int dCount = 0;
+					//if (damages != null)
+					//	dCount = damages.Length;
+					//
+					// Console.WriteLine("ProcessHits() - Damages Produced = " + dCount.ToString());
+				}
+				catch(Exception ex)
+				{
+					Console.WriteLine ("ProcessHits() - CaculateDamage ERROR - " + ex.Message);	
+				}
+
+				if (damages != null)
+				{
+					int[] damageAmounts = new int[damages.Length];
+
+					for (int j = 0; j < damages.Length; j++)
+					{
+						if (damages[j] is DamageSystem.Damage)
+						{
+							mDamageSystem.Add((DamageSystem.Damage)damages[j]);
+							damageAmounts[j] = ((DamageSystem.Damage)damages[j]).Amount;
+						}
+						else if (damages[j] is DamageOverTimeSystem.DamageOverTime)
+						{
+							mDamageOverTimeSystem.Add ((DamageOverTimeSystem.DamageOverTime)damages[j]);
+							damageAmounts[j] = ((DamageOverTimeSystem.DamageOverTime)damages[j]).Amount;
+
+						}
+						else 
+							throw new Exception("ProcessHits() - Unexpected Damge type. " + damages[j].GetType().Name);
+					}
+
+					// Console.WriteLine ("ProcessHits() - Publishing HIT RESULTS - 1");	
+					// Publish event with the Hit Results
+					actionID = (int)ACTIONS.TargetHit;
+
+					r = default(CombatEventRecord);
+					r.ActionID = actionID;
+					r.Time = gt.TotalElapsedSeconds;
+					r.OfficerArrayIndex = operatorEntityArrayIndex;      // Attacking vessel's acting Tactical Officer
+					r.StationArrayIndex = stationEntityArrayIndex;       // Attacking vessel Tactical Station
+					r.ShipArrayIndex = attackingShipEntityArrayIndex;    // Attacking vessel
+
+					r.WeaponArrayIndex = weaponEntityArrayIndex;         // Attacking vessel's weapon used
+					r.TargetArrayIndices = new int[]{currentTarget.EntityArrayIndex};
+					r.TargetOwnerArrayIndices = GetOwner(r.TargetArrayIndices);	
+					r.HitPoints = GetHitPoints(r.TargetArrayIndices);
+					//Console.WriteLine ("ProcessHits() - Publishing HIT RESULTS - 2");	
+					r.Damage = damageAmounts;
+					mSimEventManager.PublishEvent(attacker, actionID, r);
+				}
+			}
 		}
 		
 		/// <summary>

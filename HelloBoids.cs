@@ -3308,7 +3308,7 @@ namespace HelloBoids
 				int weaponIndex;
 				Memory<Weapon>weaponStruct = (Memory<Weapon>) weapons[0].GetUserStruct(typeof(Weapon), out weaponIndex);
 				int componentIndex;
-				Memory<Component>componentStructForWeaponEntity = (Memory<Component>)weapons[0].GetUserStruct(typeof(Weapon), out componentIndex);
+				Memory<Component>componentStructForWeaponEntity = (Memory<Component>)weapons[0].GetUserStruct(typeof(Component), out componentIndex);
 				
 				bool canFire = weaponStruct.Span[0].CanFire(out errorReason);
 				
@@ -3358,31 +3358,7 @@ namespace HelloBoids
 						// todo: fix.  for now we wont iterate all targets, just the most near one
 						Boid currentTarget = targets[0];
 						double distanceToTargetSquared = distances[0];
-						
-						// TODO: QUEUE ANIMATION TO FIRE THIS WEAPON 
-						// Publish Event for this Weapon Fire At Target Attempt
-						int actionID = (int)ACTIONS.FiringAt;
-						CombatEventRecord r; //= new CombatEventRecord();
-						r = default(CombatEventRecord);
-						r.ActionID = actionID;
-						
-						//Console.WriteLine ("Do_Tactical_Logic() - Publishing FiringAt 1");	
-						r.Time = gt.TotalElapsedSeconds;
-						r.OfficerArrayIndex = operatorEntityArrayIndex;    // Attacking vessel's acting Tactical Officer
-						r.StationArrayIndex = stationArrayIndex;     // Attacking vessel Tactical Station
-						r.ShipArrayIndex = attackerArrayIndex;       // Attacking vessel
-						r.WeaponArrayIndex = weaponArrayIndex;       // Attacking vessel's weapon used
-						
-						r.TargetArrayIndices = new int[]{currentTarget.EntityArrayIndex};
-						//Console.WriteLine ("Do_Tactical_Logic() - Publishing FiringAt 1b");	
-						r.TargetOwnerArrayIndices = GetOwner(r.TargetArrayIndices);
-						//Console.WriteLine ("Do_Tactical_Logic() - Publishing FiringAt 2");	
-						r.HitPoints = GetHitPoints(r.TargetArrayIndices);
-						//Console.WriteLine ("Do_Tactical_Logic() - Publishing FiringAt 3");	
-						r.Damage = null;
-						
-						mSimEventManager.PublishEvent(attacker, actionID, r);
-						
+												
 						// NOTE: TacticalStation.CanHit() returns true if a hit WILL RESULT from the fired shot
 						//       even if the HIT is not the expected location on a Target or even on the correct Target!
 						//       Otherwise it is a total MISS.  We log the hit/miss EVENT either way... typically as a 
@@ -3404,7 +3380,48 @@ namespace HelloBoids
 								// todo: randomly choose between 
 								// battery, opticalsensors, wings, laser, overall droid, tacticalstation or operator
 								EntityNode specificSubTarget = currentTarget;
-								damages = CalculateDamage(operators[0], specificSubTarget, componentStructForWeaponEntity, weaponStruct, gt, random); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
+								bool criticalMalfunctionHasOccurred;
+								damages = CalculateDamage(operators[0], specificSubTarget, componentStructForWeaponEntity, weaponStruct, gt, random, out criticalMalfunctionHasOccurred); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
+								
+								if (criticalMalfunctionHasOccurred)
+								{
+									// we need to determine what (including the weapon itself) got damaged by this criticalMalfunction.
+									// Depending on the weapon, there's a chance the weapon itself was not damaged in some type of ammo explosion perhaps
+									// but anyone or assemblies and components nearby have a chance of damage... and
+									// those in turn if suffering critical damage, can damage other components (eg an initial ammo explosion resuling in a magazine explosion)
+									
+									
+									
+								}
+								else
+								{
+									
+									// Publish Event for this Weapon Fire At Target Attempt
+									int actionID = (int)ACTIONS.FiringAt;
+									CombatEventRecord r; //= new CombatEventRecord();
+									r = default(CombatEventRecord);
+									r.ActionID = actionID;
+
+									//Console.WriteLine ("Do_Tactical_Logic() - Publishing FiringAt 1");	
+									r.Time = gt.TotalElapsedSeconds;
+									r.OfficerArrayIndex = operatorEntityArrayIndex;    // Attacking vessel's acting Tactical Officer
+									r.StationArrayIndex = stationArrayIndex;     // Attacking vessel Tactical Station
+									r.ShipArrayIndex = attackerArrayIndex;       // Attacking vessel
+									r.WeaponArrayIndex = weaponArrayIndex;       // Attacking vessel's weapon used
+
+									r.TargetArrayIndices = new int[]{currentTarget.EntityArrayIndex};
+									//Console.WriteLine ("Do_Tactical_Logic() - Publishing FiringAt 1b");	
+									r.TargetOwnerArrayIndices = GetOwner(r.TargetArrayIndices);
+									//Console.WriteLine ("Do_Tactical_Logic() - Publishing FiringAt 2");	
+									r.HitPoints = GetHitPoints(r.TargetArrayIndices);
+									//Console.WriteLine ("Do_Tactical_Logic() - Publishing FiringAt 3");	
+									r.Damage = null;
+
+
+									// TODO: QUEUE ANIMATION TO FIRE THIS WEAPON occurs via listeners of the PublishEvent?
+									mSimEventManager.PublishEvent(attacker, actionID, r);
+								}
+								
 								int dCount = 0;
 								if (damages != null)
 									dCount = damages.Length;
@@ -3444,9 +3461,9 @@ namespace HelloBoids
 								
 								// Console.WriteLine ("Do_Tactical_Logic() - Publishing HIT RESULTS - 1");	
 								// Publish event with the Hit Results
-								actionID = (int)ACTIONS.TargetHit;
+								int actionID = (int)ACTIONS.TargetHit;
 								
-								r = default(CombatEventRecord);
+								CombatEventRecord r = default(CombatEventRecord);
 								r.ActionID = actionID;
 								r.Time = gt.TotalElapsedSeconds;
 								r.OfficerArrayIndex = operatorEntityArrayIndex;  // Attacking vessel's acting Tactical Officer
@@ -3459,6 +3476,7 @@ namespace HelloBoids
 								r.HitPoints = GetHitPoints(r.TargetArrayIndices);
 								//Console.WriteLine ("Do_Tactical_Logic() - Publishing HIT RESULTS - 2");	
 								r.Damage = damageAmounts;
+								
 								mSimEventManager.PublishEvent(attacker, actionID, r);
 							}
 						}
@@ -3905,6 +3923,33 @@ namespace HelloBoids
 			
 			
 			
+			public float Accuracy; // based on type of weapon, Level, craftsmanship, any damage already taken
+		
+		// 0.0 - 1.0f coefficient for tendancy to malfunction. MaterialQuality and Craftsmanship have impact
+        public float Malfunction;    // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
+		                             // Malfunction is determined from Level, Craftsmenship, MaterialQuality and currentHitpoints
+		
+		
+		
+		
+
+		//DAMAGE_TYPE DamageType;
+		// double HalfDamage; // distance at which the amount of damage is halved
+		
+	    // this is dice of damage, but often contains a multiplier like (100) afterwards.  We don't need the multiplier since we just compute a min/max damage range or maybe we compute a single damage that then gets modified based on the target evasive maneuvers and such
+		// int AverageDamage;       
+		//	public double KEDamage;
+		// double VacuumHalfDamage;
+
+		//			public string Range; // string description of range (eg: "very long range")
+		// public double RangeSquared; 
+		//public double MaxRange;
+		//			public double MaxRange2;
+		//			public double VacuumMaxRange;
+		//			public double VacuumMaxRange2;
+		
+		//			
+			
 			
 			/*
 			Production laserDamage;
@@ -3931,16 +3976,16 @@ namespace HelloBoids
 			}
 			
 			
-			
 			// target distance... check halfDamage amount
-			
+			double halfDamage = weaponStruct.Span[0].HalfDamage;
 			
 			
 			// weapon %power of maxpower being used vs weapon output
+			//double powerCoeff = weaponStruct.Span[0].BeamOutput > 0 ? weaponStruct.Span[0].BeamOutput / weaponStruct.Span[0].PowerReqt : 0;
 			
 			
-			// weapon Hitpoints - damage percent to weapon determines if increased malfunction and decreased accuracy
-			
+			// weapon HitPoints.Current / HitPoints.Base - decreased accuracy (note: CalculateMalfunction() already takes into account damage)
+			double weaponDamageCoeff = componentStruct.Span[0].HitPoints.Base > 0 ? componentStruct.Span[0].HitPoints.Current / componentStruct.Span[0].HitPoints.Base : 0;
 			
 			
 			int lfIndex = -1;
@@ -4010,10 +4055,6 @@ namespace HelloBoids
 			dot.Duration = 0.05f;
 			result[1] = dot;
 			
-
-			
-			
-			
 			
 			
 			//see Keystone.Game01.Messages.   public class AttackResults since
@@ -4053,21 +4094,17 @@ namespace HelloBoids
 			// Pow() expression result which will make rand.NextDouble() increasingly
 			// MORE LIKELY to be a higher value thus resuling in a MALFUNCTION.
 			double weaponQualityCoefficient = componentStruct.Span[0].MaterialQuality;   
-			double weaponDamageCoefficient = componentStruct.Span[0].HitPoints.Current / componentStruct.Span[0].HitPoints.Base;
+			double weaponDamageCoefficient = componentStruct.Span[0].HitPoints.Base > 0 ? componentStruct.Span[0].HitPoints.Current / componentStruct.Span[0].HitPoints.Base : 0;
 			double weaponLevelCoefficient = componentStruct.Span[0].Level / MAX_LEVEL;
 			double weaponCraftsmanshipCoefficient = componentStruct.Span[0].Craftsmanship;
 			
 			// multiply all coefficients together
 			double combined = weaponQualityCoefficient * weaponDamageCoefficient * weaponLevelCoefficient * weaponCraftsmanshipCoefficient;
 			
-			
-			
 			// range [0.001 - 1.0]  the greater the value, the more likely like a malfunction will occur 
-			double malfChance = 1.0 - weaponQualityCoefficient;  // EXPONENT - todo: this should be based on the weapon Level and craftsmenship of the of the Weapon
-			
+			double malfChance = Utils.Clamp(combined, 0.1d, 1.0d);  // EXPONENT 
 			// range [0.01 - 1.00]
 			double factor = 0.9d; // the lower the value, the greater the chance of a malfunction
-
 			bool malfunctionOccurred = rand.NextDouble() > System.Math.Pow(factor, -malfChance); // rand.NextDouble() should always be in range [0.0, 1.0]
 			// Math.Pow(factor, -malfChance) == Math.Pow(0.9 -(.25)) == 1 / (0.9^0.25)  ==  1 / 0.97400374642529676442270619639968 ==  1.0266900960803409723972392556152
 
@@ -9237,9 +9274,25 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		//			public string RoF;
 		
         public double RangeSquared;
-        public float Accuracy;
 		public int SnapShot;
         //	public string Shots;
+		
+		/* temp notes:
+			In GURPS Vehicles 2nd Edition (3rd Edition ruleset), weapon Accuracy (Acc) is determined based on the type of weapon, its Tech Level (TL), and whether it is a projectile or beam weapon.
+			Acc in GURPS is the bonus added to skill when taking an Aim maneuver.GURPS Vehicles provides comprehensive rules to design custom weapons or select standard ones.Weapon Accuracy by 
+			TypeP
+			rojectile Weapons: The accuracy of conventional guns is determined by the weapon's barrel length, type, and TL. Longer barrels generally provide higher Accuracy.
+			Beam Weapons (Lasers, Particle Beams): These often have high Accuracy ratings.Targeting Systems: Radar- or laser-directed weapons gain an additional +2 to hit, which stacks with the
+			weapon's base Acc.Automatic Weapons: The accuracy is typically applied to the first shot (or the burst if using rules like GURPS Tactical Shooting).
+			Stability: If a vehicle is moving, the weapon's accuracy can be affected by the vehicle's Handling and Stability Rating.
+			Key Rules for Vehicle Weapons
+			Weapon Quality: Fine (Accurate) weapons increase the Acc bonus.
+			Using 3rd Ed in 4th Ed: If using GURPS Vehicles 2nd Edition (3e) to design vehicles for GURPS 4th Edition, a common rule
+			of thumb is to halve the Accuracy to align with 4th Edition standards.
+			Aiming Time: You must take an Aim maneuver to receive the Accuracy bonus.
+			Maximum Acc: The combined bonus from all targeting systems (scopes, computers) cannot exceed the weapon's base Accuracy.
+		*/
+		public float Accuracy; // based on type of weapon, Level, craftsmanship, any damage already taken
 		
 		// 0.0 - 1.0f coefficient for tendancy to malfunction. MaterialQuality and Craftsmanship have impact
         public float Malfunction;    // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
@@ -9250,15 +9303,13 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
 
 		public DAMAGE_TYPE DamageType;
-        public int Damage; // amount of damage it can inflict
-        public int HalfDamage;
-		
-		//public string Damage;         // this is dice of damage, but often contains a multiplier like (100) afterwards.  We don't need the multiplier since we just compute a min/max damage range or maybe we compute a single damage that then gets modified based on the target evasive maneuvers and such
-		public int AverageDamage;       
-		//			public double KEDamage;
-		//			public double HalfDamage;  // the range at which the amount of damage the weapon can do is at least halved.
-		//			public double VacuumHalfDamage;
 
+        public double HalfDamage; // distance at which the amount of damage is halved
+		
+	    // this is dice of damage, but often contains a multiplier like (100) afterwards.  We don't need the multiplier since we just compute a min/max damage range or maybe we compute a single damage that then gets modified based on the target evasive maneuvers and such
+		public int AverageDamage;       
+		//	public double KEDamage;
+		public double VacuumHalfDamage;
 
 		//			public string Range; // string description of range (eg: "very long range")
 		public double MaxRange;
@@ -21192,6 +21243,21 @@ public abstract class PlanedFrustum
 			double result = System.Math.Max(value1, value2);
 			result = System.Math.Max(result, value3);
 			return result;
+		}
+		
+		public static double Clamp (double num)
+		{
+			return Clamp (num, 0.0, 1.0);
+		}
+		
+		public static double Clamp(double num, double min, double max)
+		{
+			if (num > max) 
+				num = max;
+			else if (num < min)
+				num = min;
+			
+			return num;
 		}
 		
 		public static double RandomWithVariance(Random rand, double baseValue, double variancePercentage)

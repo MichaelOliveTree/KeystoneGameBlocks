@@ -3308,7 +3308,7 @@ namespace HelloBoids
 				int weaponIndex;
 				Memory<Weapon>weaponStruct = (Memory<Weapon>) weapons[0].GetUserStruct(typeof(Weapon), out weaponIndex);
 				int componentIndex;
-				Memory<Component>componentStructForWeaponEntity = (Memory<Component>)weapons[0].GetUserStruct(typeof(Weapon), out componentIndex);
+				Memory<Component>componentStructForWeaponEntity = (Memory<Component>)weapons[0].GetUserStruct(typeof(Component), out componentIndex);
 				
 				bool canFire = weaponStruct.Span[0].CanFire(out errorReason);
 				
@@ -3781,7 +3781,7 @@ namespace HelloBoids
 			
 			hits = new HIT[1];
 			hits[0].Target = target;
-			hits[0].Owner = null;
+			hits[0].Owner = target;
 			hits[0].WeaponUsed = weaponEntity; // how does this work if its an explosion or fire or radiation volume?
 			hits[0].Location = vec;
 				
@@ -3823,11 +3823,16 @@ namespace HelloBoids
 			
 			for (int currentHitIndex = 0;  currentHitIndex < hits.Length; currentHitIndex++)
 			{
+				EntityNode attacker = hits[currentHitIndex].Owner;
+				EntityNode currentTarget = hits[currentHitIndex].Target;
+				
+				// NOTE: hit.Owner is always the containing Starship/Container/Vehicle/Building
 				EntryClass.mUserDataStore[attacker.EntityKey].IncrementInteger("shotsfired");
 				//Console.WriteLine("ProcessHits() - Attacker Droid @ Array Index '" + currentArrayIndex.ToString() + "' firing shot # " + EntryClass.mUserDataStore[attacker.EntityKey].IncrementInteger("shotsfired").ToString() + " on Droid @ Array Index '" + currentTarget.EntityArrayIndex.ToString() + "'");
 
+				
 				// TODO: QUEUE ANIMATION TO FIRE THIS WEAPON 
-				// Publish Event for this Weapon Fire At Target Attempt
+				// Publish a CombatEventRecord containing the 'FireAt' Attempt
 				int actionID = (int)ACTIONS.FiringAt;
 				CombatEventRecord r; //= new CombatEventRecord();
 				r = default(CombatEventRecord);
@@ -3859,9 +3864,20 @@ namespace HelloBoids
 					// todo: change parameter attacker to tacticalStation?
 					// todo: randomly choose between 
 					// battery, opticalsensors, wings, laser, overall droid, tacticalstation or operator
-					EntityNode specificSubTarget = currentTarget;
+					EntityNode stationOperator = Boids[operatorEntityArrayIndex];
+					EntityNode specificSubTarget = hits[currentHitIndex].Target;
+					EntityNode weaponEntity = Boids[weaponEntityArrayIndex];
+					
+					int componentIndex;
+					int weaponIndex;
+					Memory<Component> componentStructForWeaponEntity = (Memory<Component>)weaponEntity.GetUserStruct(typeof(Component), out componentIndex);
+					Memory<Weapon> weaponStruct = (Memory<Weapon>)weaponEntity.GetUserStruct(typeof(Weapon), out weaponIndex);
+					
 					bool critMalfunctionHasOccurred;
-					damages = CalculateDamage(operators[0], specificSubTarget, componentStructForWeaponEntity, weaponStruct, gt, random, out critMalfunctionHasOccurred); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
+					
+					// NOTE: if damages occurs, there can be multiple TYPES of damages in the return damages[] because a single target 
+					//       may for example receive kinetic damage AND on-going fire damage, and/or other damages.
+					damages = CalculateDamage(stationOperator, specificSubTarget, componentStructForWeaponEntity, weaponStruct, gt, random, out critMalfunctionHasOccurred); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
 
 					//TODO: IF 0 Damage occurs because the Target was able to resist the attack with armor or passive defenses
 					//      the result of damage should return 0 and not NULL or anything because resisting an attack is valid information to know in an event log
@@ -3898,8 +3914,16 @@ namespace HelloBoids
 							throw new Exception("ProcessHits() - Unexpected Damge type. " + damages[j].GetType().Name);
 					}
 
+					
+					// TODO: so for chained / recursive / cascading damage, where should we initiate that?
+					// We do know for an Explosion, an explosion ENtity can be retreived from an ObjectPool
+					// and then added to the Scene.  That Entity can be flagged as a MissionObject perhaps?
+					// 
+					
+					
+					
 					// Console.WriteLine ("ProcessHits() - Publishing HIT RESULTS - 1");	
-					// Publish event with the Hit Results
+					// Publish a CombatEventRecord containing the Hit Results
 					actionID = (int)ACTIONS.TargetHit;
 
 					r = default(CombatEventRecord);
@@ -3926,23 +3950,23 @@ namespace HelloBoids
 		/// </summary>
         private object[] CalculateDamage(EntityNode attackerOperator, EntityNode target, Memory<Component> componentStruct, Memory<Weapon> weaponStruct, GameTime gt, Random rand, out bool criticalMalfunctionHasOccurred)
         {
-			// 1 - Calc Malfunction
+			// 1 - [DONE] - Calc Malfunction
+			// 2 - Distance effect on Damage (laser attenuation/falloff)
+			// 3 - Recursive / Cascading / Chain-Reaction Damage
+			// 4 - variances for spawned Droid Size
+			// 5 - randomness of skills of operators
+			// 6 - armor of the Droid randomness based on the size of the Droid
 			
+			// 7 - armor option for Operators
+			// 8 - destruction of Droids upon lose of hitpoints
+			// 9 - double buffering of Data
+			// 10 - finish Statistics and Policies
+			// 11 - class Builder 
 			
-			// 5 - Distance effect on Damage (laser attenuation/falloff)
-			// 6 - variances for spawned Droid Size
-			// 8 - randomness of skills of operators
-			// 9 - armor of the Droid randomness based on the size of the Droid
-			// 10 - armor option for Operators
-			// 7 - destruction of Droids upon lose of hitpoints
-			
-
-			// 3- double buffering of Data
-			// 4 - finish Statistics and Policies
-			// 5 - class Builder 
 			
 			// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
 			// https://gamedev.stackexchange.com/questions/148961/how-to-design-a-damage-formula-in-an-rpg-which-keeps-weapons-with-different-atta
+			
 			
 			//Console.WriteLine("CalculateDamage() - Begin.");
 			System.Diagnostics.Debug.Assert (attackerOperator.Configuration == (uint)HumanOperatorConfiguration, "CalculateDamage() - AttackerOperator is of incorrect CONFIGURATION.");
@@ -3956,7 +3980,7 @@ namespace HelloBoids
 			//  specific sub-location of target aimed at
 			//  specific sub-location of target hit
 			
-	
+			
 			// note: this will be different if a MINE or AREA EFFECT damage occurs
 			// and there are multiple targets and multiple sub-locations on the target(s) that are damaged.
 	
@@ -3999,7 +4023,10 @@ namespace HelloBoids
 			
 			
 			
+			
 			// weapon %power of maxpower being used vs weapon output
+			
+			
 			
 			
 			// weapon Hitpoints - damage percent to weapon determines if increased malfunction and decreased accuracy
@@ -4035,7 +4062,6 @@ namespace HelloBoids
 				damageAmountWithVariance *= critMultiplier;
 			
 		
-			
 			// target Armor  //targetFL.Span[0].Armor.Armor[side].
 			int defense = targetLF.Span[0].Armor.AverageDR;
 			// if the defense is higher than the damage, then 0 damage gets through.  Math.Max() will prevent any "negative" damage in that case.
@@ -4045,7 +4071,6 @@ namespace HelloBoids
 			Console.WriteLine ("CalculateDamage() - Result == " + finalDamageAmount.ToString() + " (Target Average Defense == " + defense.ToString() + " Weapon Attack Value == " + damageAmountWithVariance.ToString() + " Critical Hit == " + isCriticalHit.ToString() + ")");
 			double time = gt.TotalElapsedSeconds;
 	
-			
 						
 			// ------------------------------------------
 			object[] result = new object[2];
@@ -4072,12 +4097,6 @@ namespace HelloBoids
 			dot.TimeOfAttack = time;
 			dot.Duration = 0.05f;
 			result[1] = dot;
-			
-
-			
-			
-			
-			
 			
 			//see Keystone.Game01.Messages.   public class AttackResults since
 			// we need results going over the network
@@ -4116,14 +4135,13 @@ namespace HelloBoids
 			// Pow() expression result which will make rand.NextDouble() increasingly
 			// MORE LIKELY to be a higher value thus resuling in a MALFUNCTION.
 			double weaponQualityCoefficient = componentStruct.Span[0].MaterialQuality;   
-			double weaponDamageCoefficient = componentStruct.Span[0].HitPoints.Current / componentStruct.Span[0].HitPoints.Base;
+			double weaponDamageCoefficient = componentStruct.Span[0].HitPoints.Base > 0 ? componentStruct.Span[0].HitPoints.Current / componentStruct.Span[0].HitPoints.Base : 0;
 			double weaponLevelCoefficient = componentStruct.Span[0].Level / MAX_LEVEL;
 			double weaponCraftsmanshipCoefficient = componentStruct.Span[0].Craftsmanship;
 			
 			// multiply all coefficients together
 			double combined = weaponQualityCoefficient * weaponDamageCoefficient * weaponLevelCoefficient * weaponCraftsmanshipCoefficient;
-			
-			
+						
 			
 			// range [0.001 - 1.0]  the greater the value, the more likely like a malfunction will occur 
 			double malfChance = 1.0 - weaponQualityCoefficient;  // EXPONENT - todo: this should be based on the weapon Level and craftsmenship of the of the Weapon

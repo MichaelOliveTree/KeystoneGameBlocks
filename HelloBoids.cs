@@ -3340,6 +3340,10 @@ namespace HelloBoids
 					}
 				
 					
+					
+					// TEMP HACK
+					// THE FOLLOWING BLOCK SHOULD GO INTO HasHitOccurred()
+					// BEGIN BLOCK ------------------
 					//List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE); // TODO: Hopefully this FindNearestTarget() can be optimized.... spatial searches even with Octree is slow.
 					
 					// This overloaded version of FindNearestTarget() returns the sorted list of neighbors from closest to furthest along with their distances to the current droid
@@ -3350,6 +3354,9 @@ namespace HelloBoids
 
 					targets = tmp.OfType<Boid>().ToList();
 					//Console.WriteLine("Do_Tactical_Logic() - Attacker Droid @ Array Index '" + attackerArrayIndex.ToString() + "' Found " + targets.Count.ToString() + " targets.");
+					//      NOTE - 
+					// END BLOCK ------------------
+					
 					
 					
 					// WE HAVE A TARGET AND A WEAPON THAT CAN FIRE
@@ -3915,11 +3922,7 @@ namespace HelloBoids
 					}
 
 					
-					// TODO: so for chained / recursive / cascading damage, where should we initiate that?
-					// We do know for an Explosion, an explosion ENtity can be retreived from an ObjectPool
-					// and then added to the Scene.  That Entity can be flagged as a MissionObject perhaps?
-					// 
-					
+				
 					
 					
 					// Console.WriteLine ("ProcessHits() - Publishing HIT RESULTS - 1");	
@@ -3953,6 +3956,19 @@ namespace HelloBoids
 			// 1 - [DONE] - Calc Malfunction
 			// 2 - Distance effect on Damage (laser attenuation/falloff)
 			// 3 - Recursive / Cascading / Chain-Reaction Damage
+				// TODO: so for chained / recursive / cascading damage, where should we initiate that?
+					// We do know for an Explosion, an explosion ENtity can be retreived from an ObjectPool
+					// and then added to the Scene.  That Entity can be flagged as a MissionObject perhaps?
+					// 
+					// In KGB for Interiors, we can use our TileMaps and search x distance away using floodfill
+					// In space and in HelloBoids, we can use 
+					//  a) a bigger sub-set of the adjacents rather than one target to HasHitOccurred()... include the desired target along with some adjacents within X range of the Target perhaps.
+					//  b) we still need this sub-set for our Sensor detection where ships can mask their signatures somewhat by flying in formation in a column (from 
+					//     the target's point-of-view) towards the the target.
+					//  c) or we just re-search over again with Octree to find new adjacents... or
+					//     again, we can use the SensorContact data...
+			
+			
 			// 4 - variances for spawned Droid Size
 			// 5 - randomness of skills of operators
 			// 6 - armor of the Droid randomness based on the size of the Droid

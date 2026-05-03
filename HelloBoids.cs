@@ -728,6 +728,8 @@ namespace HelloBoids
         private double MaxSpeed;
         private double TurnFactor; // For boundary avoidance
 
+		private float MAX_LEVEL = 10.0f;
+		
         public OctreeOctant Octree { get; }
         public static IntervalTimers mIntervalTimers;
 
@@ -3611,7 +3613,13 @@ namespace HelloBoids
 			
 				
 			// weapon accuracy (verify this includes effects of any existing damage on the weapon)
-			double weaponDamage = weapon
+			int componentIndex;
+			int weaponIndex;
+			
+			Memory<Component> weaponComponentStruct = (Memory<Component>)weaponEntity.GetUserStruct(typeof(Component), out componentIndex);
+			Memory<Weapon> weaponStruct = (Memory<Weapon>)weaponEntity.GetUserStruct(typeof(Weapon), out weaponIndex);
+			double weaponDamage = weaponComponentStruct.Span[0].HitPoints.Base > 0 ? weaponComponentStruct.Span[0].HitPoints.Current / weaponComponentStruct.Span[0].HitPoints.Base : 0;
+			
 			
 			// operator skill  
 			//Skill tacticalOperationsSkill = attackerOperator.Skills[SKILLS.TacticalOperations];
@@ -3619,7 +3627,26 @@ namespace HelloBoids
 			
 			
 			// operator Health
+			int lfIndex;
+			Memory<LifeForm> lfOperator = (Memory<LifeForm>)attackerOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
+			double operatorHealthCoeff = lfOperator.Span[0].HitPoints.Base > 0 ? lfOperator.Span[0].HitPoints.Current / lfOperator.Span[0].HitPoints.Base : 0;
 			
+			// GG-AI-OV - In RPG design, Stamina and Fatigue are two distinct mechanics used to manage player action, pace combat, and encourage strategic resource management.
+			// While often used interchangeably, they typically represent short-term exertion versus long-term penalties.
+			//
+			// Stamina: Short-Term Exertion
+			// Definition: A replenishable resource used for immediate actions like running, dodging, or attacking.
+			// Behavior: Depletes rapidly during action and recovers quickly, often automatically when out of combat.
+			// Goal: Limits the "15-minute work day," ensuring players cannot perform high-power actions indefinitely.
+			// Example: A white bar that empties while sprinting in Ghost Recon.
+			// 
+			// Fatigue: Long-Term Penalty
+			// Definition: A negative status effect or reduced capacity that accumulates when stamina is overused, or through illness, hunger, or long travel.
+			// Behavior: Accumulates gradually. It acts as a "penalty" that reduces the maximum stamina capacity, meaning the character recovers less over time.
+			// Goal: Encourages resting and tactical pacing.Example: In Story of Seasons, fatigue builds up while working and causes the character to pass out if it reaches 100
+			
+			double fatigue = lfOperator.Span[0].Fatigue;
+											 
 			
 			// stealth
 			
@@ -3631,9 +3658,15 @@ namespace HelloBoids
 			
 			
 			
-			// target distance			
-			double currentDistance = distancesSquared[selectedIndex];
+			// target distance	
+			int sensorArrayIndex = attackingShip.EntityArrayIndex + OPTICAL_SENSOR_OFFSET;
+			int sensorSpanIndex; 
+			EntityNode sensor = Boids[sensorArrayIndex];
+			Memory<Sensor> sensorStruct = (Memory<Sensor>)sensor.GetUserStruct(typeof(Sensor), out sensorSpanIndex);
 			
+			double currentTargetDistanceSquared = distancesSquared[selectedIndex];
+			// inverse square law for Optical Sensors
+			double detectionProbability = Math.Sqrt(sensorStruct.Span[0].RangeSquared) * (1 / currentTargetDistanceSquared); 
 			
 			// target evasive
 			// COMPARE VELOCITY MAGNITUDE CHANGES OVER X SECONDS PERIOD OF TIME
@@ -8650,6 +8683,28 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		}
 	}
 		
+	
+	
+	public struct Stat
+	{
+		// GG-AI-OV - A 32-bit float (the System.Single type in .NET) uses 24 bits for its significand (including one implicit bit). 
+		// This means: Up to 16,777,216 (\(2^{24}\)): Every whole number can be represented exactly.
+		// Beyond 16,777,216: The "gap" between representable numbers increases. 
+		// For example, \(2^{24} + 1\) (16,777,217) cannot be represented exactly and will be rounded to 16,777,216 or 16,777,218.
+		// Larger Values: As the numbers grow, the gaps get wider. Eventually, a float can only represent multiples of 4, then multiples of 8, and so on.
+			
+		public float Base;
+		public float Current;
+			
+		public Stat (float baseValue)
+		{
+			Base = baseValue;
+		}
+			
+		
+		
+	}
+	
 	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
 	public struct LifeForm
 	{
@@ -8660,10 +8715,19 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
 		// These will serve as Station Operators for now
 		public double CreationDateTime;
+		
+		
+		// STATS?
+		// 
 		public double Age;            // technically, this probably doesnt need to be stored... we only need the CreationDate?  // assign using Utils.GetAge() and find Age via 'age = Utils.GetAge(entity.CreationDate);'
 		public double MaxAge;
 		
 		public HitPoints HitPoints; 
+		public Stat Fatigue;
+		public Stat Stamina;
+		
+		// todo: what about various stats like STR, CON, Fatigue, Stamina, DEX, INT, CHARISMA, etc?
+		
 		public Armor Armor;
 		
 		public Membership[] Memberships;
@@ -8691,7 +8755,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
         public string FullName;
 		
-		public uint Level; // technological level. 
+		public float Level; // technological level. 
 		
         public float MaterialQuality; // cheap vs very fine materials (eg poorly refined steel vs damascus steel)
         public float Craftsmanship;   // how well the item is put together or manufactured (often taking into account the skill level of the maker)

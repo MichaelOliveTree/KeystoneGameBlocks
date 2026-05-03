@@ -3523,7 +3523,7 @@ namespace HelloBoids
 			hits = null;
 			
 			// 1 - [DONE] - Calc Malfunction
-			// 2 - Distance effect on Damage (laser attenuation/falloff) 
+			// 2 - [DONE] - Distance effect on Damage (laser attenuation/falloff) 
 			//     - for kinetic say a ballistic projectile or catapult bolt in atmosphere... depends on atmosphere and perhaps gravity too \
 			//     - for laser, inverse square law 'intensity = intensity * ( 1 / d^2)' where for instance double the distance == 1/4 the intensity of the beam
 			//      if (distance > falloffStart) 
@@ -3631,22 +3631,10 @@ namespace HelloBoids
 			Memory<LifeForm> lfOperator = (Memory<LifeForm>)attackerOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
 			double operatorHealthCoeff = lfOperator.Span[0].HitPoints.Base > 0 ? lfOperator.Span[0].HitPoints.Current / lfOperator.Span[0].HitPoints.Base : 0;
 			
-			// GG-AI-OV - In RPG design, Stamina and Fatigue are two distinct mechanics used to manage player action, pace combat, and encourage strategic resource management.
-			// While often used interchangeably, they typically represent short-term exertion versus long-term penalties.
-			//
-			// Stamina: Short-Term Exertion
-			// Definition: A replenishable resource used for immediate actions like running, dodging, or attacking.
-			// Behavior: Depletes rapidly during action and recovers quickly, often automatically when out of combat.
-			// Goal: Limits the "15-minute work day," ensuring players cannot perform high-power actions indefinitely.
-			// Example: A white bar that empties while sprinting in Ghost Recon.
-			// 
-			// Fatigue: Long-Term Penalty
-			// Definition: A negative status effect or reduced capacity that accumulates when stamina is overused, or through illness, hunger, or long travel.
-			// Behavior: Accumulates gradually. It acts as a "penalty" that reduces the maximum stamina capacity, meaning the character recovers less over time.
-			// Goal: Encourages resting and tactical pacing.Example: In Story of Seasons, fatigue builds up while working and causes the character to pass out if it reaches 100
 			
-			double fatigue = lfOperator.Span[0].Fatigue;
-											 
+			
+			double fatigue = lfOperator.Span[0].Fatigue.Base > 0 ? lfOperator.Span[0].Fatigue.Current / lfOperator.Span[0].Fatigue.Base : 0;
+										 
 			
 			// stealth
 			
@@ -3817,8 +3805,11 @@ namespace HelloBoids
 		/// The resulting damage types and amounts (and duration for damage that can be applied overtime)
 		/// that occur on this successful hit.
 		/// </summary>
-        private object[] CalculateDamage(EntityNode attackerOperator, EntityNode target, double distanceSquared, Memory<Component> componentStruct, Memory<Weapon> weaponStruct, GameTime gt, Random rand, out bool criticalMalfunctionHasOccurred)
+        private object[] CalculateDamage(EntityNode attackerOperator, EntityNode target, double distanceSquared, Memory<Component> componentStructForWeaponEntity, Memory<Weapon> weaponStruct, GameTime gt, Random rand, out bool criticalMalfunctionHasOccurred)
         {
+			
+			
+			
 			/*
 			Production laserDamage;
 			laserDamage.Amount = 5;
@@ -3832,8 +3823,10 @@ namespace HelloBoids
 			result[0] = laserDamage;
 			*/
 			
+			
+			
 			criticalMalfunctionHasOccurred = false;
-			bool malfunction = CalculateMalfunction(componentStruct, weaponStruct, rand, out criticalMalfunctionHasOccurred);
+			bool malfunction = CalculateMalfunction(componentStructForWeaponEntity, weaponStruct, rand, out criticalMalfunctionHasOccurred);
 			
 			if (criticalMalfunctionHasOccurred)
 			{
@@ -3849,34 +3842,36 @@ namespace HelloBoids
 			
 			// weapon %power of maxpower being used vs weapon output
 			
-					
-			
-			// weapon Hitpoints - damage percent to weapon determines if increased malfunction and decreased accuracy
-			
+
 			
 			
 			int lfIndex = -1;
 			Memory<LifeForm> targetLF = (Memory<LifeForm>)attackerOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
 
 			
-			// todo: the weapon's actual damage needs to be a result along a bell curve of the average Damage
+			// the weapon's actual damage needs to be a result along a bell curve of the average Damage
 			// https://gamedev.stackexchange.com/questions/198751/how-to-calculate-player-damage-in-a-game
 			// https://gamedev.stackexchange.com/questions/154920/browser-rpg-fight-calculation-formula/154927#154927  <- one user's opinion on why the 'luck' mechanic shouldn't be used
 			double damageAmount = weaponStruct.Span[0].AverageDamage;
 			double variancePercentage = 0.10; // 10%
 			double damageAmountWithVariance = Utils.RandomWithVariance(rand, damageAmount, variancePercentage);
 			
-			// distance based falloff
-			// - kinetic energy in atmosphere
-			// - lasers in atmosphere
-			// - lasers in vacuum.
+			bool inAtmosphere = true;
+			// Distance Based Falloff
 			if (weaponStruct.Span[0].DamageType == 0)
 			{
-				// inverse square law for Lasers (NOTE: that does NOT include Particle Weapons though in the future)
+				// inverse square law for Lasers in Vacuum (NOTE: that does NOT include Particle Weapons though in the future)
 				damageAmountWithVariance = damageAmountWithVariance * (1 / (weaponStruct.Span[0].Range * weaponStruct.Span[0].Range));
+				
+				if (inAtmosphere)
+				{
+					// lasers in atmosphere falloff at a faster rate... should be based on thickness of the atmosphere... and other factors perhaps
+					
+				}
 			}
 			else 
 			{
+				// kinetic in atmosphere
 				double fallOffSquared = weaponStruct.Span[0].FallOffStart * weaponStruct.Span[0].FallOffStart;
 				if (distanceSquared > fallOffSquared) 
 				{
@@ -3884,7 +3879,6 @@ namespace HelloBoids
 
 					double damageDropPerUnit = 0.5d; // keep in mind we are using distances SQUARED so we may need to half these values 
 					damageAmountWithVariance = (distanceSquared - fallOffSquared) * damageDropPerUnit;
-
 				}
 			}
 
@@ -8722,11 +8716,27 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		public double Age;            // technically, this probably doesnt need to be stored... we only need the CreationDate?  // assign using Utils.GetAge() and find Age via 'age = Utils.GetAge(entity.CreationDate);'
 		public double MaxAge;
 		
-		public HitPoints HitPoints; 
-		public Stat Fatigue;
-		public Stat Stamina;
 		
 		// todo: what about various stats like STR, CON, Fatigue, Stamina, DEX, INT, CHARISMA, etc?
+		
+		// GG-AI-OV - In RPG design, Stamina and Fatigue are two distinct mechanics used to manage player action, pace combat, and encourage strategic resource management.
+		// While often used interchangeably, they typically represent short-term exertion versus long-term penalties.
+		//
+		// Stamina: Short-Term Exertion
+		// Definition: A replenishable resource used for immediate actions like running, dodging, or attacking.
+		// Behavior: Depletes rapidly during action and recovers quickly, often automatically when out of combat.
+		// Goal: Limits the "15-minute work day," ensuring players cannot perform high-power actions indefinitely.
+		// Example: A white bar that empties while sprinting in Ghost Recon.
+		public Stat Stamina;
+		
+		// Fatigue: Long-Term Penalty
+		// Definition: A negative status effect or reduced capacity that accumulates when stamina is overused, or through illness, hunger, or long travel.
+		// Behavior: Accumulates gradually. It acts as a "penalty" that reduces the maximum stamina capacity, meaning the character recovers less over time.
+			// Goal: Encourages resting and tactical pacing.Example: In Story of Seasons, fatigue builds up while working and causes the character to pass out if it reaches 100
+		public Stat Fatigue;
+		
+		public HitPoints HitPoints; 
+		
 		
 		public Armor Armor;
 		

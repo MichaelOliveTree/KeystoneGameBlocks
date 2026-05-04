@@ -3823,8 +3823,6 @@ namespace HelloBoids
 			result[0] = laserDamage;
 			*/
 			
-			
-			
 			criticalMalfunctionHasOccurred = false;
 			bool malfunction = CalculateMalfunction(componentStructForWeaponEntity, weaponStruct, rand, out criticalMalfunctionHasOccurred);
 			
@@ -3837,8 +3835,6 @@ namespace HelloBoids
 				
 				return null;
 			}
-		
-			
 			
 			// weapon %power of maxpower being used vs weapon output
 			int laserIndex = attackerOperator.EntityArrayIndex - HUMAN_OPERATOR_OFFSET; // subtract to get the main Boid entity array Index
@@ -3853,12 +3849,9 @@ namespace HelloBoids
 			double reqt = powerConsumer.Span[0].PowerRequirement; // 
 			double minimum = powerConsumer.Span[0].MinimumPower;  
 			
-			
-			
 			int lfIndex = -1;
 			Memory<LifeForm> targetLF = (Memory<LifeForm>)attackerOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
 
-			
 			// the weapon's actual damage needs to be a result along a bell curve of the average Damage
 			// https://gamedev.stackexchange.com/questions/198751/how-to-calculate-player-damage-in-a-game
 			// https://gamedev.stackexchange.com/questions/154920/browser-rpg-fight-calculation-formula/154927#154927  <- one user's opinion on why the 'luck' mechanic shouldn't be used
@@ -3875,8 +3868,8 @@ namespace HelloBoids
 				
 				if (inAtmosphere)
 				{
-					// lasers in atmosphere falloff at a faster rate... should be based on thickness of the atmosphere... and other factors perhaps
-					
+					// lasers in atmosphere falloff at a faster rate... should be based on thickness of the atmosphere... and other factors perhaps but we'll just reduce by 1/4 for now.
+					damageAmountWithVariance *= 0.25;
 				}
 			}
 			else 
@@ -3903,12 +3896,10 @@ namespace HelloBoids
 			bool isCriticalHit = rand.NextDouble() > System.Math.Pow(factor, -critChance); // rand.NextDouble() will be in range [0.0, 1.0]
 			// eg. Math.Pow(2.71, -2) == 1/2.71^2  ==  1/7.344 == 0.13616371099249738
 			
-			
 			double critMultiplier = 2;
 			if (isCriticalHit)
 				damageAmountWithVariance *= critMultiplier;
 			
-		
 			// target Armor  //targetFL.Span[0].Armor.Armor[side].
 			int defense = targetLF.Span[0].Armor.AverageDR;
 			// if the defense is higher than the damage, then 0 damage gets through.  Math.Max() will prevent any "negative" damage in that case.
@@ -3917,7 +3908,6 @@ namespace HelloBoids
 			// NOTE: Damage amount generated. 
 			Console.WriteLine ("CalculateDamage() - Result == " + finalDamageAmount.ToString() + " (Target Average Defense == " + defense.ToString() + " Weapon Attack Value == " + damageAmountWithVariance.ToString() + " Critical Hit == " + isCriticalHit.ToString() + ")");
 			double time = gt.TotalElapsedSeconds;
-	
 						
 			// ------------------------------------------
 			object[] result = new object[2];
@@ -3933,7 +3923,7 @@ namespace HelloBoids
 		
 			// TODO: what if we were to make and add multiple DamageSystem.Damage records instead
 			//       and execute them no earlier than their "TimeOfAttack?"  This way we wouldn't 
-			//       need a seperate System for the two,we would just need to only execute them
+			//       need a seperate System for the two, we would just need to only execute them
 			//       when the "TimeOfAttack was <= gt.GetTime();
 			//       
 			DamageOverTimeSystem.DamageOverTime dot;
@@ -3945,7 +3935,7 @@ namespace HelloBoids
 			dot.Duration = 0.05f;
 			result[1] = dot;
 			
-			//see Keystone.Game01.Messages.   public class AttackResults since
+			// see Keystone.Game01.Messages.   public class AttackResults since
 			// we need results going over the network
 			return result;
         }
@@ -3989,7 +3979,6 @@ namespace HelloBoids
 			// multiply all coefficients together
 			double combined = weaponQualityCoefficient * weaponDamageCoefficient * weaponLevelCoefficient * weaponCraftsmanshipCoefficient;
 						
-			
 			// range [0.001 - 1.0]  the greater the value, the more likely like a malfunction will occur 
 			double malfChance = 1.0 - weaponQualityCoefficient;  // EXPONENT - todo: this should be based on the weapon Level and craftsmenship of the of the Weapon
 			
@@ -4033,7 +4022,6 @@ namespace HelloBoids
 			int count = (int)allTacticalStations.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 		
 			{
-				
 				Boid droid = (Boid)EntryClass.bSim.Boids[allComponents.Span[(int)i].EntityArrayIndex];
 				
 				string errorReason;
@@ -4125,12 +4113,11 @@ namespace HelloBoids
 				}
 			
 			
-			
 			return false;
 		}
 			
 		/// <summary>
-		/// based on policies
+		/// Based on policies
 		/// </summary>	
 		private double[] DoWeaponFitnessScores(EntityNode ship, EntityNode target)
 		{
@@ -4243,6 +4230,11 @@ namespace HelloBoids
 				//bool hasStruct = weaponStruct.Span[0].GetUserStructFlag(USER_STRUCT_FLAG_1);
 				//weaponStruct.Span[0].SetUserRuntimeFlag(USER_RUNTIME_FLAG_1, flagValue);
 				//bool hasRuntimeFlag = weaponStruct.Span[0].GetUserRuntimeFlag(USER_RUNTIME_FLAG_1);
+				
+				
+				// For The Culture: Similar to BLeBRiTY, For The Culture is another version of charades that celebrates Black culture in an engaging way. Free on the App Store.
+				// BLeBRiTY: 
+				
 				
 				try
 				{

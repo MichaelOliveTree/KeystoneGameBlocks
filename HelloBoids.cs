@@ -3841,8 +3841,18 @@ namespace HelloBoids
 			
 			
 			// weapon %power of maxpower being used vs weapon output
+			int laserIndex = attackerOperator.EntityArrayIndex - HUMAN_OPERATOR_OFFSET; // subtract to get the main Boid entity array Index
+			laserIndex = laserIndex + LASER_OFFSET; // now add the laserOffset to it to get the laser Entity Array index
 			
-
+			EntityNode laser = Boids[laserIndex];
+			int powerProducerIndex = -1;
+			int powerConsumerIndex = -1;
+			Memory<PowerProducer> powerProducer = (Memory<PowerProducer>)laser.GetUserStruct(typeof(PowerProducer), out powerProducerIndex);
+			Memory<PowerConsumer> powerConsumer = (Memory<PowerConsumer>)laser.GetUserStruct(typeof(PowerConsumer), out powerConsumerIndex);
+			
+			double reqt = powerConsumer.Span[0].PowerRequirement; // 
+			double minimum = powerConsumer.Span[0].MinimumPower;  
+			
 			
 			
 			int lfIndex = -1;
@@ -3891,7 +3901,7 @@ namespace HelloBoids
 			
 			// 0% at luck = 0 and approaches 100% as luck goes to infinity.
 			bool isCriticalHit = rand.NextDouble() > System.Math.Pow(factor, -critChance); // rand.NextDouble() will be in range [0.0, 1.0]
-			// Math.Pow(2.71, -2) == 1/2.71^2  ==  1/7.344 == 0.13616371099249738
+			// eg. Math.Pow(2.71, -2) == 1/2.71^2  ==  1/7.344 == 0.13616371099249738
 			
 			
 			double critMultiplier = 2;

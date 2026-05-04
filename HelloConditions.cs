@@ -728,6 +728,8 @@ namespace HelloBoids
         private double MaxSpeed;
         private double TurnFactor; // For boundary avoidance
 
+		private float MAX_LEVEL = 10.0f;
+		
         public OctreeOctant Octree { get; }
         public static IntervalTimers mIntervalTimers;
 
@@ -1512,40 +1514,40 @@ namespace HelloBoids
 			storeWeapon.Span[checkOutIndex].Configuration = LaserConfiguration;
 			storeWeapon.Span[checkOutIndex].Reliable = true;
 			storeWeapon.Span[checkOutIndex].Compact = true;
+			
 			storeWeapon.Span[checkOutIndex].Accuracy = 10;
 			storeWeapon.Span[checkOutIndex].SnapShot = 2;
-			storeWeapon.Span[checkOutIndex].Malfunction_ = 0.2f; // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
-			//public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
 			
-//			public string Shots;
+			storeWeapon.Span[checkOutIndex].Malfunction = 0.2f; // todo: this may be not needed if Malfunction is calculated at runtime to include Damage to the weapon when firing) // range 0.0 - 1.0, Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
+
 			
-			storeWeapon.Span[checkOutIndex].CoolDown_ = 0.3f; // this is the cooldown between when this weapon can be fired again.  It is RoF and perhaps CyclicRate too ultimately. Any "ANIMATION" of the weapon firing should last less than the time of this cooldown!
-//			public string RoF;
+			storeWeapon.Span[checkOutIndex].NumShots = 3;  // todo: Needs to be like HitPoints with .Base and .Current   eg. how many bullets are in a magazine 
+			storeWeapon.Span[checkOutIndex].ReloadCoolDown = 3.0f; //
+			storeWeapon.Span[checkOutIndex].CoolDown = 0.3f; // This is Rate-of-Fire.  This is the cooldown between when this weapon can be fired again.  It is RoF and perhaps CyclicRate too ultimately. Any "ANIMATION" of the weapon firing should last less than the time of this cooldown!
+
 			
+			// todo: PowerReqt should be part of PowerUsing struct?
 //			storeWeapon.Span[checkOutIndex].PowerReqt = 0.0f;
-//			
-//			public string Mount;
-//			public string Direction;
+
 
 			// TODO: these are like "internal" items and can be used if another power source is no longer connected
-//			public string PowerCellType;  // TOOD: Need an ENUM
-//			public int PowerCellQuantity;
-//			public double PowerCellWeight;
+//			string PowerCellType;  // TOOD: Need an ENUM
+//			int PowerCellQuantity;
+//			double PowerCellWeight;
 			
 			// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
 //			storeWeapon.Span[checkOutIndex].TypeDamage = DAMAGE_TYPE.Burning;     // TOOD: Need an ENUM
-			//public string Damage;         // this is dice of damage, but often contains a multiplier like (100) afterwards.  We don't need the multiplier since we just compute a min/max damage range or maybe we compute a single damage that then gets modified based on the target evasive maneuvers and such
 			storeWeapon.Span[checkOutIndex].AverageDamage = 32;       
-//			public double KEDamage = 3.0d;
-//			public double HalfDamage; 
-//			public double VacuumHalfDamage;
-			
-//			public string Range; // string description of range (eg: "very long range")
-			storeWeapon.Span[checkOutIndex].MaxRange = 10;
+//			double KEDamage = 3.0d;
+			storeWeapon.Span[checkOutIndex].FallOffStart = 25; 
+//			double VacuumFallOffStart;
+			storeWeapon.Span[checkOutIndex].Range = 10;   
+			storeWeapon.Span[checkOutIndex].RangeSquared = storeWeapon.Span[checkOutIndex].Range * storeWeapon.Span[checkOutIndex].Range;
 //			public double MaxRange2;
 //			public double VacuumMaxRange;
 //			public double VacuumMaxRange2;
     
+
 			
 			// Laser struct
 			ComponentStore<Laser_Struct> storeLasers = EntryClass.mCStoreCol.CheckOut<Laser_Struct>(EntryClass.NUM_ENTRIES); 
@@ -2338,7 +2340,7 @@ namespace HelloBoids
 
 
 		
-		private List<EntityNode> FindNearestTarget (EntityNode source, List<Tuple<int, double>> neighbors, out double[] distances)
+		private List<EntityNode> FindNearestTarget (EntityNode source, List<Tuple<int, double>> neighbors, double maxSearchDistanceSquared, out double[] distances)
 		{
 			distances = null;
 			if (neighbors == null || neighbors.Count == 0) return null;
@@ -2348,19 +2350,31 @@ namespace HelloBoids
 					
 			ComponentStore<Transform.Transform_Struct> allTransforms = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
 	
+			int foundCount = 0;
 			for (int i = 0; i < neighbors.Count; i++)
 			{
 				int arrayIndex = allTransforms.Span[neighbors[i].Item1].EntityArrayIndex;
 				EntityNode currentTarget = Boids[arrayIndex];
 				distances[i] = Vector3d.GetDistance3dSquared(source.Translation, currentTarget.Translation); // allTransforms.Span[neighbors[i].Item1].Translation);
 				tmp[i] = currentTarget;
+				
+				if (distances[i] <= maxSearchDistanceSquared)
+					foundCount++;	
+				
 				System.Diagnostics.Debug.Assert(source != currentTarget, "FindNearestTarget() - Target cannot be same as the Current Source Droid!");
 			}
 
 			// Sort 'the keys double[]' (distances) and rearrange associated data 'EntityNode[]' (results) accordingly
 			Array.Sort(distances, tmp);
-
-			return new List<EntityNode>(tmp);
+			
+			EntityNode[] found = new EntityNode[foundCount];
+			Array.ConstrainedCopy(tmp, 0, found, 0, foundCount);
+			
+			double[] distancesTrunc = new double[foundCount];
+			Array.ConstrainedCopy(distances, 0, distancesTrunc, 0, foundCount);
+			
+			
+			return new List<EntityNode>(found);
 		}
 		
 		///<summary>
@@ -3307,6 +3321,8 @@ namespace HelloBoids
 				int weaponArrayIndex = weapons[0].EntityArrayIndex; // todo: hack -  we know all droids have one weapon but this will fail otherwise
 				int weaponIndex;
 				Memory<Weapon>weaponStruct = (Memory<Weapon>) weapons[0].GetUserStruct(typeof(Weapon), out weaponIndex);
+				int componentIndex;
+				Memory<Component>componentStructForWeaponEntity = (Memory<Component>)weapons[0].GetUserStruct(typeof(Component), out componentIndex);
 				
 				bool canFire = weaponStruct.Span[0].CanFire(out errorReason);
 				
@@ -3336,130 +3352,26 @@ namespace HelloBoids
 					{
 						Console.WriteLine("Do_Tactical_Logic() -  Attacker Droid Array Index '" + attackerArrayIndex.ToString() + "' does not exist. " + ex.Message);
 					}
-				
-					
-					//List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE); // TODO: Hopefully this FindNearestTarget() can be optimized.... spatial searches even with Octree is slow.
-					
-					// This overloaded version of FindNearestTarget() returns the sorted list of neighbors from closest to furthest along with their distances to the current droid
-					List<EntityNode> tmp = FindNearestTarget(attacker, neighbors, out distances);
-					if (tmp == null || tmp.Count == 0)
-						return;     // NOTE: for parallel.For we use "return"
-						// continue; // NOTE: for regular for() loop we use "continue"
-
-					targets = tmp.OfType<Boid>().ToList();
-					//Console.WriteLine("Do_Tactical_Logic() - Attacker Droid @ Array Index '" + attackerArrayIndex.ToString() + "' Found " + targets.Count.ToString() + " targets.");
-					
-					
+									
 					// WE HAVE A TARGET AND A WEAPON THAT CAN FIRE
 					try
-					{
-						// todo: fix.  for now we wont iterate all targets, just the most near one
-						Boid currentTarget = targets[0];
-						double distanceToTargetSquared = distances[0];
-						
-						// TODO: QUEUE ANIMATION TO FIRE THIS WEAPON 
-						// Publish Event for this Weapon Fire At Target Attempt
-						int actionID = (int)ACTIONS.FiringAt;
-						CombatEventRecord r; //= new CombatEventRecord();
-						r = default(CombatEventRecord);
-						r.ActionID = actionID;
-						
-						//Console.WriteLine ("Do_Tactical_Logic() - Publishing FiringAt 1");	
-						r.Time = gt.TotalElapsedSeconds;
-						r.OfficerArrayIndex = operatorEntityArrayIndex;    // Attacking vessel's acting Tactical Officer
-						r.StationArrayIndex = stationArrayIndex;     // Attacking vessel Tactical Station
-						r.ShipArrayIndex = attackerArrayIndex;       // Attacking vessel
-						r.WeaponArrayIndex = weaponArrayIndex;       // Attacking vessel's weapon used
-						
-						r.TargetArrayIndices = new int[]{currentTarget.EntityArrayIndex};
-						//Console.WriteLine ("Do_Tactical_Logic() - Publishing FiringAt 1b");	
-						r.TargetOwnerArrayIndices = GetOwner(r.TargetArrayIndices);
-						//Console.WriteLine ("Do_Tactical_Logic() - Publishing FiringAt 2");	
-						r.HitPoints = GetHitPoints(r.TargetArrayIndices);
-						//Console.WriteLine ("Do_Tactical_Logic() - Publishing FiringAt 3");	
-						r.Damage = null;
-						
-						mSimEventManager.PublishEvent(attacker, actionID, r);
-						
+					{						
 						// NOTE: TacticalStation.CanHit() returns true if a hit WILL RESULT from the fired shot
 						//       even if the HIT is not the expected location on a Target or even on the correct Target!
 						//       Otherwise it is a total MISS.  We log the hit/miss EVENT either way... typically as a 
 						//       COMBAT ACTION INITIATED and a COMBAT ACTION RESULT.  There can be multiple COMBAT ACTION RESULTS
 						//       for instance if a mine field is laid, and some time later, a ship/craft is impacted by it... potentially
 						//       years later!
-						if (tacticalStationStruct.Span[0].CanHit(currentTarget))
+						HIT[] hits;
+						
+						if (!HitHasOccurred(operators[0], attacker, neighbors, weapons[0], gt, random, out hits))
 						{
-							EntryClass.mUserDataStore[attacker.EntityKey].IncrementInteger("shotsfired");
-							//Console.WriteLine("Do_Tactical_Logic() - Attacker Droid @ Array Index '" + currentArrayIndex.ToString() + "' firing shot # " + EntryClass.mUserDataStore[attacker.EntityKey].IncrementInteger("shotsfired").ToString() + " on Droid @ Array Index '" + currentTarget.EntityArrayIndex.ToString() + "'");
-
-							// NOTE: here we assume the Fire() occurs immediately using a lightspeed laser and the damage is instantaneous 
-							//       and does not need any travel time to reach the currentTarget
-							object[] damages = null;
-							
-							try 
-							{
-								// todo: change parameter attacker to tacticalStation?
-								// todo: randomly choose between 
-								// battery, opticalsensors, wings, laser, overall droid, tacticalstation or operator
-								EntityNode specificSubTarget = currentTarget;
-								damages = CalculateDamage(operators[0], specificSubTarget, weaponStruct, gt, random); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
-								int dCount = 0;
-								if (damages != null)
-									dCount = damages.Length;
-								
-								
-								//TODO: IF 0 Damage occurs because the Target was able to resist the attack with armor or passive defenses
-								//      the result of damage should return 0 and not NULL or anything because resisting an attack is valid information to know in an event log
-								
-								
-								// Console.WriteLine("Do_Tactical_Logic() - Damages Produced = " + dCount.ToString());
-							}
-							catch(Exception ex)
-							{
-								Console.WriteLine ("Do_Tactical_Logic() - CaculateDamage ERROR - " + ex.Message);	
-							}
-
-							if (damages != null)
-							{
-								int[] damageAmounts = new int[damages.Length];
-								
-								for (int j = 0; j < damages.Length; j++)
-								{
-									if (damages[j] is DamageSystem.Damage)
-									{
-										mDamageSystem.Add((DamageSystem.Damage)damages[j]);
-										damageAmounts[j] = ((DamageSystem.Damage)damages[j]).Amount;
-									}
-									else if (damages[j] is DamageOverTimeSystem.DamageOverTime)
-									{
-										mDamageOverTimeSystem.Add ((DamageOverTimeSystem.DamageOverTime)damages[j]);
-										damageAmounts[j] = ((DamageOverTimeSystem.DamageOverTime)damages[j]).Amount;
-										
-									}
-									else 
-										throw new Exception("Do_Tactical_Logic() - Unexpected Damge type. " + damages[j].GetType().Name);
-								}
-								
-								// Console.WriteLine ("Do_Tactical_Logic() - Publishing HIT RESULTS - 1");	
-								// Publish event with the Hit Results
-								actionID = (int)ACTIONS.TargetHit;
-								
-								r = default(CombatEventRecord);
-								r.ActionID = actionID;
-								r.Time = gt.TotalElapsedSeconds;
-								r.OfficerArrayIndex = operatorEntityArrayIndex;  // Attacking vessel's acting Tactical Officer
-								r.StationArrayIndex = stationArrayIndex;         // Attacking vessel Tactical Station
-								r.ShipArrayIndex = attackerArrayIndex;           // Attacking vessel
-
-								r.WeaponArrayIndex = weaponArrayIndex;           // Attacking vessel's weapon used
-								r.TargetArrayIndices = new int[]{currentTarget.EntityArrayIndex};
-								r.TargetOwnerArrayIndices = GetOwner(r.TargetArrayIndices);	
-								r.HitPoints = GetHitPoints(r.TargetArrayIndices);
-								//Console.WriteLine ("Do_Tactical_Logic() - Publishing HIT RESULTS - 2");	
-								r.Damage = damageAmounts;
-								mSimEventManager.PublishEvent(attacker, actionID, r);
-							}
-						}
+							return;
+						}	
+						
+						Console.WriteLine("Do_Tactical_Logic() -  " + hits.Length.ToString() + " HITs have occurred.");
+						ProcessHits(hits, operatorEntityArrayIndex, stationArrayIndex, attackerArrayIndex, weaponArrayIndex, gt, random);
+						
 					}
 					catch (Exception ex)
 					{
@@ -3592,6 +3504,510 @@ namespace HelloBoids
 			// - nap/sleep
 			// Console.WriteLine("End target prioritization...");
 		}
+		
+		public struct HIT 
+		{
+			public EntityNode Attacker;
+			public EntityNode Target;
+			public EntityNode Owner;            // if an assembly, component or operator, Owner is the Starship or Droid that is hosting them.
+			public EntityNode WeaponUsed;
+			public Vector3d Location;           // the impact point in worldspace on the targeted ship/droid/component/operator/world/colony/etc
+			public double DistanceSquared;
+		}
+		
+		
+		// NOTE: This only applies for FTL weapons... "CanHit()" must be different for Missiles, Kinetic Energy Weapons and Particle Weapons that are slower than light
+		public bool HitHasOccurred(EntityNode attackerOperator, EntityNode attackingShip, List<Tuple<int, double>> neighbors, EntityNode weaponEntity, GameTime gt, Random rand, out HIT[] hits)
+		{
+			bool result = false;
+			hits = null;
+			
+			// 1 - [DONE] - Calc Malfunction
+			// 2 - Distance effect on Damage (laser attenuation/falloff) 
+			//     - for kinetic say a ballistic projectile or catapult bolt in atmosphere... depends on atmosphere and perhaps gravity too \
+			//     - for laser, inverse square law 'intensity = intensity * ( 1 / d^2)' where for instance double the distance == 1/4 the intensity of the beam
+			//      if (distance > falloffStart) 
+			//		{
+    		//			float damageReduction = (distance - falloffStart) * damageDropPerUnit;
+    		//			currentDamage = Math.Max(minDamage, baseDamage - damageReduction);
+			//		}
+		
+			// 3 - Recursive / Cascading / Chain-Reaction Damage
+				// - PRODUCTION & CONSUMPTION should be used for propgating things like Fire and Radiation right?
+				//		- its kind of like cellular automata though isn't it? if the 
+			
+				// TODO: so for chained / recursive / cascading damage, where should we initiate that?
+					// We do know for an Explosion, an explosion ENtity can be retreived from an ObjectPool
+					// and then added to the Scene.  That Entity can be flagged as a MissionObject perhaps?
+					// 
+					// In KGB for Interiors, we can use our TileMaps and search x distance away using floodfill
+					// In space and in HelloBoids, we can use 
+					//  a) a bigger sub-set of the adjacents rather than one target to HasHitOccurred()... include the desired target along with some adjacents within X range of the Target perhaps.
+					//  b) we still need this sub-set for our Sensor detection where ships can mask their signatures somewhat by flying in formation in a column (from 
+					//     the target's point-of-view) towards the the target.
+					//  c) or we just re-search over again with Octree to find new adjacents... or
+					//     again, we can use the SensorContact data...
+			
+					// EntityPool for things like Explosions, RadiationFields, etc
+			
+			// 4 - variances for spawned Droid Size
+			// 5 - randomness of skills of operators
+			// 6 - armor of the Droid randomness based on the size of the Droid
+			
+			// 7 - armor option for Operators
+			// 8 - destruction of Droids upon lose of hitpoints
+			// 9 - double buffering of Data
+			// 10 - finish Statistics and Policies
+			// 11 - class Builder 
+			
+			
+			// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
+			// https://gamedev.stackexchange.com/questions/148961/how-to-design-a-damage-formula-in-an-rpg-which-keeps-weapons-with-different-atta
+			
+			
+			//Console.WriteLine("CalculateDamage() - Begin.");
+			System.Diagnostics.Debug.Assert (attackerOperator.Configuration == (uint)HumanOperatorConfiguration, "CalculateDamage() - AttackerOperator is of incorrect CONFIGURATION.");
+										 
+			// TODO: I think we want to have all relevant data on attacker and target
+			// for instance
+			// TacticalStation used
+			// Operator of Tactical Station
+			// time of event
+			// Target Vehicle
+			//  specific sub-location of target aimed at
+			//  specific sub-location of target hit
+			
+			
+			// note: this will be different if a MINE or AREA EFFECT damage occurs
+			// and there are multiple targets and multiple sub-locations on the target(s) that are damaged.
+	
+			// todo: so TacticalStation stores the stats correct?
+			//       Well, we have dedicated EntryClass.Statistics now
+	
+			//string factionColor = "Red";
+			//factionColor = (rand.NextDouble() >= 0.5d) ? "Red" : "Blue";
+			//b.BlackBoardData.SetString("faction", factionColor);
+				
+			
+
+			//List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE); // TODO: Hopefully this FindNearestTarget() can be optimized.... spatial searches even with Octree is slow.
+			// This overloaded version of FindNearestTarget() returns the sorted list of neighbors from closest to furthest along with their distances to the current droid
+			double[] distancesSquared;
+			double maxSearchDistanceSquared = Utils.GetMax(EntryClass.bSim.AlignmentDistance, EntryClass.bSim.CohesionDistance, EntryClass.bSim.SeparationDistance); // we want a much narrower search for potential targets than that used to find neighbors/aka adjacencents
+			maxSearchDistanceSquared *= maxSearchDistanceSquared;
+			
+			List<EntityNode> potentialTargets = FindNearestTarget(attackingShip, neighbors, maxSearchDistanceSquared, out distancesSquared);
+			if (potentialTargets == null || potentialTargets.Count == 0)
+				return result;		 
+
+			int selectedIndex = 0;
+			
+			
+			//TODO: find the actual target that was hit... we may be aiming for an assembly or component and may hit something different, such as a different Component or Operator or even a different Starship or Droid or NOTHING
+			
+			// todo: for tactical station, the logic for determining hit+damage should rely on the crew station.css script and not the operator.  Instead, we just grab bonuses or minuses from the operator crew member.
+			//  - time to get a lock
+			//  - bonus for time 
+			//  - bonus for damage
+			//  and remember, it's the tactical station that keeps track of all the weapons available and the targets (including friendlies)
+			
+				
+			// weapon accuracy (verify this includes effects of any existing damage on the weapon)
+			int componentIndex;
+			int weaponIndex;
+			
+			Memory<Component> weaponComponentStruct = (Memory<Component>)weaponEntity.GetUserStruct(typeof(Component), out componentIndex);
+			Memory<Weapon> weaponStruct = (Memory<Weapon>)weaponEntity.GetUserStruct(typeof(Weapon), out weaponIndex);
+			double weaponDamage = weaponComponentStruct.Span[0].HitPoints.Base > 0 ? weaponComponentStruct.Span[0].HitPoints.Current / weaponComponentStruct.Span[0].HitPoints.Base : 0;
+			
+			
+			// operator skill  
+			//Skill tacticalOperationsSkill = attackerOperator.Skills[SKILLS.TacticalOperations];
+			Skill targetingSkill = attackerOperator.Skills[SKILLS.Targeting];
+			
+			
+			// operator Health
+			int lfIndex;
+			Memory<LifeForm> lfOperator = (Memory<LifeForm>)attackerOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
+			double operatorHealthCoeff = lfOperator.Span[0].HitPoints.Base > 0 ? lfOperator.Span[0].HitPoints.Current / lfOperator.Span[0].HitPoints.Base : 0;
+			
+			// GG-AI-OV - In RPG design, Stamina and Fatigue are two distinct mechanics used to manage player action, pace combat, and encourage strategic resource management.
+			// While often used interchangeably, they typically represent short-term exertion versus long-term penalties.
+			//
+			// Stamina: Short-Term Exertion
+			// Definition: A replenishable resource used for immediate actions like running, dodging, or attacking.
+			// Behavior: Depletes rapidly during action and recovers quickly, often automatically when out of combat.
+			// Goal: Limits the "15-minute work day," ensuring players cannot perform high-power actions indefinitely.
+			// Example: A white bar that empties while sprinting in Ghost Recon.
+			// 
+			// Fatigue: Long-Term Penalty
+			// Definition: A negative status effect or reduced capacity that accumulates when stamina is overused, or through illness, hunger, or long travel.
+			// Behavior: Accumulates gradually. It acts as a "penalty" that reduces the maximum stamina capacity, meaning the character recovers less over time.
+			// Goal: Encourages resting and tactical pacing.Example: In Story of Seasons, fatigue builds up while working and causes the character to pass out if it reaches 100
+			
+			double fatigue = lfOperator.Span[0].Fatigue;
+											 
+			
+			// stealth
+			
+			
+			// target last acquisition - previous aquisition makes it easier to re-aquire
+			// STATISTICS search
+			
+			// sensorLockOfTargetTimeElapsed (aka durationOfSensorAquistion) // how much time has this  target been tracked by sensors already
+			
+			
+			
+			// target distance	
+			int sensorArrayIndex = attackingShip.EntityArrayIndex + OPTICAL_SENSOR_OFFSET;
+			int sensorSpanIndex; 
+			EntityNode sensor = Boids[sensorArrayIndex];
+			Memory<Sensor> sensorStruct = (Memory<Sensor>)sensor.GetUserStruct(typeof(Sensor), out sensorSpanIndex);
+			
+			double currentTargetDistanceSquared = distancesSquared[selectedIndex];
+			// inverse square law for Optical Sensors
+			double detectionProbability = Math.Sqrt(sensorStruct.Span[0].RangeSquared) * (1 / currentTargetDistanceSquared); 
+			
+			// target evasive
+			// COMPARE VELOCITY MAGNITUDE CHANGES OVER X SECONDS PERIOD OF TIME
+			
+			
+			
+			// target deployed counter measures within X time (time * fallOff aka call it 'attenuation')
+			// - STATISTICS SEARCH
+			
+			
+			
+			Vector3d start = attackingShip.Translation;   // todo: if hierarchical and if this is the Weapon and not the Droid, it should be .DerivedTranslation
+			Vector3d targetLoc = potentialTargets[selectedIndex].Translation; // TODO: if hierarchical, this should be .DerivedTranslation
+			
+			hits = new HIT[1];
+			hits[0].Target = potentialTargets[selectedIndex];
+			hits[0].Owner = potentialTargets[selectedIndex];  //  target is same as owner for now since target is a Boid and not the Operator or Station or Laser or Battery or Wings
+			hits[0].WeaponUsed = weaponEntity; // how does this work if its an explosion or fire or radiation volume?
+			hits[0].Location = targetLoc;    // the impact point
+			hits[0].DistanceSquared = distancesSquared[selectedIndex];
+			
+			
+			result = true;
+			return result;
+		}
+		
+		
+		public void ProcessHits(HIT[] hits, int operatorEntityArrayIndex, int stationEntityArrayIndex, int attackingShipEntityArrayIndex, int weaponEntityArrayIndex, GameTime gt, Random random)
+		{
+			
+			for (int currentHitIndex = 0;  currentHitIndex < hits.Length; currentHitIndex++)
+			{
+				EntityNode attacker = hits[currentHitIndex].Owner;
+				EntityNode currentTarget = hits[currentHitIndex].Target;
+				
+				// NOTE: hit.Owner is always the containing Starship/Container/Vehicle/Building
+				EntryClass.mUserDataStore[attacker.EntityKey].IncrementInteger("shotsfired");
+				//Console.WriteLine("ProcessHits() - Attacker Droid @ Array Index '" + currentArrayIndex.ToString() + "' firing shot # " + EntryClass.mUserDataStore[attacker.EntityKey].IncrementInteger("shotsfired").ToString() + " on Droid @ Array Index '" + currentTarget.EntityArrayIndex.ToString() + "'");
+
+				
+				// TODO: QUEUE ANIMATION TO FIRE THIS WEAPON 
+				// Publish a CombatEventRecord containing the 'FireAt' Attempt
+				int actionID = (int)ACTIONS.FiringAt;
+				CombatEventRecord r; //= new CombatEventRecord();
+				r = default(CombatEventRecord);
+				r.ActionID = actionID;
+
+				//Console.WriteLine ("ProcessHits() - Publishing FiringAt 1");	
+				r.Time = gt.TotalElapsedSeconds;
+				r.OfficerArrayIndex = operatorEntityArrayIndex;    // Attacking vessel's acting Tactical Officer
+				r.StationArrayIndex = stationEntityArrayIndex;     // Attacking vessel Tactical Station
+				r.ShipArrayIndex = attackingShipEntityArrayIndex;       // Attacking vessel
+				r.WeaponArrayIndex = weaponEntityArrayIndex;       // Attacking vessel's weapon used
+
+				r.TargetArrayIndices = new int[]{currentTarget.EntityArrayIndex};
+				//Console.WriteLine ("ProcessHits() - Publishing FiringAt 1b");	
+				r.TargetOwnerArrayIndices = GetOwner(r.TargetArrayIndices);
+				//Console.WriteLine ("ProcessHits() - Publishing FiringAt 2");	
+				r.HitPoints = GetHitPoints(r.TargetArrayIndices);
+				//Console.WriteLine ("ProcessHits() - Publishing FiringAt 3");	
+				r.Damage = null;
+
+				mSimEventManager.PublishEvent(attacker, actionID, r);
+
+				// NOTE: here we assume the Fire() occurs immediately using a lightspeed laser and the damage is instantaneous 
+				//       and does not need any travel time to reach the currentTarget
+				object[] damages = null;
+
+				try 
+				{
+					// todo: change parameter attacker to tacticalStation?
+					// todo: randomly choose between 
+					// battery, opticalsensors, wings, laser, overall droid, tacticalstation or operator
+					EntityNode stationOperator = Boids[operatorEntityArrayIndex];
+					EntityNode specificSubTarget = hits[currentHitIndex].Target;
+					EntityNode weaponEntity = Boids[weaponEntityArrayIndex];
+					
+					int componentIndex;
+					int weaponIndex;
+					Memory<Component> componentStructForWeaponEntity = (Memory<Component>)weaponEntity.GetUserStruct(typeof(Component), out componentIndex);
+					Memory<Weapon> weaponStruct = (Memory<Weapon>)weaponEntity.GetUserStruct(typeof(Weapon), out weaponIndex);
+					
+					bool critMalfunctionHasOccurred;
+					
+					// NOTE: if damages occurs, there can be multiple TYPES of damages in the return damages[] because a single target 
+					//       may for example receive kinetic damage AND on-going fire damage, and/or other damages.
+					damages = CalculateDamage(stationOperator, specificSubTarget, hits[currentHitIndex].DistanceSquared, componentStructForWeaponEntity, weaponStruct, gt, random, out critMalfunctionHasOccurred); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
+
+					//TODO: IF 0 Damage occurs because the Target was able to resist the attack with armor or passive defenses
+					//      the result of damage should return 0 and not NULL or anything because resisting an attack is valid information to know in an event log
+					//
+					//int dCount = 0;
+					//if (damages != null)
+					//	dCount = damages.Length;
+					//
+					// Console.WriteLine("ProcessHits() - Damages Produced = " + dCount.ToString());
+				}
+				catch(Exception ex)
+				{
+					Console.WriteLine ("ProcessHits() - CaculateDamage ERROR - " + ex.Message);	
+				}
+
+				if (damages != null)
+				{
+					int[] damageAmounts = new int[damages.Length];
+
+					for (int j = 0; j < damages.Length; j++)
+					{
+						if (damages[j] is DamageSystem.Damage)
+						{
+							mDamageSystem.Add((DamageSystem.Damage)damages[j]);
+							damageAmounts[j] = ((DamageSystem.Damage)damages[j]).Amount;
+						}
+						else if (damages[j] is DamageOverTimeSystem.DamageOverTime)
+						{
+							mDamageOverTimeSystem.Add ((DamageOverTimeSystem.DamageOverTime)damages[j]);
+							damageAmounts[j] = ((DamageOverTimeSystem.DamageOverTime)damages[j]).Amount;
+
+						}
+						else 
+							throw new Exception("ProcessHits() - Unexpected Damge type. " + damages[j].GetType().Name);
+					}
+
+					
+					// Console.WriteLine ("ProcessHits() - Publishing HIT RESULTS - 1");	
+					// Publish a CombatEventRecord containing the Hit Results
+					actionID = (int)ACTIONS.TargetHit;
+
+					r = default(CombatEventRecord);
+					r.ActionID = actionID;
+					r.Time = gt.TotalElapsedSeconds;
+					r.OfficerArrayIndex = operatorEntityArrayIndex;      // Attacking vessel's acting Tactical Officer
+					r.StationArrayIndex = stationEntityArrayIndex;       // Attacking vessel Tactical Station
+					r.ShipArrayIndex = attackingShipEntityArrayIndex;    // Attacking vessel
+
+					r.WeaponArrayIndex = weaponEntityArrayIndex;         // Attacking vessel's weapon used
+					r.TargetArrayIndices = new int[]{currentTarget.EntityArrayIndex};
+					r.TargetOwnerArrayIndices = GetOwner(r.TargetArrayIndices);	
+					r.HitPoints = GetHitPoints(r.TargetArrayIndices);
+					//Console.WriteLine ("ProcessHits() - Publishing HIT RESULTS - 2");	
+					r.Damage = damageAmounts;
+					mSimEventManager.PublishEvent(attacker, actionID, r);
+				}
+			}
+		}
+		
+		/// <summary>
+		/// The resulting damage types and amounts (and duration for damage that can be applied overtime)
+		/// that occur on this successful hit.
+		/// </summary>
+        private object[] CalculateDamage(EntityNode attackerOperator, EntityNode target, double distanceSquared, Memory<Component> componentStruct, Memory<Weapon> weaponStruct, GameTime gt, Random rand, out bool criticalMalfunctionHasOccurred)
+        {
+			/*
+			Production laserDamage;
+			laserDamage.Amount = 5;
+			laserDamage.DistributionList = null;
+			laserDamage.EntityID = droid.Index;
+			laserDamage.Location = Vector3d.Zero();
+			laserDamage.ProductID = (int)PRODUCTS.MicrowaveDamage;
+			laserDamage.SearchPrimitive = null;
+			laserDamage.Value = 1;
+			
+			result[0] = laserDamage;
+			*/
+			
+			criticalMalfunctionHasOccurred = false;
+			bool malfunction = CalculateMalfunction(componentStruct, weaponStruct, rand, out criticalMalfunctionHasOccurred);
+			
+			if (criticalMalfunctionHasOccurred)
+			{
+				// the weapon has failed in a critical way.  Damage may occur to the operator (if the weapon is handheld or loaders are nearby)
+				// or it may cause damage to any assemblies or components near it.
+				// TODO: we may need to spawn an Explosion from the ObjectPool<EntityNode> op;
+				
+				
+				return null;
+			}
+		
+			
+			
+			// weapon %power of maxpower being used vs weapon output
+			
+					
+			
+			// weapon Hitpoints - damage percent to weapon determines if increased malfunction and decreased accuracy
+			
+			
+			
+			int lfIndex = -1;
+			Memory<LifeForm> targetLF = (Memory<LifeForm>)attackerOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
+
+			
+			// todo: the weapon's actual damage needs to be a result along a bell curve of the average Damage
+			// https://gamedev.stackexchange.com/questions/198751/how-to-calculate-player-damage-in-a-game
+			// https://gamedev.stackexchange.com/questions/154920/browser-rpg-fight-calculation-formula/154927#154927  <- one user's opinion on why the 'luck' mechanic shouldn't be used
+			double damageAmount = weaponStruct.Span[0].AverageDamage;
+			double variancePercentage = 0.10; // 10%
+			double damageAmountWithVariance = Utils.RandomWithVariance(rand, damageAmount, variancePercentage);
+			
+			// distance based falloff
+			// - kinetic energy in atmosphere
+			// - lasers in atmosphere
+			// - lasers in vacuum.
+			if (weaponStruct.Span[0].DamageType == 0)
+			{
+				// inverse square law for Lasers (NOTE: that does NOT include Particle Weapons though in the future)
+				damageAmountWithVariance = damageAmountWithVariance * (1 / (weaponStruct.Span[0].Range * weaponStruct.Span[0].Range));
+			}
+			else 
+			{
+				double fallOffSquared = weaponStruct.Span[0].FallOffStart * weaponStruct.Span[0].FallOffStart;
+				if (distanceSquared > fallOffSquared) 
+				{
+					damageAmountWithVariance *= 0.5d; // initial drop is half of the damageAmountWithVariance (we might want to compute this prior to factorinig in variance)
+
+					double damageDropPerUnit = 0.5d; // keep in mind we are using distances SQUARED so we may need to half these values 
+					damageAmountWithVariance = (distanceSquared - fallOffSquared) * damageDropPerUnit;
+
+				}
+			}
+
+			// critChance is variable based on operator skill, factor is tweakable.
+			// the higher the "factor" and "critChance" (exponent), the smaller the resulting
+			// Pow() expression will result which will make rand.NextDouble() increasingly
+			// MORE LIKELY to be a higher value thus resuling in a CRITICAL HIT.
+			double critChance = 2.0d; // EXPONENT - todo: this should be based on the weapon and the skill of the operator
+			double factor = 1.25d; // factor of 1 or less will result in there NEVER being a critical hit
+			
+			// 0% at luck = 0 and approaches 100% as luck goes to infinity.
+			bool isCriticalHit = rand.NextDouble() > System.Math.Pow(factor, -critChance); // rand.NextDouble() will be in range [0.0, 1.0]
+			// Math.Pow(2.71, -2) == 1/2.71^2  ==  1/7.344 == 0.13616371099249738
+			
+			
+			double critMultiplier = 2;
+			if (isCriticalHit)
+				damageAmountWithVariance *= critMultiplier;
+			
+		
+			// target Armor  //targetFL.Span[0].Armor.Armor[side].
+			int defense = targetLF.Span[0].Armor.AverageDR;
+			// if the defense is higher than the damage, then 0 damage gets through.  Math.Max() will prevent any "negative" damage in that case.
+			double finalDamageAmount = Math.Max(0, damageAmountWithVariance - defense); 
+									
+			// NOTE: Damage amount generated. 
+			Console.WriteLine ("CalculateDamage() - Result == " + finalDamageAmount.ToString() + " (Target Average Defense == " + defense.ToString() + " Weapon Attack Value == " + damageAmountWithVariance.ToString() + " Critical Hit == " + isCriticalHit.ToString() + ")");
+			double time = gt.TotalElapsedSeconds;
+	
+						
+			// ------------------------------------------
+			object[] result = new object[2];
+			
+			DamageSystem.Damage d;
+			d.AttackerOperatorEntityArrayIndex = attackerOperator.EntityArrayIndex;
+			d.WeaponUsedEntityArrayIndex = weaponStruct.Span[0].EntityArrayIndex;
+			d.TargetEntityArrayIndex = target.EntityArrayIndex;
+			d.Amount = (int)finalDamageAmount;
+			d.TimeOfAttack = time;
+			result[0] = d;
+			
+		
+			// TODO: what if we were to make and add multiple DamageSystem.Damage records instead
+			//       and execute them no earlier than their "TimeOfAttack?"  This way we wouldn't 
+			//       need a seperate System for the two,we would just need to only execute them
+			//       when the "TimeOfAttack was <= gt.GetTime();
+			//       
+			DamageOverTimeSystem.DamageOverTime dot;
+			dot.AttackerOperatorEntityArrayIndex = attackerOperator.EntityArrayIndex;
+			dot.WeaponUsedEntityArrayIndex = weaponStruct.Span[0].EntityArrayIndex;
+			dot.TargetEntityArrayIndex = target.EntityArrayIndex;
+			dot.Amount = 1;  // weaponStruct.BeamOutput;
+			dot.TimeOfAttack = time;
+			dot.Duration = 0.05f;
+			result[1] = dot;
+			
+			//see Keystone.Game01.Messages.   public class AttackResults since
+			// we need results going over the network
+			return result;
+        }
+
+        private bool CalculateMalfunction (Memory<Component> componentStruct, Memory<Weapon> weaponStruct, Random rand, out bool criticalMalfunctionHasOccurred)
+		{
+			/*
+			In GURPS Vehicles 2nd Edition, weapon malfunction (Malf) rates are primarily determined 
+			by the weapon's Tech Level (TL) and construction quality, with most standard weapons 
+			having a Malf of 16 or 17. A failure (roll > skill) triggers a Malf check if the roll 
+			also exceeds the weapon's Malf number (e.g., 17 or 18).
+			
+			Standard Reliability: Most modern 
+			(TL7-8) weapons have a Malf of 17, meaning a malfunction occurs on a 17 or 18.
+			
+			High Reliability: Very reliable weapons (e.g., some TL8) might only malfunction on a 18, 
+			or only during a critical failure.Poor Conditions: Lack of maintenance, mud, or water can 
+			reduce a weapon's Malf number (e.g., to 15 or 16), making jams more frequent.
+			
+			Quality Modifiers: Fine-quality weapons can improve reliability by 1 or more, while cheap
+			weapons may see it reduced.Vehicle-Mounted Weapon Malf: Generally, vehicle weapons use 
+			these same standard Malf numbers, often interpreted as needing a 17+ or 18 to fail on a 
+			sustained fire roll, especially for high-volume weapons like autocannons.A malfunction 
+			usually requires a "Ready" maneuver to clear (stoppage) or more severe repairs for a 
+			broken weapon
+			*/
+			
+			criticalMalfunctionHasOccurred = false;
+			
+			// our LEVELs will be floating points and allow for 0.1, 0.2, ... 2.5...etc -> 10.0
+			const double MAX_LEVEL = 10d;
+			// malfChance is variable based on weapon craftsmanship, factor is tweakable.
+			// the higher the "factor" and "malfChance" (exponent), the smaller the resulting
+			// Pow() expression result which will make rand.NextDouble() increasingly
+			// MORE LIKELY to be a higher value thus resuling in a MALFUNCTION.
+			double weaponQualityCoefficient = componentStruct.Span[0].MaterialQuality;   
+			double weaponDamageCoefficient = componentStruct.Span[0].HitPoints.Base > 0 ? componentStruct.Span[0].HitPoints.Current / componentStruct.Span[0].HitPoints.Base : 0;
+			double weaponLevelCoefficient = componentStruct.Span[0].Level / MAX_LEVEL;
+			double weaponCraftsmanshipCoefficient = componentStruct.Span[0].Craftsmanship;
+			
+			// multiply all coefficients together
+			double combined = weaponQualityCoefficient * weaponDamageCoefficient * weaponLevelCoefficient * weaponCraftsmanshipCoefficient;
+						
+			
+			// range [0.001 - 1.0]  the greater the value, the more likely like a malfunction will occur 
+			double malfChance = 1.0 - weaponQualityCoefficient;  // EXPONENT - todo: this should be based on the weapon Level and craftsmenship of the of the Weapon
+			
+			// range [0.01 - 1.00]
+			double factor = 0.9d; // the lower the value, the greater the chance of a malfunction
+
+			bool malfunctionOccurred = rand.NextDouble() > System.Math.Pow(factor, -malfChance); // rand.NextDouble() should always be in range [0.0, 1.0]
+			// Math.Pow(factor, -malfChance) == Math.Pow(0.9 -(.25)) == 1 / (0.9^0.25)  ==  1 / 0.97400374642529676442270619639968 ==  1.0266900960803409723972392556152
+
+			if (malfunctionOccurred)
+			{
+				double criticalMalfunctionThreshold = 0.91d;
+				double variancePercentage = 0.05; // 5%
+				criticalMalfunctionThreshold = Utils.RandomWithVariance(rand, criticalMalfunctionThreshold, variancePercentage);
+				
+				if (rand.NextDouble() > criticalMalfunctionThreshold)
+					criticalMalfunctionHasOccurred = true;
+			}			
+
+			return malfunctionOccurred;
+		}
+		
 		
 		/// <summary>
 		/// Loop through all Components and set the Runtime flags that determine if this component/device is ready for use
@@ -3754,13 +4170,13 @@ namespace HelloBoids
 			for (int i = 0; i < numWeapons; i++)
 			{
 				// todo:  is the weapon available? does it need to aim at target? has it been doing so already? time for turret to rotate towards target
-				if (allWeaponsForThisShip.Span[0].CoolDown_ == 0)  // if coolDown != 0 then the fitness score should just be 0?
+				if (allWeaponsForThisShip.Span[0].CoolDown == 0)  // if coolDown != 0 then the fitness score should just be 0?
 				{
 					scores[i] = 0;
 				}
 				else
 				{
-					scores[i] = (allWeaponsForThisShip.Span[0].Damage * weights[0]) * (laser.Span[0].PowerReqt * weights[1]);
+					scores[i] = (allWeaponsForThisShip.Span[0].AverageDamage * weights[0]) * (laser.Span[0].PowerReqt * weights[1]);
 				}
 			}
 			
@@ -3851,220 +4267,6 @@ namespace HelloBoids
 				
 				// TODO: Do these .Is****  functions need to be setting mRuntimeFlags?
 			});
-		}
-		
-		/// <summary>
-		/// The resulting damage types and amounts (and duration for damage that can be applied overtime)
-		/// that occur on this successful hit.
-		/// </summary>
-        private object[] CalculateDamage(EntityNode attackerOperator, EntityNode target, Memory<Weapon> weaponStruct, GameTime gt, Random rand)
-        {
-			// 1 - Calc Malfunction
-			
-			
-			// 5 - Distance effect on Damage (laser attenuation/falloff)
-			// 6 - variances for spawned Droid Size
-			// 8 - randomness of skills of operators
-			// 9 - armor of the Droid randomness based on the size of the Droid
-			// 10 - armor option for Operators
-			// 7 - destruction of Droids upon lose of hitpoints
-			
-
-			// 3- double buffering of Data
-			// 4 - finish Statistics and Policies
-			// 5 - class Builder 
-			
-			// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
-			// https://gamedev.stackexchange.com/questions/148961/how-to-design-a-damage-formula-in-an-rpg-which-keeps-weapons-with-different-atta
-			
-			//Console.WriteLine("CalculateDamage() - Begin.");
-			System.Diagnostics.Debug.Assert (attackerOperator.Configuration == (uint)HumanOperatorConfiguration, "CalculateDamage() - AttackerOperator is of incorrect CONFIGURATION.");
-										 
-			// TODO: I think we want to have all relevant data on attacker and target
-			// for instance
-			// TacticalStation used
-			// Operator of Tactical Station
-			// time of event
-			// Target Vehicle
-			//  specific sub-location of target aimed at
-			//  specific sub-location of target hit
-			
-	
-			// note: this will be different if a MINE or AREA EFFECT damage occurs
-			// and there are multiple targets and multiple sub-locations on the target(s) that are damaged.
-	
-			// todo: so TacticalStation stores the stats correct?
-			//       Well, we have dedicated EntryClass.Statistics now
-	
-			//string factionColor = "Red";
-			//factionColor = (rand.NextDouble() >= 0.5d) ? "Red" : "Blue";
-			//b.BlackBoardData.SetString("faction", factionColor);
-			
-			
-			
-			
-			
-			/*
-			Production laserDamage;
-			laserDamage.Amount = 5;
-			laserDamage.DistributionList = null;
-			laserDamage.EntityID = droid.Index;
-			laserDamage.Location = Vector3d.Zero();
-			laserDamage.ProductID = (int)PRODUCTS.MicrowaveDamage;
-			laserDamage.SearchPrimitive = null;
-			laserDamage.Value = 1;
-			
-			result[0] = laserDamage;
-			*/
-			
-			bool malfunction = CalculateMalfunction(weaponStruct, rand);
-			
-			
-			int lfIndex = -1;
-			Memory<LifeForm> targetLF = (Memory<LifeForm>)attackerOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
-
-			
-			// todo: the weapon's actual damage needs to be a result along a bell curve of the average Damage
-			// https://gamedev.stackexchange.com/questions/198751/how-to-calculate-player-damage-in-a-game
-			// https://gamedev.stackexchange.com/questions/154920/browser-rpg-fight-calculation-formula/154927#154927  <- one user's opinion on why the 'luck' mechanic shouldn't be used
-			double damageAmount = weaponStruct.Span[0].AverageDamage;
-			
-			double variancePercentage = 0.10; // 10%
-
-			double min = damageAmount * (1 - variancePercentage);
-			double max = damageAmount * (1 + variancePercentage);
-			double damageAmountWithVariance = rand.NextDouble() * (max - min) + min;
-			
-			
-			// critChance is variable based on operator skill, factor is tweakable.
-			// the higher the "factor" and "critChance" (exponent), the smaller the resulting
-			// Pow() expression will result which will make rand.NextDouble() increasingly
-			// MORE LIKELY to be a higher value thus resuling in a CRITICAL HIT.
-			double critChance = 2.0d; // EXPONENT - todo: this should be based on the weapon and the skill of the operator
-			double factor = 1.25d; // factor of 1 or less will result in there NEVER being a critical hit
-			
-			// 0% at luck = 0 and approaches 100% as luck goes to infinity.
-			bool isCriticalHit = rand.NextDouble() > System.Math.Pow(factor, -critChance); // rand.NextDouble() will be in range [0.0, 1.0]
-			// Math.Pow(2.71, -2) == 1/2.71^2  ==  1/7.344 == 0.13616371099249738
-			
-			
-			double critMultiplier = 2;
-			if (isCriticalHit)
-				damageAmountWithVariance *= critMultiplier;
-			
-			//targetFL.Span[0].Armor.Armor[side].
-			
-			
-			
-			// target distance
-			
-			
-			
-			// weapon %power of maxpower being used vs weapon output
-			
-			
-			// weapon Hitpoints - damage percent to weapon determines if increased malfunction and decreased accuracy
-			
-			
-			
-			
-			
-			// target Armor
-			int defense = targetLF.Span[0].Armor.AverageDR;
-			// if the defense is higher than the damage, then 0 damage gets through.  Math.Max() will prevent any "negative" damage in that case.
-			double finalDamageAmount = Math.Max(0, damageAmountWithVariance - defense); 
-									
-			// NOTE: Damage amount generated. 
-			Console.WriteLine ("CalculateDamage() - Result == " + finalDamageAmount.ToString() + " (Target Average Defense == " + defense.ToString() + " Weapon Attack Value == " + damageAmountWithVariance.ToString() + " Critical Hit == " + isCriticalHit.ToString() + ")");
-			double time = gt.TotalElapsedSeconds;
-	
-			
-			
-			
-			// ------------------------------------------
-			object[] result = new object[2];
-			
-			DamageSystem.Damage d;
-			d.AttackerOperatorEntityArrayIndex = attackerOperator.EntityArrayIndex;
-			d.WeaponUsedEntityArrayIndex = weaponStruct.Span[0].EntityArrayIndex;
-			d.TargetEntityArrayIndex = target.EntityArrayIndex;
-			d.Amount = (int)finalDamageAmount;
-			d.TimeOfAttack = time;
-			result[0] = d;
-			
-		
-			// TODO: what if we were to make and add multiple DamageSystem.Damage records instead
-			//       and execute them no earlier than their "TimeOfAttack?"  This way we wouldn't 
-			//       need a seperate System for the two,we would just need to only execute them
-			//       when the "TimeOfAttack was <= gt.GetTime();
-			//       
-			DamageOverTimeSystem.DamageOverTime dot;
-			dot.AttackerOperatorEntityArrayIndex = attackerOperator.EntityArrayIndex;
-			dot.WeaponUsedEntityArrayIndex = weaponStruct.Span[0].EntityArrayIndex;
-			dot.TargetEntityArrayIndex = target.EntityArrayIndex;
-			dot.Amount = 1;  // weaponStruct.BeamOutput;
-			dot.TimeOfAttack = time;
-			dot.Duration = 0.05f;
-			result[1] = dot;
-			
-
-			
-			
-			
-			
-			
-			//see Keystone.Game01.Messages.   public class AttackResults since
-			// we need results going over the network
-			return result;
-        }
-
-        private bool CalculateMalfunction(Memory<Weapon> weaponStruct, Random rand)
-		{
-			/*
-			In GURPS Vehicles 2nd Edition, weapon malfunction (Malf) rates are primarily determined 
-			by the weapon's Tech Level (TL) and construction quality, with most standard weapons 
-			having a Malf of 16 or 17. A failure (roll > skill) triggers a Malf check if the roll 
-			also exceeds the weapon's Malf number (e.g., 17 or 18).
-			
-			Standard Reliability: Most modern 
-			(TL7-8) weapons have a Malf of 17, meaning a malfunction occurs on a 17 or 18.
-			
-			High Reliability: Very reliable weapons (e.g., some TL8) might only malfunction on a 18, 
-			or only during a critical failure.Poor Conditions: Lack of maintenance, mud, or water can 
-			reduce a weapon's Malf number (e.g., to 15 or 16), making jams more frequent.
-			
-			Quality Modifiers: Fine-quality weapons can improve reliability by 1 or more, while cheap
-			weapons may see it reduced.Vehicle-Mounted Weapon Malf: Generally, vehicle weapons use 
-			these same standard Malf numbers, often interpreted as needing a 17+ or 18 to fail on a 
-			sustained fire roll, especially for high-volume weapons like autocannons.A malfunction 
-			usually requires a "Ready" maneuver to clear (stoppage) or more severe repairs for a 
-			broken weapon
-			*/
-			
-			
-			// malfChance is variable based on weapon craftsmanship, factor is tweakable.
-			// the higher the "factor" and "malfChance" (exponent), the smaller the resulting
-			// Pow() expression result which will make rand.NextDouble() increasingly
-			// MORE LIKELY to be a higher value thus resuling in a MALFUNCTION.
-			double weaponQualityCoefficient = 0.75d;
-			double malfChance = 1.0 - weaponQualityCoefficient;  // EXPONENT - todo: this should be based on the weapon Level and craftsmenship of the of the Weapon
-			double factor = 0.9d; // factor of 1 OR LESS will result in there NEVER being a malfunction
-
-			bool malfunctionOccurred = rand.NextDouble() > System.Math.Pow(factor, -malfChance); // rand.NextDouble() should always be in range [0.0, 1.0]
-			// Math.Pow(factor, -malfChance) == Math.Pow(2.71, -(2)) == 1 / (2.71^2)  ==  1 / 7.344 == 0.13616371099249738
-			
-			// (factor raised to the malfChance) totaling 1.0 or less, will make a MALFUNCTION impossible
-			// the higher the resulting factor raised to the malfChance, the more probably a MALFUNCTION occurs
-			
-			
-			// has this malfunction resulted in a crtical malfunction such as an explosion of the ammunition which
-			// may result in damage to the weapon and/or operator?
-			double critMultiplier = 2;
-			if (isCriticalMalfunction)
-				damageAmountWithVariance *= critMultiplier;
-			
-			
-			return malfunctionOccurred;
 		}
 		
 #region Consumption and Production
@@ -8481,6 +8683,28 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		}
 	}
 		
+	
+	
+	public struct Stat
+	{
+		// GG-AI-OV - A 32-bit float (the System.Single type in .NET) uses 24 bits for its significand (including one implicit bit). 
+		// This means: Up to 16,777,216 (\(2^{24}\)): Every whole number can be represented exactly.
+		// Beyond 16,777,216: The "gap" between representable numbers increases. 
+		// For example, \(2^{24} + 1\) (16,777,217) cannot be represented exactly and will be rounded to 16,777,216 or 16,777,218.
+		// Larger Values: As the numbers grow, the gaps get wider. Eventually, a float can only represent multiples of 4, then multiples of 8, and so on.
+			
+		public float Base;
+		public float Current;
+			
+		public Stat (float baseValue)
+		{
+			Base = baseValue;
+		}
+			
+		
+		
+	}
+	
 	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
 	public struct LifeForm
 	{
@@ -8491,10 +8715,19 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
 		// These will serve as Station Operators for now
 		public double CreationDateTime;
+		
+		
+		// STATS?
+		// 
 		public double Age;            // technically, this probably doesnt need to be stored... we only need the CreationDate?  // assign using Utils.GetAge() and find Age via 'age = Utils.GetAge(entity.CreationDate);'
 		public double MaxAge;
 		
 		public HitPoints HitPoints; 
+		public Stat Fatigue;
+		public Stat Stamina;
+		
+		// todo: what about various stats like STR, CON, Fatigue, Stamina, DEX, INT, CHARISMA, etc?
+		
 		public Armor Armor;
 		
 		public Membership[] Memberships;
@@ -8522,7 +8755,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
         public string FullName;
 		
-		public uint Level; // technological level. 
+		public float Level; // technological level. 
 		
         public float MaterialQuality; // cheap vs very fine materials (eg poorly refined steel vs damascus steel)
         public float Craftsmanship;   // how well the item is put together or manufactured (often taking into account the skill level of the maker)
@@ -8992,46 +9225,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			if (Actions.Count == 0)
 				Actions = null;
 		}
-		   	
-		// NOTE: This only applies for FTL weapons... "CanHit()" must be different for Missiles, Kinetic Energy Weapons and Particle Weapons that are slower than light
-		public bool CanHit(EntityNode target)
-		{
-			bool result = false;
-			
-			
-			// todo: for tactical station, the logic for determining hit+damage should rely on the crew station.css script and not the operator.  Instead, we just grab bonuses or minuses from the operator crew member.
-			//  - time to get a lock
-			//  - bonus for time 
-			//  - bonus for damage
-			//  and remember, it's the tactical station that keeps track of all the weapons available and the targets (including friendlies)
-			
-				
-			// stealth
-			
-			// target last acquisition - previous aquisition makes it easier to re-aquire
-			
-			// sensorLockOfTargetTimeElapsed (aka durationOfSensorAquistion) // how much time has this  target been tracked by sensors already
-			
-			// operator skill
-			
-			
-			// operator Health
-			
-			
-			// target distance			
 
-			
-			// target evasive
-			
-			
-			// target deployed counter measures within X time (time * fallOff aka call it 'attenuation')
-					
-			
-			result = true;
-			return result;
-		}
-		
-		
 		// todo: Actions that have completed need to be removed from a list?
 		///<summary>
 		/// Determines if an Action can be assigned to this Component based on existing Actions
@@ -9207,7 +9401,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
     {
 		public int EntityArrayIndex;
 		public CONFIGURATION Configuration;
-		//public int Index; // from this we can get the EntityIndex
 		
         // kinetic energy type weapons build parameters 
         public float Bore;
@@ -9216,41 +9409,37 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		public bool Compact;
 		
         // stats
-        public int RoF;
         
-        public double RangeSquared;
-        public float Accuracy;
-		public int SnapShot;
-        //public float Malfunction; // 0.0 - 1.0f coefficient for tendancy to malfunction. MaterialQuality and Craftsmanship have impact
-        
-		//	public string Shots;
-		public float Malfunction_ ; // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
-		//public string Malfunction; // TOOD: Need an ENUM or logarithmic value? or 
-
+        public int NumShots;      // Should be like HitPoints... HitPoints.Base and HitPoints.Current  so NumShots.Base and NumShots.Current.  Make sure NumShots can accommodate the RoF
+		public float CoolDown;    // This is the Rate-of-Fire (RoF) expressed as a cooldown value.  For instance, a RoF = 1/5 means once shot per 5 turns (eg 1 per every 5 seconds == 5 second cooldown) RoF = 1 means one shot per one second = 1 second cooldown.  
+		public float ReloadCoolDown; // This occurs after NumShots.Current reaches 0.
 		
-		public float CoolDown_;    // RoF expressed as a cooldown value.  For instance, a RoF = 1/5 means once shot per 5 turns (eg 1 per every 5 seconds == 5 second cooldown) RoF = 1 means one shot per one second = 1 second cooldown.  
-		//			public string RoF;
-
-		public DAMAGE_TYPE DamageType;
-        public int Damage; // amount of damage it can inflict
-        public int HalfDamage;
-		
-		//public string Damage;         // this is dice of damage, but often contains a multiplier like (100) afterwards.  We don't need the multiplier since we just compute a min/max damage range or maybe we compute a single damage that then gets modified based on the target evasive maneuvers and such
-		public int AverageDamage;       
-		//			public double KEDamage;
-		//			public double HalfDamage;  // the range at which the amount of damage the weapon can do is at least halved.
-		//			public double VacuumHalfDamage;
-
-
-		//			public string Range; // string description of range (eg: "very long range")
-		public double MaxRange;
+		public double Range;
+		public double RangeSquared; // for convenience rather than having to recompute for comparison against the distance of a target Entity
 		//			public double MaxRange2;
 		//			public double VacuumMaxRange;
 		//			public double VacuumMaxRange2;
+        
+        public float Accuracy;      // based on type of weapon (revolvers -> rifles -> lasers) 
+		public int SnapShot;        // this is a penalty for Accuracy when not aiming but needing to try to hit a target as quickly as possible.  It's based on the weapons bulk,design and size.
+		                            // For our purposes, this would be a statistic and probalby modify our [0.0 - 1.0f] Accuracy stat
+        
 		
-		//			
-		//			public string Mount;
-		//			public string Direction;
+		// 0.0 - 1.0f coefficient for tendancy to malfunction. MaterialQuality and Craftsmanship have impact
+        public float Malfunction;    // 0 to Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
+		                             // Malfunction is determined from Level, Craftsmenship, MaterialQuality and currentHitpoints
+				
+
+		public DAMAGE_TYPE DamageType;
+        public int AverageDamage; // amount of damage it can inflict
+        //   Kinetic Energy (KE) damage in GURPS—or more accurately, calculating damage based on muzzle energy or impact velocity—is primarily needed to bridge the gap between abstract gameplay mechanics and realistic, simulation-heavy ballistics. While the GURPS Basic Set provides simplified damage values for common weapons, a formal KE system is needed to:Standardize Weapon Stats: It ensures that damage across different guns, especially experimental or high-TL weapons, is mathematically consistent rather than based on guesswork.Accurately Model Armor Penetration: Penetration in reality scales with KE divided by the cross-sectional area of the projectile. A formal system allows for precise calculation of how a bullet interacts with DR (Damage Resistance).Bridge TL Gaps: It allows for realistic conversions between different technological levels (TL), ensuring a TL7 rifle feels correctly powered compared to a TL9 railgun, based on actual energy output.Why a Specific KE System is UsedThe need for this arises because simply scaling damage linearly with velocity does not work.Consistency: The GURPS 4th Edition Basic Set allows for varied wounding modifiers based on caliber (e.g., \(pi-\), \(pi\), \(pi+\), \(pi++\)).Realism over Fiat: Instead of a writer guessing that a gun does \(2d+2\), developers or GMs use projectile velocity and mass to calculate KE and map that to a realistic GURPS damage die.Collisions: KE calculation is vital for determining damage in massive impacts, such as vehicle crashes or huge monsters falling, which is not easily covered by standard weapon stats.Summary of UtilityHigh-Tech Campaigns: Essential for balancing modern and futuristic firearms (High-Tech, Ultra-Tech).Detailed Simulation: Used by GMs who want armor penetration to follow physical laws rather than abstract tables.Vehicular Combat: Used to calculate damage from collisions (e.g., GURPS Vehicles 2nd Ed).In short, while not needed for cinematic games, a formal Kinetic Energy formula is needed to keep damage realistic and consistent when dealing with high-velocity weapons or physics-heavy scenarios.
+		//public double KEDamage; (Crushing or Impaling damage formula specifically =  KEDamage = Damage * Velocity * Acceleration * Weight
+		
+		public int FallOffStart; // distance in meters at which the damage inflicted begins to be reduced
+		// public double VacuumFallOffStart;    
+		
+		
+		
 		
         // runtime flags
         //public bool IsFiring; // todo: for weapons this is Component.isInUse, 
@@ -9269,12 +9458,10 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			errorReason = null;
 			bool result = true;
 
-			
-			
-			
 			return true;
 		}
     }
+	
 	
 	/*
 	ref struct ComponentLaserStruct
@@ -9371,7 +9558,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			
 			for (int i = 0; i < numFaces; i++)
 			{
-				double surfaceArea = GetArmorFaceSurfaceArea (i, box);
+				double surfaceArea = GetArmorFaceSurfaceArea ((BoundingBox.BOX_FACES)i, box);
 				
 				Faces[i] = new ArmorFace(box, i);
 				Faces[i].SurfaceAttributes = ArmorFace.SURFACE_ATTRIBUTES.None;
@@ -17593,11 +17780,11 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
             tris[4] = new Triangle(v[2], v[6], v[0]); 
             tris[5] = new Triangle(v[2], v[4], v[0]);
 
-            // back 2 faces
+            // FRONT 2 faces (+z, facing into the camera.  In fact if this were not so, the RIGHT 2 faces above would not be correct (but they are correct)
             tris[6] = new Triangle(v[3], v[6], v[2]); 
             tris[7] = new Triangle(v[3], v[7], v[6]);
 
-            // front 2 faces
+            // back 2 faces (-z , closest to camera)
             tris[2] = new Triangle(v[0], v[4], v[1]); 
             tris[3] = new Triangle(v[1], v[4], v[5]);
 
@@ -17631,9 +17818,9 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
             // the side faces
             polys[(int)BOX_FACES.LEFT] = new Polygon(v[0], v[2], v[6], v[4]); // left 
             polys[(int)BOX_FACES.RIGHT] = new Polygon(v[1], v[5], v[7], v[3]); // right
+			
 			polys[(int)BOX_FACES.FRONT] = new Polygon(v[3], v[7], v[6], v[2]); // front // FRONT (+z) <--NOTE: "FRONT" (+z) denotes facing INTO the camera.  So if you place an Actor into the scene, the eyes of that actor will be facing away from you and into the Camera unless you apply a 180 y axis rotation in the assetplacementtgool logic
-
-            polys[(int)BOX_FACES.BACK] = new Polygon(v[0], v[4], v[5], v[1]); // back
+            polys[(int)BOX_FACES.BACK] = new Polygon(v[0], v[4], v[5], v[1]); // back // -z, face closest to the camera.
             
             return polys;
         }
@@ -21178,6 +21365,15 @@ public abstract class PlanedFrustum
 			return result;
 		}
 		
+		public static double RandomWithVariance(Random rand, double baseValue, double variancePercentage)
+		{
+			double min = baseValue * (1 - variancePercentage);
+			double max = baseValue * (1 + variancePercentage);
+			double damageAmountWithVariance = rand.NextDouble() * (max - min) + min;
+			
+			return damageAmountWithVariance;
+		}
+		
 		public static byte[] CompressWithBrotli(byte[] inputBytes)
 		{
 			using var outputStream = new MemoryStream();
@@ -23076,5 +23272,5 @@ public abstract class PlanedFrustum
 		}
 	}
    #endregion  */
-   
+
 }

@@ -3837,17 +3837,25 @@ namespace HelloBoids
 			}
 			
 			// weapon %power of maxpower being used vs weapon output
-			int laserIndex = attackerOperator.EntityArrayIndex - HUMAN_OPERATOR_OFFSET; // subtract to get the main Boid entity array Index
-			laserIndex = laserIndex + LASER_OFFSET; // now add the laserOffset to it to get the laser Entity Array index
+			int laserEntityArrayIndex = attackerOperator.EntityArrayIndex - HUMAN_OPERATOR_OFFSET; // subtract to get the main Boid entity array Index
+			laserEntityArrayIndex = laserEntityArrayIndex + LASER_OFFSET; // now add the laserOffset to it to get the laser Entity Array index
 			
-			EntityNode laser = Boids[laserIndex];
-			int powerProducerIndex = -1;
+			
+			
+			EntityNode laser = Boids[laserEntityArrayIndex];
+			int laserIndex = -1;
 			int powerConsumerIndex = -1;
-			Memory<PowerProducer> powerProducer = (Memory<PowerProducer>)laser.GetUserStruct(typeof(PowerProducer), out powerProducerIndex);
+			
 			Memory<PowerConsumer> powerConsumer = (Memory<PowerConsumer>)laser.GetUserStruct(typeof(PowerConsumer), out powerConsumerIndex);
+			Memory<Laser_Struct> laserStruct = (Memory<Laser_Struct>)laser.GetUserStruct(typeof(Laser_Struct), out laserIndex);
+			
+			
+			double output = laserStruct.Span[0].BeamOutput;
 			
 			double reqt = powerConsumer.Span[0].PowerRequirement; // 
 			double minimum = powerConsumer.Span[0].MinimumPower;  
+			
+			// todo: we need to establish the reqt based on output.  Output should be a Stat perhaps with a base and a current?
 			
 			int lfIndex = -1;
 			Memory<LifeForm> targetLF = (Memory<LifeForm>)attackerOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
@@ -3858,6 +3866,8 @@ namespace HelloBoids
 			double damageAmount = weaponStruct.Span[0].AverageDamage;
 			double variancePercentage = 0.10; // 10%
 			double damageAmountWithVariance = Utils.RandomWithVariance(rand, damageAmount, variancePercentage);
+			
+			Console.WriteLine ("CalculateDamage() - Line 1");
 			
 			bool inAtmosphere = true;
 			// Distance Based Falloff
@@ -3885,6 +3895,7 @@ namespace HelloBoids
 				}
 			}
 
+			Console.WriteLine ("CalculateDamage() - Line 2");
 			// critChance is variable based on operator skill, factor is tweakable.
 			// the higher the "factor" and "critChance" (exponent), the smaller the resulting
 			// Pow() expression will result which will make rand.NextDouble() increasingly

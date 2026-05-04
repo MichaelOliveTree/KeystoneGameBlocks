@@ -3603,11 +3603,16 @@ namespace HelloBoids
 			int selectedIndex = 0;
 			
 			
-			//TODO: find the actual target that was hit... we may be aiming for an assembly or component and may hit something different, such as a different Component or Operator or even a different Starship or Droid or NOTHING
+			// what is the weapon type? 
+			// if the weapon is a laser and punches through the hull armor and then through the hull itself and damages components(s) within the ship
+			// then we need to determine this.
 			
-			// todo: for tactical station, the logic for determining hit+damage should rely on the crew station.css script and not the operator.  Instead, we just grab bonuses or minuses from the operator crew member.
+			
+			
+			// Determine the weighted probabilities of hitting the target or one (or more) of its assemblies and/or components or lifeforms on board
+			
 			//  - time to get a lock
-			//  - bonus for time 
+			//  - bonus for time and bonus if previously aquired last tick() 
 			//  - bonus for damage
 			//  and remember, it's the tactical station that keeps track of all the weapons available and the targets (including friendlies)
 			
@@ -3666,6 +3671,25 @@ namespace HelloBoids
 			
 			
 			
+			// TODO:  find the actual target that was hit... we may be aiming for an assembly or component and may hit something different, such as a different Component or Operator or even a different Starship or Droid or NOTHING
+			// TODO:  Alternatively, we may have hit another Ship(s) (or one or more of it's assemblies and/or components and/or LifeForms on board)
+			//        Or we may have MISSED altogether
+			
+			// float[] weights;
+			// Hull
+			// Wings
+			// CrewStation
+			// Laser
+			// Battery
+			// Operator
+			
+			
+			
+
+			
+			
+			
+			
 			Vector3d start = attackingShip.Translation;   // todo: if hierarchical and if this is the Weapon and not the Droid, it should be .DerivedTranslation
 			Vector3d targetLoc = potentialTargets[selectedIndex].Translation; // TODO: if hierarchical, this should be .DerivedTranslation
 			
@@ -3694,7 +3718,6 @@ namespace HelloBoids
 				EntryClass.mUserDataStore[attacker.EntityKey].IncrementInteger("shotsfired");
 				//Console.WriteLine("ProcessHits() - Attacker Droid @ Array Index '" + currentArrayIndex.ToString() + "' firing shot # " + EntryClass.mUserDataStore[attacker.EntityKey].IncrementInteger("shotsfired").ToString() + " on Droid @ Array Index '" + currentTarget.EntityArrayIndex.ToString() + "'");
 
-				
 				// TODO: QUEUE ANIMATION TO FIRE THIS WEAPON 
 				// Publish a CombatEventRecord containing the 'FireAt' Attempt
 				int actionID = (int)ACTIONS.FiringAt;
@@ -3722,7 +3745,7 @@ namespace HelloBoids
 				// NOTE: here we assume the Fire() occurs immediately using a lightspeed laser and the damage is instantaneous 
 				//       and does not need any travel time to reach the currentTarget
 				object[] damages = null;
-
+				
 				try 
 				{
 					// todo: change parameter attacker to tacticalStation?
@@ -3867,8 +3890,6 @@ namespace HelloBoids
 			double variancePercentage = 0.10; // 10%
 			double damageAmountWithVariance = Utils.RandomWithVariance(rand, damageAmount, variancePercentage);
 			
-			Console.WriteLine ("CalculateDamage() - Line 1");
-			
 			bool inAtmosphere = true;
 			// Distance Based Falloff
 			if (weaponStruct.Span[0].DamageType == 0)
@@ -3895,7 +3916,6 @@ namespace HelloBoids
 				}
 			}
 
-			Console.WriteLine ("CalculateDamage() - Line 2");
 			// critChance is variable based on operator skill, factor is tweakable.
 			// the higher the "factor" and "critChance" (exponent), the smaller the resulting
 			// Pow() expression will result which will make rand.NextDouble() increasingly
@@ -3911,9 +3931,12 @@ namespace HelloBoids
 			if (isCriticalHit)
 				damageAmountWithVariance *= critMultiplier;
 			
+			// TODO: based on which side is hit, use that ArmorFace and it's layers to determine DR
+						
 			// target Armor  //targetFL.Span[0].Armor.Armor[side].
 			int defense = targetLF.Span[0].Armor.AverageDR;
 			// if the defense is higher than the damage, then 0 damage gets through.  Math.Max() will prevent any "negative" damage in that case.
+			// NOTE: armor sustaining damage over time is not being modeled here.
 			double finalDamageAmount = Math.Max(0, damageAmountWithVariance - defense); 
 									
 			// NOTE: Damage amount generated. 
@@ -3944,7 +3967,7 @@ namespace HelloBoids
 			dot.Amount = 1;  // weaponStruct.BeamOutput;
 			dot.TimeOfAttack = time;
 			dot.Duration = 0.05f;
-			result[1] = dot;
+			result[1] = dot;p;'
 			
 			// see Keystone.Game01.Messages.   public class AttackResults since
 			// we need results going over the network

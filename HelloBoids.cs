@@ -3281,25 +3281,25 @@ namespace HelloBoids
 			//for (int i = 0; i < Boids.Count; i++)
             {
 				if (Boids[(int)i] is Boid == false) return;
+				Boid attackingShip = (Boid)Boids[(int)i];
 				
 				Random random = ThreadedRandom.Instance;
-				Boid attacker = (Boid)Boids[(int)i];
 				
 				// NOTE: Transform_Struct will  host indices for Boids, OpticalSensors and TacticalStations
-				int currentInternalIndex = attacker.GetUserStructIndex(typeof(Transform.Transform_Struct));
-				int attackerArrayIndex = attacker.EntityArrayIndex;
-				System.Diagnostics.Debug.Assert (attackerArrayIndex == i, "Do_Droid_Logic() - i and attackerArrayIndex do not match.");
+				int currentInternalIndex = attackingShip.GetUserStructIndex(typeof(Transform.Transform_Struct));
+				int attackerEntityArrayIndex = attackingShip.EntityArrayIndex;
+				System.Diagnostics.Debug.Assert (attackerEntityArrayIndex == i, "Do_Droid_Logic() - i and attackerEntityArrayIndex do not match.");
 				
 				// get a reference to the Station and determine if it "CanAct()"
-				EntityNode[] operators = GetTacticalStationOperators(attackerArrayIndex);
-				EntityNode[] tacticalStationEnts = GetTacticalStations(attackerArrayIndex);
+				EntityNode[] operators = GetTacticalStationOperators(attackerEntityArrayIndex);
+				EntityNode[] tacticalStationEnts = GetTacticalStations(attackerEntityArrayIndex);
 				if (operators == null || tacticalStationEnts == null || operators.Length == 0 || tacticalStationEnts.Length == 0) return;
 
 				int operatorEntityArrayIndex = operators[0].EntityArrayIndex;  
 				int operatorIndex;
 				Memory<LifeForm> operatorStruct = (Memory<LifeForm>) operators[0].GetUserStruct(typeof(LifeForm), out operatorIndex);
 
-				int stationArrayIndex = tacticalStationEnts[0].EntityArrayIndex;  
+				int stationEntityArrayIndex = tacticalStationEnts[0].EntityArrayIndex;  
 				int tacticalIndex;
 				Memory<TacticalStation> tacticalStationStruct = (Memory<TacticalStation>) tacticalStationEnts[0].GetUserStruct(typeof(TacticalStation), out tacticalIndex);
 
@@ -3317,30 +3317,34 @@ namespace HelloBoids
 				//      - any Contacts in list marked as FOF.Foe + FOF.Hostile as opposed to just FOF.Foe (note: stale contacts are still treated as available in case of need to persue)
 				//      	- FOF.Withdrawing may be ignored for example if ROE says we don't persue in this circumstance including disabled ships and unarmed ships like freighters
 				
-				EntityNode[] weapons = GetWeapons(attackerArrayIndex);	
+				
+				// TODO: Here i Think we should be retrieving the Contacts and Targets from the tacticalStation
+				//       and the Target list should already be prioritized.
+				
+				
+				EntityNode[] weapons = GetWeapons(attackerEntityArrayIndex);	
 				int weaponArrayIndex = weapons[0].EntityArrayIndex; // todo: hack -  we know all droids have one weapon but this will fail otherwise
 				int weaponIndex;
 				Memory<Weapon>weaponStruct = (Memory<Weapon>) weapons[0].GetUserStruct(typeof(Weapon), out weaponIndex);
-				int componentIndex;
-				Memory<Component>componentStructForWeaponEntity = (Memory<Component>)weapons[0].GetUserStruct(typeof(Component), out componentIndex);
+				//int componentIndex;
+				//Memory<Component>componentStructForWeaponEntity = (Memory<Component>)weapons[0].GetUserStruct(typeof(Component), out componentIndex);
 				
+				 // TODO: Establish CANFIRE PER WEAPON - following only uses the 1 weapon we know exists on each Droid.
 				bool canFire = weaponStruct.Span[0].CanFire(out errorReason);
 				
 				//Console.WriteLine("Do_Tactical_Logic() - Weapon CanFire() == " + canFire.ToString());		
-				if (canFire) // TODO: Establish CANFIRE PER WEAPON
+				if (canFire)
            	 	{  
-
 					string weaponKey = weapons[0].EntityKey;
 					bool suspend = false;
 					mIntervalTimers.Reset(weaponKey, "droid_canfire", suspend);
 					
-					List<Boid> targets = null;
-					double[] distances = null;				
+				
 					List<Tuple<int, double>> neighbors = null;
 
 					try
 					{
-						bool success = mNeighbors.TryGetValue(attackerArrayIndex, out neighbors);
+						bool success = mNeighbors.TryGetValue(attackerEntityArrayIndex, out neighbors);
 						if (!success) 
 						{
 							//System.Diagnostics.Debug.Assert(mNeighbors.Count > 0, "Do_Tactical_Logic() - ASSERTION FAILED - Check that optical Sensors[] list is being filled via Spawn().");
@@ -3350,10 +3354,10 @@ namespace HelloBoids
 					}
 					catch (Exception ex)
 					{
-						Console.WriteLine("Do_Tactical_Logic() -  Attacker Droid Array Index '" + attackerArrayIndex.ToString() + "' does not exist. " + ex.Message);
+						Console.WriteLine("Do_Tactical_Logic() -  Attacker Droid Array Index '" + attackerEntityArrayIndex.ToString() + "' does not exist. " + ex.Message);
 					}
 									
-					// WE HAVE A TARGET AND A WEAPON THAT CAN FIRE
+
 					try
 					{						
 						// NOTE: TacticalStation.CanHit() returns true if a hit WILL RESULT from the fired shot
@@ -3364,14 +3368,13 @@ namespace HelloBoids
 						//       years later!
 						HIT[] hits;
 						
-						if (!HitHasOccurred(operators[0], attacker, neighbors, weapons[0], gt, random, out hits))
+						if (!HitHasOccurred(attackingShip, tacticalStationEnts[0], operators[0], weapons[0], neighbors, gt, random, out hits))
 						{
 							return;
 						}	
 						
 						Console.WriteLine("Do_Tactical_Logic() -  " + hits.Length.ToString() + " HITs have occurred.");
-						ProcessHits(hits, operatorEntityArrayIndex, stationArrayIndex, attackerArrayIndex, weaponArrayIndex, gt, random);
-						
+						ProcessHits(hits, operatorEntityArrayIndex, stationEntityArrayIndex, attackerEntityArrayIndex, weaponArrayIndex, gt, random);
 					}
 					catch (Exception ex)
 					{
@@ -3395,11 +3398,9 @@ namespace HelloBoids
             System.Threading.Tasks.Parallel.For(0, count, i => 		
 			{
 				if (Boids[i] is Boid == false) return;
-				
 				Boid current = (Boid)Boids[i];
-				
-				//int stationID = GetTacticalStations(i)[0]; 
-				EntityNode tacticalStation = GetTacticalStations(i)[0]; //(EntityNode)Boids[stationID];
+			
+				EntityNode tacticalStation = GetTacticalStations(i)[0]; 
 				
 				//Console.WriteLine("DoTargetPrioritization - for TacticalStatin '" + tacticalStation.EntityKey + "'");
 				
@@ -3517,7 +3518,7 @@ namespace HelloBoids
 		
 		
 		// NOTE: This only applies for FTL weapons... "CanHit()" must be different for Missiles, Kinetic Energy Weapons and Particle Weapons that are slower than light
-		public bool HitHasOccurred(EntityNode attackerOperator, EntityNode attackingShip, List<Tuple<int, double>> neighbors, EntityNode weaponEntity, GameTime gt, Random rand, out HIT[] hits)
+		public bool HitHasOccurred(EntityNode attackingShip, EntityNode attackingTacticalStation, EntityNode attackingOperator, EntityNode weaponEntity, List<Tuple<int, double>> neighbors, GameTime gt, Random rand, out HIT[] hits)
 		{
 			bool result = false;
 			hits = null;
@@ -3566,7 +3567,7 @@ namespace HelloBoids
 			
 			
 			//Console.WriteLine("CalculateDamage() - Begin.");
-			System.Diagnostics.Debug.Assert (attackerOperator.Configuration == (uint)HumanOperatorConfiguration, "CalculateDamage() - AttackerOperator is of incorrect CONFIGURATION.");
+			System.Diagnostics.Debug.Assert (attackingOperator.Configuration == (uint)HumanOperatorConfiguration, "CalculateDamage() - AttackerOperator is of incorrect CONFIGURATION.");
 										 
 			// TODO: I think we want to have all relevant data on attacker and target
 			// for instance
@@ -3603,7 +3604,7 @@ namespace HelloBoids
 			int selectedIndex = 0;
 			
 			
-			// what is the weapon type? 
+			// what is the weapon type ? (explosive, impaling/crushing, fire, radiation, 
 			// if the weapon is a laser and punches through the hull armor and then through the hull itself and damages components(s) within the ship
 			// then we need to determine this.
 			
@@ -3611,10 +3612,24 @@ namespace HelloBoids
 			
 			// Determine the weighted probabilities of hitting the target or one (or more) of its assemblies and/or components or lifeforms on board
 			
-			//  - time to get a lock
-			//  - bonus for time and bonus if previously aquired last tick() 
+			//  - time to get a lock (todo: i think a 'lock' in this sense is not acquisition, its a special type of high fidelity tracking\homing for
+			//    a missile typically. 
+			//  - bonus for amount of time it's been tracked so far.  Upon loss of contact, we will guess the new location
+			//    but it will be speculative.   
 			//  - bonus for damage
 			//  and remember, it's the tactical station that keeps track of all the weapons available and the targets (including friendlies)
+			List<SensorContact> contacts = attackingTacticalStation.GetSensorContacts();
+			List<Target> targets = attackingTacticalStation.GetTargets();
+			
+			if (contacts == null || contacts.Count == 0) 
+			{
+			
+			}
+			
+			if (targets == null || targets.Count == 0) 
+			{
+				
+			}
 			
 				
 			// weapon accuracy (verify this includes effects of any existing damage on the weapon)
@@ -3628,12 +3643,12 @@ namespace HelloBoids
 			
 			// operator skill  
 			//Skill tacticalOperationsSkill = attackerOperator.Skills[SKILLS.TacticalOperations];
-			Skill targetingSkill = attackerOperator.Skills[SKILLS.Targeting];
+			Skill targetingSkill = attackingOperator.Skills[SKILLS.Targeting];
 			
 			
 			// operator Health
 			int lfIndex;
-			Memory<LifeForm> lfOperator = (Memory<LifeForm>)attackerOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
+			Memory<LifeForm> lfOperator = (Memory<LifeForm>)attackingOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
 			double operatorHealthCoeff = lfOperator.Span[0].HitPoints.Base > 0 ? lfOperator.Span[0].HitPoints.Current / lfOperator.Span[0].HitPoints.Base : 0;
 			
 			
@@ -3676,13 +3691,17 @@ namespace HelloBoids
 			//        Or we may have MISSED altogether
 			
 			// float[] weights;
-			// Hull
+			// Hull(Boid)
 			// Wings
 			// CrewStation
 			// Laser
+			// OpticalSenso
 			// Battery
 			// Operator
 			
+			int tacticalStationIndex = attackingShip.EntityArrayIndex + OPTICAL_SENSOR_OFFSET;
+			Memory<TacticalStation> tacticalStation = (Memory<TacticalStation>)attackingTacticalStation.GetUserStruct(typeof(TacticalStation), out tacticalStationIndex); 
+
 			
 			
 
@@ -3967,7 +3986,7 @@ namespace HelloBoids
 			dot.Amount = 1;  // weaponStruct.BeamOutput;
 			dot.TimeOfAttack = time;
 			dot.Duration = 0.05f;
-			result[1] = dot;p;'
+			result[1] = dot;
 			
 			// see Keystone.Game01.Messages.   public class AttackResults since
 			// we need results going over the network

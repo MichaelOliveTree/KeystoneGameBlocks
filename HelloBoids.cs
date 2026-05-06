@@ -3007,7 +3007,7 @@ namespace HelloBoids
 		private void Do_Tactical_Logic(int seed, double maxDistance, GameTime gt)
 		{
 			//Console.WriteLine("Do_Tactical_Logic() - BEGIN ");
-			//ThreadedRandom random = new ThreadedRandom(seed);
+			//ThreadedRandom random = new ThreadedRandom(seed); // <- WARNING: This is not correct when we need to use it in a Parallel.For().  It must be instanced by EACH parallel.For() thread! See below...
 			
 			
 			
@@ -3125,7 +3125,7 @@ namespace HelloBoids
 				// NOTE: Transform_Struct will  host indices for Boids, OpticalSensors and TacticalStations
 				int currentInternalIndex = attackingShip.GetUserStructIndex(typeof(Transform.Transform_Struct));
 				int attackerEntityArrayIndex = attackingShip.EntityArrayIndex;
-				System.Diagnostics.Debug.Assert (attackerEntityArrayIndex == i, "Do_Droid_Logic() - i and attackerEntityArrayIndex do not match.");
+				System.Diagnostics.Debug.Assert (attackerEntityArrayIndex == i, "Do_Droid_Logic() - 'i' and attackerEntityArrayIndex do not match.");
 				
 				// get a reference to the Station and determine if it "CanAct()"
 				EntityNode[] operators = GetTacticalStationOperators(attackerEntityArrayIndex);
@@ -3203,14 +3203,14 @@ namespace HelloBoids
 						//       COMBAT ACTION INITIATED and a COMBAT ACTION RESULT.  There can be multiple COMBAT ACTION RESULTS
 						//       for instance if a mine field is laid, and some time later, a ship/craft is impacted by it... potentially
 						//       years later!
-						HIT[] hits;
+						List<HIT> hits;
 						
 						if (!HitHasOccurred(attackingShip, tacticalStationEnts[0], operators[0], weapons[0], neighbors, gt, random, out hits))
 						{
 							return;
 						}	
 						
-						Console.WriteLine("Do_Tactical_Logic() -  " + hits.Length.ToString() + " HITs have occurred.");
+						Console.WriteLine("Do_Tactical_Logic() -  " + hits.Count.ToString() + " HITs have occurred.");
 						ProcessHits(hits, operatorEntityArrayIndex, stationEntityArrayIndex, attackerEntityArrayIndex, weaponArrayIndex, gt, random);
 					}
 					catch (Exception ex)
@@ -3263,7 +3263,7 @@ namespace HelloBoids
 				System.Diagnostics.Debug.Assert(currentStation.EntityKey.Contains("tactical"), "ProcessOpticalSensors() - Entity is NOT a TacticalStation.");
 				
 				int currentBoidArrayIndex = currentStation.EntityArrayIndex - TACTICAL_STATION_OFFSET;
-				Boid currentBoid = (Boid)Boids[currentBoidArrayIndex];
+				EntityNode attackingShip = Boids[currentBoidArrayIndex];
 				
 				//Console.WriteLine ("2");
 				EntityNode[] sensorEntities = GetSensors(currentBoidArrayIndex); // todo: we currently do  not have EntityNode allowing adding of child nodes.  This is needed next.
@@ -3542,7 +3542,7 @@ namespace HelloBoids
 		
 		
 		// NOTE: This only applies for FTL weapons... "CanHit()" must be different for Missiles, Kinetic Energy Weapons and Particle Weapons that are slower than light
-		public bool HitHasOccurred(EntityNode attackingShip, EntityNode attackingTacticalStation, EntityNode attackingOperator, EntityNode weaponEntity, List<Tuple<int, double>> neighbors, GameTime gt, Random rand, out HIT[] hits)
+		public bool HitHasOccurred(EntityNode attackingShip, EntityNode attackingTacticalStation, EntityNode attackingOperator, EntityNode weaponEntity, List<Tuple<int, double>> neighbors, GameTime gt, Random rand, out List<HIT> hits)
 		{
 			bool result = false;
 			hits = null;
@@ -3590,8 +3590,8 @@ namespace HelloBoids
 			// https://gamedev.stackexchange.com/questions/148961/how-to-design-a-damage-formula-in-an-rpg-which-keeps-weapons-with-different-atta
 			
 			
-			//Console.WriteLine("CalculateDamage() - Begin.");
-			System.Diagnostics.Debug.Assert (attackingOperator.Configuration == (uint)HumanOperatorConfiguration, "CalculateDamage() - AttackerOperator is of incorrect CONFIGURATION.");
+			//Console.WriteLine("HitHasOccurred() - Begin.");
+			System.Diagnostics.Debug.Assert (attackingOperator.Configuration == (uint)HumanOperatorConfiguration, "HitHasOccurred() - AttackerOperator is of incorrect CONFIGURATION.");
 										 
 			// TODO: I think we want to have all relevant data on attacker and target
 			// for instance
@@ -3614,14 +3614,12 @@ namespace HelloBoids
 			//b.BlackBoardData.SetString("faction", factionColor);
 				
 			
-
 			int selectedIndex = 0;
 			
 			
 			// what is the weapon type ? (explosive, impaling/crushing, fire, radiation, 
 			// if the weapon is a laser and punches through the hull armor and then through the hull itself and damages components(s) within the ship
 			// then we need to determine this.
-			
 			
 			
 			// Determine the weighted probabilities of hitting the target or one (or more) of its assemblies and/or components or lifeforms on board
@@ -3638,8 +3636,11 @@ namespace HelloBoids
 			//}
 			List<Target> targets = attackingTacticalStation.GetTargets();
 			
-			hits = new HIT[1];
-			if (targets != null && targets.Count > 0) 
+			hits = new List<HIT>();
+			// NOTE: If there are NO TARGETS this method should not even have been called. 
+			System.Diagnostics.Debug.Assert (targets != null && targets.Count > 0, "HitHasOccurred() - If there are NO TARGETS this method should not even have been called. ") ;
+			
+			for (int i = 0; i < targets.Count; i++)
 			{
 				// weapon accuracy (verify this includes effects of any existing damage on the weapon)
 				int componentIndex;
@@ -3649,19 +3650,15 @@ namespace HelloBoids
 				Memory<Weapon> weaponStruct = (Memory<Weapon>)weaponEntity.GetUserStruct(typeof(Weapon), out weaponIndex);
 				double weaponDamage = weaponComponentStruct.Span[0].HitPoints.Base > 0 ? weaponComponentStruct.Span[0].HitPoints.Current / weaponComponentStruct.Span[0].HitPoints.Base : 0;
 
-
 				// operator skill  
 				//Skill tacticalOperationsSkill = attackerOperator.Skills[SKILLS.TacticalOperations];
 				Skill targetingSkill = attackingOperator.Skills[SKILLS.Targeting];
-
 
 				// operator Health
 				int lfIndex;
 				Memory<LifeForm> lfOperator = (Memory<LifeForm>)attackingOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
 				double operatorHealthCoeff = lfOperator.Span[0].HitPoints.Base > 0 ? lfOperator.Span[0].HitPoints.Current / lfOperator.Span[0].HitPoints.Base : 0;
-
 				double fatigue = lfOperator.Span[0].Fatigue.Base > 0 ? lfOperator.Span[0].Fatigue.Current / lfOperator.Span[0].Fatigue.Base : 0;
-
 
 				// stealth
 
@@ -3680,7 +3677,7 @@ namespace HelloBoids
 				EntityNode sensor = Boids[sensorArrayIndex];
 				Memory<Sensor> sensorStruct = (Memory<Sensor>)sensor.GetUserStruct(typeof(Sensor), out sensorSpanIndex);
 
-				double currentTargetDistanceSquared = distancesSquared[selectedIndex];
+				double currentTargetDistanceSquared = targets[i].DistanceSquared; //  selectedIndex];
 				// inverse square law for Optical Sensors
 				double detectionProbability = Math.Sqrt(sensorStruct.Span[0].RangeSquared) * (1 / currentTargetDistanceSquared); 
 
@@ -3691,7 +3688,7 @@ namespace HelloBoids
 
 				// target deployed counter measures within X time (time * fallOff aka call it 'attenuation')
 				// - STATISTICS SEARCH
-
+			
 
 
 				// TODO:  find the actual target that was hit... we may be aiming for an assembly or component and may hit something different, such as a different Component or Operator or even a different Starship or Droid or NOTHING
@@ -3699,42 +3696,54 @@ namespace HelloBoids
 				//        Or we may have MISSED altogether
 
 				// float[] weights;
+				
+				
 				// Hull(Boid)
 				// Wings
 				// CrewStation
 				// Laser
-				// OpticalSenso
+				// OpticalSensor
 				// Battery
 				// Operator
+				List<EntityNode> selectedTargets = new List<EntityNode>();
+				bool hasHit = true; // <- temp hack.  Run formula using above coefficients and such to determine if we hit and what we hit
 
-				int tacticalStationIndex = attackingShip.EntityArrayIndex + OPTICAL_SENSOR_OFFSET;
-				Memory<TacticalStation> tacticalStation = (Memory<TacticalStation>)attackingTacticalStation.GetUserStruct(typeof(TacticalStation), out tacticalStationIndex); 
+				
 
+				
+				if (hasHit)
+				{
+					for (int j = 0; j < selectedTargets.Count; j++)
+					{
+						int tacticalStationIndex = attackingShip.EntityArrayIndex + OPTICAL_SENSOR_OFFSET;
+						Memory<TacticalStation> tacticalStation = (Memory<TacticalStation>)attackingTacticalStation.GetUserStruct(typeof(TacticalStation), out tacticalStationIndex); 
 
+						Vector3d start = attackingShip.Translation;   // todo: if hierarchical and if this is the Weapon and not the Droid, it should be .DerivedTranslation
+						Vector3d targetLoc = selectedTargets[j].Translation; // TODO: if hierarchical, this should be .DerivedTranslation
 
-
-
-
-
-
-				Vector3d start = attackingShip.Translation;   // todo: if hierarchical and if this is the Weapon and not the Droid, it should be .DerivedTranslation
-				Vector3d targetLoc = potentialTargets[selectedIndex].Translation; // TODO: if hierarchical, this should be .DerivedTranslation
-			
-				hits[0].Resolution = HIT.RESOLUTION.Hit;
-				hits[0].Target = potentialTargets[selectedIndex];
-				hits[0].Owner = potentialTargets[selectedIndex];  //  target is same as owner for now since target is a Boid and not the Operator or Station or Laser or Battery or Wings
-				hits[0].WeaponUsed = weaponEntity; // how does this work if its an explosion or fire or radiation volume?
-				hits[0].Location = targetLoc;    // the impact point
-				hits[0].DistanceSquared = distancesSquared[selectedIndex];
-			}
-			else
-			{
-				hits[0].Resolution = HIT.RESOLUTION.Miss;
-				hits[0].Target = potentialTargets[selectedIndex];
-				hits[0].Owner = potentialTargets[selectedIndex];  //  target is same as owner for now since target is a Boid and not the Operator or Station or Laser or Battery or Wings
-				hits[0].WeaponUsed = weaponEntity; // how does this work if its an explosion or fire or radiation volume?
-				hits[0].Location = Vector3d.Zero();    
-				hits[0].DistanceSquared = distancesSquared[selectedIndex];
+						HIT hit = default(HIT);
+						hit.Resolution = HIT.RESOLUTION.Hit;
+						hit.Target = selectedTargets[j];
+						hit.Owner = GetOwner(selectedTargets[j]);  //  target is same as owner for now since target is a Boid and not the Operator or Station or Laser or Battery or Wings
+						hit.WeaponUsed = weaponEntity; // how does this work if its an explosion or fire or radiation volume? we need to grab such an Entity from an object Pool
+						hit.Location = targetLoc;    // the impact point
+						hit.DistanceSquared = targets[i].DistanceSquared;
+						
+						hits.Add(hit);
+					}
+				}
+				else
+				{
+					HIT miss = default(HIT);
+					miss.Resolution = HIT.RESOLUTION.Miss;
+					miss.Target =  Boids[targets[i].EntityArrayIndex];
+					miss.Owner =  GetOwner(Boids[targets[i].EntityArrayIndex]);  //  target is same as owner for now since target is a Boid and not the Operator or Station or Laser or Battery or Wings
+					miss.WeaponUsed = weaponEntity; // todo: need to potentially lease an Explosion or Fire volume or Radiation volume, etc, from object Pool and spawn it
+					miss.Location = Vector3d.Zero();    
+					miss.DistanceSquared = targets[i].DistanceSquared;
+				
+					hits.Add(miss);
+				}
 			}
 			
 			result = true;
@@ -3742,10 +3751,10 @@ namespace HelloBoids
 		}
 		
 		
-		public void ProcessHits(HIT[] hits, int operatorEntityArrayIndex, int stationEntityArrayIndex, int attackingShipEntityArrayIndex, int weaponEntityArrayIndex, GameTime gt, Random random)
+		public void ProcessHits(List<HIT> hits, int operatorEntityArrayIndex, int stationEntityArrayIndex, int attackingShipEntityArrayIndex, int weaponEntityArrayIndex, GameTime gt, Random random)
 		{
 			
-			for (int currentHitIndex = 0;  currentHitIndex < hits.Length; currentHitIndex++)
+			for (int currentHitIndex = 0;  currentHitIndex < hits.Count; currentHitIndex++)
 			{
 				EntityNode attacker = hits[currentHitIndex].Owner;
 				EntityNode currentTarget = hits[currentHitIndex].Target;
@@ -8660,6 +8669,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		public STATUS Status;
 		public CREWSTATUS CrewStatus;
 		public Stat HitPoints;         // max hitpoints of target... should a Sensor be able to know this exact number?  It's really just a game thing and maybe we should just use visual observations of condition of ship instead
+		public double DistanceSquared; 
 	}
 
 	

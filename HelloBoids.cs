@@ -33,6 +33,11 @@ using Microsoft.CSharp;
 using System.IO;
 
 
+//  /.salty
+//  /.theway
+//  /.fourfours
+
+
 
 // @LT Gaming
 // @ObsidianAnt
@@ -714,10 +719,10 @@ namespace HelloBoids
 		internal System.Collections.Concurrent.ConcurrentDictionary<int, ComponentStore<Production>> mProduction;
         internal System.Collections.Concurrent.ConcurrentDictionary<int, ComponentStore<Consumption>> mConsumption;
 		
-		
+				
+
         public Seeds Seeds { get; set; }
 						 
-		//public ThreadedRandom mTHRandom;
 		
         private double SeparationDistance;
         private double SeparationFactor ;
@@ -764,6 +769,10 @@ namespace HelloBoids
 		public static SimulationEventManager mSimEventManager;
 		
 		private object mLock = new object();
+			
+		private static System.Threading.SemaphoreSlim mSort = new System.Threading.SemaphoreSlim(1);
+		
+		
 		
 			
 		
@@ -1007,8 +1016,8 @@ namespace HelloBoids
 			}
 		}
 		
-			// NOTE: This is horribly inefficient because it just iterates t hrough all EntityNodes to find the
-			//       one "Sensor" that has the expected EntityKey that starts with "sensor_" and otherwise has same number part as this Droid's mID
+		// NOTE: This is horribly inefficient because it just iterates t hrough all EntityNodes to find the
+		//       one "Sensor" that has the expected EntityKey that starts with "sensor_" and otherwise has same number part as this Droid's mID
 		public EntityNode[] GetSensors(int entityArrayIndex)
 		{
 			if (EntryClass.bSim.Boids == null) return null;
@@ -2996,10 +3005,7 @@ namespace HelloBoids
         }
 #endif
         		
-		
-	
-		private static System.Threading.SemaphoreSlim mSort = new System.Threading.SemaphoreSlim(1);
-		
+
 		
 		/// <summary>
 		/// Seed might typically be Seeds.Local_Droid_Tactical_Logic + mCurrentFrame;
@@ -3176,11 +3182,10 @@ namespace HelloBoids
 					bool suspend = false;
 					mIntervalTimers.Reset(weaponKey, "droid_canfire", suspend);
 					
-				
-					List<Tuple<int, double>> neighbors = null;
-
 					try
-					{
+					{		
+						List<Tuple<int, double>> neighbors = null;
+						
 						bool success = mNeighbors.TryGetValue(attackerEntityArrayIndex, out neighbors);
 						if (!success) 
 						{
@@ -3188,15 +3193,12 @@ namespace HelloBoids
 							//Console.WriteLine("Do_Tactical_Logic() -  No neighbors exist in mNeighbors! This usually occurs during the very first frame since Droid Logic occurs before ProcessOpticalSensing()");
 							return;
 						}
-					}
-					catch (Exception ex)
-					{
-						Console.WriteLine("Do_Tactical_Logic() -  Attacker Droid Array Index '" + attackerEntityArrayIndex.ToString() + "' does not exist. " + ex.Message);
-					}
-									
-
-					try
-					{						
+						
+						EntityNode tacticalStation = GetTacticalStations(i)[0]; 
+						List<Target> targets = tacticalStation.GetTargets();
+						if (targets == null || targets.Count == 0) return;
+					
+						
 						// NOTE: TacticalStation.CanHit() returns true if a hit WILL RESULT from the fired shot
 						//       even if the HIT is not the expected location on a Target or even on the correct Target!
 						//       Otherwise it is a total MISS.  We log the hit/miss EVENT either way... typically as a 
@@ -3215,6 +3217,7 @@ namespace HelloBoids
 					}
 					catch (Exception ex)
 					{
+						Console.WriteLine("Do_Tactical_Logic() -  Attacker Droid Array Index '" + attackerEntityArrayIndex.ToString() + "' does not exist. " + ex.Message);
 						Console.WriteLine ("Do_Tactical_Logic() - ERROR - " + ex.Message);
 					}
 				}
@@ -3640,6 +3643,7 @@ namespace HelloBoids
 			// NOTE: If there are NO TARGETS this method should not even have been called. 
 			System.Diagnostics.Debug.Assert (targets != null && targets.Count > 0, "HitHasOccurred() - If there are NO TARGETS this method should not even have been called. ") ;
 			
+			// TODO: we may not need to loop here exactly through Targets... all of these "targets" can potentially be hit at once with one weapon... say a large nuke.
 			for (int i = 0; i < targets.Count; i++)
 			{
 				// weapon accuracy (verify this includes effects of any existing damage on the weapon)
@@ -3705,7 +3709,11 @@ namespace HelloBoids
 				// OpticalSensor
 				// Battery
 				// Operator
+				
+				// the selectedTargets are all the Entities (including sub-Entities within a Ship like sensors, computers, power generators, life support systems, bunks, etc)
+				// that have been "hit" by the weapon being used by the attackingShip
 				List<EntityNode> selectedTargets = new List<EntityNode>();
+				selectedTargets.Add(Boids[targets[0].EntityArrayIndex]);
 				bool hasHit = true; // <- temp hack.  Run formula using above coefficients and such to determine if we hit and what we hit
 
 				

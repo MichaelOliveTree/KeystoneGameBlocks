@@ -5267,16 +5267,20 @@ namespace HelloBoids
 				//else
 				//{
 	            	//List<Production> production = mProduction.GetOrAdd(productID, (key) =>  new List<Production>());
-            		ComponentStore<Production> production = mProduction.GetOrAdd (productID, (key) =>  EntryClass.mCStoreCol.CheckOut<Production>(EntryClass.NUM_ENTRIES, (int)p.ProductID));
+            		ComponentStore<Production> productionStore = mProduction.GetOrAdd (productID, (key) =>  EntryClass.mCStoreCol.CheckOut<Production>(EntryClass.NUM_ENTRIES, (int)p.ProductID));
 					Predicate<Production> productionForThisEntityAndProductAlreadyExists = x => x.ProductID == p.ProductID && x.ProducerEntityArrayIndex == p.ProducerEntityArrayIndex;
-					Production search = production.Find(productionForThisEntityAndProductAlreadyExists);
+					Production search = productionStore.Find(productionForThisEntityAndProductAlreadyExists);
 				
 					if (search.Equals(default(Production)))
 					{
 						int index;
-						Memory<Production> mem = (Memory<Production>)production.CheckOut(out index);
-						mem.Span[0] = p;
+						Memory<Production> mem = (Memory<Production>)productionStore.CheckOut(out index);
+
+                        // TODO: c# 10 does not require the following two lines and instead we can just use mem.Span[0] = p;
+                        Span<Production> span = mem.Span;
+                        span[0] = p;
 						
+
 						//Console.WriteLine("RegisterProduction() - PRODUCTION '" + ((PRODUCTS)productID).ToString() + "' REGISTERED>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
 						
 					}
@@ -5299,15 +5303,19 @@ namespace HelloBoids
 				int productID = c.ProductID;
 				//Console.WriteLine ("RegisterConsumption()  - productID == " + productID.ToString());
             	//List<Consumption> consumption = mConsumption.GetOrAdd (productID, (key) =>  new List<Consumption>());
-				ComponentStore<Consumption> consumption = mConsumption.GetOrAdd (productID, (key) =>  EntryClass.mCStoreCol.CheckOut<Consumption>(EntryClass.NUM_ENTRIES, (int)c.ProductID));
+				ComponentStore<Consumption> consumptionStore = mConsumption.GetOrAdd (productID, (key) =>  EntryClass.mCStoreCol.CheckOut<Consumption>(EntryClass.NUM_ENTRIES, (int)c.ProductID));
 				Predicate<Consumption> consumptionForThisEntityAndProductAlreadyExists = x => x.ProductID == c.ProductID && x.ConsumerEntityArrayIndex == c.ConsumerEntityArrayIndex;
-				Consumption search = consumption.Find(consumptionForThisEntityAndProductAlreadyExists);
+				Consumption search = consumptionStore.Find(consumptionForThisEntityAndProductAlreadyExists);
 				
 				if (search.Equals(default(Consumption)))
 				{
 					int index;
-					Memory<Consumption> mem = consumption.CheckOut(out index);
-					mem.Span[0] = c;
+					Memory<Consumption> mem = consumptionStore.CheckOut(out index);
+                    // consumption.Span[0] = c; // <- we would need the exact index already for assigment of ComponentStore.Span[index]  to work
+					
+                     // TODO: c# 10 does not require the following two lines and instead we can just use mem.Span[0] = c;
+                    Span<Consumption> span = mem.Span;
+                    span[0] = c;
 				}
 				else 
 					Console.WriteLine("RegisterConsumption() - Consumption '" + ((PRODUCTS)c.ProductID).ToString() + " for Entity " + c.ConsumerEntityArrayIndex + "' already exists.");
@@ -6165,10 +6173,15 @@ return (0,0);
 			Skills = new Dictionary<SKILLS, Skill>();	
 				
 			ComponentStore<BaseObject> store = EntryClass.mCStoreCol.CheckOut<BaseObject>(EntryClass.NUM_ENTRIES * 2); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
-            int index = -1;
-            mMemStore_BaseObject = store.CheckOut(out index);
-			AddUserStruct(typeof(BaseObject), mMemStore_BaseObject, index);
-	
+            int baseObjectIndex = -1;
+            mMemStore_BaseObject = store.CheckOut(out baseObjectIndex);
+			AddUserStruct(typeof(BaseObject), mMemStore_BaseObject, baseObjectIndex);
+
+            Console.WriteLine("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
+            Console.WriteLine("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
+            Console.WriteLine("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
+
+                
 			//mMemStore_BaseObject.Span[0].InternalTransformIndex = index; // <-- Important to do this here. Eventually we need to be able to modify these when/if our Memory<T> records are ordered differently at runtime
 				
         }
@@ -9692,8 +9705,31 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		}
 		
 
-		public double Cost;
-		public double Weight;
+		public double Cost
+        {
+           get 
+            {
+                double result = 0;
+
+                for (int i = 0; i < Faces.Length; i++)
+                    result += Faces[i].Cost;
+
+                return result;
+            }
+        }
+
+		public double Weight 
+        {
+            get 
+            {
+                double result = 0;
+
+                for (int i = 0; i < Faces.Length; i++)
+                    result += Faces[i].Weight;
+
+                return result;
+            }
+        }
 		
 		// average DR of all layers on all Faces
 		public int AverageDR 
@@ -9725,7 +9761,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			{
 				Faces[i] = new ArmorFace(box, i);
 				Faces[i].SurfaceAttributes = ArmorFace.SURFACE_ATTRIBUTES.None;
-				Faces[i].SurfaceArea = GetArmorFaceSurfaceArea ((BoundingBox.BOX_FACES)i, box);
+				
 
 				Faces[i].Defense = 50; // passive defense... 
 				Faces[i].Layers = new ArmorLayer[numLayers];
@@ -9749,47 +9785,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			}
 		}
 		
-		public double GetArmorFaceSurfaceArea (BoundingBox.BOX_FACES side, BoundingBox box)
-		{
-			double result = 0;
-			
-			
-			// TODO: make sure our ArmorFace[] array indices match those of our BoundingBox
-			//       WARNING: See BoundingBox.GetQuadFaceVertices()  because i think
-			//       there we grab the vertices for each face and we are using different
-			//       indices for each Face.  They need to be the same.
-			// Face0 (the end that points +z from camera) = FRONT = WIDTH * HEIGHT
-			// Face1 (the end that points -z toward camera) = BACK = WIDTH * HEIGHT
-			// Face2 = (the end that points +x to right of camera) = RIGHT = DEPTH * HEIGHT
-			// Face3 = (the end that points -x to left of camera) = LEFT = DEPTH * HEIGHT
-			// Face4 = top +y = TOP = WIDTH * DEPTH
-			// Face5 = bottom -y = BOTTOM = WIDTH * DEPTH
-			
-			BoundingBox.BOX_FACES eSide = (BoundingBox.BOX_FACES)side;
-			
-			switch (eSide)
-			{
-				case BoundingBox.BOX_FACES.RIGHT:
-				case BoundingBox.BOX_FACES.LEFT:
-					result = box.Height * box.Depth;
-					break;
-				case BoundingBox.BOX_FACES.TOP:
-				case BoundingBox.BOX_FACES.BOTTOM:
-					result = box.Width * box.Depth;
-					break;
-				case BoundingBox.BOX_FACES.FRONT: // <--NOTE: "FRONT" (+z) denotes facing INTO the camera.  So if you place an Actor into the scene, the eyes of that actor will be facing away from you and into the Camera unless you apply a 180 y axis rotation in the assetplacementtgool logic
-				case BoundingBox.BOX_FACES.BACK:
-					result = box.Width * box.Height;
-					break;
-			}
-				
-			
-			// and for any given one side surfaceArea = LW or surfaceArea = LH or surfaceArea = WH 
-			// or a 
-			// volume in cubic meters where surfaceArea = 6 x (cube root of (volume))^2 
-			
-			return result;
-		}
 		
 		/// <summary>
 		/// surfaceAreaCubicMeters
@@ -9899,10 +9894,16 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		private BoundingBox mBox;
 		public ArmorFace(BoundingBox box, int faceIndex)
 		{
+
 			mBox = box;
 			mFaceIndex = faceIndex; // the faceIndex of the BoundingBox (see BoundingBox.GetFaceVertices())
 			
 			Vertices = BoundingBox.GetQuadFaceVertices(mBox);
+            SurfaceAttributes = SURFACE_ATTRIBUTES.None;
+            //SurfaceArea = GetArmorFaceSurfaceArea ((BoundingBox.BOX_FACES)mFaceIndex, mBox);
+            Layers = null;
+            Slope = 0;
+            Defense = 0;
 		}
 		
 		public ArmorLayer[] Layers;
@@ -9966,38 +9967,52 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		{
 			get 
 			{
-				double result = 0;
-				// todo: to compute the surface area of each face, we should pass in a 
-				// box primitive where surfaceArea = 2 * (WH + DH + WD)  
-				double D = mBox.Depth;
-				double W = mBox.Width;
-				double H = mBox.Height;
-
-				// the face indices match those of BoundingBox.GetQuadFaceVerices()
-				// This also matches enums for TV3D CUBEMAP faces.
-				// 0: Positive X (Right)1: Negative X (Left)2: Positive Y (Top)3: Negative Y (Bottom)4: Positive Z (Front)5: Negative Z (Back)
-					
-				switch (mFaceIndex)
-				{
-					case 0: // RIGHT (+x)
-					case 1: // LEFT (-x)
-						result = W * D;
-						break;
-					
-					case 2: // TOP (+y)
-					case 3: // BOTTOM (-y)
-						result = H * D;
-						break;
-						
-					case 4: // FRONT (+z) <--NOTE: "FRONT" (+z) denotes facing INTO the camera.  So if you place an Actor into the scene, the eyes of that actor will be facing away from you and into the Camera unless you apply a 180 y axis rotation in the assetplacementtgool logic
-					case 5: // BACK (-z)
-						result = W*H;
-						break;
-				}
-			
-				return result;
-			}
+                return GetArmorFaceSurfaceArea((BoundingBox.BOX_FACES)mFaceIndex, mBox);
+            }
 		}
+
+        public double GetArmorFaceSurfaceArea (BoundingBox.BOX_FACES side, BoundingBox box)
+		{
+			double result = 0;
+			
+			
+			// TODO: make sure our ArmorFace[] array indices match those of our BoundingBox
+			//       WARNING: See BoundingBox.GetQuadFaceVertices()  because i think
+			//       there we grab the vertices for each face and we are using different
+			//       indices for each Face.  They need to be the same.
+			// Face0 (the end that points +z from camera) = FRONT = WIDTH * HEIGHT
+			// Face1 (the end that points -z toward camera) = BACK = WIDTH * HEIGHT
+			// Face2 = (the end that points +x to right of camera) = RIGHT = DEPTH * HEIGHT
+			// Face3 = (the end that points -x to left of camera) = LEFT = DEPTH * HEIGHT
+			// Face4 = top +y = TOP = WIDTH * DEPTH
+			// Face5 = bottom -y = BOTTOM = WIDTH * DEPTH
+			
+			BoundingBox.BOX_FACES eSide = (BoundingBox.BOX_FACES)side;
+			
+			switch (eSide)
+			{
+				case BoundingBox.BOX_FACES.RIGHT:
+				case BoundingBox.BOX_FACES.LEFT:
+					result = box.Height * box.Depth;
+					break;
+				case BoundingBox.BOX_FACES.TOP:
+				case BoundingBox.BOX_FACES.BOTTOM:
+					result = box.Width * box.Depth;
+					break;
+				case BoundingBox.BOX_FACES.FRONT: // <--NOTE: "FRONT" (+z) denotes facing INTO the camera.  So if you place an Actor into the scene, the eyes of that actor will be facing away from you and into the Camera unless you apply a 180 y axis rotation in the assetplacementtgool logic
+				case BoundingBox.BOX_FACES.BACK:
+					result = box.Width * box.Height;
+					break;
+			}
+				
+			
+			// and for any given one side surfaceArea = LW or surfaceArea = LH or surfaceArea = WH 
+			// or a 
+			// volume in cubic meters where surfaceArea = 6 x (cube root of (volume))^2 
+			
+			return result;
+		}
+		
 		
         public double Weight 
 		{
@@ -10512,7 +10527,21 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		{
 			if (string.IsNullOrEmpty(buildScriptRelativeResourcePath)) throw new ArgumentOutOfRangeException("Builder.ctor() - Build Script relative path cannot be null.");
 			mBuildScriptRelativeResourcePath = buildScriptRelativeResourcePath;
+            UserTypeID = -1;
+            
+            BuildPersistString = null;
+            
+            Configuration = CONFIGURATION.None;
+            
+            mBuildSpecificPropertyValues = new Dictionary<string, object>();
 
+            mBuildScript = null;
+            mComponetScript = null;
+            mComponent = null;
+            mPropertyChanged = true;
+            mBuildChanged = true;
+            mBuildScriptInitialized = false;
+            
 			// TODO: Load this Build Script.  This script CAN be shared because the Values of the 
 			//       Build properties are stored inm the Component
 			//mBuildScript = Repository.Create("Builder", mBuildScriptRelativeResourcePath);
@@ -10832,6 +10861,11 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
         public override string ToString()
         {
+            return null;
+                    
+                /* TODO: Commented out the following only because DotNetFiddle is not working for me in San Fran Library
+                         but mycompiler.io/new/csharp   is but it does not use c# 10 and so Json namespace doesnt exist.
+                    
             // NOTE: we only need to write out the build parameters and from that we can
             //       reconstitute the full entity
 
@@ -10846,6 +10880,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			PropertySpec[] buildSpecificProperties = GetProperties(out buildSpecificPropertyValues);
 			
 			// JSon == javascript object notation
+            
 			var options = new System.Text.Json.JsonSerializerOptions 
 			{ 
     			DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull    |
@@ -10867,6 +10902,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			Console.WriteLine("Builder.ToString() - DESERIALIZE count = " + buildSpecificProperties.Length.ToString());
 			Console.WriteLine("Build.ToString() - COMPLETED.");
             return jsonString;
+            */
 		}
 #endregion
 	}
@@ -21541,15 +21577,9 @@ public abstract class PlanedFrustum
 		public static byte[] CompressWithBrotli(byte[] inputBytes)
 		{
 
-            using (var outputStream = new MemoryStream())
-    		{
-                using (var brotliStream = new System.IO.Compression.BrotliStream(outputStream, System.IO.Compression.CompressionLevel.Optimal))
-    			{
-    				brotliStream.Write(inputBytes, 0, inputBytes.Length);
-    			}
-    			return outputStream.ToArray();
-            }
-        
+            throw new NotImplementedException(); 
+            
+            
             /* c# 10
 			using var outputStream = new MemoryStream();
 			using (var brotliStream = new System.IO.Compression.BrotliStream(outputStream, System.IO.Compression.CompressionLevel.Optimal))
@@ -21562,6 +21592,8 @@ public abstract class PlanedFrustum
 		
 		public static byte[] DecompressWithBrotli(byte[] compressedData)
 		{
+             throw new NotImplementedException(); 
+            /*
 			using (var inputStream = new MemoryStream(compressedData))
             {
     			using (var outputStream = new MemoryStream())
@@ -21573,7 +21605,7 @@ public abstract class PlanedFrustum
         			return  outputStream.ToArray();
                 }
             }
-			
+			*/
 		}
 		
 		// ArrayExtensions from KeystoneStandardLibrary.Extensions.ArrayExtensions

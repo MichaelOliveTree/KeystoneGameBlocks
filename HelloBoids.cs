@@ -1002,18 +1002,10 @@ namespace HelloBoids
 		{
 			EntityNode e = Boids[entityArrayIndex];
 			int index;
-			
-			if ((e.Configuration & (uint)CONFIGURATION.LifeForm) != 0)
-			{
-				Memory<LifeForm> lf = (Memory<LifeForm>)e.GetUserStruct(typeof(LifeForm), out index);
-				return lf.Span[0].HitPoints;
-			}
-			else
-			{
-				System.Diagnostics.Debug.Assert((e.Configuration & (uint)CONFIGURATION.Component) != 0, "GetHitPoints() - Unexpected Entity CONFIGURATION");
-				Memory<Component> comp = (Memory<Component>)e.GetUserStruct(typeof(Component), out index);
-				return comp.Span[0].HitPoints;
-			}
+
+			Memory<BaseObject> baseObj = (Memory<BaseObject>)e.GetUserStruct(typeof(BaseObject), out index);
+			return baseObj.Span[0].HitPoints;
+
 		}
 		
 		// NOTE: This is horribly inefficient because it just iterates t hrough all EntityNodes to find the
@@ -1190,23 +1182,20 @@ namespace HelloBoids
 			//memAllTransforms.Span[transformIndex].Configuration = BoidConfiguration;
 			// b.AddUserStruct(typeof(Transform.Transform_Struct), memAllTransforms, transformIndex);
 			
-			////////////////////////////////////////////////////////////////////////////////////////////////////
-			// TRANSFORM STRUCT - NOTE: We do not need to b.AddUserStruct() because the Transform_Struct is added by default by 'class Transform'
-			int transformIndex;
-			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)b.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
-			transform.Span[0].Configuration = BoidConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
-			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
 		
+			int baseObjIndex;
+			Memory<BaseObject> baseObj = (Memory<BaseObject>)b.GetUserStruct(typeof(BaseObject), out baseObjIndex); 
+			baseObj.Span[baseObjIndex].Configuration = BoidConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
+			baseObj.Span[baseObjIndex].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
+			baseObj.Span[baseObjIndex].HitPoints =  new Stat(){ Base = 250, Current = 250};
+
 			// LIFE FORM
 			ComponentStore<LifeForm> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LifeForm>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
             int livingEntityID = -1;
             Memory<LifeForm> memLivingEnt = storeLivingEntity.CheckOut(out livingEntityID);
-			b.AddUserStruct(typeof(LifeForm), memLivingEnt, livingEntityID);
-			
+			b.AddUserStruct(typeof(LifeForm), memLivingEnt, livingEntityID);			
 			storeLivingEntity.Span[livingEntityID].Age = 1;
-			storeLivingEntity.Span[livingEntityID].HitPoints = new Stat(){ Base = 250, Current = 250};
-			storeLivingEntity.Span[livingEntityID].Configuration = BoidConfiguration;
-			
+	
 			
 			// ARMOR: this may require an array of checkOutIndices based on how many layers as determined from 
 			//       component.ArmorLayersCount
@@ -1329,13 +1318,13 @@ namespace HelloBoids
 			transform.Span[0].Configuration = OpticalSensorConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
 			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
 
-			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-			int compInternalIndex = -1;
-			Memory<Component> memComp = storeComp.CheckOut(out compInternalIndex);
-			opticalSensor.AddUserStruct(typeof(Component), memComp, compInternalIndex);
+			ComponentStore<BaseObject> storeBaseObjs = EntryClass.mCStoreCol.CheckOut<BaseObject>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+			int baseObjsIndex = -1;
+			Memory<BaseObject> memComp = storeBaseObjs.CheckOut(out baseObjsIndex);
+			opticalSensor.AddUserStruct(typeof(BaseObject), memComp, baseObjsIndex);
 
-			storeComp.Span[compInternalIndex].Configuration = OpticalSensorConfiguration;
-			storeComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
+			storeBaseObjs.Span[baseObjsIndex].Configuration = OpticalSensorConfiguration;
+			storeBaseObjs.Span[baseObjsIndex].EntityArrayIndex = arrayIndex;
 
 			// powerconsumer struct
 			ComponentStore<PowerConsumer> storePowerConsumer = EntryClass.mCStoreCol.CheckOut<PowerConsumer>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
@@ -1438,13 +1427,13 @@ namespace HelloBoids
 			transform.Span[0].Configuration = WingsConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
 			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
 
-			// component struct
-			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-			int compInternalIndex = -1;
-			Memory<Component> memComp = storeComp.CheckOut(out compInternalIndex);
-			wings.AddUserStruct(typeof(Component), memComp, compInternalIndex);
-			storeComp.Span[compInternalIndex].Configuration = WingsConfiguration;
-			storeComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
+			// BaseObject struct
+			ComponentStore<BaseObject> storeBaseObjs = EntryClass.mCStoreCol.CheckOut<BaseObject>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+			int baseObjInternalIndex = -1;
+			Memory<BaseObject> memComp = storeBaseObjs.CheckOut(out baseObjInternalIndex);
+			wings.AddUserStruct(typeof(BaseObject), memComp, baseObjInternalIndex);
+			storeBaseObjs.Span[baseObjInternalIndex].Configuration = WingsConfiguration;
+			storeBaseObjs.Span[baseObjInternalIndex].EntityArrayIndex = arrayIndex;
 
 			// powerconsumer struct
 			ComponentStore<PowerConsumer> storeWings = EntryClass.mCStoreCol.CheckOut<PowerConsumer>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
@@ -1483,6 +1472,14 @@ namespace HelloBoids
 						
 			//CONFIGURATION LaserConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.Weapon | CONFIGURATION.Laser;
 			
+			// Base Object
+			ComponentStore<BaseObject> storeBaseObjs = EntryClass.mCStoreCol.CheckOut<BaseObject>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+            int baseObjIndex = -1;
+            Memory<BaseObject> memBaseObjs = storeBaseObjs.CheckOut(out baseObjIndex);
+			laser.AddUserStruct(typeof(BaseObject), memBaseObjs, baseObjIndex);
+			storeBaseObjs.Span[checkOutIndex].Configuration = LaserConfiguration;
+			storeBaseObjs.Span[checkOutIndex].EntityArrayIndex = laser.EntityArrayIndex;
+			
 			// transform struct
 			int transformIndex;
 			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)laser.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
@@ -1494,8 +1491,6 @@ namespace HelloBoids
             int checkOutIndex = -1;
             Memory<Component> memCmp = storeComp.CheckOut(out checkOutIndex);
 			laser.AddUserStruct(typeof(Component), memCmp, checkOutIndex);
-			storeComp.Span[checkOutIndex].Configuration = LaserConfiguration;
-			storeComp.Span[checkOutIndex].EntityArrayIndex = laser.EntityArrayIndex;
 			storeComp.Span[checkOutIndex].Level = 1;
 			//storeComp.Span[checkOutIndex].Quality = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
 			storeComp.Span[checkOutIndex].Ruggedized = true;
@@ -1596,6 +1591,14 @@ namespace HelloBoids
 			
 			//CONFIGURATION TacticalStationConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.TacticalStation;
 
+			// Base Object
+			ComponentStore<BaseObject> storeBaseObjs = EntryClass.mCStoreCol.CheckOut<BaseObject>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+            int baseObjIndex = -1;
+            Memory<BaseObject> memBaseObjs = storeBaseObjs.CheckOut(out baseObjIndex);
+			station.AddUserStruct(typeof(BaseObject), memBaseObjs, baseObjIndex);
+			storeBaseObjs.Span[checkOutIndex].Configuration = TacticalStationConfiguration;
+			storeBaseObjs.Span[checkOutIndex].EntityArrayIndex = station.EntityArrayIndex;		
+			
 			// transform struct
 			int transformIndex;
 			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)station.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
@@ -1607,8 +1610,6 @@ namespace HelloBoids
 			int compInternalIndex = -1;
 			Memory<Component> memComp = storeComp.CheckOut(out compInternalIndex);
 			station.AddUserStruct(typeof(Component), memComp, compInternalIndex);
-			storeComp.Span[compInternalIndex].Configuration = TacticalStationConfiguration;
-			storeComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
 
 		
 			// powerconsumer struct
@@ -1693,6 +1694,15 @@ namespace HelloBoids
 			
 			//CONFIGURATION BatteryConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerProducer;
 			
+			// Base Object
+			ComponentStore<BaseObject> storeBaseObjs = EntryClass.mCStoreCol.CheckOut<BaseObject>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+            int baseObjIndex = -1;
+            Memory<BaseObject> memBaseObjs = storeBaseObjs.CheckOut(out baseObjIndex);
+			battery.AddUserStruct(typeof(BaseObject), memBaseObjs, baseObjIndex);
+			storeBaseObjs.Span[checkOutIndex].Configuration = BatteryConfiguration;
+			storeBaseObjs.Span[checkOutIndex].EntityArrayIndex = battery.EntityArrayIndex;
+			
+			
 			// transform struct
 			int transformIndex;
 			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)battery.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
@@ -1704,11 +1714,6 @@ namespace HelloBoids
 			int compInternalIndex = -1;
 			Memory<Component> memComp = storeComp.CheckOut(out compInternalIndex);
 			battery.AddUserStruct(typeof(Component), memComp, compInternalIndex);
-			storeComp.Span[compInternalIndex].Configuration = BatteryConfiguration;
-			storeComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
-
-			storeComp.Span[compInternalIndex].Configuration = BatteryConfiguration;
-			storeComp.Span[compInternalIndex].EntityArrayIndex = battery.EntityArrayIndex;
 			storeComp.Span[compInternalIndex].Level = 1;
 			//storeComp.Span[compInternalIndex].Quality = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
 			storeComp.Span[compInternalIndex].Ruggedized = true;
@@ -1802,10 +1807,22 @@ namespace HelloBoids
 			EntityNode humanOperator = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
 			humanOperator.Configuration = (uint)HumanOperatorConfiguration;
 			
-			int transformIndex;
-			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)humanOperator.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
-			transform.Span[0].Configuration = HumanOperatorConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
-			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
+			// BASE OBJECT
+			int baseObjIndex;
+			Memory<BaseObject> baseObj = (Memory<BaseObject>)humanOperator.GetUserStruct(typeof(BaseObject), out baseObjIndex); 
+			baseObj.Span[baseObjIndex].Configuration = HumanOperatorConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
+			baseObj.Span[baseObjIndex].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
+			baseObj.Span[baseObjIndex].HitPoints =  new Stat(){ Base = 100, Current = 100};
+			baseObj.Span[baseObjIndex].Configuration = HumanOperatorConfiguration;
+			
+			double volume = 2.2d;
+			BoundingBox box = new BoundingBox (Vector3d.Zero(), volume);
+			baseObj.Span[baseObjIndex].Armor = new Armor(box);
+			
+			// TRANSFORM
+			//int transformIndex;
+			//Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)humanOperator.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
+			
 		
 			// LIVING ENTITY
 			ComponentStore<LifeForm> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LifeForm>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
@@ -1814,11 +1831,7 @@ namespace HelloBoids
 			humanOperator.AddUserStruct(typeof(LifeForm), memLivingEnt, lfID);
 			
 			storeLivingEntity.Span[lfID].Age = 1;
-			storeLivingEntity.Span[lfID].HitPoints =  new Stat(){ Base = 100, Current = 100};
-			storeLivingEntity.Span[lfID].Configuration = HumanOperatorConfiguration;
-			
-			BoundingBox box = new BoundingBox (Vector3d.Zero(), 1);
-			storeLivingEntity.Span[lfID].Armor = new Armor(box);
+
 					
 			// Armor
 			//		
@@ -2013,9 +2026,11 @@ namespace HelloBoids
 				}
 				
 				//Console.WriteLine("Update() - Preparing to Update Damage System ");
+				ComponentStore<BaseObject> baseObjStore = null;
+				baseObjStore = EntryClass.mCStoreCol.CheckOut<BaseObject>(0);
 				try
 				{
-					mDamageSystem.Process(livingEntityStore, null, Seeds.Master, gt);
+					mDamageSystem.Process(baseObjStore, null, Seeds.Master, gt);
 					linePos = 4;
 				}
 				catch (Exception ex)
@@ -2025,7 +2040,7 @@ namespace HelloBoids
 				
 				try
 				{
-					mDamageOverTimeSystem.Process(livingEntityStore, null, Seeds.Master, gt);
+					mDamageOverTimeSystem.Process(baseObjStore, null, Seeds.Master, gt);
 					linePos = 5;
 				}
 				catch (Exception ex)
@@ -3483,8 +3498,8 @@ namespace HelloBoids
 						
 		
 						EntityNode b = Boids[currentContact.ContactEntityArrayIndex];
-						Memory<LifeForm> componentStruct = (Memory<LifeForm>)Boids[currentContact.ContactEntityArrayIndex].GetUserStruct(typeof(LifeForm), out componentIndex);
-						t.HitPoints = componentStruct.Span[0].HitPoints; 
+						Memory<BaseObject>baseObj = (Memory<BaseObject>)Boids[currentContact.ContactEntityArrayIndex].GetUserStruct(typeof(BaseObject), out componentIndex);
+						t.HitPoints = baseObj.Span[0].HitPoints; 
 
 						tacticalStation.Add(t);
 						//Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY PASSED. Target added.");
@@ -3664,18 +3679,21 @@ namespace HelloBoids
 				int componentIndex;
 				int weaponIndex;
 
-				Memory<Component> weaponComponentStruct = (Memory<Component>)weaponEntity.GetUserStruct(typeof(Component), out componentIndex);
+				Memory<BaseObject> baseObj = (Memory<BaseObject>)weaponEntity.GetUserStruct(typeof(BaseObject), out componentIndex);
 				Memory<Weapon> weaponStruct = (Memory<Weapon>)weaponEntity.GetUserStruct(typeof(Weapon), out weaponIndex);
-				double weaponDamage = weaponComponentStruct.Span[0].HitPoints.Base > 0 ? weaponComponentStruct.Span[0].HitPoints.Current / weaponComponentStruct.Span[0].HitPoints.Base : 0;
+				double weaponDamage = baseObj.Span[0].HitPoints.Base > 0 ? baseObj.Span[0].HitPoints.Current / baseObj.Span[0].HitPoints.Base : 0;
 
 				// operator skill  
 				//Skill tacticalOperationsSkill = attackerOperator.Skills[SKILLS.TacticalOperations];
 				Skill targetingSkill = attackingOperator.Skills[SKILLS.Targeting];
 
 				// operator Health
+				int baseObjIndex;
+				baseObj = (Memory<BaseObject>)attackingOperator.GetUserStruct(typeof(BaseObject), out baseObjIndex);
+				
 				int lfIndex;
 				Memory<LifeForm> lfOperator = (Memory<LifeForm>)attackingOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
-				double operatorHealthCoeff = lfOperator.Span[0].HitPoints.Base > 0 ? lfOperator.Span[0].HitPoints.Current / lfOperator.Span[0].HitPoints.Base : 0;
+				double operatorHealthCoeff = baseObj.Span[0].HitPoints.Base > 0 ? baseObj.Span[0].HitPoints.Current / baseObj.Span[0].HitPoints.Base : 0;
 				double fatigue = lfOperator.Span[0].Fatigue.Base > 0 ? lfOperator.Span[0].Fatigue.Current / lfOperator.Span[0].Fatigue.Base : 0;
 
 				// stealth
@@ -3714,10 +3732,10 @@ namespace HelloBoids
 				//        Or we may have MISSED altogether
 
 				double[] weights = new double[7];
-				ComponentStore<Component> allComponents = (ComponentStore<Component>) EntryClass.mCStoreCol.CheckOut<Component>(); //  attackingTacticalStation.GetUserStruct(typeof(Component), out tacticalStationIndex); 
+				ComponentStore<BaseObject> allBaseObjs = (ComponentStore<BaseObject>) EntryClass.mCStoreCol.CheckOut<BaseObject>(); //  attackingTacticalStation.GetUserStruct(typeof(BaseObject), out tacticalStationIndex); 
 				
 				EntityNode droid = Boids[targets[i].EntityArrayIndex];
-				int hullIndex = droid.GetUserStructIndex(typeof(Component));
+				int hullIndex = droid.GetUserStructIndex(typeof(BaseObject));
 				
 				
 				
@@ -3729,7 +3747,7 @@ namespace HelloBoids
 				EntityNode humanOperator = Boids[targets[i].EntityArrayIndex + HUMAN_OPERATOR_OFFSET];
 				
 				double totalVolume = 0;
-				weights[0] = allComponents.Span[hullIndex].Volume / totalVolume;
+				weights[0] = allBaseObjs.Span[hullIndex].Volume / totalVolume;
 				
 				
 				
@@ -3910,7 +3928,7 @@ namespace HelloBoids
 		/// The resulting damage types and amounts (and duration for damage that can be applied overtime)
 		/// that occur on this successful hit.
 		/// </summary>
-        private object[] CalculateDamage(EntityNode attackerOperator, EntityNode target, double distanceSquared, Memory<Component> componentStructForWeaponEntity, Memory<Weapon> weaponStruct, GameTime gt, Random rand, out bool criticalMalfunctionHasOccurred)
+        private object[] CalculateDamage(EntityNode attackerOperator, EntityNode target, double distanceSquared, Memory<BaseObject> baseObjForWeapon, Memory<Component> componentStructForWeaponEntity, Memory<Weapon> weaponStruct, GameTime gt, Random rand, out bool criticalMalfunctionHasOccurred)
         {
 			
 			
@@ -3929,7 +3947,7 @@ namespace HelloBoids
 			*/
 			
 			criticalMalfunctionHasOccurred = false;
-			bool malfunction = CalculateMalfunction(componentStructForWeaponEntity, weaponStruct, rand, out criticalMalfunctionHasOccurred);
+			bool malfunction = CalculateMalfunction(baseObjForWeapon, componentStructForWeaponEntity, weaponStruct, rand, out criticalMalfunctionHasOccurred);
 			
 			if (criticalMalfunctionHasOccurred)
 			{
@@ -3962,8 +3980,8 @@ namespace HelloBoids
 			
 			// todo: we need to establish the reqt based on output.  Output should be a Stat perhaps with a base and a current?
 			
-			int lfIndex = -1;
-			Memory<LifeForm> targetLF = (Memory<LifeForm>)attackerOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
+			int baseObjIndex = -1;
+			Memory<BaseObject> targetBaseObj = (Memory<BaseObject>)attackerOperator.GetUserStruct(typeof(BaseObject), out baseObjIndex);
 
 			// the weapon's actual damage needs to be a result along a bell curve of the average Damage
 			// https://gamedev.stackexchange.com/questions/198751/how-to-calculate-player-damage-in-a-game
@@ -4016,7 +4034,7 @@ namespace HelloBoids
 			// TODO: based on which side is hit, use that ArmorFace and it's layers to determine DR
 						
 			// target Armor  //targetFL.Span[0].Armor.Armor[side].
-			int defense = targetLF.Span[0].Armor.AverageDR;
+			int defense = targetBaseObj.Span[0].Armor.AverageDR;
 			// if the defense is higher than the damage, then 0 damage gets through.  Math.Max() will prevent any "negative" damage in that case.
 			// NOTE: armor sustaining damage over time is not being modeled here.
 			double finalDamageAmount = Math.Max(0, damageAmountWithVariance - defense); 
@@ -4056,7 +4074,7 @@ namespace HelloBoids
 			return result;
         }
 
-        private bool CalculateMalfunction (Memory<Component> componentStruct, Memory<Weapon> weaponStruct, Random rand, out bool criticalMalfunctionHasOccurred)
+        private bool CalculateMalfunction (Memory<BaseObject> baseObj, Memory<Component> componentStruct, Memory<Weapon> weaponStruct, Random rand, out bool criticalMalfunctionHasOccurred)
 		{
 			/*
 			In GURPS Vehicles 2nd Edition, weapon malfunction (Malf) rates are primarily determined 
@@ -4087,8 +4105,9 @@ namespace HelloBoids
 			// the higher the "factor" and "malfChance" (exponent), the smaller the resulting
 			// Pow() expression result which will make rand.NextDouble() increasingly
 			// MORE LIKELY to be a higher value thus resuling in a MALFUNCTION.
+			
+			double weaponDamageCoefficient = baseObj.Span[0].HitPoints.Base > 0 ? baseObj.Span[0].HitPoints.Current / baseObj.Span[0].HitPoints.Base : 0;
 			double weaponQualityCoefficient = componentStruct.Span[0].MaterialQuality;   
-			double weaponDamageCoefficient = componentStruct.Span[0].HitPoints.Base > 0 ? componentStruct.Span[0].HitPoints.Current / componentStruct.Span[0].HitPoints.Base : 0;
 			double weaponLevelCoefficient = componentStruct.Span[0].Level / MAX_LEVEL;
 			double weaponCraftsmanshipCoefficient = componentStruct.Span[0].Craftsmanship;
 			
@@ -5119,10 +5138,10 @@ namespace HelloBoids
 				mDamageResults.Clear();
 			}
 					
-			public void Process(ComponentStore<LifeForm> store, object[] parameters, int seed, GameTime gt)
+			public void Process(ComponentStore<BaseObject> store, object[] parameters, int seed, GameTime gt)
 			{
 				if (store == null) return;
-				Span<LifeForm> memSpan = store.Span;
+				Span<BaseObject> memSpan = store.Span;
 				
 				if (mRecords != null)
 				{
@@ -5191,10 +5210,10 @@ namespace HelloBoids
 			/// FireDamage for example, can last for several seconds and so any one particular FireDamage record is
 			/// not removed from the ComponentStore<> until it's expired
 			/// </summary>
-			public void Process(ComponentStore<LifeForm> store, object[] parameters, int seed, GameTime gt)
+			public void Process(ComponentStore<BaseObject> store, object[] parameters, int seed, GameTime gt)
 			{
 				if (store == null) return;
-				Span<LifeForm> memSpan = store.Span;
+				Span<BaseObject> memSpan = store.Span;
 							
 				if (mRecords != null)
 				{
@@ -9000,9 +9019,9 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
 			errorReason = null;
 			
-			ComponentStore<LifeForm> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
-			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
-			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
+			ComponentStore<BaseObject> allLivingEntities = EntryClass.mCStoreCol.CheckOut<BaseObject>(0);
+			//ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
+			//ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 						
 			// NOTE: if this station requires an AI operator at the very least, then NumOperators will be == 1.
 			//       And the operator ID will point to another Component (eg a Computer running some tpe of software...eg Targeting Software)

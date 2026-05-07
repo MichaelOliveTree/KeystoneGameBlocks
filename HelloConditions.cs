@@ -28,9 +28,14 @@ using System.Collections.Generic;
 using System.Linq;
 // using System.Numerics;
 // using System.Runtime.Intrinsics; // for SIMD enabled code
-using Microsoft.CodeAnalysis;
+//using Microsoft.CodeAnalysis;
 using Microsoft.CSharp;
 using System.IO;
+
+
+//  /.salty
+//  /.theway
+//  /.fourfours
 
 
 
@@ -714,10 +719,10 @@ namespace HelloBoids
 		internal System.Collections.Concurrent.ConcurrentDictionary<int, ComponentStore<Production>> mProduction;
         internal System.Collections.Concurrent.ConcurrentDictionary<int, ComponentStore<Consumption>> mConsumption;
 		
-		
+				
+
         public Seeds Seeds { get; set; }
 						 
-		//public ThreadedRandom mTHRandom;
 		
         private double SeparationDistance;
         private double SeparationFactor ;
@@ -764,6 +769,10 @@ namespace HelloBoids
 		public static SimulationEventManager mSimEventManager;
 		
 		private object mLock = new object();
+			
+		private static System.Threading.SemaphoreSlim mSort = new System.Threading.SemaphoreSlim(1);
+		
+		
 		
 			
 		
@@ -820,7 +829,7 @@ namespace HelloBoids
 #if USE_MEMORY_T
 
             // add data processors
-            DataProcessorsStore.Processor<LifeForm> lifeCycleBehavior = DoLifeCycle;
+            DataProcessorsStore.Processor<BaseObject> lifeCycleBehavior = DoLifeCycle;
             mDataProcessor.Add("LIFECYCLE", lifeCycleBehavior);
 
 			
@@ -979,9 +988,9 @@ namespace HelloBoids
 			return Boids[entityArrayIndex];
 		}
 		
-		public HitPoints[] GetHitPoints(int[] entityArrayIndices)
+		public Stat[] GetHitPoints(int[] entityArrayIndices)
 		{
-			HitPoints[] hitpoints = new HitPoints[entityArrayIndices.Length];
+			Stat[] hitpoints = new Stat[entityArrayIndices.Length];
 			
 			for (int i = 0; i <  hitpoints.Length; i++)
 				hitpoints[i] = GetHitPoints(entityArrayIndices[i]);
@@ -989,26 +998,18 @@ namespace HelloBoids
 			return hitpoints;
 		}
 		
-		public HitPoints GetHitPoints(int entityArrayIndex)
+		public Stat GetHitPoints(int entityArrayIndex)
 		{
 			EntityNode e = Boids[entityArrayIndex];
 			int index;
-			
-			if ((e.Configuration & (uint)CONFIGURATION.LifeForm) != 0)
-			{
-				Memory<LifeForm> lf = (Memory<LifeForm>)e.GetUserStruct(typeof(LifeForm), out index);
-				return lf.Span[0].HitPoints;
-			}
-			else
-			{
-				System.Diagnostics.Debug.Assert((e.Configuration & (uint)CONFIGURATION.Component) != 0, "GetHitPoints() - Unexpected Entity CONFIGURATION");
-				Memory<Component> comp = (Memory<Component>)e.GetUserStruct(typeof(Component), out index);
-				return comp.Span[0].HitPoints;
-			}
+
+			Memory<BaseObject> baseObj = (Memory<BaseObject>)e.GetUserStruct(typeof(BaseObject), out index);
+			return baseObj.Span[0].HitPoints;
+
 		}
 		
-			// NOTE: This is horribly inefficient because it just iterates t hrough all EntityNodes to find the
-			//       one "Sensor" that has the expected EntityKey that starts with "sensor_" and otherwise has same number part as this Droid's mID
+		// NOTE: This is horribly inefficient because it just iterates t hrough all EntityNodes to find the
+		//       one "Sensor" that has the expected EntityKey that starts with "sensor_" and otherwise has same number part as this Droid's mID
 		public EntityNode[] GetSensors(int entityArrayIndex)
 		{
 			if (EntryClass.bSim.Boids == null) return null;
@@ -1181,23 +1182,20 @@ namespace HelloBoids
 			//memAllTransforms.Span[transformIndex].Configuration = BoidConfiguration;
 			// b.AddUserStruct(typeof(Transform.Transform_Struct), memAllTransforms, transformIndex);
 			
-			////////////////////////////////////////////////////////////////////////////////////////////////////
-			// TRANSFORM STRUCT - NOTE: We do not need to b.AddUserStruct() because the Transform_Struct is added by default by 'class Transform'
-			int transformIndex;
-			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)b.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
-			transform.Span[0].Configuration = BoidConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
-			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
 		
+			int baseObjIndex;
+			Memory<BaseObject> baseObj = (Memory<BaseObject>)b.GetUserStruct(typeof(BaseObject), out baseObjIndex); 
+			baseObj.Span[baseObjIndex].Configuration = BoidConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
+			baseObj.Span[baseObjIndex].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
+			baseObj.Span[baseObjIndex].HitPoints =  new Stat(){ Base = 250, Current = 250};
+
 			// LIFE FORM
 			ComponentStore<LifeForm> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LifeForm>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
             int livingEntityID = -1;
             Memory<LifeForm> memLivingEnt = storeLivingEntity.CheckOut(out livingEntityID);
-			b.AddUserStruct(typeof(LifeForm), memLivingEnt, livingEntityID);
-			
+			b.AddUserStruct(typeof(LifeForm), memLivingEnt, livingEntityID);			
 			storeLivingEntity.Span[livingEntityID].Age = 1;
-			storeLivingEntity.Span[livingEntityID].HitPoints = new HitPoints(){ Base = 250, Current = 250};
-			storeLivingEntity.Span[livingEntityID].Configuration = BoidConfiguration;
-			
+	
 			
 			// ARMOR: this may require an array of checkOutIndices based on how many layers as determined from 
 			//       component.ArmorLayersCount
@@ -1320,13 +1318,13 @@ namespace HelloBoids
 			transform.Span[0].Configuration = OpticalSensorConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
 			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
 
-			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-			int compInternalIndex = -1;
-			Memory<Component> memComp = storeComp.CheckOut(out compInternalIndex);
-			opticalSensor.AddUserStruct(typeof(Component), memComp, compInternalIndex);
+			ComponentStore<BaseObject> storeBaseObjs = EntryClass.mCStoreCol.CheckOut<BaseObject>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+			int baseObjsIndex = -1;
+			Memory<BaseObject> memComp = storeBaseObjs.CheckOut(out baseObjsIndex);
+			opticalSensor.AddUserStruct(typeof(BaseObject), memComp, baseObjsIndex);
 
-			storeComp.Span[compInternalIndex].Configuration = OpticalSensorConfiguration;
-			storeComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
+			storeBaseObjs.Span[baseObjsIndex].Configuration = OpticalSensorConfiguration;
+			storeBaseObjs.Span[baseObjsIndex].EntityArrayIndex = arrayIndex;
 
 			// powerconsumer struct
 			ComponentStore<PowerConsumer> storePowerConsumer = EntryClass.mCStoreCol.CheckOut<PowerConsumer>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
@@ -1429,13 +1427,13 @@ namespace HelloBoids
 			transform.Span[0].Configuration = WingsConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
 			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
 
-			// component struct
-			ComponentStore<Component> storeComp = EntryClass.mCStoreCol.CheckOut<Component>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-			int compInternalIndex = -1;
-			Memory<Component> memComp = storeComp.CheckOut(out compInternalIndex);
-			wings.AddUserStruct(typeof(Component), memComp, compInternalIndex);
-			storeComp.Span[compInternalIndex].Configuration = WingsConfiguration;
-			storeComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
+			// BaseObject struct
+			ComponentStore<BaseObject> storeBaseObjs = EntryClass.mCStoreCol.CheckOut<BaseObject>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+			int baseObjInternalIndex = -1;
+			Memory<BaseObject> memComp = storeBaseObjs.CheckOut(out baseObjInternalIndex);
+			wings.AddUserStruct(typeof(BaseObject), memComp, baseObjInternalIndex);
+			storeBaseObjs.Span[baseObjInternalIndex].Configuration = WingsConfiguration;
+			storeBaseObjs.Span[baseObjInternalIndex].EntityArrayIndex = arrayIndex;
 
 			// powerconsumer struct
 			ComponentStore<PowerConsumer> storeWings = EntryClass.mCStoreCol.CheckOut<PowerConsumer>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
@@ -1474,6 +1472,14 @@ namespace HelloBoids
 						
 			//CONFIGURATION LaserConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.Weapon | CONFIGURATION.Laser;
 			
+			// Base Object
+			ComponentStore<BaseObject> storeBaseObjs = EntryClass.mCStoreCol.CheckOut<BaseObject>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+            int baseObjIndex = -1;
+            Memory<BaseObject> memBaseObjs = storeBaseObjs.CheckOut(out baseObjIndex);
+			laser.AddUserStruct(typeof(BaseObject), memBaseObjs, baseObjIndex);
+			storeBaseObjs.Span[baseObjIndex].Configuration = LaserConfiguration;
+			storeBaseObjs.Span[baseObjIndex].EntityArrayIndex = laser.EntityArrayIndex;
+			
 			// transform struct
 			int transformIndex;
 			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)laser.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
@@ -1485,8 +1491,6 @@ namespace HelloBoids
             int checkOutIndex = -1;
             Memory<Component> memCmp = storeComp.CheckOut(out checkOutIndex);
 			laser.AddUserStruct(typeof(Component), memCmp, checkOutIndex);
-			storeComp.Span[checkOutIndex].Configuration = LaserConfiguration;
-			storeComp.Span[checkOutIndex].EntityArrayIndex = laser.EntityArrayIndex;
 			storeComp.Span[checkOutIndex].Level = 1;
 			//storeComp.Span[checkOutIndex].Quality = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
 			storeComp.Span[checkOutIndex].Ruggedized = true;
@@ -1587,6 +1591,14 @@ namespace HelloBoids
 			
 			//CONFIGURATION TacticalStationConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.TacticalStation;
 
+			// Base Object
+			ComponentStore<BaseObject> storeBaseObjs = EntryClass.mCStoreCol.CheckOut<BaseObject>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+            int baseObjIndex = -1;
+            Memory<BaseObject> memBaseObjs = storeBaseObjs.CheckOut(out baseObjIndex);
+			station.AddUserStruct(typeof(BaseObject), memBaseObjs, baseObjIndex);
+			storeBaseObjs.Span[baseObjIndex].Configuration = TacticalStationConfiguration;
+			storeBaseObjs.Span[baseObjIndex].EntityArrayIndex = station.EntityArrayIndex;		
+			
 			// transform struct
 			int transformIndex;
 			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)station.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
@@ -1598,8 +1610,6 @@ namespace HelloBoids
 			int compInternalIndex = -1;
 			Memory<Component> memComp = storeComp.CheckOut(out compInternalIndex);
 			station.AddUserStruct(typeof(Component), memComp, compInternalIndex);
-			storeComp.Span[compInternalIndex].Configuration = TacticalStationConfiguration;
-			storeComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
 
 		
 			// powerconsumer struct
@@ -1684,6 +1694,15 @@ namespace HelloBoids
 			
 			//CONFIGURATION BatteryConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerProducer;
 			
+			// Base Object
+			ComponentStore<BaseObject> storeBaseObjs = EntryClass.mCStoreCol.CheckOut<BaseObject>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+            int baseObjIndex = -1;
+            Memory<BaseObject> memBaseObjs = storeBaseObjs.CheckOut(out baseObjIndex);
+			battery.AddUserStruct(typeof(BaseObject), memBaseObjs, baseObjIndex);
+			storeBaseObjs.Span[baseObjIndex].Configuration = BatteryConfiguration;
+			storeBaseObjs.Span[baseObjIndex].EntityArrayIndex = battery.EntityArrayIndex;
+			
+			
 			// transform struct
 			int transformIndex;
 			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)battery.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
@@ -1695,11 +1714,6 @@ namespace HelloBoids
 			int compInternalIndex = -1;
 			Memory<Component> memComp = storeComp.CheckOut(out compInternalIndex);
 			battery.AddUserStruct(typeof(Component), memComp, compInternalIndex);
-			storeComp.Span[compInternalIndex].Configuration = BatteryConfiguration;
-			storeComp.Span[compInternalIndex].EntityArrayIndex = arrayIndex;
-
-			storeComp.Span[compInternalIndex].Configuration = BatteryConfiguration;
-			storeComp.Span[compInternalIndex].EntityArrayIndex = battery.EntityArrayIndex;
 			storeComp.Span[compInternalIndex].Level = 1;
 			//storeComp.Span[compInternalIndex].Quality = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
 			storeComp.Span[compInternalIndex].Ruggedized = true;
@@ -1793,10 +1807,22 @@ namespace HelloBoids
 			EntityNode humanOperator = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
 			humanOperator.Configuration = (uint)HumanOperatorConfiguration;
 			
-			int transformIndex;
-			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)humanOperator.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
-			transform.Span[0].Configuration = HumanOperatorConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
-			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
+			// BASE OBJECT
+			int baseObjIndex;
+			Memory<BaseObject> baseObj = (Memory<BaseObject>)humanOperator.GetUserStruct(typeof(BaseObject), out baseObjIndex); 
+			baseObj.Span[baseObjIndex].Configuration = HumanOperatorConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
+			baseObj.Span[baseObjIndex].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
+			baseObj.Span[baseObjIndex].HitPoints =  new Stat(){ Base = 100, Current = 100};
+			baseObj.Span[baseObjIndex].Configuration = HumanOperatorConfiguration;
+			
+			double volume = 2.2d;
+			BoundingBox box = new BoundingBox (Vector3d.Zero(), volume);
+			baseObj.Span[baseObjIndex].Armor = new Armor(box);
+			
+			// TRANSFORM
+			//int transformIndex;
+			//Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)humanOperator.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
+			
 		
 			// LIVING ENTITY
 			ComponentStore<LifeForm> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LifeForm>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
@@ -1805,11 +1831,7 @@ namespace HelloBoids
 			humanOperator.AddUserStruct(typeof(LifeForm), memLivingEnt, lfID);
 			
 			storeLivingEntity.Span[lfID].Age = 1;
-			storeLivingEntity.Span[lfID].HitPoints =  new HitPoints(){ Base = 100, Current = 100};
-			storeLivingEntity.Span[lfID].Configuration = HumanOperatorConfiguration;
-			
-			BoundingBox box = new BoundingBox (Vector3d.Zero(), 1);
-			storeLivingEntity.Span[lfID].Armor = new Armor(box);
+
 					
 			// Armor
 			//		
@@ -1934,7 +1956,7 @@ namespace HelloBoids
 	#if USE_MEMORY_T == false
 				// TEST CLASSES (Object Oriented Technique)
 				// =====================
-				this.UpdateClasses(gt); 
+				//this.UpdateClasses(gt); 
 				
 				/*
 								   this.Boids,
@@ -2004,9 +2026,11 @@ namespace HelloBoids
 				}
 				
 				//Console.WriteLine("Update() - Preparing to Update Damage System ");
+				ComponentStore<BaseObject> baseObjStore = null;
+				baseObjStore = EntryClass.mCStoreCol.CheckOut<BaseObject>(0);
 				try
 				{
-					mDamageSystem.Process(livingEntityStore, null, Seeds.Master, gt);
+					mDamageSystem.Process(baseObjStore, null, Seeds.Master, gt);
 					linePos = 4;
 				}
 				catch (Exception ex)
@@ -2016,7 +2040,7 @@ namespace HelloBoids
 				
 				try
 				{
-					mDamageOverTimeSystem.Process(livingEntityStore, null, Seeds.Master, gt);
+					mDamageOverTimeSystem.Process(baseObjStore, null, Seeds.Master, gt);
 					linePos = 5;
 				}
 				catch (Exception ex)
@@ -2086,143 +2110,144 @@ namespace HelloBoids
 		/// </summary>
         //public void UpdateClasses(GameTime gt, List<Boid> allBoids, double separationDistance, double separationFactor, double alignmentDistance, double alignmentFactor, 
 		//						  double cohesionDistance, double cohesionFactor, double maxSpeed, double turnFactor)
-		
-		public void UpdateClasses(GameTime gt)
-		{
-									  
-            //////////////////////////////////////////////////////////////////
-            // Life Cycle
-            //////////////////////////////////////////////////////////////////
-			/*
-			sting entityKey = currentBoid.EntityKey;
-            bool spawnReady = mIntervalTimers.IsReady(entityKey, "droid_spawn");
-            if (spawnReady)
-            {
-				
-                //Console.WriteLine("Spawn Ready == " + spawnReady.ToString());
-                mIntervalTimers.Reset(entityKey, "droid_spawn");
-            }
-			*/
+
+
+//		public void UpdateClasses(GameTime gt)
+//		{
+//									  
+//           //////////////////////////////////////////////////////////////////
+//            // Life Cycle
+//           //////////////////////////////////////////////////////////////////
+//			/*
+//			sting entityKey = currentBoid.EntityKey;
+//            bool spawnReady = mIntervalTimers.IsReady(entityKey, "droid_spawn");
+//            if (spawnReady)
+//            {
+//				
+//                //Console.WriteLine("Spawn Ready == " + spawnReady.ToString());
+//                mIntervalTimers.Reset(entityKey, "droid_spawn");
+//            }
+//			*/
 			
-            //////////////////////////////////////////////////////////////////
-            // Flocking
-            //////////////////////////////////////////////////////////////////		
-			
-			int count = Boids.Count;
-            System.Threading.Tasks.Parallel.For(0, count, i => 
-            //for (int i = 0; i < Boids.Count; i++)
-            {
-				if (Boids[(int)i] is Boid == false) return;
-				
-				
-                List<int> found;
-                List<Boid> neighbors;
-
-				double separationDistance = EntryClass.SEPERATION_DISTANCE;
-				double alignmentDistance = EntryClass.ALIGNMENT_DISTANCE;
-				double cohesionDistance = EntryClass.COHESION_DISTANCE;
-
-				// more parameters
-				double separationFactor = EntryClass.SEPARATION_FACTOR;
-				double alignmentFactor = EntryClass.ALIGNMENT_FACTOR;
-				double cohesionFactor = EntryClass.COHESION_FACTOR;
-				double turnFactor =  EntryClass.TURN_FACTOR; // For boundary avoidance
-				double maxSpeed = EntryClass.MAX_SPEED;
-				
-				double seperatationDistanceSquare = separationDistance * separationDistance;
-				double alignmentDistanceSquared = alignmentDistance * alignmentDistance;
-				double cohesionDistanceSquared = cohesionDistance * cohesionDistance;
-				
-				double elapsedSeconds = gt.ElapsedSeconds;
-            	double largestDistance = Utils.GetMax(this.SeparationDistance, this.AlignmentDistance, this.CohesionDistance);
-            	double largestDistanceSquared = largestDistance * largestDistance;
-            
-				
-                using (EntryClass.CodeProfiler.HookUp("GetNeighbors"))
-                {
-                    // WARNING: here we pass in entire list of
-                    // boids to each boid, which is super slow until we have spatial
-                    // partitioning
-                    found = GetNeighbors((Boid)Boids[i], largestDistance, largestDistanceSquared);
-
-                    if (found == null || found.Count == 0) 
-                   	{ 
-					   //Console.WriteLine("UpdateClasses() - Found Count == 0");
-						neighbors = null;
-					}
-                    else
-					{
-						//Console.WriteLine("UpdateClasses() - Found Count == 0");
-
-						neighbors = new List<Boid>(found.Count);
-						for (int j = 0; j < found.Count; j++)
-						{
-							neighbors.Add((Boid)Boids[found[j]]);
-						}
-					}
-				} // end Using "GetNeighbors"
-               
-
-				//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-				// Apply Flocking Rules
-				//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-                using (EntryClass.CodeProfiler.HookUp("FlockingRules"))
-               	{
-					// Apply Rules
-					//var (sepX, sepY) = Boid.Separate(elapsedSeconds, Boids, Boids[i], separationDistance, separationFactor);
-					double sepX = 0d; double sepY = 0d;
-					if (neighbors != null)
-					 (sepX, sepY) = Boid.Separate(elapsedSeconds, Boids, (Boid)Boids[(int)i], separationDistance, separationFactor, neighbors);
-
-					//var (alignX, alignY) = Boid.Align(elapsedSeconds, Boids, Boids[i], alignmentDistance, alignmentFactor);
-					double alignX = 0d; double alignY = 0d;
-					if (neighbors != null)
-						(alignX, alignY) = Boid.Align(elapsedSeconds, Boids, (Boid)Boids[(int)i], alignmentDistance, alignmentFactor, neighbors);
-
-					//var (cohX, cohY) = Boid.Cohese(elapsedSeconds, Boids, Boids[i], cohesionDistance, cohesionFactor);
-					double cohX = 0d; double cohY = 0d;
-
-					if (neighbors != null)
-						(cohX, cohY) = Boid.Cohese(elapsedSeconds, Boids, (Boid)Boids[(int)i], cohesionDistance, cohesionFactor, neighbors);
-
-					// Sum forces
-					Vector3d v;
-					v.x = sepX + alignX + cohX;
-					v.y = sepY + alignY + cohY;
-					v.z = 0.0d;
-
-					// Apply speed limits
-					double speed = v.Length;
-
-					if (speed > maxSpeed && maxSpeed != 0)
-					{
-						v = (v / speed) * maxSpeed;
-					}
-
-					// ... (Optional: Implement min speed if needed)
-
-					// Update position
-					v *= elapsedSeconds;
-					Boids[(int)i].Velocity += v;
-					Boids[(int)i].Translation += Boids[i].Velocity;
-					
-			#if SPATIAL_MOVE_UPDATES // this define needs to remain FALSE because currently Octree is NOT THREAD SAFE
-					Boids[(int)i].SpatialNode.OnEntityNode_Moved(Boids[(int)i]);
-			#endif
-
-			#if DEBUG_OUTPUT
-					const string SEPERATOR = "|";
-					Utils.AppendText(EntryClass.mSimulationOutputFile, Boids[i].Translation.ToString() + SEPERATOR + Boids[i].Velocity.ToString());
-			#endif
-					
-					// Apply boundary rules (wrap around)
-					// (You'd need to define boundary dimensions here)
-					// If X > maxX, X = minX, etc.
-
-				} // end for loop
-			});  // end using "FlockingRules"   NOTE: Close Parenthesis and Semicolon here is needed after close curly brace only when using Parallel.For()
-        } 
-
+ //           //////////////////////////////////////////////////////////////////
+ //           // Flocking
+ //           //////////////////////////////////////////////////////////////////		
+//			
+//			int count = Boids.Count;
+//           System.Threading.Tasks.Parallel.For(0, count, i => 
+//            //for (int i = 0; i < Boids.Count; i++)
+//            {
+//				if (Boids[(int)i] is Boid == false) return;
+//				
+//				
+//                List<int> found;
+//               List<Boid> neighbors;
+//
+//				double separationDistance = EntryClass.SEPERATION_DISTANCE;
+//				double alignmentDistance = EntryClass.ALIGNMENT_DISTANCE;
+//				double cohesionDistance = EntryClass.COHESION_DISTANCE;
+//
+//				// more parameters
+//				double separationFactor = EntryClass.SEPARATION_FACTOR;
+//				double alignmentFactor = EntryClass.ALIGNMENT_FACTOR;
+//				double cohesionFactor = EntryClass.COHESION_FACTOR;
+//				double turnFactor =  EntryClass.TURN_FACTOR; // For boundary avoidance
+//				double maxSpeed = EntryClass.MAX_SPEED;
+//				
+//				double seperatationDistanceSquare = separationDistance * separationDistance;
+//				double alignmentDistanceSquared = alignmentDistance * alignmentDistance;
+//				double cohesionDistanceSquared = cohesionDistance * cohesionDistance;
+//				
+//				double elapsedSeconds = gt.ElapsedSeconds;
+//           	double largestDistance = Utils.GetMax(this.SeparationDistance, this.AlignmentDistance, this.CohesionDistance);
+//            	double largestDistanceSquared = largestDistance * largestDistance;
+//           
+//				
+//               using (EntryClass.CodeProfiler.HookUp("GetNeighbors"))
+//                {
+//                    // WARNING: here we pass in entire list of
+//                    // boids to each boid, which is super slow until we have spatial
+//                   // partitioning
+//                    found = GetNeighbors((Boid)Boids[i], largestDistance, largestDistanceSquared);
+//
+//                    if (found == null || found.Count == 0) 
+//                   	{ 
+//					   //Console.WriteLine("UpdateClasses() - Found Count == 0");
+//						neighbors = null;
+//					}
+//                    else
+//					{
+//						//Console.WriteLine("UpdateClasses() - Found Count == 0");
+//
+//						neighbors = new List<Boid>(found.Count);
+//						for (int j = 0; j < found.Count; j++)
+//						{
+//							neighbors.Add((Boid)Boids[found[j]]);
+//						}
+//					}
+//				} // end Using "GetNeighbors"
+//            
+//
+//				///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//				// Apply Flocking Rules
+//				//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//               using (EntryClass.CodeProfiler.HookUp("FlockingRules"))
+//               	{
+//					// Apply Rules
+//					//var (sepX, sepY) = Boid.Separate(elapsedSeconds, Boids, Boids[i], separationDistance, separationFactor);
+//					double sepX = 0d; double sepY = 0d;
+//					if (neighbors != null)
+//					 (sepX, sepY) = Boid.Separate(elapsedSeconds, Boids, (Boid)Boids[(int)i], separationDistance, separationFactor, neighbors);
+//
+//					//var (alignX, alignY) = Boid.Align(elapsedSeconds, Boids, Boids[i], alignmentDistance, alignmentFactor);
+//					double alignX = 0d; double alignY = 0d;
+//					if (neighbors != null)
+//						(alignX, alignY) = Boid.Align(elapsedSeconds, Boids, (Boid)Boids[(int)i], alignmentDistance, alignmentFactor, neighbors);
+//
+//					//var (cohX, cohY) = Boid.Cohese(elapsedSeconds, Boids, Boids[i], cohesionDistance, cohesionFactor);
+//					double cohX = 0d; double cohY = 0d;
+//
+//					if (neighbors != null)
+//						(cohX, cohY) = Boid.Cohese(elapsedSeconds, Boids, (Boid)Boids[(int)i], cohesionDistance, cohesionFactor, neighbors);
+//
+//					// Sum forces
+//					Vector3d v;
+//					v.x = sepX + alignX + cohX;
+//					v.y = sepY + alignY + cohY;
+//					v.z = 0.0d;
+//
+//					// Apply speed limits
+//					double speed = v.Length;
+//
+//					if (speed > maxSpeed && maxSpeed != 0)
+//					{
+//						v = (v / speed) * maxSpeed;
+//					}
+//
+//					// ... (Optional: Implement min speed if needed)
+//
+//					// Update position
+//					v *= elapsedSeconds;
+//					Boids[(int)i].Velocity += v;
+//					Boids[(int)i].Translation += Boids[i].Velocity;
+//					
+//			#if SPATIAL_MOVE_UPDATES // this define needs to remain FALSE because currently Octree is NOT THREAD SAFE
+//					Boids[(int)i].SpatialNode.OnEntityNode_Moved(Boids[(int)i]);
+//			#endif
+//
+//			#if DEBUG_OUTPUT
+//					const string SEPERATOR = "|";
+//					Utils.AppendText(EntryClass.mSimulationOutputFile, Boids[i].Translation.ToString() + SEPERATOR + Boids[i].Velocity.ToString());
+//			#endif
+//					
+//					// Apply boundary rules (wrap around)
+//					// (You'd need to define boundary dimensions here)
+//					// If X > maxX, X = minX, etc.
+//
+//				} // end for loop
+//			});  // end using "FlockingRules"   NOTE: Close Parenthesis and Semicolon here is needed after close curly brace only when using Parallel.For()
+//       } 
+//   */
 #if USE_MEMORY_T
 		
 	
@@ -2513,15 +2538,12 @@ namespace HelloBoids
 			
 		
 		// https://github.com/MonoGame/MonoGame/blob/db9e544dfb3f1c1e8bfc2ea08fec31c1c17a9033/MonoGame.Framework/Game.cs#L539
-        private void DoLifeCycle(ComponentStore<LifeForm> store, object[] parameters, int seed, GameTime gt)
+        private void DoLifeCycle(ComponentStore<BaseObject> store, object[] parameters, int seed, GameTime gt)
         {
-			ComponentStore<LifeForm> testLEComp = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
-			//Console.WriteLine("DoLifeCycle() - Stores are the same == " + (store == testLEComp).ToString());
-			
-			// TODO: until both paths use DoLifeCycle(), this will throw off deterministism for Memory<T> path
-    		return;
-    
-			Span<LifeForm> livingEntitySpan = store.Span;
+			return;
+
+			ComponentStore<LifeForm> lfs = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);    
+			Span<BaseObject> baseObj = store.Span;
 	
 			int recordCount = (int)store.Count;
 			
@@ -2533,7 +2555,7 @@ namespace HelloBoids
             for (int i = 0; i < recordCount; i++)
 			{
 				// NOTE: this timerID is taken from the LivingEntity struct's spanIndex
-				int index = livingEntitySpan[i].EntityArrayIndex;
+				int index = baseObj[i].EntityArrayIndex;
 				string entityKey = Boids[index].EntityKey; 
 				
 				bool spawnReady = mIntervalTimers.IsReady(entityKey, "droid_spawn");
@@ -2545,8 +2567,8 @@ namespace HelloBoids
 				
 				// todo: i think we need to check to see if this record is for
 				//       an Entity that is enabled
-				double age = gt.ElapsedSeconds - livingEntitySpan[i].CreationDateTime;// Utils.GetAge(memSpan[i].CreationDateTime);
-				livingEntitySpan[i].Age = age;
+				double age = gt.ElapsedSeconds - lfs.Span[i].CreationDateTime;// Utils.GetAge(memSpan[i].CreationDateTime);
+				lfs.Span[i].Age = age;
 				if (age >= maxAge)
 				{
 					// TODO: there is a bug here in CheckIn and Destroy()... we are not managing the entity.Index and entity.SpanIndex properly
@@ -2568,7 +2590,7 @@ namespace HelloBoids
 			{
 				// todo: i think we need to check to see if this record is for
 				//       an Entity that is enabled
-				double age = gt.TotalElapsedSeconds - livingEntitySpan[i].CreationDateTime;
+				double age = gt.TotalElapsedSeconds - lfs.Span[i].CreationDateTime;
 				Random mTHRandom = ThreadedRandom.Instance;  //(this.Seeds.Master);
 				
 				Spawn(mTHRandom, i, width, height, depth);
@@ -2996,173 +3018,7 @@ namespace HelloBoids
         }
 #endif
         		
-		
-	
-		private static System.Threading.SemaphoreSlim mSort = new System.Threading.SemaphoreSlim(1);
-		
-		/// <summary>
-		/// This is mostly just creating 'SensorContact' from "neighbors" .... based on policies
-		/// </summary>
-		private void CreateContactListFromAdjacents()
-		{
-			if (mNeighbors.Count == 0) return;
-			//Console.WriteLine("DoContactListSorting() - STARTING");
-			
-			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
-			int recordCount = (int)allTacticalStations.Count;
 
-            System.Threading.Tasks.Parallel.For(0, recordCount, i => 		
-			{
-				// NOTE: problem with the BOOLEAN version of this Configuration test is, we want to test for Boid configuration and ONLY Boid configuration
-				//       and not another Configuration such as HumanOperatorConfiguration which CONTAINS all of BoidConfiguration  but LOGICALLY OR's "|" CONFIGURATION.Sentient as well 
-				//       and so it WILL pass the BOOLEAN version of this test.  Thus solution is a DIRECT == compare.  Duh!
-				if (allTacticalStations.Span[(int)i].Configuration != TacticalStationConfiguration)
-				//if ((allTacticalStations.Span[(int)i].Configuration & BoidConfiguration) != BoidConfiguration)
-				{
-					//Console.WriteLine("configuration = " + allTransforms.Span[(int)i].Configuration.ToString());
-					return;
-				}	
-				
-				int currentStationArrayIndex = allTacticalStations.Span[(int)i].EntityArrayIndex; // current.EntityArrayIndex; //  current.GetUserStructIndex(typeof(Transform.Transform_Struct));
-				//System.Diagnostics.Debug.Assert( (int)i == currentArrayIndex, "DoContactListSorting() - array index does not match...");
-				// the adjacnets that are stored in neighbors from the overall mNeighbors is very much stores Area of Interest for each Droid
-				// but we will only send them things that their sensors can detect (and "eyes" are treated as optical sensors)
-				//Console.WriteLine ("DoContactListSorting() - Key for current == " + Boids[currentArrayIndex].EntityKey);
-				
-				// TODO: Should we be iterating over the 'TacticalStation' struct's and NOT the Boids array? and then getting the SensorContacts from it?
-				//       we could skip any TacticalStation that is not designated as PRIMARY TacticalStation
-				
-				EntityNode currentStation = Boids[currentStationArrayIndex]; // <-- if we can get the Sensors without having to get the current Boid... hmm...
-				System.Diagnostics.Debug.Assert(currentStation.EntityKey.Contains("tactical"), "ProcessOpticalSensors() - Entity is NOT a TacticalStation.");
-				
-				int currentBoidArrayIndex = currentStation.EntityArrayIndex - TACTICAL_STATION_OFFSET;
-				Boid currentBoid = (Boid)Boids[currentBoidArrayIndex];
-				
-				//Console.WriteLine ("2");
-				EntityNode[] sensorEntities = GetSensors(currentBoidArrayIndex); // todo: we currently do  not have EntityNode allowing adding of child nodes.  This is needed next.
-				
-				int sensorsCount = 0;
-				if (sensorEntities != null) sensorsCount = sensorEntities.Length;
-				//Console.WriteLine("CreateContactListFromAdjacents() - Sensor Count == " + sensorsCount);
-				if (sensorEntities == null) return; 
-				
-				//Console.WriteLine ("4");
-				
-				// grab the neighbors/adjacents for this Droid.  The returned parameter List<Tuple<int, double>> tells us which Droid (int) index was detected and the (double) distance to it  
-				List<Tuple<int, double>> neighbors = null;
-				
-				//Console.WriteLine("CreateContactListFromAdjacents() - Looking for Neighbors at Array Index  == " + currentArrayIndex.ToString());
-				//foreach (int key in mNeighbors.Keys)
-				//	Console.WriteLine ("Key == " + key.ToString());
-				
-				bool success = mNeighbors.TryGetValue(currentBoidArrayIndex, out neighbors);
-								
-				//Console.WriteLine("DoContactListSorting() - Found '" + neighbors.Count.ToString() + "' Adjacents for Droid @ Array Index == '" + currentArrayIndex.ToString() + "' ");
-				List<SensorContact> contacts = new List<SensorContact>();
-				
-				//Console.WriteLine("CreateContactListFromAdjacents - 1");
-				
-				// iterate through all the potential "contacts"
-				for (int j = 0; j < neighbors.Count; j++)
-				{			
-					contacts.Clear();
-					ComponentStore<Transform.Transform_Struct> allTransforms  = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
-					
-					double distanceSquared = neighbors[(int)j].Item2;
-					int potentialContactsInternalTransformIndex = neighbors[(int)j].Item1; 
-					int potentialContactsEntityArrayIndex = allTransforms.Span[potentialContactsInternalTransformIndex].EntityArrayIndex;
-			  
-					//Console.WriteLine("CreateContactListFromAdjacents - 2");
-					// Iterate through all the Sensors the current Droid is using to see which ones might
-					// detect this potential contact.  This is why a "SensorContact" may already exist
-					// in the List<SensorContact> 'contacts'  because multiple Sensors on _the_same_ship_
-					// might detect this adjacent 'contact.'
-					for (int k = 0; k < sensorEntities.Length; k++)
-					{
-						int sensorStructIndex = -1;
-						Memory<Sensor> sensorStruct = (Memory<Sensor>)sensorEntities[k].GetUserStruct(typeof(Sensor), out sensorStructIndex);
-						int sensorArrayIndex = sensorStruct.Span[0].EntityArrayIndex;
-						
-						double sensorRangeSquared = sensorStruct.Span[0].RangeSquared;
-						
-						//Console.WriteLine("CreateContactListFromAdjacents() - Range = " +  sensorRangeSquared.ToString() + " Distance to Contact ==  " + Math.Sqrt(distanceSquared).ToString());
-						
-						if (sensorRangeSquared >= distanceSquared)
-						{
-							SensorContact c;
-
-							// if another sensor on this same vehicle has detected this potential contact already, append it's Sensor index
-							// to the list of SensorIndices for this contact so we know all sensors that detected it.
-							Predicate<SensorContact> contactExists = contact => contact.ContactEntityArrayIndex == potentialContactsEntityArrayIndex;
-							c = contacts.Find(contactExists);
-
-							if (!c.Equals(default(SensorContact)))
-							{
-								//Console.WriteLine("CreateContactListFromAdjacents() - sensor contact name == " + c.Name);
-								if (c.SensorsIndices == null) 
-									c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices,  sensorArrayIndex); // sensorStructIndex);
-								else
-									c.SensorsIndices.Append(sensorArrayIndex); // sensorStructIndex);
-
-								//Console.WriteLine("DoContactListSorting() - Appending SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
-							}
-							else // contact has not yet already been detected by another Sensor within this same ship during this loop through all sensors on this same ship
-							{
-								c = new SensorContact();
-
-								//Console.WriteLine("DoContactListSorting() - Creating NEW SensorContact of Droid at Array Index = '" + contactsEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
-								Boid bb = null;
-								try 
-								{
-									bb =  (Boid)this.Boids[potentialContactsEntityArrayIndex];
-								}
-								catch (Exception ex)
-								{
-									Console.WriteLine("DoContactListSorting() - ERROR: Boid contact at Array Index == " + c.ContactEntityArrayIndex.ToString() + " not found. " + ex.Message);
-								}
-
-								//Console.WriteLine ("9");
-								//int sensorContactInternalTransformIndex = bb.GetUserStructIndex(typeof(Transform.Transform_Struct));
-								// contact details are needed to find the correct SensorContact to potentially merge with an existing SensorContact for this detected Entity
-								// NOTE: HelloBoids should only have one element within its SensorsIndices
-								//       because each Droid only has one Sensor ('Optical Sensor' == eyes)
-								c.ContactEntityArrayIndex = potentialContactsEntityArrayIndex; // index within the Boid[] array of the detected Droid
-								c.Index = (int)i;
-								c.Name =  "boid_" + potentialContactsEntityArrayIndex.ToString(); // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
-								c.RegistryNumber = c.Name;
-								c.Type = SensorContact.TYPE.Drone;
-								c.ContactStatus = Target.STATUS.Unknown;
-								c.FriendOrFoe = SensorContact.FoF.Unknown;
-								c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices, sensorArrayIndex); //sensorStructIndex);
-								
-								// telemetry
-								SensorContact.ContactTelemetry t;
-								t.Radius = (float)bb.BoundingBox.Radius;    // how might size be spoofed?
-								t.Position = bb.Translation;
-								t.Velocity = bb.Velocity;
-								t.DistanceSquared = distanceSquared;
-								t.Heading = 0;
-								t.TimeAcquired = Utils.NowTicks(); // todo: this needs to eventually just be gt.Ticks <-- which must come from 'gametime fixedstep' and not 'real-time'
-								t.TimeLast = t.TimeAcquired;
-
-								c.Add(t);			
-								contacts.Add(c);
-								//Console.WriteLine("DoContactListSorting() - Added NEW SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
-							}
-						} // end sensor range check
-					} // end for SensorsCount
-				} // end for neihbors Count
-				
-
-				// add all of the SensorContacts to the current TacticalStation, and it will be responsible for
-				// properly merging these SensorContacts with existing ones so as to maintain
-				// proper SensorContact histories for all detected Entities.
-				if (contacts != null)
-					currentStation.Add(contacts); 
-			});
-			
-			//Console.WriteLine("DoContactListSorting() - COMPLETED.");
-		}
 		
 		/// <summary>
 		/// Seed might typically be Seeds.Local_Droid_Tactical_Logic + mCurrentFrame;
@@ -3170,7 +3026,7 @@ namespace HelloBoids
 		private void Do_Tactical_Logic(int seed, double maxDistance, GameTime gt)
 		{
 			//Console.WriteLine("Do_Tactical_Logic() - BEGIN ");
-			//ThreadedRandom random = new ThreadedRandom(seed);
+			//ThreadedRandom random = new ThreadedRandom(seed); // <- WARNING: This is not correct when we need to use it in a Parallel.For().  It must be instanced by EACH parallel.For() thread! See below...
 			
 			
 			
@@ -3281,25 +3137,25 @@ namespace HelloBoids
 			//for (int i = 0; i < Boids.Count; i++)
             {
 				if (Boids[(int)i] is Boid == false) return;
+				Boid attackingShip = (Boid)Boids[(int)i];
 				
 				Random random = ThreadedRandom.Instance;
-				Boid attacker = (Boid)Boids[(int)i];
 				
 				// NOTE: Transform_Struct will  host indices for Boids, OpticalSensors and TacticalStations
-				int currentInternalIndex = attacker.GetUserStructIndex(typeof(Transform.Transform_Struct));
-				int attackerArrayIndex = attacker.EntityArrayIndex;
-				System.Diagnostics.Debug.Assert (attackerArrayIndex == i, "Do_Droid_Logic() - i and attackerArrayIndex do not match.");
+				int currentInternalIndex = attackingShip.GetUserStructIndex(typeof(Transform.Transform_Struct));
+				int attackerEntityArrayIndex = attackingShip.EntityArrayIndex;
+				System.Diagnostics.Debug.Assert (attackerEntityArrayIndex == i, "Do_Droid_Logic() - 'i' and attackerEntityArrayIndex do not match.");
 				
 				// get a reference to the Station and determine if it "CanAct()"
-				EntityNode[] operators = GetTacticalStationOperators(attackerArrayIndex);
-				EntityNode[] tacticalStationEnts = GetTacticalStations(attackerArrayIndex);
+				EntityNode[] operators = GetTacticalStationOperators(attackerEntityArrayIndex);
+				EntityNode[] tacticalStationEnts = GetTacticalStations(attackerEntityArrayIndex);
 				if (operators == null || tacticalStationEnts == null || operators.Length == 0 || tacticalStationEnts.Length == 0) return;
 
 				int operatorEntityArrayIndex = operators[0].EntityArrayIndex;  
 				int operatorIndex;
 				Memory<LifeForm> operatorStruct = (Memory<LifeForm>) operators[0].GetUserStruct(typeof(LifeForm), out operatorIndex);
 
-				int stationArrayIndex = tacticalStationEnts[0].EntityArrayIndex;  
+				int stationEntityArrayIndex = tacticalStationEnts[0].EntityArrayIndex;  
 				int tacticalIndex;
 				Memory<TacticalStation> tacticalStationStruct = (Memory<TacticalStation>) tacticalStationEnts[0].GetUserStruct(typeof(TacticalStation), out tacticalIndex);
 
@@ -3317,64 +3173,64 @@ namespace HelloBoids
 				//      - any Contacts in list marked as FOF.Foe + FOF.Hostile as opposed to just FOF.Foe (note: stale contacts are still treated as available in case of need to persue)
 				//      	- FOF.Withdrawing may be ignored for example if ROE says we don't persue in this circumstance including disabled ships and unarmed ships like freighters
 				
-				EntityNode[] weapons = GetWeapons(attackerArrayIndex);	
+				
+				// TODO: Here i Think we should be retrieving the Contacts and Targets from the tacticalStation
+				//       and the Target list should already be prioritized.
+				
+				
+				EntityNode[] weapons = GetWeapons(attackerEntityArrayIndex);	
 				int weaponArrayIndex = weapons[0].EntityArrayIndex; // todo: hack -  we know all droids have one weapon but this will fail otherwise
 				int weaponIndex;
 				Memory<Weapon>weaponStruct = (Memory<Weapon>) weapons[0].GetUserStruct(typeof(Weapon), out weaponIndex);
-				int componentIndex;
-				Memory<Component>componentStructForWeaponEntity = (Memory<Component>)weapons[0].GetUserStruct(typeof(Component), out componentIndex);
+				//int componentIndex;
+				//Memory<Component>componentStructForWeaponEntity = (Memory<Component>)weapons[0].GetUserStruct(typeof(Component), out componentIndex);
 				
+				 // TODO: Establish CANFIRE PER WEAPON - following only uses the 1 weapon we know exists on each Droid.
 				bool canFire = weaponStruct.Span[0].CanFire(out errorReason);
 				
 				//Console.WriteLine("Do_Tactical_Logic() - Weapon CanFire() == " + canFire.ToString());		
-				if (canFire) // TODO: Establish CANFIRE PER WEAPON
+				if (canFire)
            	 	{  
-
 					string weaponKey = weapons[0].EntityKey;
 					bool suspend = false;
 					mIntervalTimers.Reset(weaponKey, "droid_canfire", suspend);
 					
-					List<Boid> targets = null;
-					double[] distances = null;				
-					List<Tuple<int, double>> neighbors = null;
-
 					try
-					{
-						bool success = mNeighbors.TryGetValue(attackerArrayIndex, out neighbors);
+					{		
+						List<Tuple<int, double>> neighbors = null;
+						
+						bool success = mNeighbors.TryGetValue(attackerEntityArrayIndex, out neighbors);
 						if (!success) 
 						{
 							//System.Diagnostics.Debug.Assert(mNeighbors.Count > 0, "Do_Tactical_Logic() - ASSERTION FAILED - Check that optical Sensors[] list is being filled via Spawn().");
 							//Console.WriteLine("Do_Tactical_Logic() -  No neighbors exist in mNeighbors! This usually occurs during the very first frame since Droid Logic occurs before ProcessOpticalSensing()");
 							return;
 						}
-					}
-					catch (Exception ex)
-					{
-						Console.WriteLine("Do_Tactical_Logic() -  Attacker Droid Array Index '" + attackerArrayIndex.ToString() + "' does not exist. " + ex.Message);
-					}
-									
-					// WE HAVE A TARGET AND A WEAPON THAT CAN FIRE
-					try
-					{						
+						
+						EntityNode tacticalStation = GetTacticalStations(i)[0]; 
+						List<Target> targets = tacticalStation.GetTargets();
+						if (targets == null || targets.Count == 0) return;
+					
+						
 						// NOTE: TacticalStation.CanHit() returns true if a hit WILL RESULT from the fired shot
 						//       even if the HIT is not the expected location on a Target or even on the correct Target!
 						//       Otherwise it is a total MISS.  We log the hit/miss EVENT either way... typically as a 
 						//       COMBAT ACTION INITIATED and a COMBAT ACTION RESULT.  There can be multiple COMBAT ACTION RESULTS
 						//       for instance if a mine field is laid, and some time later, a ship/craft is impacted by it... potentially
 						//       years later!
-						HIT[] hits;
+						List<HIT> hits;
 						
-						if (!HitHasOccurred(operators[0], attacker, neighbors, weapons[0], gt, random, out hits))
+						if (!HitHasOccurred(attackingShip, tacticalStationEnts[0], operators[0], weapons[0], neighbors, gt, random, out hits))
 						{
 							return;
 						}	
 						
-						Console.WriteLine("Do_Tactical_Logic() -  " + hits.Length.ToString() + " HITs have occurred.");
-						ProcessHits(hits, operatorEntityArrayIndex, stationArrayIndex, attackerArrayIndex, weaponArrayIndex, gt, random);
-						
+						Console.WriteLine("Do_Tactical_Logic() -  " + hits.Count.ToString() + " HITs have occurred.");
+						ProcessHits(hits, operatorEntityArrayIndex, stationEntityArrayIndex, attackerEntityArrayIndex, weaponArrayIndex, gt, random);
 					}
 					catch (Exception ex)
 					{
+						Console.WriteLine("Do_Tactical_Logic() -  Attacker Droid Array Index '" + attackerEntityArrayIndex.ToString() + "' does not exist. " + ex.Message);
 						Console.WriteLine ("Do_Tactical_Logic() - ERROR - " + ex.Message);
 					}
 				}
@@ -3386,23 +3242,194 @@ namespace HelloBoids
 		
 		
 		/// <summary>
-		/// based on policies
+		/// This is mostly just creating 'SensorContact' from "neighbors" .... based on policies
+		/// </summary>
+		private void CreateContactListFromAdjacents()
+		{
+			if (mNeighbors.Count == 0) return;
+			//Console.WriteLine("CreateContactListFromAdjacents() - STARTING");
+			
+			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
+			int recordCount = (int)allTacticalStations.Count;
+
+            System.Threading.Tasks.Parallel.For(0, recordCount, i => 		
+			{
+				// NOTE: problem with the BOOLEAN version of this Configuration test is, we want to test for Boid configuration and ONLY Boid configuration
+				//       and not another Configuration such as HumanOperatorConfiguration which CONTAINS all of BoidConfiguration  but LOGICALLY OR's "|" CONFIGURATION.Sentient as well 
+				//       and so it WILL pass the BOOLEAN version of this test.  Thus solution is a DIRECT == compare.  Duh!
+				if (allTacticalStations.Span[(int)i].Configuration != TacticalStationConfiguration)
+				//if ((allTacticalStations.Span[(int)i].Configuration & BoidConfiguration) != BoidConfiguration)
+				{
+					//Console.WriteLine("CreateContactListFromAdjacents() - configuration = " + allTransforms.Span[(int)i].Configuration.ToString());
+					return;
+				}	
+				
+				int currentStationArrayIndex = allTacticalStations.Span[(int)i].EntityArrayIndex; // current.EntityArrayIndex; //  current.GetUserStructIndex(typeof(Transform.Transform_Struct));
+				//System.Diagnostics.Debug.Assert( (int)i == currentArrayIndex, "DoContactListSorting() - array index does not match...");
+				// the adjacnets that are stored in neighbors from the overall mNeighbors is very much stores Area of Interest for each Droid
+				// but we will only send them things that their sensors can detect (and "eyes" are treated as optical sensors)
+				//Console.WriteLine ("CreateContactListFromAdjacents() - Key for current == " + Boids[currentArrayIndex].EntityKey);
+				
+				// TODO: Should we be iterating over the 'TacticalStation' struct's and NOT the Boids array? and then getting the SensorContacts from it?
+				//       we could skip any TacticalStation that is not designated as PRIMARY TacticalStation
+				
+				EntityNode currentStation = Boids[currentStationArrayIndex]; // <-- if we can get the Sensors without having to get the current Boid... hmm...
+				List<SensorContact> contacts = new List<SensorContact>();
+				
+				System.Diagnostics.Debug.Assert(currentStation.EntityKey.Contains("tactical"), "ProcessOpticalSensors() - Entity is NOT a TacticalStation.");
+				
+				int currentBoidArrayIndex = currentStation.EntityArrayIndex - TACTICAL_STATION_OFFSET;
+				EntityNode attackingShip = Boids[currentBoidArrayIndex];
+				
+				//Console.WriteLine ("2");
+				EntityNode[] sensorEntities = GetSensors(currentBoidArrayIndex); // todo: we currently do  not have EntityNode allowing adding of child nodes.  This is needed next.
+				
+				int sensorsCount = 0;
+				if (sensorEntities != null) sensorsCount = sensorEntities.Length;
+				//Console.WriteLine("CreateContactListFromAdjacents() - Sensor Count == " + sensorsCount);
+				if (sensorEntities == null) return; 
+				
+				//Console.WriteLine ("4");
+				
+				// grab the neighbors/adjacents for this Droid.  The returned parameter List<Tuple<int, double>> tells us which Droid (int) index was detected and the (double) distance to it  
+				List<Tuple<int, double>> neighbors = null;
+				
+				//Console.WriteLine("CreateContactListFromAdjacents() - Looking for Neighbors at Array Index  == " + currentArrayIndex.ToString());
+				//foreach (int key in mNeighbors.Keys)
+				//	Console.WriteLine ("CreateContactListFromAdjacents() - Key == " + key.ToString());
+				
+				bool success = mNeighbors.TryGetValue(currentBoidArrayIndex, out neighbors);
+								
+				//Console.WriteLine("CreateContactListFromAdjacents() - Found '" + neighbors.Count.ToString() + "' Adjacents for Droid @ Array Index == '" + currentArrayIndex.ToString() + "' ");
+				
+				
+
+				//List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE); // TODO: Hopefully this FindNearestTarget() can be optimized.... spatial searches even with Octree is slow.
+				// This overloaded version of FindNearestTarget() returns the sorted list of neighbors from closest to furthest along with their distances to the current droid
+				double[] distancesSquared;
+				double maxSearchDistanceSquared = Utils.GetMax(EntryClass.bSim.AlignmentDistance, EntryClass.bSim.CohesionDistance, EntryClass.bSim.SeparationDistance); // we want a much narrower search for potential targets than that used to find neighbors/aka adjacencents
+				maxSearchDistanceSquared *= maxSearchDistanceSquared;
+
+				List<EntityNode> potentialTargets = FindNearestTarget(attackingShip, neighbors, maxSearchDistanceSquared, out distancesSquared);
+				if (potentialTargets == null || potentialTargets.Count == 0)
+					return;		 
+				
+				//Console.WriteLine("CreateContactListFromAdjacents() - BEGIN iterate through potential contacts.");
+				
+				// iterate through all the potential "contacts"
+				for (int j = 0; j < potentialTargets.Count; j++)
+				{			
+					
+					ComponentStore<Transform.Transform_Struct> allTransforms  = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
+					
+					double distanceSquared = distancesSquared[j];
+					//int potentialContactsInternalTransformIndex = neighbors[(int)j].Item1; 
+					int potentialContactsEntityArrayIndex = potentialTargets[j].EntityArrayIndex; //allTransforms.Span[potentialContactsInternalTransformIndex].EntityArrayIndex;
+			  
+					//Console.WriteLine("CreateContactListFromAdjacents() - 2");
+					// Iterate through all the Sensors the current Droid is using to see which ones might
+					// detect this potential contact.  This is why a "SensorContact" may already exist
+					// in the List<SensorContact> 'contacts'  because multiple Sensors on _the_same_ship_
+					// might detect this adjacent 'contact.'
+					for (int k = 0; k < sensorEntities.Length; k++)
+					{
+						int sensorStructIndex = -1;
+						Memory<Sensor> sensorStruct = (Memory<Sensor>)sensorEntities[k].GetUserStruct(typeof(Sensor), out sensorStructIndex);
+						int sensorArrayIndex = sensorStruct.Span[0].EntityArrayIndex;
+						
+						double sensorRangeSquared = sensorStruct.Span[0].RangeSquared;
+						
+						//Console.WriteLine("CreateContactListFromAdjacents() - Range = " +  sensorRangeSquared.ToString() + " Distance to Contact ==  " + Math.Sqrt(distanceSquared).ToString());
+						
+						if (sensorRangeSquared >= distanceSquared)
+						{
+							SensorContact c;
+
+							// if another sensor on this same vehicle has detected this potential contact already, append it's Sensor index
+							// to the list of SensorIndices for this contact so we know all sensors that detected it.
+							Predicate<SensorContact> contactExists = contact => contact.ContactEntityArrayIndex == potentialContactsEntityArrayIndex;
+							c = contacts.Find(contactExists);
+
+							if (!c.Equals(default(SensorContact)))
+							{
+								//Console.WriteLine("CreateContactListFromAdjacents() - sensor contact name == " + c.Name);
+								if (c.SensorsIndices == null) 
+									c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices,  sensorArrayIndex); // sensorStructIndex);
+								else
+									c.SensorsIndices.Append(sensorArrayIndex); // sensorStructIndex);
+
+								//Console.WriteLine("CreateContactListFromAdjacents() - Appending SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
+							}
+							else // contact has not yet already been detected by another Sensor within this same ship during this loop through all sensors on this same ship
+							{
+								c = new SensorContact();
+
+								//Console.WriteLine("CreateContactListFromAdjacents() - Creating NEW SensorContact of Droid at Array Index = '" + contactsEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
+								Boid bb = null;
+								try 
+								{
+									bb =  (Boid)this.Boids[potentialContactsEntityArrayIndex];
+								}
+								catch (Exception ex)
+								{
+									Console.WriteLine("DoContactListSorting() - ERROR: Boid contact at Array Index == " + c.ContactEntityArrayIndex.ToString() + " not found. " + ex.Message);
+								}
+
+								//int sensorContactInternalTransformIndex = bb.GetUserStructIndex(typeof(Transform.Transform_Struct));
+								// contact details are needed to find the correct SensorContact to potentially merge with an existing SensorContact for this detected Entity
+								// NOTE: HelloBoids should only have one element within its SensorsIndices
+								//       because each Droid only has one Sensor ('Optical Sensor' == eyes)
+								c.ContactEntityArrayIndex = potentialContactsEntityArrayIndex; // index within the Boid[] array of the detected Droid
+								c.Index = (int)i;
+								c.Name =  "boid_" + potentialContactsEntityArrayIndex.ToString(); // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
+								c.RegistryNumber = c.Name;
+								c.Type = SensorContact.TYPE.Drone;
+								c.ContactStatus = Target.STATUS.Unknown;
+								c.FriendOrFoe = SensorContact.FoF.Unknown;
+								c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices, sensorArrayIndex); //sensorStructIndex);
+								
+								// telemetry
+								SensorContact.ContactTelemetry telemetry;
+								telemetry.Radius = (float)bb.BoundingBox.Radius;    // how might size be spoofed?
+								telemetry.Position = bb.Translation;
+								telemetry.Velocity = bb.Velocity;
+								telemetry.DistanceSquared = distanceSquared;
+								telemetry.Heading = 0;
+								telemetry.TimeAcquired = Utils.NowTicks(); // todo: this needs to eventually just be gt.Ticks <-- which must come from 'gametime fixedstep' and not 'real-time'
+								telemetry.TimeLast = telemetry.TimeAcquired;
+
+								c.Add(telemetry);			
+								contacts.Add(c);
+								//Console.WriteLine("CreateContactListFromAdjacents() - Added NEW SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
+							}
+						} // end sensor range check
+					} // end for SensorsCount
+				} // end for neihbors Count
+				
+
+				// add all of the SensorContacts to the current TacticalStation, and it will be responsible for
+				// properly merging these SensorContacts with existing ones so as to maintain
+				// proper SensorContact histories for all detected Entities.
+				if (contacts != null)
+					currentStation.Add(contacts); 
+			});
+			
+			//Console.WriteLine("CreateContactListFromAdjacents() - COMPLETED.");
+		}
+		
+		/// <summary>
+		/// Using the current set of "SensorContacts" received, prioritize a list of hostile Targets based on policies
 		/// </summary>
 		private void DoTargetPrioritization()
 		{
-			//Console.WriteLine("DoTargetPrioritization");
+			//Console.WriteLine("DoTargetPrioritization()");
 			int count = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 		
 			{
 				if (Boids[i] is Boid == false) return;
-				
 				Boid current = (Boid)Boids[i];
-				
-				//int stationID = GetTacticalStations(i)[0]; 
-				EntityNode tacticalStation = GetTacticalStations(i)[0]; //(EntityNode)Boids[stationID];
-				
-				//Console.WriteLine("DoTargetPrioritization - for TacticalStatin '" + tacticalStation.EntityKey + "'");
-				
+			
+				EntityNode tacticalStation = GetTacticalStations(i)[0]; 
 				List<SensorContact> contacts = tacticalStation.GetSensorContacts();
 				if (contacts == null || contacts.Count == 0) return;
 								
@@ -3444,7 +3471,7 @@ namespace HelloBoids
 			
 					SensorContact currentContact = contacts[j];
 					
-					//Console.WriteLine("DoTargetPrioritization - PRE- roePolicy.Execute()" );
+					//Console.WriteLine("DoTargetPrioritization() - PRE- roePolicy.Execute()" );
 					if (roePolicy.Execute())
 					{
 						// Targets are those SensorContacts that friendly forces will potentially fire upon.
@@ -3463,11 +3490,17 @@ namespace HelloBoids
 						t.WeaponsAssigned = null;
 						t.Status = Target.STATUS.Active;
 						t.CrewStatus = Target.CREWSTATUS.Alive;
-						t.Hitpoints = 20;        // Boids[c.ContactIndex].Hitpoints; // max hitpoints of target... should a Sensor be able to know this exact number?  It's really just a game thing and maybe we should just use visual observations of condition of ship instead
-						t.CurrentHitPoints = 18; // Boids[c.ContactIndex].CurrentHP ; // used to determine % damage of Target
+						// used to determine % damage of Target.   Should a Sensor be able to know this exact number?  
+						// It's really just a game thing and maybe we should just use visual observations of condition of ship instead
+						int componentIndex;
+						
+		
+						EntityNode b = Boids[currentContact.ContactEntityArrayIndex];
+						Memory<BaseObject>baseObj = (Memory<BaseObject>)Boids[currentContact.ContactEntityArrayIndex].GetUserStruct(typeof(BaseObject), out componentIndex);
+						t.HitPoints = baseObj.Span[0].HitPoints; 
 
 						tacticalStation.Add(t);
-						Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY PASSED. Target added.");
+						//Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY PASSED. Target added.");
 						
 					}
 					else
@@ -3502,11 +3535,19 @@ namespace HelloBoids
 			// - sparring
 			// - theater (performances, orchestras, bands, etc)
 			// - nap/sleep
-			// Console.WriteLine("End target prioritization...");
+			 //Console.WriteLine("End target prioritization...");
 		}
 		
 		public struct HIT 
 		{
+			public enum RESOLUTION
+			{
+				None, 
+				Miss,
+				Hit
+			}
+			
+			public RESOLUTION Resolution;
 			public EntityNode Attacker;
 			public EntityNode Target;
 			public EntityNode Owner;            // if an assembly, component or operator, Owner is the Starship or Droid that is hosting them.
@@ -3517,13 +3558,13 @@ namespace HelloBoids
 		
 		
 		// NOTE: This only applies for FTL weapons... "CanHit()" must be different for Missiles, Kinetic Energy Weapons and Particle Weapons that are slower than light
-		public bool HitHasOccurred(EntityNode attackerOperator, EntityNode attackingShip, List<Tuple<int, double>> neighbors, EntityNode weaponEntity, GameTime gt, Random rand, out HIT[] hits)
+		public bool HitHasOccurred(EntityNode attackingShip, EntityNode attackingTacticalStation, EntityNode attackingOperator, EntityNode weaponEntity, List<Tuple<int, double>> neighbors, GameTime gt, Random rand, out List<HIT> hits)
 		{
 			bool result = false;
 			hits = null;
 			
 			// 1 - [DONE] - Calc Malfunction
-			// 2 - Distance effect on Damage (laser attenuation/falloff) 
+			// 2 - [DONE] - Distance effect on Damage (laser attenuation/falloff) 
 			//     - for kinetic say a ballistic projectile or catapult bolt in atmosphere... depends on atmosphere and perhaps gravity too \
 			//     - for laser, inverse square law 'intensity = intensity * ( 1 / d^2)' where for instance double the distance == 1/4 the intensity of the beam
 			//      if (distance > falloffStart) 
@@ -3565,8 +3606,8 @@ namespace HelloBoids
 			// https://gamedev.stackexchange.com/questions/148961/how-to-design-a-damage-formula-in-an-rpg-which-keeps-weapons-with-different-atta
 			
 			
-			//Console.WriteLine("CalculateDamage() - Begin.");
-			System.Diagnostics.Debug.Assert (attackerOperator.Configuration == (uint)HumanOperatorConfiguration, "CalculateDamage() - AttackerOperator is of incorrect CONFIGURATION.");
+			//Console.WriteLine("HitHasOccurred() - Begin.");
+			System.Diagnostics.Debug.Assert (attackingOperator.Configuration == (uint)HumanOperatorConfiguration, "HitHasOccurred() - AttackerOperator is of incorrect CONFIGURATION.");
 										 
 			// TODO: I think we want to have all relevant data on attacker and target
 			// for instance
@@ -3589,115 +3630,184 @@ namespace HelloBoids
 			//b.BlackBoardData.SetString("faction", factionColor);
 				
 			
-
-			//List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE); // TODO: Hopefully this FindNearestTarget() can be optimized.... spatial searches even with Octree is slow.
-			// This overloaded version of FindNearestTarget() returns the sorted list of neighbors from closest to furthest along with their distances to the current droid
-			double[] distancesSquared;
-			double maxSearchDistanceSquared = Utils.GetMax(EntryClass.bSim.AlignmentDistance, EntryClass.bSim.CohesionDistance, EntryClass.bSim.SeparationDistance); // we want a much narrower search for potential targets than that used to find neighbors/aka adjacencents
-			maxSearchDistanceSquared *= maxSearchDistanceSquared;
-			
-			List<EntityNode> potentialTargets = FindNearestTarget(attackingShip, neighbors, maxSearchDistanceSquared, out distancesSquared);
-			if (potentialTargets == null || potentialTargets.Count == 0)
-				return result;		 
-
 			int selectedIndex = 0;
 			
 			
-			//TODO: find the actual target that was hit... we may be aiming for an assembly or component and may hit something different, such as a different Component or Operator or even a different Starship or Droid or NOTHING
+			// what is the weapon type ? (explosive, impaling/crushing, fire, radiation, 
+			// if the weapon is a laser and punches through the hull armor and then through the hull itself and damages components(s) within the ship
+			// then we need to determine this.
 			
-			// todo: for tactical station, the logic for determining hit+damage should rely on the crew station.css script and not the operator.  Instead, we just grab bonuses or minuses from the operator crew member.
-			//  - time to get a lock
-			//  - bonus for time 
+			
+			// Determine the weighted probabilities of hitting the target or one (or more) of its assemblies and/or components or lifeforms on board
+			
+			//  - time to get a lock (todo: i think a 'lock' in this sense is not acquisition, its a special type of high fidelity tracking\homing for
+			//    a missile typically. 
+			//  - bonus for amount of time it's been tracked so far.  Upon loss of contact, we will guess the new location
+			//    but it will be speculative.   
 			//  - bonus for damage
 			//  and remember, it's the tactical station that keeps track of all the weapons available and the targets (including friendlies)
+			//List<SensorContact> contacts = attackingTacticalStation.GetSensorContacts();
+			//if (contacts == null || contacts.Count == 0) 
+			//{
+			//}
+			List<Target> targets = attackingTacticalStation.GetTargets();
 			
+			hits = new List<HIT>();
+
+			System.Diagnostics.Debug.Assert (targets != null && targets.Count > 0, "HitHasOccurred() - If there are NO TARGETS this method should not even have been called. ") ;
+			
+			// the targets are already prioritized in order of first choice to last choice
+			// as well as which weapons should be used on them.
+			// for now we'll focus on just the first target.
+			// TODO: there is a problem here.... we do need adjacents because even friendlies that are near Targets
+			// may get accidentally hit by our weapons... potentially... especially if they are missiles/torps and they use
+			// a proximity fuse and they are too close to an enemy ship.  Sometimes these may even be strategic decisions to 
+			// risk the friendly anyway because there is little choice to wait where the enemy ship may be in position and time to fire a salvo.
+			
+			// NOTE: we do have neighbors passed in.
+			
+			
+			
+			
+			
+			// TODO: we may not need to loop here exactly through Targets... all of these "targets" can potentially be hit at once with one weapon... say a large nuke.
+			for (int i = 0; i < targets.Count; i++)
+			{
+				// weapon accuracy (verify this includes effects of any existing damage on the weapon)
+				int componentIndex;
+				int weaponIndex;
+
+				Memory<BaseObject> baseObj = (Memory<BaseObject>)weaponEntity.GetUserStruct(typeof(BaseObject), out componentIndex);
+				Memory<Weapon> weaponStruct = (Memory<Weapon>)weaponEntity.GetUserStruct(typeof(Weapon), out weaponIndex);
+				double weaponDamage = baseObj.Span[0].HitPoints.Base > 0 ? baseObj.Span[0].HitPoints.Current / baseObj.Span[0].HitPoints.Base : 0;
+
+				// operator skill  
+				//Skill tacticalOperationsSkill = attackerOperator.Skills[SKILLS.TacticalOperations];
+				Skill targetingSkill = attackingOperator.Skills[SKILLS.Targeting];
+
+				// operator Health
+				int baseObjIndex;
+				baseObj = (Memory<BaseObject>)attackingOperator.GetUserStruct(typeof(BaseObject), out baseObjIndex);
 				
-			// weapon accuracy (verify this includes effects of any existing damage on the weapon)
-			int componentIndex;
-			int weaponIndex;
+				int lfIndex;
+				Memory<LifeForm> lfOperator = (Memory<LifeForm>)attackingOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
+				double operatorHealthCoeff = baseObj.Span[0].HitPoints.Base > 0 ? baseObj.Span[0].HitPoints.Current / baseObj.Span[0].HitPoints.Base : 0;
+				double fatigue = lfOperator.Span[0].Fatigue.Base > 0 ? lfOperator.Span[0].Fatigue.Current / lfOperator.Span[0].Fatigue.Base : 0;
+
+				// stealth
+
+
+				// target last acquisition - previous aquisition makes it easier to re-aquire
+				// STATISTICS search
+
+				// sensorLockOfTargetTimeElapsed (aka durationOfSensorAquistion) // how much time has this  target been tracked by sensors already
+
+				// TODO: TARGETS must be based off the list of Targets in the TacticalStation that were found and added in 
+
+
+				// target distance	
+				int sensorArrayIndex = attackingShip.EntityArrayIndex + OPTICAL_SENSOR_OFFSET;
+				int sensorSpanIndex; 
+				EntityNode sensor = Boids[sensorArrayIndex];
+				Memory<Sensor> sensorStruct = (Memory<Sensor>)sensor.GetUserStruct(typeof(Sensor), out sensorSpanIndex);
+
+				double currentTargetDistanceSquared = targets[i].DistanceSquared; //  selectedIndex];
+				// inverse square law for Optical Sensors
+				double detectionProbability = Math.Sqrt(sensorStruct.Span[0].RangeSquared) * (1 / currentTargetDistanceSquared); 
+
+				// target evasive
+				// COMPARE VELOCITY MAGNITUDE CHANGES OVER X SECONDS PERIOD OF TIME
+
+
+
+				// target deployed counter measures within X time (time * fallOff aka call it 'attenuation')
+				// - STATISTICS SEARCH
 			
-			Memory<Component> weaponComponentStruct = (Memory<Component>)weaponEntity.GetUserStruct(typeof(Component), out componentIndex);
-			Memory<Weapon> weaponStruct = (Memory<Weapon>)weaponEntity.GetUserStruct(typeof(Weapon), out weaponIndex);
-			double weaponDamage = weaponComponentStruct.Span[0].HitPoints.Base > 0 ? weaponComponentStruct.Span[0].HitPoints.Current / weaponComponentStruct.Span[0].HitPoints.Base : 0;
-			
-			
-			// operator skill  
-			//Skill tacticalOperationsSkill = attackerOperator.Skills[SKILLS.TacticalOperations];
-			Skill targetingSkill = attackerOperator.Skills[SKILLS.Targeting];
-			
-			
-			// operator Health
-			int lfIndex;
-			Memory<LifeForm> lfOperator = (Memory<LifeForm>)attackerOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
-			double operatorHealthCoeff = lfOperator.Span[0].HitPoints.Base > 0 ? lfOperator.Span[0].HitPoints.Current / lfOperator.Span[0].HitPoints.Base : 0;
-			
-			// GG-AI-OV - In RPG design, Stamina and Fatigue are two distinct mechanics used to manage player action, pace combat, and encourage strategic resource management.
-			// While often used interchangeably, they typically represent short-term exertion versus long-term penalties.
-			//
-			// Stamina: Short-Term Exertion
-			// Definition: A replenishable resource used for immediate actions like running, dodging, or attacking.
-			// Behavior: Depletes rapidly during action and recovers quickly, often automatically when out of combat.
-			// Goal: Limits the "15-minute work day," ensuring players cannot perform high-power actions indefinitely.
-			// Example: A white bar that empties while sprinting in Ghost Recon.
-			// 
-			// Fatigue: Long-Term Penalty
-			// Definition: A negative status effect or reduced capacity that accumulates when stamina is overused, or through illness, hunger, or long travel.
-			// Behavior: Accumulates gradually. It acts as a "penalty" that reduces the maximum stamina capacity, meaning the character recovers less over time.
-			// Goal: Encourages resting and tactical pacing.Example: In Story of Seasons, fatigue builds up while working and causes the character to pass out if it reaches 100
-			
-			double fatigue = lfOperator.Span[0].Fatigue;
-											 
-			
-			// stealth
-			
-			
-			// target last acquisition - previous aquisition makes it easier to re-aquire
-			// STATISTICS search
-			
-			// sensorLockOfTargetTimeElapsed (aka durationOfSensorAquistion) // how much time has this  target been tracked by sensors already
-			
-			
-			
-			// target distance	
-			int sensorArrayIndex = attackingShip.EntityArrayIndex + OPTICAL_SENSOR_OFFSET;
-			int sensorSpanIndex; 
-			EntityNode sensor = Boids[sensorArrayIndex];
-			Memory<Sensor> sensorStruct = (Memory<Sensor>)sensor.GetUserStruct(typeof(Sensor), out sensorSpanIndex);
-			
-			double currentTargetDistanceSquared = distancesSquared[selectedIndex];
-			// inverse square law for Optical Sensors
-			double detectionProbability = Math.Sqrt(sensorStruct.Span[0].RangeSquared) * (1 / currentTargetDistanceSquared); 
-			
-			// target evasive
-			// COMPARE VELOCITY MAGNITUDE CHANGES OVER X SECONDS PERIOD OF TIME
-			
-			
-			
-			// target deployed counter measures within X time (time * fallOff aka call it 'attenuation')
-			// - STATISTICS SEARCH
-			
-			
-			
-			Vector3d start = attackingShip.Translation;   // todo: if hierarchical and if this is the Weapon and not the Droid, it should be .DerivedTranslation
-			Vector3d targetLoc = potentialTargets[selectedIndex].Translation; // TODO: if hierarchical, this should be .DerivedTranslation
-			
-			hits = new HIT[1];
-			hits[0].Target = potentialTargets[selectedIndex];
-			hits[0].Owner = potentialTargets[selectedIndex];  //  target is same as owner for now since target is a Boid and not the Operator or Station or Laser or Battery or Wings
-			hits[0].WeaponUsed = weaponEntity; // how does this work if its an explosion or fire or radiation volume?
-			hits[0].Location = targetLoc;    // the impact point
-			hits[0].DistanceSquared = distancesSquared[selectedIndex];
-			
+
+
+				// TODO:  find the actual target that was hit... we may be aiming for an assembly or component and may hit something different, such as a different Component or Operator or even a different Starship or Droid or NOTHING
+				// TODO:  Alternatively, we may have hit another Ship(s) (or one or more of it's assemblies and/or components and/or LifeForms on board)
+				//        Or we may have MISSED altogether
+
+				double[] weights = new double[7];
+				ComponentStore<BaseObject> allBaseObjs = (ComponentStore<BaseObject>) EntryClass.mCStoreCol.CheckOut<BaseObject>(); //  attackingTacticalStation.GetUserStruct(typeof(BaseObject), out tacticalStationIndex); 
+				
+				EntityNode droid = Boids[targets[i].EntityArrayIndex];
+				int hullIndex = droid.GetUserStructIndex(typeof(BaseObject));
+				
+				
+				
+				EntityNode wings = Boids[targets[i].EntityArrayIndex + WINGS_OFFSET];
+				EntityNode tacticalStation = Boids[targets[i].EntityArrayIndex + TACTICAL_STATION_OFFSET];
+				EntityNode laser = Boids[targets[i].EntityArrayIndex + LASER_OFFSET];
+				EntityNode battery = Boids[targets[i].EntityArrayIndex + BATTERY_OFFSET];
+				EntityNode opticalSensor = Boids[targets[i].EntityArrayIndex + OPTICAL_SENSOR_OFFSET];
+				EntityNode humanOperator = Boids[targets[i].EntityArrayIndex + HUMAN_OPERATOR_OFFSET];
+				
+				double totalVolume = 0;
+				weights[0] = allBaseObjs.Span[hullIndex].Volume / totalVolume;
+				
+				
+				
+				// Hull(Boid)
+				// Wings
+				// CrewStation
+				// Laser
+				// OpticalSensor
+				// Battery
+				// Operator
+				
+				// the selectedTargets are all the Entities (including sub-Entities within a Ship like sensors, computers, power generators, life support systems, bunks, etc)
+				// that have been "hit" by the weapon being used by the attackingShip
+				List<EntityNode> selectedTargets = new List<EntityNode>();
+				selectedTargets.Add(Boids[targets[0].EntityArrayIndex]);
+				bool hasHit = true; // <- temp hack.  Run formula using above coefficients and such to determine if we hit and what we hit
+
+
+				if (hasHit)
+				{
+					for (int j = 0; j < selectedTargets.Count; j++)
+					{
+						int tacticalStationIndex = attackingShip.EntityArrayIndex + OPTICAL_SENSOR_OFFSET;
+						//Memory<TacticalStation> tacticalStation = (Memory<TacticalStation>)attackingTacticalStation.GetUserStruct(typeof(TacticalStation), out tacticalStationIndex); 
+
+						Vector3d start = attackingShip.Translation;   // todo: if hierarchical and if this is the Weapon and not the Droid, it should be .DerivedTranslation
+						Vector3d targetLoc = selectedTargets[j].Translation; // TODO: if hierarchical, this should be .DerivedTranslation
+
+						HIT hit = default(HIT);
+						hit.Resolution = HIT.RESOLUTION.Hit;
+						hit.Target = selectedTargets[j];
+						hit.Owner = GetOwner(selectedTargets[j]);  //  target is same as owner for now since target is a Boid and not the Operator or Station or Laser or Battery or Wings
+						hit.WeaponUsed = weaponEntity; // how does this work if its an explosion or fire or radiation volume? we need to grab such an Entity from an object Pool
+						hit.Location = targetLoc;    // the impact point
+						hit.DistanceSquared = targets[i].DistanceSquared;
+						
+						hits.Add(hit);
+					}
+				}
+				else
+				{
+					HIT miss = default(HIT);
+					miss.Resolution = HIT.RESOLUTION.Miss;
+					miss.Target =  Boids[targets[i].EntityArrayIndex];
+					miss.Owner =  GetOwner(Boids[targets[i].EntityArrayIndex]);  //  target is same as owner for now since target is a Boid and not the Operator or Station or Laser or Battery or Wings
+					miss.WeaponUsed = weaponEntity; // todo: need to potentially lease an Explosion or Fire volume or Radiation volume, etc, from object Pool and spawn it
+					miss.Location = Vector3d.Zero();    
+					miss.DistanceSquared = targets[i].DistanceSquared;
+				
+					hits.Add(miss);
+				}
+			}
 			
 			result = true;
 			return result;
 		}
 		
 		
-		public void ProcessHits(HIT[] hits, int operatorEntityArrayIndex, int stationEntityArrayIndex, int attackingShipEntityArrayIndex, int weaponEntityArrayIndex, GameTime gt, Random random)
+		public void ProcessHits(List<HIT> hits, int operatorEntityArrayIndex, int stationEntityArrayIndex, int attackingShipEntityArrayIndex, int weaponEntityArrayIndex, GameTime gt, Random random)
 		{
 			
-			for (int currentHitIndex = 0;  currentHitIndex < hits.Length; currentHitIndex++)
+			for (int currentHitIndex = 0;  currentHitIndex < hits.Count; currentHitIndex++)
 			{
 				EntityNode attacker = hits[currentHitIndex].Owner;
 				EntityNode currentTarget = hits[currentHitIndex].Target;
@@ -3706,7 +3816,6 @@ namespace HelloBoids
 				EntryClass.mUserDataStore[attacker.EntityKey].IncrementInteger("shotsfired");
 				//Console.WriteLine("ProcessHits() - Attacker Droid @ Array Index '" + currentArrayIndex.ToString() + "' firing shot # " + EntryClass.mUserDataStore[attacker.EntityKey].IncrementInteger("shotsfired").ToString() + " on Droid @ Array Index '" + currentTarget.EntityArrayIndex.ToString() + "'");
 
-				
 				// TODO: QUEUE ANIMATION TO FIRE THIS WEAPON 
 				// Publish a CombatEventRecord containing the 'FireAt' Attempt
 				int actionID = (int)ACTIONS.FiringAt;
@@ -3734,7 +3843,7 @@ namespace HelloBoids
 				// NOTE: here we assume the Fire() occurs immediately using a lightspeed laser and the damage is instantaneous 
 				//       and does not need any travel time to reach the currentTarget
 				object[] damages = null;
-
+				
 				try 
 				{
 					// todo: change parameter attacker to tacticalStation?
@@ -3744,8 +3853,10 @@ namespace HelloBoids
 					EntityNode specificSubTarget = hits[currentHitIndex].Target;
 					EntityNode weaponEntity = Boids[weaponEntityArrayIndex];
 					
+					int baseObjIndex;
 					int componentIndex;
 					int weaponIndex;
+					Memory<BaseObject> baseObjForWeaponEntity = (Memory<BaseObject>)weaponEntity.GetUserStruct(typeof(BaseObject), out baseObjIndex);
 					Memory<Component> componentStructForWeaponEntity = (Memory<Component>)weaponEntity.GetUserStruct(typeof(Component), out componentIndex);
 					Memory<Weapon> weaponStruct = (Memory<Weapon>)weaponEntity.GetUserStruct(typeof(Weapon), out weaponIndex);
 					
@@ -3753,7 +3864,7 @@ namespace HelloBoids
 					
 					// NOTE: if damages occurs, there can be multiple TYPES of damages in the return damages[] because a single target 
 					//       may for example receive kinetic damage AND on-going fire damage, and/or other damages.
-					damages = CalculateDamage(stationOperator, specificSubTarget, hits[currentHitIndex].DistanceSquared, componentStructForWeaponEntity, weaponStruct, gt, random, out critMalfunctionHasOccurred); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
+					damages = CalculateDamage(stationOperator, specificSubTarget, hits[currentHitIndex].DistanceSquared, baseObjForWeaponEntity, componentStructForWeaponEntity, weaponStruct, gt, random, out critMalfunctionHasOccurred); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
 
 					//TODO: IF 0 Damage occurs because the Target was able to resist the attack with armor or passive defenses
 					//      the result of damage should return 0 and not NULL or anything because resisting an attack is valid information to know in an event log
@@ -3817,8 +3928,11 @@ namespace HelloBoids
 		/// The resulting damage types and amounts (and duration for damage that can be applied overtime)
 		/// that occur on this successful hit.
 		/// </summary>
-        private object[] CalculateDamage(EntityNode attackerOperator, EntityNode target, double distanceSquared, Memory<Component> componentStruct, Memory<Weapon> weaponStruct, GameTime gt, Random rand, out bool criticalMalfunctionHasOccurred)
+        private object[] CalculateDamage(EntityNode attackerOperator, EntityNode target, double distanceSquared, Memory<BaseObject> baseObjForWeapon, Memory<Component> componentStructForWeaponEntity, Memory<Weapon> weaponStruct, GameTime gt, Random rand, out bool criticalMalfunctionHasOccurred)
         {
+			
+			
+			
 			/*
 			Production laserDamage;
 			laserDamage.Amount = 5;
@@ -3833,7 +3947,7 @@ namespace HelloBoids
 			*/
 			
 			criticalMalfunctionHasOccurred = false;
-			bool malfunction = CalculateMalfunction(componentStruct, weaponStruct, rand, out criticalMalfunctionHasOccurred);
+			bool malfunction = CalculateMalfunction(baseObjForWeapon, componentStructForWeaponEntity, weaponStruct, rand, out criticalMalfunctionHasOccurred);
 			
 			if (criticalMalfunctionHasOccurred)
 			{
@@ -3844,39 +3958,54 @@ namespace HelloBoids
 				
 				return null;
 			}
-		
-			
 			
 			// weapon %power of maxpower being used vs weapon output
-			
-					
-			
-			// weapon Hitpoints - damage percent to weapon determines if increased malfunction and decreased accuracy
+			int laserEntityArrayIndex = attackerOperator.EntityArrayIndex - HUMAN_OPERATOR_OFFSET; // subtract to get the main Boid entity array Index
+			laserEntityArrayIndex = laserEntityArrayIndex + LASER_OFFSET; // now add the laserOffset to it to get the laser Entity Array index
 			
 			
 			
-			int lfIndex = -1;
-			Memory<LifeForm> targetLF = (Memory<LifeForm>)attackerOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
+			EntityNode laser = Boids[laserEntityArrayIndex];
+			int laserIndex = -1;
+			int powerConsumerIndex = -1;
+			
+			Memory<PowerConsumer> powerConsumer = (Memory<PowerConsumer>)laser.GetUserStruct(typeof(PowerConsumer), out powerConsumerIndex);
+			Memory<Laser_Struct> laserStruct = (Memory<Laser_Struct>)laser.GetUserStruct(typeof(Laser_Struct), out laserIndex);
+			
+			
+			double output = laserStruct.Span[0].BeamOutput;
+			
+			double reqt = powerConsumer.Span[0].PowerRequirement; // 
+			double minimum = powerConsumer.Span[0].MinimumPower;  
+			
+			// todo: we need to establish the reqt based on output.  Output should be a Stat perhaps with a base and a current?
+			
+			int baseObjIndex = -1;
+			Memory<BaseObject> targetBaseObj = (Memory<BaseObject>)attackerOperator.GetUserStruct(typeof(BaseObject), out baseObjIndex);
 
-			
-			// todo: the weapon's actual damage needs to be a result along a bell curve of the average Damage
+			// the weapon's actual damage needs to be a result along a bell curve of the average Damage
 			// https://gamedev.stackexchange.com/questions/198751/how-to-calculate-player-damage-in-a-game
 			// https://gamedev.stackexchange.com/questions/154920/browser-rpg-fight-calculation-formula/154927#154927  <- one user's opinion on why the 'luck' mechanic shouldn't be used
 			double damageAmount = weaponStruct.Span[0].AverageDamage;
 			double variancePercentage = 0.10; // 10%
 			double damageAmountWithVariance = Utils.RandomWithVariance(rand, damageAmount, variancePercentage);
 			
-			// distance based falloff
-			// - kinetic energy in atmosphere
-			// - lasers in atmosphere
-			// - lasers in vacuum.
+			bool inAtmosphere = true;
+			// Distance Based Falloff
 			if (weaponStruct.Span[0].DamageType == 0)
 			{
-				// inverse square law for Lasers (NOTE: that does NOT include Particle Weapons though in the future)
+				// inverse square law for Lasers in Vacuum (NOTE: that does NOT include Particle Weapons though in the future)
 				damageAmountWithVariance = damageAmountWithVariance * (1 / (weaponStruct.Span[0].Range * weaponStruct.Span[0].Range));
+				
+				if (inAtmosphere)
+				{
+					// lasers in atmosphere falloff at a faster rate... should be based on thickness of the atmosphere... and other factors perhaps but we'll just reduce by 1/4 for now.
+					damageAmountWithVariance *= 0.25;
+				}
 			}
 			else 
 			{
+				// kinetic in atmosphere
 				double fallOffSquared = weaponStruct.Span[0].FallOffStart * weaponStruct.Span[0].FallOffStart;
 				if (distanceSquared > fallOffSquared) 
 				{
@@ -3884,7 +4013,6 @@ namespace HelloBoids
 
 					double damageDropPerUnit = 0.5d; // keep in mind we are using distances SQUARED so we may need to half these values 
 					damageAmountWithVariance = (distanceSquared - fallOffSquared) * damageDropPerUnit;
-
 				}
 			}
 
@@ -3897,23 +4025,23 @@ namespace HelloBoids
 			
 			// 0% at luck = 0 and approaches 100% as luck goes to infinity.
 			bool isCriticalHit = rand.NextDouble() > System.Math.Pow(factor, -critChance); // rand.NextDouble() will be in range [0.0, 1.0]
-			// Math.Pow(2.71, -2) == 1/2.71^2  ==  1/7.344 == 0.13616371099249738
-			
+			// eg. Math.Pow(2.71, -2) == 1/2.71^2  ==  1/7.344 == 0.13616371099249738
 			
 			double critMultiplier = 2;
 			if (isCriticalHit)
 				damageAmountWithVariance *= critMultiplier;
 			
-		
+			// TODO: based on which side is hit, use that ArmorFace and it's layers to determine DR
+						
 			// target Armor  //targetFL.Span[0].Armor.Armor[side].
-			int defense = targetLF.Span[0].Armor.AverageDR;
+			int defense = targetBaseObj.Span[0].Armor.AverageDR;
 			// if the defense is higher than the damage, then 0 damage gets through.  Math.Max() will prevent any "negative" damage in that case.
+			// NOTE: armor sustaining damage over time is not being modeled here.
 			double finalDamageAmount = Math.Max(0, damageAmountWithVariance - defense); 
 									
 			// NOTE: Damage amount generated. 
 			Console.WriteLine ("CalculateDamage() - Result == " + finalDamageAmount.ToString() + " (Target Average Defense == " + defense.ToString() + " Weapon Attack Value == " + damageAmountWithVariance.ToString() + " Critical Hit == " + isCriticalHit.ToString() + ")");
 			double time = gt.TotalElapsedSeconds;
-	
 						
 			// ------------------------------------------
 			object[] result = new object[2];
@@ -3929,7 +4057,7 @@ namespace HelloBoids
 		
 			// TODO: what if we were to make and add multiple DamageSystem.Damage records instead
 			//       and execute them no earlier than their "TimeOfAttack?"  This way we wouldn't 
-			//       need a seperate System for the two,we would just need to only execute them
+			//       need a seperate System for the two, we would just need to only execute them
 			//       when the "TimeOfAttack was <= gt.GetTime();
 			//       
 			DamageOverTimeSystem.DamageOverTime dot;
@@ -3941,12 +4069,12 @@ namespace HelloBoids
 			dot.Duration = 0.05f;
 			result[1] = dot;
 			
-			//see Keystone.Game01.Messages.   public class AttackResults since
+			// see Keystone.Game01.Messages.   public class AttackResults since
 			// we need results going over the network
 			return result;
         }
 
-        private bool CalculateMalfunction (Memory<Component> componentStruct, Memory<Weapon> weaponStruct, Random rand, out bool criticalMalfunctionHasOccurred)
+        private bool CalculateMalfunction (Memory<BaseObject> baseObj, Memory<Component> componentStruct, Memory<Weapon> weaponStruct, Random rand, out bool criticalMalfunctionHasOccurred)
 		{
 			/*
 			In GURPS Vehicles 2nd Edition, weapon malfunction (Malf) rates are primarily determined 
@@ -3977,15 +4105,15 @@ namespace HelloBoids
 			// the higher the "factor" and "malfChance" (exponent), the smaller the resulting
 			// Pow() expression result which will make rand.NextDouble() increasingly
 			// MORE LIKELY to be a higher value thus resuling in a MALFUNCTION.
+			
+			double weaponDamageCoefficient = baseObj.Span[0].HitPoints.Base > 0 ? baseObj.Span[0].HitPoints.Current / baseObj.Span[0].HitPoints.Base : 0;
 			double weaponQualityCoefficient = componentStruct.Span[0].MaterialQuality;   
-			double weaponDamageCoefficient = componentStruct.Span[0].HitPoints.Base > 0 ? componentStruct.Span[0].HitPoints.Current / componentStruct.Span[0].HitPoints.Base : 0;
 			double weaponLevelCoefficient = componentStruct.Span[0].Level / MAX_LEVEL;
 			double weaponCraftsmanshipCoefficient = componentStruct.Span[0].Craftsmanship;
 			
 			// multiply all coefficients together
 			double combined = weaponQualityCoefficient * weaponDamageCoefficient * weaponLevelCoefficient * weaponCraftsmanshipCoefficient;
 						
-			
 			// range [0.001 - 1.0]  the greater the value, the more likely like a malfunction will occur 
 			double malfChance = 1.0 - weaponQualityCoefficient;  // EXPONENT - todo: this should be based on the weapon Level and craftsmenship of the of the Weapon
 			
@@ -4029,7 +4157,6 @@ namespace HelloBoids
 			int count = (int)allTacticalStations.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 		
 			{
-				
 				Boid droid = (Boid)EntryClass.bSim.Boids[allComponents.Span[(int)i].EntityArrayIndex];
 				
 				string errorReason;
@@ -4121,12 +4248,11 @@ namespace HelloBoids
 				}
 			
 			
-			
 			return false;
 		}
 			
 		/// <summary>
-		/// based on policies
+		/// Based on policies
 		/// </summary>	
 		private double[] DoWeaponFitnessScores(EntityNode ship, EntityNode target)
 		{
@@ -4226,11 +4352,11 @@ namespace HelloBoids
 				bool flagValue = canFire;
 				
 				int componentIndex;
-				Memory<Component> compStruct = (Memory<Component>)weapon.GetUserStruct(typeof(Component), out componentIndex);
-				compStruct.Span[0].SetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
-				bool hasStruct = compStruct.Span[0].GetUserStructFlag(USER_STRUCT_FLAG_1);
-				compStruct.Span[0].SetUserRuntimeFlag(USER_RUNTIME_FLAG_1, flagValue);
-				bool hasRuntimeFlag = compStruct.Span[0].GetUserRuntimeFlag(USER_RUNTIME_FLAG_1);
+				Memory<BaseObject> baseObj = (Memory<BaseObject>)weapon.GetUserStruct(typeof(BaseObject), out componentIndex);
+				baseObj.Span[0].SetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
+				bool hasStruct = baseObj.Span[0].GetUserStructFlag(USER_STRUCT_FLAG_1);
+				baseObj.Span[0].SetUserRuntimeFlag(USER_RUNTIME_FLAG_1, flagValue);
+				bool hasRuntimeFlag = baseObj.Span[0].GetUserRuntimeFlag(USER_RUNTIME_FLAG_1);
 				
 				int weaponIndex;
 				Memory<Weapon> weaponStruct = (Memory<Weapon>)weapon.GetUserStruct(typeof(Weapon), out weaponIndex);
@@ -4239,6 +4365,11 @@ namespace HelloBoids
 				//bool hasStruct = weaponStruct.Span[0].GetUserStructFlag(USER_STRUCT_FLAG_1);
 				//weaponStruct.Span[0].SetUserRuntimeFlag(USER_RUNTIME_FLAG_1, flagValue);
 				//bool hasRuntimeFlag = weaponStruct.Span[0].GetUserRuntimeFlag(USER_RUNTIME_FLAG_1);
+				
+				
+				// For The Culture: Similar to BLeBRiTY, For The Culture is another version of charades that celebrates Black culture in an engaging way. Free on the App Store.
+				// BLeBRiTY: 
+				
 				
 				try
 				{
@@ -4757,14 +4888,10 @@ namespace HelloBoids
 			List<Consumption> mRecords;
 			List<SkillSystem.ModificationResult> mSkillModResults;
 			
-			public SkillModificationSystem()
-			{
-				mRecords = new List<Consumption>();
-				mSkillModResults = new List<SkillSystem.ModificationResult>();
-			}
-			
 			public void Add (Consumption d)
 			{
+                if (mRecords == null) mRecords = new List<Consumption>();
+                
 				mRecords.Add (d);
 				//Console.WriteLine ("SkillModificationSystem.Add() - Record count == " + mRecords.Count.ToString());
 			}
@@ -4772,7 +4899,10 @@ namespace HelloBoids
 			public void Clear()
 			{
 				mRecords.Clear();
-				mSkillModResults.Clear();
+                if (mSkillModResults == null)
+                    mSkillModResults = new List<SkillSystem.ModificationResult>();
+                else
+    				mSkillModResults.Clear();
 			}
 					
 			public void Process(ComponentStore<LifeForm> store, object[] parameters, int seed, GameTime gt)
@@ -4821,8 +4951,8 @@ namespace HelloBoids
 
 		public interface ISimEventRecord
 		{
-			public int ActionID {get; set;}
-			public double Time {get; set;}
+			int ActionID {get; set;}
+			double Time {get; set;}
 		}
 		
 		public struct CombatEventRecord : ISimEventRecord
@@ -4844,7 +4974,7 @@ namespace HelloBoids
 			
 			// NOTE: The following fields may not be necessary for all ActionID types.  For now we'll just keep them in this one struct til we learn more about the different record types we'll need and how we'll be storing them
 			public int[] Damage;             // amount of damage inflicted during this event
-			public HitPoints[] HitPoints;    // Target operator(s), component(s), assembly(s) or ship(s) hitpoint at the end of this event 
+			public Stat[] HitPoints;    // Target operator(s), component(s), assembly(s) or ship(s) hitpoint at the end of this event 
 		}
 		
 		
@@ -4938,7 +5068,7 @@ namespace HelloBoids
 			}
 			
 
-			public void Apply(ComponentStore<LifeForm> store, object[] parameters, int seed, GameTime gt)
+			public void Apply(ComponentStore<BaseObject> store, object[] parameters, int seed, GameTime gt)
 			{
 				// NOTE: the store used here must refer to the actual memStore the Droid uses
 				//       to store it's data or else there is no way to update that Droid...Duh!
@@ -4948,7 +5078,7 @@ namespace HelloBoids
 				//       to know which ones to use
 				//       
 				if (store == null) return;
-				Span<LifeForm> memSpan = store.Span;
+				Span<BaseObject> memSpan = store.Span;
 				List<DamageResult> records = (List<DamageResult>)parameters[0];					
 				
 				if (records != null)
@@ -4956,11 +5086,11 @@ namespace HelloBoids
 					for (int i = 0; i < records.Count; i++)
 					{
 						int spanIndex;
-						Memory<LifeForm> lf  = (Memory<LifeForm>)EntryClass.bSim.Boids[records[i].TargetEntityArrayIndex].GetUserStruct(typeof(LifeForm), out spanIndex);
+						Memory<BaseObject> baseObject  = (Memory<BaseObject>)EntryClass.bSim.Boids[records[i].TargetEntityArrayIndex].GetUserStruct(typeof(BaseObject), out spanIndex);
 						//LifeForm lf = (LifeForm)memSpan[records[i].EntityIndex];
-						HitPoints prev = lf.Span[0].HitPoints;
-						lf.Span[0].HitPoints.Current -= records[i].Amount;
-						Console.WriteLine ("HealthSystem.Apply() -  Entity '" + EntryClass.bSim.Boids[records[i].TargetEntityArrayIndex].EntityKey + " Hitpoints: '" + lf.Span[0].HitPoints.ToString() + "' Previously was: '" + prev.ToString() + "'");
+						Stat prev = baseObject.Span[0].HitPoints;
+						baseObject.Span[0].HitPoints.Current -= records[i].Amount;
+						Console.WriteLine ("HealthSystem.Apply() -  Entity '" + EntryClass.bSim.Boids[records[i].TargetEntityArrayIndex].EntityKey + " Hitpoints: '" + baseObject.Span[0].HitPoints.ToString() + "' Previously was: '" + prev.ToString() + "'");
 						
 					}
 				}
@@ -4982,17 +5112,13 @@ namespace HelloBoids
 			
 			System.Collections.Concurrent.ConcurrentQueue<Damage> mRecords;
 			List<HealthSystem.DamageResult> mDamageResults;
-			
-			public DamageSystem()
-			{
-				mRecords = new System.Collections.Concurrent.ConcurrentQueue<Damage>();
-				mDamageResults = new List<HealthSystem.DamageResult>();
-			}
-			
+
 			public void Add (Damage d)
 			{
 				try
 				{
+                    if (mRecords == null) mRecords = new System.Collections.Concurrent.ConcurrentQueue<Damage>();
+                    
 					mRecords.Enqueue(d);
 				}
 				catch (Exception ex)
@@ -5004,13 +5130,16 @@ namespace HelloBoids
 			public void Clear()
 			{
 				mRecords.Clear();
-				mDamageResults.Clear();
+                if (mDamageResults == null) 
+                    mDamageResults = new List<HealthSystem.DamageResult>();
+                else
+    				mDamageResults.Clear();
 			}
 					
-			public void Process(ComponentStore<LifeForm> store, object[] parameters, int seed, GameTime gt)
+			public void Process(ComponentStore<BaseObject> store, object[] parameters, int seed, GameTime gt)
 			{
 				if (store == null) return;
-				Span<LifeForm> memSpan = store.Span;
+				Span<BaseObject> memSpan = store.Span;
 				
 				if (mRecords != null)
 				{
@@ -5048,19 +5177,16 @@ namespace HelloBoids
 			
 			System.Collections.Concurrent.ConcurrentQueue<DamageOverTime> mRecords;
 			List<HealthSystem.DamageResult> mDamageResults;
-			
-			
-			public DamageOverTimeSystem()
-			{
-				mRecords = new System.Collections.Concurrent.ConcurrentQueue<DamageOverTime>();
-				mDamageResults = new List<HealthSystem.DamageResult>();
-			}
+
 			
 			public void Add (DamageOverTime d)
 			{
 				try
 				{
-					mRecords.Enqueue(d);
+                    if (mRecords == null) 
+                        mRecords = new System.Collections.Concurrent.ConcurrentQueue<DamageOverTime>();
+					
+                    mRecords.Enqueue(d);
 					//Console.WriteLine ("DamageOverTimeSystem.Add() - Record count == " + mRecords.Count.ToString());
 				}
 				catch (Exception ex)
@@ -5072,17 +5198,20 @@ namespace HelloBoids
 			public void Clear()
 			{
 				mRecords.Clear();
-				mDamageResults.Clear();
+                if (mDamageResults == null)            
+                    mDamageResults = new List<HealthSystem.DamageResult>();
+                else
+                    mDamageResults.Clear();
 			}
 			
 			/// <summary>
 			/// FireDamage for example, can last for several seconds and so any one particular FireDamage record is
 			/// not removed from the ComponentStore<> until it's expired
 			/// </summary>
-			public void Process(ComponentStore<LifeForm> store, object[] parameters, int seed, GameTime gt)
+			public void Process(ComponentStore<BaseObject> store, object[] parameters, int seed, GameTime gt)
 			{
 				if (store == null) return;
-				Span<LifeForm> memSpan = store.Span;
+				Span<BaseObject> memSpan = store.Span;
 							
 				if (mRecords != null)
 				{
@@ -5145,8 +5274,9 @@ namespace HelloBoids
 					if (search.Equals(default(Production)))
 					{
 						int index;
-						Memory<Production> mem = production.CheckOut(out index);
+						Memory<Production> mem = (Memory<Production>)production.CheckOut(out index);
 						mem.Span[0] = p;
+						
 						//Console.WriteLine("RegisterProduction() - PRODUCTION '" + ((PRODUCTS)productID).ToString() + "' REGISTERED>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
 						
 					}
@@ -6019,6 +6149,8 @@ return (0,0);
         protected BoundingBox _box;
         protected OctreeOctant _octant;
 		
+		protected Memory<BaseObject> mMemStore_BaseObject;  // todo: should we auto-add this as wse do here in constructor or add it manually?
+		
 		protected UserData mUserData;
 		public Dictionary<SKILLS, Skill> Skills;
 		
@@ -6030,7 +6162,15 @@ return (0,0);
 			mID = entityKey;
 			mUserData = EntryClass.mUserDataStore.CheckOut(mID);
 				
-			Skills = new Dictionary<SKILLS, Skill>();		
+			Skills = new Dictionary<SKILLS, Skill>();	
+				
+			ComponentStore<BaseObject> store = EntryClass.mCStoreCol.CheckOut<BaseObject>(EntryClass.NUM_ENTRIES * 2); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
+            int index = -1;
+            mMemStore_BaseObject = store.CheckOut(out index);
+			AddUserStruct(typeof(BaseObject), mMemStore_BaseObject, index);
+	
+			//mMemStore_BaseObject.Span[0].InternalTransformIndex = index; // <-- Important to do this here. Eventually we need to be able to modify these when/if our Memory<T> records are ordered differently at runtime
+				
         }
 		
 		public string EntityKey { get {return mID;}}
@@ -8593,8 +8733,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		public int[] TargetedBy;      // other Ships/Vehciles/Entities, ground radars, factions, etc that are targeting this Target
 		public STATUS Status;
 		public CREWSTATUS CrewStatus;
-		public int Hitpoints;         // max hitpoints of target... should a Sensor be able to know this exact number?  It's really just a game thing and maybe we should just use visual observations of condition of ship instead
-		public int CurrentHitPoints;  // used to determine % damage of Target
+		public Stat HitPoints;         // max hitpoints of target... should a Sensor be able to know this exact number?  It's really just a game thing and maybe we should just use visual observations of condition of ship instead
+		public double DistanceSquared; 
 	}
 
 	
@@ -8672,19 +8812,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		IsUnJamming =        1 << 8 // denotes a quick fix in the field requiring less than 1 minute to resolve (isFixingMinorMalfunction), 
 	}
 	
-	public struct HitPoints // TODO: This may be renamed to "RPGStat" or something in the future and used for all stats that are modifiable (in one way or another.. eg an item buf or from damage taken)
-	{
-		public int Base;
-		public int Current;
-		
-		public override string ToString()
-		{
-			return "HP: " + Current.ToString() + "/" + Base.ToString();
-		}
-	}
-		
-	
-	
 	public struct Stat
 	{
 		// GG-AI-OV - A 32-bit float (the System.Single type in .NET) uses 24 bits for its significand (including one implicit bit). 
@@ -8695,12 +8822,69 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			
 		public float Base;
 		public float Current;
-			
+		public string Label;
+		
 		public Stat (float baseValue)
 		{
 			Base = baseValue;
+			Current = baseValue;
+			Label = null;
 		}
 			
+		public override string ToString()
+		{
+			return Label + ": " + Current.ToString() + "/" + Base.ToString();
+		}
+		
+	}
+	
+	
+	public struct BaseObject
+	{
+		public int EntityArrayIndex;
+		public CONFIGURATION Configuration;
+		  public string FullName;
+		
+		
+		// stats
+        public Stat HitPoints; 
+        public double Cost;
+        public double Weight;
+        public double Volume;
+        public double SurfaceArea;
+		// 'Defense' is Armor (Armor Faces with Armor Layers and DR and PD)
+		
+		// https://www.google.com/search?q=memory%3CT%3E+and+span%3CT%3E+from+a+struct+with+nested+structs&rlz=1C1GCPF_enUS1162US1162&oq=memory%3CT%3E+and+span%3CT%3E+from+a+struct+with+nested+structs&gs_lcrp=EgZjaHJvbWUyBggAEEUYOdIBCTExMDEzajBqMagCALACAA&sourceid=chrome&ie=UTF-8
+        public Armor Armor; 
+        
+		public uint mUserStructFlags;
+		public uint mUserRuntimeFlags;
+		public uint mRuntimeFlags;
+
+				
+        public delegate void OnCreate();  // or OnAddedToScene()
+        public delegate void OnDestroy(); // or OnRemovedFromScene()
+		
+		public void SetUserStructFlag(uint flag, bool value)
+		{
+			mUserStructFlags |= flag;
+		}
+		
+		public bool	GetUserStructFlag(uint flag)
+		{
+			return (flag & mUserStructFlags) != 0;	
+		}
+		
+		
+		public void SetUserRuntimeFlag(uint flag, bool value)
+		{
+			mUserRuntimeFlags |= flag;
+		}
+		
+		public bool GetUserRuntimeFlag(uint flag)
+		{
+			return (flag & mUserRuntimeFlags) != 0;	
+		}
 		
 		
 	}
@@ -8708,11 +8892,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
 	public struct LifeForm
 	{
-		public int EntityArrayIndex;
-		public CONFIGURATION Configuration;
-		
-		public string FullName;
-		
+	
 		// These will serve as Station Operators for now
 		public double CreationDateTime;
 		
@@ -8722,21 +8902,32 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		public double Age;            // technically, this probably doesnt need to be stored... we only need the CreationDate?  // assign using Utils.GetAge() and find Age via 'age = Utils.GetAge(entity.CreationDate);'
 		public double MaxAge;
 		
-		public HitPoints HitPoints; 
-		public Stat Fatigue;
-		public Stat Stamina;
 		
 		// todo: what about various stats like STR, CON, Fatigue, Stamina, DEX, INT, CHARISMA, etc?
 		
-		public Armor Armor;
+		// GG-AI-OV - In RPG design, Stamina and Fatigue are two distinct mechanics used to manage player action, pace combat, and encourage strategic resource management.
+		// While often used interchangeably, they typically represent short-term exertion versus long-term penalties.
+		//
+		// Stamina: Short-Term Exertion
+		// Definition: A replenishable resource used for immediate actions like running, dodging, or attacking.
+		// Behavior: Depletes rapidly during action and recovers quickly, often automatically when out of combat.
+		// Goal: Limits the "15-minute work day," ensuring players cannot perform high-power actions indefinitely.
+		// Example: A white bar that empties while sprinting in Ghost Recon.
+		public Stat Stamina;
+		
+		// Fatigue: Long-Term Penalty
+		// Definition: A negative status effect or reduced capacity that accumulates when stamina is overused, or through illness, hunger, or long travel.
+		// Behavior: Accumulates gradually. It acts as a "penalty" that reduces the maximum stamina capacity, meaning the character recovers less over time.
+			// Goal: Encourages resting and tactical pacing.Example: In Story of Seasons, fatigue builds up while working and causes the character to pass out if it reaches 100
+		public Stat Fatigue;
+		
+		
+				
 		
 		public Membership[] Memberships;
 		public Skill[] Skills;
 		
-		// LivingEntity vs Component both have this mRuntimeFlags but they are unique to each interface because typically LivingEntity and Component structs DO NOT exist within the same Entity.
-		// - this could conceivably change in the future if for instance a Cyborg or Robot was also a "Character" that was needed the LivingEntity struct.
-		public uint mRuntimeFlags;
-
+		
 	
 		public double GetAge(double currentTime)
 		{
@@ -8751,9 +8942,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 	public struct Component  // aka: "Useable Component"
     {
 		public int EntityArrayIndex;
-		public CONFIGURATION Configuration;
 		
-        public string FullName;
+     
 		
 		public float Level; // technological level. 
 		
@@ -8773,28 +8963,14 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		/// <summary>
 		/// The required skills an Operator must have to use this Component
 		/// </summary>
-		public Skill[] Skills;
+		public Skill[] RequiredSkills;
+		
+		public InternalStructure Internals; 	
 		
 		
-		// 'Defense' is Armor (Armor Faces with Armor Layers and DR and PD)
-		// TODO: i think these simply need to be part of the Component 
-		// https://www.google.com/search?q=memory%3CT%3E+and+span%3CT%3E+from+a+struct+with+nested+structs&rlz=1C1GCPF_enUS1162US1162&oq=memory%3CT%3E+and+span%3CT%3E+from+a+struct+with+nested+structs&gs_lcrp=EgZjaHJvbWUyBggAEEUYOdIBCTExMDEzajBqMagCALACAA&sourceid=chrome&ie=UTF-8
-        public Armor Armor; 
-        public InternalStructure Internals; 	
-		
-        // stats
-        public HitPoints HitPoints; 
-        public float Cost;
-        public float Weight;
-        public float Volume;
-        public float SurfaceArea;
-
         // runtime
 		public int[] OperatorIDs;
-		// LivingEntity vs Component both have this mRuntimeFlags but they are unique to each interface because typically LivingEntity and Component structs DO NOT exist within the same Entity.
-		// - this could conceivably change in the future if for instance a Cyborg or Robot was also a "Character" that was needed the LivingEntity struct. 
-		public uint mUserRuntimeFlags;
-		public uint mUserStructFlags;
+
 		
 		public double StartTime; // when "Use" began
 		public double Duration;  // if the "Use" is of a set Duration, track how long that Duration is... for instance, a sleep duration might be 6 hours of gameTime
@@ -8806,9 +8982,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		public bool Looping; // Repeating
 		public double CooldownDuration; 
 		
-		
-        public delegate void OnCreate();  // or OnAddedToScene()
-        public delegate void OnDestroy(); // or OnRemovedFromScene()
+
 		public delegate void OnUseStarted();
 		public delegate void OnUseEnded();
 
@@ -8816,26 +8990,9 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		{
  		}
 		
-		public void SetUserStructFlag(uint flag, bool value)
-		{
-			mUserStructFlags |= flag;
-		}
 		
-		public bool	GetUserStructFlag(uint flag)
-		{
-			return (flag & mUserStructFlags) != 0;	
-		}
 		
-		public void SetUserRuntimeFlag(uint flag, bool value)
-		{
-			mUserRuntimeFlags |= flag;
-		}
-		
-		public bool GetUserRuntimeFlag(uint flag)
-		{
-			return (flag & mUserRuntimeFlags) != 0;	
-		}
-							
+				
 		public bool DoIsPowered(out string errorReason)
 		{
 			errorReason = null;
@@ -8873,9 +9030,9 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
 			errorReason = null;
 			
-			ComponentStore<LifeForm> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
-			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
-			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
+			//ComponentStore<LifeForm> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
+			ComponentStore<BaseObject> allBaseObjects  = EntryClass.mCStoreCol.CheckOut<BaseObject>(0);
+			//ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 						
 			// NOTE: if this station requires an AI operator at the very least, then NumOperators will be == 1.
 			//       And the operator ID will point to another Component (eg a Computer running some tpe of software...eg Targeting Software)
@@ -8890,20 +9047,24 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 					{
 						int index = this.OperatorIDs[i];
 						
-						float percentage = allLivingEntities.Span[index].HitPoints.Current / allLivingEntities.Span[index].HitPoints.Base;
+						float percentage = allBaseObjects.Span[index].HitPoints.Current / allBaseObjects.Span[index].HitPoints.Base;
 						if (percentage <= DAMAGE_PERCENT_THRESHOLD)
 						{
-							errorReason = "Operator '" + allLivingEntities.Span[index].FullName + "' is not Healthy enough to operate this Component.";
+							errorReason = "Operator '" + allBaseObjects.Span[index].FullName + "' is not Healthy enough to operate this Component.";
 							return false;
 						}
 						
 						
-						if (this.Skills != null)
+						if (this.RequiredSkills != null)
 						{
-							string name = allLivingEntities.Span[index].FullName;
+							string name = allBaseObjects.Span[index].FullName;
 							
 							// operator has necessary skills to use this Component\Station
-							Skill[] operatorSkills = allLivingEntities.Span[index].Skills;
+							EntityNode stationOperator = EntryClass.bSim.Boids[allBaseObjects.Span[i].EntityArrayIndex];
+							int operatorIndex;
+							Memory<LifeForm> tacticalStationOpStruct = (Memory<LifeForm>)stationOperator.GetUserStruct(typeof(LifeForm), out operatorIndex);
+							Skill[] operatorSkills = tacticalStationOpStruct.Span[0].Skills;
+
 							if (operatorSkills == null)
 							{
 								errorReason = "Operator '" + name + "' does not have the required skills to operate this Component";
@@ -8912,17 +9073,17 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 
 							int totalSkillCount = 0;
 							
-							for (int j = 0; j < this.Skills.Length; j++)
+							for (int j = 0; j < this.RequiredSkills.Length; j++)
 							{
 								for (int k = 0; k < operatorSkills.Length; k++)
 								{
-									if (operatorSkills[k].SkillType == this.Skills[j].SkillType)
+									if (operatorSkills[k].SkillType == this.RequiredSkills[j].SkillType)
 									{
-										if (operatorSkills[k].Level < this.Skills[j].Level)
+										if (operatorSkills[k].Level < this.RequiredSkills[j].Level)
 										{
 											
-											int level = this.Skills[j].Level;
-											string skillname = this.Skills[j].SkillType.ToString();
+											int level = this.RequiredSkills[j].Level;
+											string skillname = this.RequiredSkills[j].SkillType.ToString();
 
 											errorReason = $"Operator {name}, does not have the required skill level {level} for the skill {skillname}.";
 											return false;
@@ -8933,19 +9094,21 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 								}
 							}
 							
-							if (totalSkillCount < this.Skills.Length)
+							if (totalSkillCount < this.RequiredSkills.Length)
 							{
 								errorReason = $"Operator {name}, does not have the required skills or skill levels for all skills required to use this Component.";
 								return false;
 							}
 						}
 					}
-				}
+				}	 
 			}
 		
 			return true;
 		}	
 		
+		
+		/*
 		public bool IsInUse 
 		{
 			get {return (mUserRuntimeFlags & (uint)USER_RUNTIME_FLAGS.IsInUse) == (uint)USER_RUNTIME_FLAGS.IsInUse;}
@@ -9066,6 +9229,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
                     mUserRuntimeFlags &= ~(uint)USER_RUNTIME_FLAGS.IsUnJamming;
 			}
 		}
+		*/
+		
 	}
 	
 	
@@ -9245,15 +9410,15 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			bool result = true;
 
 		#if DEBUG
-			int componentIndex;
-			Memory<Component> cmp = (Memory<Component>) station.GetUserStruct(typeof(Component), out componentIndex); //"HelloBoids.Component"); // );
-			System.Diagnostics.Debug.Assert (station.EntityArrayIndex == cmp.Span[0].EntityArrayIndex);
+			int baseObjectIndex;
+			Memory<BaseObject> baseObj = (Memory<BaseObject>) station.GetUserStruct(typeof(BaseObject), out baseObjectIndex); //"HelloBoids.Component"); // );
+			System.Diagnostics.Debug.Assert (station.EntityArrayIndex == baseObj.Span[0].EntityArrayIndex);
 		#endif
 				
 				
-			if (!cmp.IsEmpty)
+			if (!baseObj.IsEmpty)
 			{
-				string name = cmp.Span[0].FullName;
+				string name = baseObj.Span[0].FullName;
 				int max = MaxActions;
 				int diff = NumActions;
 				if (diff <= 0)
@@ -9558,11 +9723,10 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			
 			for (int i = 0; i < numFaces; i++)
 			{
-				double surfaceArea = GetArmorFaceSurfaceArea ((BoundingBox.BOX_FACES)i, box);
-				
 				Faces[i] = new ArmorFace(box, i);
 				Faces[i].SurfaceAttributes = ArmorFace.SURFACE_ATTRIBUTES.None;
-				    
+				Faces[i].SurfaceArea = GetArmorFaceSurfaceArea ((BoundingBox.BOX_FACES)i, box);
+
 				Faces[i].Defense = 50; // passive defense... 
 				Faces[i].Layers = new ArmorLayer[numLayers];
 					for (int j = 0; j < numLayers; j++)
@@ -9960,7 +10124,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         // NOTE: hitpoints I think is fine for inanimate objects,
         //       but not good for living things. 
         //       https://www.youtube.com/watch?v=sMWMB9bjFGo
-        public HitPoints HitPoints;		
+        public Stat HitPoints;		
 		
 		public bool Robotic 
 		{
@@ -10010,9 +10174,14 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			}
 		}
     }
-
 	#endregion // USER STRUCTS 
 
+    public struct EntitySystemUpdateContext
+    {
+       	// see SelectionNode or Elements.SwitchNode for help
+			
+			
+    }
     public interface IEntitySystem
     {
         // 1) an IEntitySystem of type "City{World.Country.Province.County}" might include many different types of child IEntitySystem within it.
@@ -10024,12 +10193,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         //        - these Systems also CONSUME from "Stores"... how do we assign Stores and make them available to something like a "City?"
         // 2) Stores - food, supplies, medicines, clothing, energy
         // 3) Do we need to support rendering Proxies here (2D and 3D?)
-		public struct EntitySystemUpdateContext
-    	{
-        	// see SelectionNode or Elements.SwitchNode for help
-			
-			
-    	}
+		
 	
         int Seed { get; }
         int EntityCount { get; }
@@ -10060,7 +10224,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
     {
         public delegate IProcGeneratedItem CreateEntityHandler(int seed, string path);
         public delegate void GenerateSystemHandler(int seed);
-        public delegate void UpdateHandler(double elapsedSeconds, IEntitySystem.EntitySystemUpdateContext context);
+        public delegate void UpdateHandler(double elapsedSeconds, EntitySystemUpdateContext context);
 
         // private variables
         protected string mPath;
@@ -10085,7 +10249,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			
 		}
 		
-        public virtual void Update(double elapsedSeconds, IEntitySystem.EntitySystemUpdateContext context)
+        public virtual void Update(double elapsedSeconds, EntitySystemUpdateContext context)
         {
             // select from mUpdateHandlers based on context... its essentially like update LOD where the
             // update simulation can be simpler when this IEntitySystem is far away or has no players near it...
@@ -10265,7 +10429,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         {
         }
 
-        public override void Update(double elapsedSeconds, IEntitySystem.EntitySystemUpdateContext context)
+        public override void Update(double elapsedSeconds, EntitySystemUpdateContext context)
         {
 
         }
@@ -21376,25 +21540,39 @@ public abstract class PlanedFrustum
 		
 		public static byte[] CompressWithBrotli(byte[] inputBytes)
 		{
+
+            using (var outputStream = new MemoryStream())
+    		{
+                using (var brotliStream = new System.IO.Compression.BrotliStream(outputStream, System.IO.Compression.CompressionLevel.Optimal))
+    			{
+    				brotliStream.Write(inputBytes, 0, inputBytes.Length);
+    			}
+    			return outputStream.ToArray();
+            }
+        
+            /* c# 10
 			using var outputStream = new MemoryStream();
 			using (var brotliStream = new System.IO.Compression.BrotliStream(outputStream, System.IO.Compression.CompressionLevel.Optimal))
 			{
 				brotliStream.Write(inputBytes, 0, inputBytes.Length);
 			}
-			return outputStream.ToArray();
+            return outputStream.ToArray();
+		    */
 		}
 		
 		public static byte[] DecompressWithBrotli(byte[] compressedData)
 		{
-			using var inputStream = new MemoryStream(compressedData);
-			using var outputStream = new MemoryStream();
-			
-			using (var brotliStream = new System.IO.Compression.BrotliStream(inputStream, System.IO.Compression.CompressionMode.Decompress))
-			{
-				brotliStream.CopyTo(outputStream);
-			}
-			return  outputStream.ToArray();
-			
+			using (var inputStream = new MemoryStream(compressedData))
+            {
+    			using (var outputStream = new MemoryStream())
+    			{
+        			using (var brotliStream = new System.IO.Compression.BrotliStream(inputStream, System.IO.Compression.CompressionMode.Decompress))
+        			{
+        				brotliStream.CopyTo(outputStream);
+        			}
+        			return  outputStream.ToArray();
+                }
+            }
 			
 		}
 		

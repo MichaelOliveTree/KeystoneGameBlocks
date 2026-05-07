@@ -3640,8 +3640,22 @@ namespace HelloBoids
 			List<Target> targets = attackingTacticalStation.GetTargets();
 			
 			hits = new List<HIT>();
-			// NOTE: If there are NO TARGETS this method should not even have been called. 
+
 			System.Diagnostics.Debug.Assert (targets != null && targets.Count > 0, "HitHasOccurred() - If there are NO TARGETS this method should not even have been called. ") ;
+			
+			// the targets are already prioritized in order of first choice to last choice
+			// as well as which weapons should be used on them.
+			// for now we'll focus on just the first target.
+			// TODO: there is a problem here.... we do need adjacents because even friendlies that are near Targets
+			// may get accidentally hit by our weapons... potentially... especially if they are missiles/torps and they use
+			// a proximity fuse and they are too close to an enemy ship.  Sometimes these may even be strategic decisions to 
+			// risk the friendly anyway because there is little choice to wait where the enemy ship may be in position and time to fire a salvo.
+			
+			// NOTE: we do have neighbors passed in.
+			
+			
+			
+			
 			
 			// TODO: we may not need to loop here exactly through Targets... all of these "targets" can potentially be hit at once with one weapon... say a large nuke.
 			for (int i = 0; i < targets.Count; i++)
@@ -3699,7 +3713,24 @@ namespace HelloBoids
 				// TODO:  Alternatively, we may have hit another Ship(s) (or one or more of it's assemblies and/or components and/or LifeForms on board)
 				//        Or we may have MISSED altogether
 
-				// float[] weights;
+				double[] weights = new double[7];
+				ComponentStore<Component> allComponents = (ComponentStore<Component>) EntryClass.mCStoreCol.CheckOut<Component>(); //  attackingTacticalStation.GetUserStruct(typeof(Component), out tacticalStationIndex); 
+				
+				EntityNode droid = Boids[targets[i].EntityArrayIndex];
+				int hullIndex = droid.GetUserStructIndex(typeof(Component));
+				
+				
+				
+				EntityNode wings = Boids[targets[i].EntityArrayIndex + WINGS_OFFSET];
+				EntityNode tacticalStation = Boids[targets[i].EntityArrayIndex + TACTICAL_STATION_OFFSET];
+				EntityNode laser = Boids[targets[i].EntityArrayIndex + LASER_OFFSET];
+				EntityNode battery = Boids[targets[i].EntityArrayIndex + BATTERY_OFFSET];
+				EntityNode opticalSensor = Boids[targets[i].EntityArrayIndex + OPTICAL_SENSOR_OFFSET];
+				EntityNode humanOperator = Boids[targets[i].EntityArrayIndex + HUMAN_OPERATOR_OFFSET];
+				
+				double totalVolume = 0;
+				weights[0] = allComponents.Span[hullIndex].Volume / totalVolume;
+				
 				
 				
 				// Hull(Boid)
@@ -3716,15 +3747,13 @@ namespace HelloBoids
 				selectedTargets.Add(Boids[targets[0].EntityArrayIndex]);
 				bool hasHit = true; // <- temp hack.  Run formula using above coefficients and such to determine if we hit and what we hit
 
-				
 
-				
 				if (hasHit)
 				{
 					for (int j = 0; j < selectedTargets.Count; j++)
 					{
 						int tacticalStationIndex = attackingShip.EntityArrayIndex + OPTICAL_SENSOR_OFFSET;
-						Memory<TacticalStation> tacticalStation = (Memory<TacticalStation>)attackingTacticalStation.GetUserStruct(typeof(TacticalStation), out tacticalStationIndex); 
+						//Memory<TacticalStation> tacticalStation = (Memory<TacticalStation>)attackingTacticalStation.GetUserStruct(typeof(TacticalStation), out tacticalStationIndex); 
 
 						Vector3d start = attackingShip.Translation;   // todo: if hierarchical and if this is the Weapon and not the Droid, it should be .DerivedTranslation
 						Vector3d targetLoc = selectedTargets[j].Translation; // TODO: if hierarchical, this should be .DerivedTranslation
@@ -5021,7 +5050,7 @@ namespace HelloBoids
 			}
 			
 
-			public void Apply(ComponentStore<LifeForm> store, object[] parameters, int seed, GameTime gt)
+			public void Apply(ComponentStore<BaseObject> store, object[] parameters, int seed, GameTime gt)
 			{
 				// NOTE: the store used here must refer to the actual memStore the Droid uses
 				//       to store it's data or else there is no way to update that Droid...Duh!
@@ -5031,7 +5060,7 @@ namespace HelloBoids
 				//       to know which ones to use
 				//       
 				if (store == null) return;
-				Span<LifeForm> memSpan = store.Span;
+				Span<BaseObject> memSpan = store.Span;
 				List<DamageResult> records = (List<DamageResult>)parameters[0];					
 				
 				if (records != null)
@@ -5039,11 +5068,11 @@ namespace HelloBoids
 					for (int i = 0; i < records.Count; i++)
 					{
 						int spanIndex;
-						Memory<LifeForm> lf  = (Memory<LifeForm>)EntryClass.bSim.Boids[records[i].TargetEntityArrayIndex].GetUserStruct(typeof(LifeForm), out spanIndex);
+						Memory<BaseObject> baseObject  = (Memory<BaseObject>)EntryClass.bSim.Boids[records[i].TargetEntityArrayIndex].GetUserStruct(typeof(BaseObject), out spanIndex);
 						//LifeForm lf = (LifeForm)memSpan[records[i].EntityIndex];
-						Stat prev = lf.Span[0].HitPoints;
-						lf.Span[0].HitPoints.Current -= records[i].Amount;
-						Console.WriteLine ("HealthSystem.Apply() -  Entity '" + EntryClass.bSim.Boids[records[i].TargetEntityArrayIndex].EntityKey + " Hitpoints: '" + lf.Span[0].HitPoints.ToString() + "' Previously was: '" + prev.ToString() + "'");
+						Stat prev = baseObject.Span[0].HitPoints;
+						baseObject.Span[0].HitPoints.Current -= records[i].Amount;
+						Console.WriteLine ("HealthSystem.Apply() -  Entity '" + EntryClass.bSim.Boids[records[i].TargetEntityArrayIndex].EntityKey + " Hitpoints: '" + baseObject.Span[0].HitPoints.ToString() + "' Previously was: '" + prev.ToString() + "'");
 						
 					}
 				}
@@ -8779,14 +8808,61 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
 	}
 	
-	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
-	public struct LifeForm
+	
+	public struct BaseObject
 	{
 		public int EntityArrayIndex;
 		public CONFIGURATION Configuration;
+		  public string FullName;
 		
-		public string FullName;
 		
+		// stats
+        public Stat HitPoints; 
+        public double Cost;
+        public double Weight;
+        public double Volume;
+        public double SurfaceArea;
+		// 'Defense' is Armor (Armor Faces with Armor Layers and DR and PD)
+		
+		// https://www.google.com/search?q=memory%3CT%3E+and+span%3CT%3E+from+a+struct+with+nested+structs&rlz=1C1GCPF_enUS1162US1162&oq=memory%3CT%3E+and+span%3CT%3E+from+a+struct+with+nested+structs&gs_lcrp=EgZjaHJvbWUyBggAEEUYOdIBCTExMDEzajBqMagCALACAA&sourceid=chrome&ie=UTF-8
+        public Armor Armor; 
+        
+		public uint mUserStructFlags;
+		public uint mUserRuntimeFlags;
+		public uint mRuntimeFlags;
+
+				
+        public delegate void OnCreate();  // or OnAddedToScene()
+        public delegate void OnDestroy(); // or OnRemovedFromScene()
+		
+		public void SetUserStructFlag(uint flag, bool value)
+		{
+			mUserStructFlags |= flag;
+		}
+		
+		public bool	GetUserStructFlag(uint flag)
+		{
+			return (flag & mUserStructFlags) != 0;	
+		}
+		
+		
+		public void SetUserRuntimeFlag(uint flag, bool value)
+		{
+			mUserRuntimeFlags |= flag;
+		}
+		
+		public bool GetUserRuntimeFlag(uint flag)
+		{
+			return (flag & mUserRuntimeFlags) != 0;	
+		}
+		
+		
+	}
+	
+	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
+	public struct LifeForm
+	{
+	
 		// These will serve as Station Operators for now
 		public double CreationDateTime;
 		
@@ -8815,18 +8891,13 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			// Goal: Encourages resting and tactical pacing.Example: In Story of Seasons, fatigue builds up while working and causes the character to pass out if it reaches 100
 		public Stat Fatigue;
 		
-		public Stat HitPoints; 
 		
-		
-		public Armor Armor;
+				
 		
 		public Membership[] Memberships;
 		public Skill[] Skills;
 		
-		// LivingEntity vs Component both have this mRuntimeFlags but they are unique to each interface because typically LivingEntity and Component structs DO NOT exist within the same Entity.
-		// - this could conceivably change in the future if for instance a Cyborg or Robot was also a "Character" that was needed the LivingEntity struct.
-		public uint mRuntimeFlags;
-
+		
 	
 		public double GetAge(double currentTime)
 		{
@@ -8841,9 +8912,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 	public struct Component  // aka: "Useable Component"
     {
 		public int EntityArrayIndex;
-		public CONFIGURATION Configuration;
 		
-        public string FullName;
+     
 		
 		public float Level; // technological level. 
 		
@@ -8863,28 +8933,14 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		/// <summary>
 		/// The required skills an Operator must have to use this Component
 		/// </summary>
-		public Skill[] Skills;
+		public Skill[] RequiredSkills;
+		
+		public InternalStructure Internals; 	
 		
 		
-		// 'Defense' is Armor (Armor Faces with Armor Layers and DR and PD)
-		// TODO: i think these simply need to be part of the Component 
-		// https://www.google.com/search?q=memory%3CT%3E+and+span%3CT%3E+from+a+struct+with+nested+structs&rlz=1C1GCPF_enUS1162US1162&oq=memory%3CT%3E+and+span%3CT%3E+from+a+struct+with+nested+structs&gs_lcrp=EgZjaHJvbWUyBggAEEUYOdIBCTExMDEzajBqMagCALACAA&sourceid=chrome&ie=UTF-8
-        public Armor Armor; 
-        public InternalStructure Internals; 	
-		
-        // stats
-        public Stat HitPoints; 
-        public float Cost;
-        public float Weight;
-        public float Volume;
-        public float SurfaceArea;
-
         // runtime
 		public int[] OperatorIDs;
-		// LivingEntity vs Component both have this mRuntimeFlags but they are unique to each interface because typically LivingEntity and Component structs DO NOT exist within the same Entity.
-		// - this could conceivably change in the future if for instance a Cyborg or Robot was also a "Character" that was needed the LivingEntity struct. 
-		public uint mUserRuntimeFlags;
-		public uint mUserStructFlags;
+
 		
 		public double StartTime; // when "Use" began
 		public double Duration;  // if the "Use" is of a set Duration, track how long that Duration is... for instance, a sleep duration might be 6 hours of gameTime
@@ -8896,9 +8952,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		public bool Looping; // Repeating
 		public double CooldownDuration; 
 		
-		
-        public delegate void OnCreate();  // or OnAddedToScene()
-        public delegate void OnDestroy(); // or OnRemovedFromScene()
+
 		public delegate void OnUseStarted();
 		public delegate void OnUseEnded();
 
@@ -8906,26 +8960,9 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		{
  		}
 		
-		public void SetUserStructFlag(uint flag, bool value)
-		{
-			mUserStructFlags |= flag;
-		}
 		
-		public bool	GetUserStructFlag(uint flag)
-		{
-			return (flag & mUserStructFlags) != 0;	
-		}
 		
-		public void SetUserRuntimeFlag(uint flag, bool value)
-		{
-			mUserRuntimeFlags |= flag;
-		}
-		
-		public bool GetUserRuntimeFlag(uint flag)
-		{
-			return (flag & mUserRuntimeFlags) != 0;	
-		}
-							
+				
 		public bool DoIsPowered(out string errorReason)
 		{
 			errorReason = null;
@@ -8988,7 +9025,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 						}
 						
 						
-						if (this.Skills != null)
+						if (this.RequiredSkills != null)
 						{
 							string name = allLivingEntities.Span[index].FullName;
 							
@@ -9002,17 +9039,17 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 
 							int totalSkillCount = 0;
 							
-							for (int j = 0; j < this.Skills.Length; j++)
+							for (int j = 0; j < this.RequiredSkills.Length; j++)
 							{
 								for (int k = 0; k < operatorSkills.Length; k++)
 								{
-									if (operatorSkills[k].SkillType == this.Skills[j].SkillType)
+									if (operatorSkills[k].SkillType == this.RequiredSkills[j].SkillType)
 									{
-										if (operatorSkills[k].Level < this.Skills[j].Level)
+										if (operatorSkills[k].Level < this.RequiredSkills[j].Level)
 										{
 											
-											int level = this.Skills[j].Level;
-											string skillname = this.Skills[j].SkillType.ToString();
+											int level = this.RequiredSkills[j].Level;
+											string skillname = this.RequiredSkills[j].SkillType.ToString();
 
 											errorReason = $"Operator {name}, does not have the required skill level {level} for the skill {skillname}.";
 											return false;
@@ -9023,19 +9060,21 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 								}
 							}
 							
-							if (totalSkillCount < this.Skills.Length)
+							if (totalSkillCount < this.RequiredSkills.Length)
 							{
 								errorReason = $"Operator {name}, does not have the required skills or skill levels for all skills required to use this Component.";
 								return false;
 							}
 						}
 					}
-				}
+				}	 
 			}
 		
 			return true;
 		}	
 		
+		
+		/*
 		public bool IsInUse 
 		{
 			get {return (mUserRuntimeFlags & (uint)USER_RUNTIME_FLAGS.IsInUse) == (uint)USER_RUNTIME_FLAGS.IsInUse;}
@@ -9156,6 +9195,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
                     mUserRuntimeFlags &= ~(uint)USER_RUNTIME_FLAGS.IsUnJamming;
 			}
 		}
+		*/
+		
 	}
 	
 	
@@ -9335,15 +9376,15 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			bool result = true;
 
 		#if DEBUG
-			int componentIndex;
-			Memory<Component> cmp = (Memory<Component>) station.GetUserStruct(typeof(Component), out componentIndex); //"HelloBoids.Component"); // );
-			System.Diagnostics.Debug.Assert (station.EntityArrayIndex == cmp.Span[0].EntityArrayIndex);
+			int baseObjectIndex;
+			Memory<BaseObject> baseObj = (Memory<BaseObject>) station.GetUserStruct(typeof(BaseObject), out baseObjectIndex); //"HelloBoids.Component"); // );
+			System.Diagnostics.Debug.Assert (station.EntityArrayIndex == baseObj.Span[0].EntityArrayIndex);
 		#endif
 				
 				
 			if (!cmp.IsEmpty)
 			{
-				string name = cmp.Span[0].FullName;
+				string name = baseObj.Span[0].FullName;
 				int max = MaxActions;
 				int diff = NumActions;
 				if (diff <= 0)

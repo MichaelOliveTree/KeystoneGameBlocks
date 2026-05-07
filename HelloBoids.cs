@@ -3855,8 +3855,10 @@ namespace HelloBoids
 					EntityNode specificSubTarget = hits[currentHitIndex].Target;
 					EntityNode weaponEntity = Boids[weaponEntityArrayIndex];
 					
+					int baseObjIndex;
 					int componentIndex;
 					int weaponIndex;
+					Memory<BaseObject> baseObjForWeaponEntity = (Memory<BaseObject>)weaponEntity.GetUserStruct(typeof(BaseObject), out baseObjIndex);
 					Memory<Component> componentStructForWeaponEntity = (Memory<Component>)weaponEntity.GetUserStruct(typeof(Component), out componentIndex);
 					Memory<Weapon> weaponStruct = (Memory<Weapon>)weaponEntity.GetUserStruct(typeof(Weapon), out weaponIndex);
 					
@@ -3864,7 +3866,7 @@ namespace HelloBoids
 					
 					// NOTE: if damages occurs, there can be multiple TYPES of damages in the return damages[] because a single target 
 					//       may for example receive kinetic damage AND on-going fire damage, and/or other damages.
-					damages = CalculateDamage(stationOperator, specificSubTarget, hits[currentHitIndex].DistanceSquared, componentStructForWeaponEntity, weaponStruct, gt, random, out critMalfunctionHasOccurred); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
+					damages = CalculateDamage(stationOperator, specificSubTarget, hits[currentHitIndex].DistanceSquared, baseObjForWeaponEntity, componentStructForWeaponEntity, weaponStruct, gt, random, out critMalfunctionHasOccurred); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
 
 					//TODO: IF 0 Damage occurs because the Target was able to resist the attack with armor or passive defenses
 					//      the result of damage should return 0 and not NULL or anything because resisting an attack is valid information to know in an event log
@@ -4352,11 +4354,11 @@ namespace HelloBoids
 				bool flagValue = canFire;
 				
 				int componentIndex;
-				Memory<Component> compStruct = (Memory<Component>)weapon.GetUserStruct(typeof(Component), out componentIndex);
-				compStruct.Span[0].SetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
-				bool hasStruct = compStruct.Span[0].GetUserStructFlag(USER_STRUCT_FLAG_1);
-				compStruct.Span[0].SetUserRuntimeFlag(USER_RUNTIME_FLAG_1, flagValue);
-				bool hasRuntimeFlag = compStruct.Span[0].GetUserRuntimeFlag(USER_RUNTIME_FLAG_1);
+				Memory<BaseObject> baseObj = (Memory<Component>)weapon.GetUserStruct(typeof(BaseObject), out componentIndex);
+				baseObj.Span[0].SetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
+				bool hasStruct = baseObj.Span[0].GetUserStructFlag(USER_STRUCT_FLAG_1);
+				baseObj.Span[0].SetUserRuntimeFlag(USER_RUNTIME_FLAG_1, flagValue);
+				bool hasRuntimeFlag = baseObj.Span[0].GetUserRuntimeFlag(USER_RUNTIME_FLAG_1);
 				
 				int weaponIndex;
 				Memory<Weapon> weaponStruct = (Memory<Weapon>)weapon.GetUserStruct(typeof(Weapon), out weaponIndex);
@@ -6150,6 +6152,8 @@ return (0,0);
         protected BoundingBox _box;
         protected OctreeOctant _octant;
 		
+		protected Memory<BaseObject> mMemStore_BaseObject;  // todo: should we auto-add this as wse do here in constructor or add it manually?
+		
 		protected UserData mUserData;
 		public Dictionary<SKILLS, Skill> Skills;
 		
@@ -6161,7 +6165,15 @@ return (0,0);
 			mID = entityKey;
 			mUserData = EntryClass.mUserDataStore.CheckOut(mID);
 				
-			Skills = new Dictionary<SKILLS, Skill>();		
+			Skills = new Dictionary<SKILLS, Skill>();	
+				
+			ComponentStore<BaseObject> store = EntryClass.mCStoreCol.CheckOut<BaseObject>(EntryClass.NUM_ENTRIES * 2); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
+            int index = -1;
+            mMemStore_BaseObject = store.CheckOut(out index);
+			AddUserStruct(typeof(BaseObject), mMemStore_BaseObject, index);
+	
+			//mMemStore_BaseObject.Span[0].InternalTransformIndex = index; // <-- Important to do this here. Eventually we need to be able to modify these when/if our Memory<T> records are ordered differently at runtime
+				
         }
 		
 		public string EntityKey { get {return mID;}}

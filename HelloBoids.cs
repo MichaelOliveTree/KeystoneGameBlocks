@@ -3753,6 +3753,13 @@ namespace HelloBoids
                 // weaponsOwnDamage = 
                 
 
+                // TODO: 
+                // 1- initial test against final probability will determine HIT or MISS
+                // 2- if HIT, then we determine did we HIT the desired target or some other component
+                //    on the target?
+                // 3- if a MISS, did we HIT something else entirely like a friendly with an errant shot?
+                // base on type of weapon used, how many components did get hIT?
+                // 
 
 
 				// OPERATOR TARGETING SKILL LEVEL  

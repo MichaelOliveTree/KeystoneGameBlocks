@@ -734,7 +734,12 @@ namespace HelloBoids
         private double TurnFactor; // For boundary avoidance
 
 		private float MAX_LEVEL = 10.0f;
-		
+					
+		// our LEVELs will be floating points and allow for 0.1, 0.2, ... 2.5...etc -> 10.0
+
+        private float MAX_SKILL_LEVEL = 100f;
+
+
         public OctreeOctant Octree { get; }
         public static IntervalTimers mIntervalTimers;
 
@@ -1524,7 +1529,7 @@ namespace HelloBoids
             Memory<Component> memCmp = storeComp.CheckOut(out checkOutIndex);
 			laser.AddUserStruct(typeof(Component), memCmp, checkOutIndex);
 			memCmp.Span[0].Level = 1;
-			//memCmp.Span[checkOutIndex].Quality = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
+			memCmp.Span[0].Craftsmanship = 0.5f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
 			memCmp.Span[0].Ruggedized = true;
 			
 
@@ -1546,7 +1551,7 @@ namespace HelloBoids
 			memWep.Span[0].Reliable = true;
 			memWep.Span[0].Compact = true;
 			
-			memWep.Span[0].Accuracy = 10;
+			memWep.Span[0].Accuracy = 10; // todo: this should be computed at runtime since damage to the weapon itself can affect its accuracy
 			memWep.Span[0].SnapShot = 2;
 			
 			memWep.Span[0].Malfunction = 0.2f; // todo: this may be not needed if Malfunction is calculated at runtime to include Damage to the weapon when firing) // range 0.0 - 1.0, Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
@@ -3711,39 +3716,90 @@ namespace HelloBoids
 			// TODO: we may not need to loop here exactly through Targets... all of these "targets" can potentially be hit at once with one weapon... say a large nuke.
 			for (int i = 0; i < targets.Count; i++)
 			{
+                double[] weights = new double[10];
+
 				// weapon accuracy is based on Level and Craftsmanship. (verify this also includes effects of any existing damage to this weapon)
+                int baseObjIndex;
 				int componentIndex;
 				int weaponIndex;
 
-				Memory<BaseObject> baseObj = (Memory<BaseObject>)weaponEntity.GetUserStruct(typeof(BaseObject), out componentIndex);
+				Memory<BaseObject> baseObj = (Memory<BaseObject>)weaponEntity.GetUserStruct(typeof(BaseObject), out baseObjIndex);
 				Memory<Weapon> weaponStruct = (Memory<Weapon>)weaponEntity.GetUserStruct(typeof(Weapon), out weaponIndex);
-				double weaponDamage = baseObj.Span[0].HitPoints.Base > 0 ? baseObj.Span[0].HitPoints.Current / baseObj.Span[0].HitPoints.Base : 0;
+                Memory<Component> weaponComponentStruct = (Memory<Component>)weaponEntity.GetUserStruct(typeof(Component), out componentIndex);
 
-				// operator skill  
-				//Skill tacticalOperationsSkill = attackerOperator.Skills[SKILLS.TacticalOperations];
+
+                float levelCoeff = weaponComponentStruct.Span[0].Level / EntryClass.bSim.MAX_LEVEL;
+                levelCoeff = (float)Utils.CalculateExponentialDecay(1, 
+                                                                    0.5, 
+                                                                    weaponComponentStruct.Span[0].Level);
+
+
+                Console.WriteLine ("LEVEL COEFFICIENT == " + levelCoeff.ToString());
+
+
+                // very low craftsmanship seriously effects accuracy, but the higher the
+                // craftsmanship, the advantage starts to fall off... diminishing returns
+                float craftsmanShipCoeff = weaponComponentStruct.Span[0].Craftsmanship;
+                craftsmanShipCoeff = (float)Utils.CalculateExponentialDecay(0.01, 
+                                                                    0.5, 
+                                                                    craftsmanShipCoeff);
+
+                
+                Console.WriteLine ("CRAFTSMANSHIP COEFFICIENT == " + craftsmanShipCoeff.ToString());
+
+				float weaponsOwnDamage = (float)(baseObj.Span[0].HitPoints.Base > 0 ? baseObj.Span[0].HitPoints.Current / baseObj.Span[0].HitPoints.Base : 0);
+
+
+                // weaponsOwnDamage = 
+                
+
+
+
+				// OPERATOR TARGETING SKILL LEVEL  
+                // skill levels range from 0 - 99 with 
+                // 0 - 10 Novice
+                // 11 - 20 Intermediate
+                // 21 - 30 Average
+                // 31 - 40 Advanced
+                // 41 - 50 Professional
+                // 51 - 60 Expert
+                // 61 - 70 Master
+                // 71 - 80 Heroic
+                // 81 - 90 Legendary
+                // 91 - 100 Supernatural
+
 				Skill targetingSkill = attackingOperator.Skills[SKILLS.Targeting];
+                double skillCoefficient = targetingSkill.EffectiveValue / MAX_SKILL_LEVEL;
 
-				// operator Health
-				int baseObjIndex;
+
+
+				// OPERATOR HEALTH
 				baseObj = (Memory<BaseObject>)attackingOperator.GetUserStruct(typeof(BaseObject), out baseObjIndex);
 				
 				int lfIndex;
 				Memory<LifeForm> lfOperator = (Memory<LifeForm>)attackingOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
-				double operatorHealthCoeff = baseObj.Span[0].HitPoints.Base > 0 ? baseObj.Span[0].HitPoints.Current / baseObj.Span[0].HitPoints.Base : 0;
+				double operatorHealthCoeff = baseObj.Span[0].HitPoints.Base > 0 ? baseObj.
+                
+                // OPERATOR FATIGUE
+                Span[0].HitPoints.Current / baseObj.Span[0].HitPoints.Base : 0;
 				double fatigue = lfOperator.Span[0].Fatigue.Base > 0 ? lfOperator.Span[0].Fatigue.Current / lfOperator.Span[0].Fatigue.Base : 0;
 
-				// stealth
 
 
-				// target last acquisition - previous aquisition makes it easier to re-aquire
+                //double probability = Utils.CalculateProbability(stats, weights, bias);
+
+				// TARGET HAS STEALTH TECHNOLOGY
+
+
+				// TARGET PREVIOUSLY ACQUIRED - previous aquisition makes it easier to re-aquire
 				// STATISTICS search
 
-				// sensorLockOfTargetTimeElapsed (aka durationOfSensorAquistion) // how much time has this  target been tracked by sensors already
+				// aka durationOfSensorAquistion) // how much time has this  target been tracked by sensors already
 
 				// TODO: TARGETS must be based off the list of Targets in the TacticalStation that were found and added in 
 
 
-				// target distance	
+				// TARGET PROXIMITY	
 				int sensorArrayIndex = attackingShip.EntityArrayIndex + OPTICAL_SENSOR_OFFSET;
 				int sensorSpanIndex; 
 				EntityNode sensor = Boids[sensorArrayIndex];
@@ -3753,21 +3809,23 @@ namespace HelloBoids
 				// inverse square law for Optical Sensors
 				double detectionProbability = Math.Sqrt(sensorStruct.Span[0].RangeSquared) * (1 / currentTargetDistanceSquared); 
 
-				// target evasive
+				// TARGET USING EVASIVE MANEUVERS
 				// COMPARE VELOCITY MAGNITUDE CHANGES OVER X SECONDS PERIOD OF TIME
 
 
 
-				// target deployed counter measures within X time (time * fallOff aka call it 'attenuation')
+				// TARGET DEPLOYED COUNTER MEASURES within X time (time * fallOff aka call it 'attenuation')
 				// - STATISTICS SEARCH
 			
 
+                // TODO: we havent picked an INITIAL  item to Target on the ship... based on POLICY.
+                //  For instance, do we just want to disable this ship?
 
 				// TODO:  find the actual target that was hit... we may be aiming for an assembly or component and may hit something different, such as a different Component or Operator or even a different Starship or Droid or NOTHING
 				// TODO:  Alternatively, we may have hit another Ship(s) (or one or more of it's assemblies and/or components and/or LifeForms on board)
 				//        Or we may have MISSED altogether
 
-				double[] weights = new double[7];
+				weights = new double[7];
 				ComponentStore<BaseObject> allBaseObjs = (ComponentStore<BaseObject>) EntryClass.mCStoreCol.CheckOut<BaseObject>(); //  attackingTacticalStation.GetUserStruct(typeof(BaseObject), out tacticalStationIndex); 
 				
 				EntityNode droid = Boids[targets[i].EntityArrayIndex];
@@ -3839,6 +3897,11 @@ namespace HelloBoids
 
 				Console.WriteLine("HitHasOccurred() - Hit at subassembly or opponent index '" + selectedIndex.ToString() + "'");
 				
+
+                
+
+
+
 				// the selectedTargets are all the Entities (including sub-Entities within a Ship like sensors, computers, power generators, life support systems, bunks, etc)
 				// that have been "hit" by the weapon being used by the attackingShip
 				List<EntityNode> selectedTargets = new List<EntityNode>();
@@ -4178,10 +4241,9 @@ namespace HelloBoids
 			broken weapon
 			*/
 			
-			criticalMalfunctionHasOccurred = false;
-			
-			// our LEVELs will be floating points and allow for 0.1, 0.2, ... 2.5...etc -> 10.0
-			const double MAX_LEVEL = 10d;
+			criticalMalfunctionHasOccurred = false;              
+
+
 			// malfChance is variable based on weapon craftsmanship, factor is tweakable.
 			// the higher the "factor" and "malfChance" (exponent), the smaller the resulting
 			// Pow() expression result which will make rand.NextDouble() increasingly
@@ -4189,7 +4251,7 @@ namespace HelloBoids
 			
 			double weaponDamageCoefficient = baseObj.Span[0].HitPoints.Base > 0 ? baseObj.Span[0].HitPoints.Current / baseObj.Span[0].HitPoints.Base : 0;
 			double weaponQualityCoefficient = componentStruct.Span[0].MaterialQuality;   
-			double weaponLevelCoefficient = componentStruct.Span[0].Level / MAX_LEVEL;
+			double weaponLevelCoefficient = componentStruct.Span[0].Level / EntryClass.bSim.MAX_LEVEL;
 			double weaponCraftsmanshipCoefficient = componentStruct.Span[0].Craftsmanship;
 			
 			// multiply all coefficients together
@@ -21665,6 +21727,36 @@ public abstract class PlanedFrustum
 			return damageAmountWithVariance;
 		}
 		
+        /// <summary> Exponential Decay
+        /// f(x) = f0 * e^(-r * x)
+        /// </summary>
+        public static double CalculateExponentialDecay(double f0, double r, double x)
+        {
+            // f0 = initial value at time/distance 0
+            // r = decay rate constant (eg 0.5)
+            // x = usually time or distance
+            return f0 * Math.Exp(-r * x);
+        }
+
+
+        /// <summary>
+        /// Google AI "To calculate a probability value from statistical coefficients in C#, you can use a weighted sum (linear combination) followed by a sigmoid function. This method is commonly used in logistics regression to convert raw scores (logits) into a probability between 0 and 1."
+        /// </summary>
+        public static double CalculateProbability(double[] stats, double[] coefficients, double bias)
+        {
+            // 1. Calculate the weighted sum (logit)
+            double z = bias;
+            for (int i = 0; i < stats.Length; i++)
+            {
+                z += stats[i] * coefficients[i];
+            }
+
+            // 2. Apply the sigmoid function to get the probability
+            double probability = 1.0 / (1.0 + Math.Exp(-z));
+            return probability;
+        }
+
+
         public static double  GetVolume (BoundingBox box)
         {
             return box.Depth * box.Width * box.Height;

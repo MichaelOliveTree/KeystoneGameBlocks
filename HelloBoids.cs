@@ -1274,31 +1274,31 @@ namespace HelloBoids
 			exLine = "Spawn() - CreateOpticalSensors 7";
 	
             
-			Vector3d pos = new Vector3d(posX, posY, posZ);
-			BoundingBox box = new BoundingBox (pos, 1);
-			
-			eyes.Translation = pos;
-			eyes.BoundingBox = box; // HACK -direct BoundingBox assignment.  I need a BoundingBox set to insert into Octree since we dont have any geometry to auto compute one for us. 
-			eyes.Configuration |= (uint)CONFIGURATION.PowerUsing; // eyes are sensors so use power
+            Vector3d pos = new Vector3d(posX, posY, posZ);
+            b.BoundingBox = new BoundingBox(pos, 2d);
 			
 			wings.Translation = pos;
-			wings.BoundingBox = box; // HACK
+			wings.BoundingBox = new BoundingBox (pos, 1.25d); // HACK
 			wings.Configuration |= (uint)CONFIGURATION.PowerUsing; // wings flap so use power
 			
+			tacticalStation.Translation = pos;
+			tacticalStation.BoundingBox = new BoundingBox (pos, .4d);// HACK
+			tacticalStation.Configuration |= (uint)CONFIGURATION.PowerUsing; // stations have fancy computer screens that use power
+
+			eyes.Translation = pos;
+			eyes.BoundingBox =  new BoundingBox (pos, 0.2d); // HACK -direct BoundingBox assignment.  I need a BoundingBox set to insert into Octree since we dont have any geometry to auto compute one for us. 
+			eyes.Configuration |= (uint)CONFIGURATION.PowerUsing; // eyes are sensors so use power
+
 			laser.Translation = pos;
-			laser.BoundingBox = box;// HACK
+			laser.BoundingBox =  new BoundingBox (pos, 0.15d); 
 			laser.Configuration |= (uint)CONFIGURATION.PowerUsing; // lasers obviously use power
 			
-			tacticalStation.Translation = pos;
-			tacticalStation.BoundingBox = box;// HACK
-			tacticalStation.Configuration |= (uint)CONFIGURATION.PowerUsing; // stations have fancy computer screens that use power
-			
 			battery.Translation = pos;
-			battery.BoundingBox = box;// HACK
+			battery.BoundingBox = new BoundingBox (pos, 0.1d); 
 			battery.Configuration = (uint)CONFIGURATION.PowerProducing;
 			
 			humanOperator.Translation = pos;
-			humanOperator.BoundingBox = box;// HACK
+			humanOperator.BoundingBox =  new BoundingBox (pos, 0.7d); 
 			humanOperator.Configuration = (uint)HumanOperatorConfiguration;
 
             exLine = "Spawn() - CreateOpticalSensors 8";

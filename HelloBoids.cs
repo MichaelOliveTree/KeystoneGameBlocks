@@ -3711,7 +3711,7 @@ namespace HelloBoids
 			// TODO: we may not need to loop here exactly through Targets... all of these "targets" can potentially be hit at once with one weapon... say a large nuke.
 			for (int i = 0; i < targets.Count; i++)
 			{
-				// weapon accuracy (verify this includes effects of any existing damage on the weapon)
+				// weapon accuracy is based on Level and Craftsmanship. (verify this also includes effects of any existing damage to this weapon)
 				int componentIndex;
 				int weaponIndex;
 
@@ -3795,7 +3795,7 @@ namespace HelloBoids
                                     allBaseObjs.Span[laserIndex].Volume + 
                                     allBaseObjs.Span[batteryIndex].Volume + 
                                     allBaseObjs.Span[humanOperatorIndex].Volume;
-                Console.WriteLine ("HitHasOccurred() - WARNING: TotalVolume == '" + totalVolume.ToString() + "'");
+                Console.WriteLine ("HitHasOccurred() - TotalVolume == '" + totalVolume.ToString() + "'");
                 System.Diagnostics.Debug.Assert (totalVolume > 0, "HitHasOccured() - 'totalVolume' must not be 0.");
 
 
@@ -3823,18 +3823,18 @@ namespace HelloBoids
                 weights[HUMAN_OPERATOR_OFFSET] = allBaseObjs.Span[humanOperatorIndex].Volume / totalVolume;
 				Console.WriteLine ("Weight6 == " + weights[6].ToString());
 
-                double randomPoint = rand.NextDouble();
-
                 // Iterate through the weights in reverse order (since our weights
                 // are in order of largest to smallest) to find which index the random point belongs to.
                 selectedIndex = 0;  
+                double rValue = rand.NextDouble();
                 for (int j = weights.Length - 1; j >= 0; j--)
                 {
-                    if (randomPoint < weights[j])
+                    if (rValue < weights[j])
                     {
                         selectedIndex = j; 
                         break;
                     }
+                    rValue -= weights[j];
                 }
 
 				Console.WriteLine("HitHasOccurred() - Hit at subassembly or opponent index '" + selectedIndex.ToString() + "'");

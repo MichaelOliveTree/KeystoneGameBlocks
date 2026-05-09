@@ -28,7 +28,7 @@ using System.Collections.Generic;
 using System.Linq;
 // using System.Numerics;
 // using System.Runtime.Intrinsics; // for SIMD enabled code
-using Microsoft.CodeAnalysis;
+//using Microsoft.CodeAnalysis;
 using Microsoft.CSharp;
 using System.IO;
 
@@ -756,13 +756,17 @@ namespace HelloBoids
 		private const CONFIGURATION LaserConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.Weapon | CONFIGURATION.Laser;
 		private const CONFIGURATION TacticalStationConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.TacticalStation;
 		private const CONFIGURATION BatteryConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerProducing;
-			
-			
+						
 		
-		public const int OPTICAL_SENSOR_OFFSET = 1;
-		public const int WINGS_OFFSET = 2;
-		public const int LASER_OFFSET = 3;
-		public const int TACTICAL_STATION_OFFSET = 4;
+        // NOTE: these offsets are only necessary because we do not have EntityNode.Children
+        //      which is where the Wings, Station, Sensors, Batteries and Human Operators 
+        //      would normally be found.
+		// note: the order of these offsets is arbitrary mostly...  tried to go from
+        // largest to smallest assemblies and components
+		public const int WINGS_OFFSET = 1;
+		public const int TACTICAL_STATION_OFFSET = 2;
+        public const int OPTICAL_SENSOR_OFFSET = 3;
+        public const int LASER_OFFSET = 4;
 		public const int BATTERY_OFFSET = 5;
 		public const int HUMAN_OPERATOR_OFFSET = 6;
 		
@@ -829,7 +833,7 @@ namespace HelloBoids
 #if USE_MEMORY_T
 
             // add data processors
-            DataProcessorsStore.Processor<LifeForm> lifeCycleBehavior = DoLifeCycle;
+            DataProcessorsStore.Processor<BaseObject> lifeCycleBehavior = DoLifeCycle;
             mDataProcessor.Add("LIFECYCLE", lifeCycleBehavior);
 
 			
@@ -880,19 +884,27 @@ namespace HelloBoids
             //for (int i = 0; i < numBoids; i++)
             {
 				Random mTHRandom = ThreadedRandom.Instance; //(this.Seeds.Master);
-				
+				//Console.WriteLine("BoidSimulation.ctor() - Thread created.");
+                
                 // todo: the above doesn't make a diff, but perhaps
                 // if i added dummy objects into the array instead..?
-                object[] tmp = MemoryFragmenter.CreateAndFreeObjects(EntryClass.FRAGMENTED_OBJ_SIZE);
-                for (int j = 0; j < tmp.Length; j++)
-                    bint += tmp[j].GetHashCode();
-
-     			if(EntryClass.NUM_TO_PIN > 0)
-                    MemoryFragmenter.Fragment(EntryClass.NUM_TO_PIN, 512, EntryClass.NUM_TO_PIN / 2, 128);
-
+                if(EntryClass.NUM_TO_PIN > 0)
+                {
+                    object[] tmp = MemoryFragmenter.CreateAndFreeObjects(EntryClass.FRAGMENTED_OBJ_SIZE);
+                    for (int j = 0; j < tmp.Length; j++)
+                        bint += tmp[j].GetHashCode();
+    
+         			if(EntryClass.NUM_TO_PIN > 0)
+                        MemoryFragmenter.Fragment(EntryClass.NUM_TO_PIN, 512, EntryClass.NUM_TO_PIN / 2, 128);
+                }
+                
+                //Console.WriteLine("BoidSimulation.ctor() - PRE-SPAWN " + i.ToString());
+                
 				// spawn will add to the Octree 
-				Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> result = Spawn(mTHRandom, (int)i * ENTITIES_PER_DROID, width, height, depth);
-				int arrayIndex = (int)i * ENTITIES_PER_DROID;
+				Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode> result = 
+                    Spawn(mTHRandom, (int)i * ENTITIES_PER_DROID, width, height, depth);
+				
+                int arrayIndex = (int)i * ENTITIES_PER_DROID;
                 
 				Boids[arrayIndex]                           = result.Item1; // NOTE: must use direct assignment after having pre-initialize List<> since List<> is not threadsafe
 				Boids[arrayIndex + OPTICAL_SENSOR_OFFSET]   = result.Item2;
@@ -901,10 +913,15 @@ namespace HelloBoids
 				Boids[arrayIndex + TACTICAL_STATION_OFFSET] = result.Item5;
 				Boids[arrayIndex + BATTERY_OFFSET]          = result.Item6;
 				Boids[arrayIndex + HUMAN_OPERATOR_OFFSET]   = result.Item7;
-				
+
+                //Console.WriteLine("BoidSimulation.ctor() - POST-SPAWN " + i.ToString());
+                    
+                
 				
 				Statistics[arrayIndex] = new Statistics (PREFIX + arrayIndex.ToString());
-				
+                //Console.WriteLine("BoidSimulation.ctor() - POST STATS " + i.ToString());
+                
+                
 				//Boids.Add(b); // <-- will not work here as List<> is not threadsafe
 				//Console.WriteLine("i == " + i.ToString()); 
 								  
@@ -970,7 +987,7 @@ namespace HelloBoids
 			}
 			else if (config == (uint)BoidConfiguration)
 			{
-				return null;
+				index = index; // this is already a Droid and is it's own Owner for purposes of this function
 			}
 			
 			owner = Boids[index];
@@ -1141,7 +1158,41 @@ namespace HelloBoids
 
 				//EntryClass.mUserDataStore[entityKey].SetString("faction", factionColor);
 				System.Diagnostics.Debug.Assert(b.BlackBoardData == EntryClass.mUserDataStore[entityKey], "Spawn() -- UserData objects do not match.");
-			}
+			
+			
+    			// private const CONFIGURATION BoidConfiguration = CONFIGURATION.Transform | CONFIGURATION.RigidBody | CONFIGURATION.Sentient | CONFIGURATION.SelfPropelled;
+    			
+    			// Transform needs Configuration set... for now... its required by ProcessOpticalSensors()  hrm...
+                //ComponentStore<Transform.Transform_Struct> storeTransform = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(EntryClass.NUM_ENTRIES); 
+                int transformIndex = -1;
+    			//Memory<Transform.Transform_Struct> memAllTransforms = storeTransform.CheckOut(out transformIndex);
+    			Memory<Transform.Transform_Struct> memTransform = (Memory<Transform.Transform_Struct>)b.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
+                memTransform.Span[0].Configuration = BoidConfiguration;
+                // AddUserStruct() is not needed because Transform_Struct is created in the Transform.ctor()
+    			// b.AddUserStruct(typeof(Transform.Transform_Struct), memAllTransforms, transformIndex);
+    
+                exLine = "Spawn() - baseObj creation 1";
+    			int baseObjIndex;
+    			Memory<BaseObject> memBaseObj = (Memory<BaseObject>)b.GetUserStruct(typeof(BaseObject), out baseObjIndex); 
+    			memBaseObj.Span[0].Configuration = BoidConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
+                memBaseObj.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
+                memBaseObj.Span[0].HitPoints =  new Stat(){ Base = 250, Current = 250};
+    
+    			// LIFE FORM
+    			ComponentStore<LifeForm> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LifeForm>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+                int livingEntityID = -1;
+                Memory<LifeForm> memLivingEnt = storeLivingEntity.CheckOut(out livingEntityID);
+    			b.AddUserStruct(typeof(LifeForm), memLivingEnt, livingEntityID);			
+    			storeLivingEntity.Span[livingEntityID].Age = 1;
+    	
+    			
+    			// ARMOR: this may require an array of checkOutIndices based on how many layers as determined from 
+    			//       component.ArmorLayersCount
+    			ComponentStore<ArmorLayer> storeArmorLayers = EntryClass.mCStoreCol.CheckOut<ArmorLayer>(EntryClass.NUM_ENTRIES); 
+                int checkOutIndex = -1;
+                Memory<ArmorLayer> memArmor = storeArmorLayers.CheckOut(out checkOutIndex);
+    			b.AddUserStruct(typeof(Armor), memArmor, checkOutIndex);
+    		}
 			catch (Exception ex)
 			{
 				Console.WriteLine (exLine + " " + ex.Message);
@@ -1171,40 +1222,8 @@ namespace HelloBoids
 			{
 				Console.WriteLine(exLine + " " + ex.Message);
 			}
-			
-			
-			// private const CONFIGURATION BoidConfiguration = CONFIGURATION.Transform | CONFIGURATION.RigidBody | CONFIGURATION.Sentient | CONFIGURATION.SelfPropelled;
-			
-			// NOTE: Do NOT use the allTransforms method below
-			//ComponentStore<Transform.Transform_Struct> storeTransform = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(EntryClass.NUM_ENTRIES); 
-            //int transformIndex = -1;
-			//Memory<Transform.Transform_Struct> memAllTransforms = storeTransform.CheckOut(out transformIndex);
-			//memAllTransforms.Span[transformIndex].Configuration = BoidConfiguration;
-			// b.AddUserStruct(typeof(Transform.Transform_Struct), memAllTransforms, transformIndex);
-			
-		
-			int baseObjIndex;
-			Memory<BaseObject> baseObj = (Memory<BaseObject>)b.GetUserStruct(typeof(BaseObject), out baseObjIndex); 
-			baseObj.Span[baseObjIndex].Configuration = BoidConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
-			baseObj.Span[baseObjIndex].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
-			baseObj.Span[baseObjIndex].HitPoints =  new Stat(){ Base = 250, Current = 250};
 
-			// LIFE FORM
-			ComponentStore<LifeForm> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LifeForm>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-            int livingEntityID = -1;
-            Memory<LifeForm> memLivingEnt = storeLivingEntity.CheckOut(out livingEntityID);
-			b.AddUserStruct(typeof(LifeForm), memLivingEnt, livingEntityID);			
-			storeLivingEntity.Span[livingEntityID].Age = 1;
-	
-			
-			// ARMOR: this may require an array of checkOutIndices based on how many layers as determined from 
-			//       component.ArmorLayersCount
-			ComponentStore<ArmorLayer> storeArmorLayers = EntryClass.mCStoreCol.CheckOut<ArmorLayer>(EntryClass.NUM_ENTRIES); 
-            int checkOutIndex = -1;
-            Memory<ArmorLayer> memArmor = storeArmorLayers.CheckOut(out checkOutIndex);
-			b.AddUserStruct(typeof(Armor), memArmor, checkOutIndex);
-			
-			
+                    
 			////////////////////////////////////////////////////////////////////////////////////////////////////
 			// EYES
 			exLine = "Spawn() - CreateOpticalSensors 1";
@@ -1217,16 +1236,18 @@ namespace HelloBoids
 			{
 				Console.WriteLine(exLine + " " + ex.Message);
 			}
-						
+
+            exLine = "Spawn() - CreateOpticalSensors 2";
 			////////////////////////////////////////////////////////////////////////////////////////////////////
 			// WINGS need power to fly
 			EntityNode wings = CreateWings(arrayIndex  + WINGS_OFFSET);
-			
+
+            exLine = "Spawn() - CreateOpticalSensors 3";
 			// ////////////////////////////////////////////////////////////////////////////////////////////////////
 			// Laser
 			EntityNode laser = CreateLaser(arrayIndex + LASER_OFFSET);
 			
-			
+			exLine = "Spawn() - CreateOpticalSensors 4";
 			////////////////////////////////////////////////////////////////////////////////////////////////////
 			// TACTICAL STATION
 			EntityNode tacticalStation = CreateTacticalStation(arrayIndex + TACTICAL_STATION_OFFSET);
@@ -1240,17 +1261,19 @@ namespace HelloBoids
 			// TODO: I think we need to remove all struct creation from within Boid or EntityNode because we are unable
 			//       to manage the Index values properly that way.
 
-			
-			
+			exLine = "Spawn() - CreateOpticalSensors 5";
 			////////////////////////////////////////////////////////////////////////////////////////////////////
 			// BATTERY to power Eyes, Wings, Laser and TacticalStation
 			EntityNode battery = CreateBattery(arrayIndex + BATTERY_OFFSET);
-			
+
+            exLine = "Spawn() - CreateOpticalSensors 6";
 			////////////////////////////////////////////////////////////////////////////////////////////////////
 			// HUMAN OPERATOR for the tactical station
 			EntityNode humanOperator = CreateHumanOperator(arrayIndex + HUMAN_OPERATOR_OFFSET);
 			
-						
+			exLine = "Spawn() - CreateOpticalSensors 7";
+	
+            
 			Vector3d pos = new Vector3d(posX, posY, posZ);
 			BoundingBox box = new BoundingBox (pos, 1);
 			
@@ -1277,7 +1300,10 @@ namespace HelloBoids
 			humanOperator.Translation = pos;
 			humanOperator.BoundingBox = box;// HACK
 			humanOperator.Configuration = (uint)HumanOperatorConfiguration;
-			
+
+            exLine = "Spawn() - CreateOpticalSensors 8";
+            //Console.WriteLine(exLine);
+            
 		    if (this.Octree != null)
             {
            		Octree.Add((EntityNode)b);
@@ -1292,9 +1318,15 @@ namespace HelloBoids
 				Octree.Add((EntityNode)humanOperator);
             }
 
+            exLine = "Spawn() - CreateOpticalSensors 9";
+            //Console.WriteLine(exLine);
+            
 			result = 
 					new Tuple<Boid, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode, EntityNode>(b, eyes, wings, laser, tacticalStation, battery, humanOperator);
-			return result;
+			
+            exLine = "Spawn() - CreateOpticalSensors 10";
+            //Console.WriteLine(exLine);
+            return result;
 		}
 		
 		// todo: typically creation of structs and production and consumption would be handled in an Entity script - eg eventually for KGB it might be  \\data\\mods\\caesar\\scripts_entities\\sensor_radar.css
@@ -1318,21 +1350,19 @@ namespace HelloBoids
 			transform.Span[0].Configuration = OpticalSensorConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
 			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
 
-			ComponentStore<BaseObject> storeBaseObjs = EntryClass.mCStoreCol.CheckOut<BaseObject>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+            // BaseObjects are created internally during EntityNode ctor for now, so no need to call .AddUserStruct()
 			int baseObjsIndex = -1;
-			Memory<BaseObject> memComp = storeBaseObjs.CheckOut(out baseObjsIndex);
-			opticalSensor.AddUserStruct(typeof(BaseObject), memComp, baseObjsIndex);
-
-			storeBaseObjs.Span[baseObjsIndex].Configuration = OpticalSensorConfiguration;
-			storeBaseObjs.Span[baseObjsIndex].EntityArrayIndex = arrayIndex;
+			Memory<BaseObject> memBaseObj = (Memory<BaseObject>)opticalSensor.GetUserStruct(typeof(BaseObject), out baseObjsIndex); 
+			memBaseObj.Span[0].Configuration = OpticalSensorConfiguration;
+			memBaseObj.Span[0].EntityArrayIndex = arrayIndex;
 
 			// powerconsumer struct
 			ComponentStore<PowerConsumer> storePowerConsumer = EntryClass.mCStoreCol.CheckOut<PowerConsumer>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
 			int powerConsumerInternalIndex = -1;
 			Memory<PowerConsumer> memPowerConsumer = storePowerConsumer.CheckOut(out powerConsumerInternalIndex);
 			opticalSensor.AddUserStruct(typeof(PowerConsumer), memPowerConsumer, powerConsumerInternalIndex);
-			storePowerConsumer.Span[powerConsumerInternalIndex].Configuration = WingsConfiguration;
-			storePowerConsumer.Span[powerConsumerInternalIndex].EntityArrayIndex = arrayIndex;
+			memPowerConsumer.Span[0].Configuration = WingsConfiguration;
+			memPowerConsumer.Span[0].EntityArrayIndex = arrayIndex;
 			
 			
 			int sensorInternalIndex = -1;
@@ -1427,21 +1457,19 @@ namespace HelloBoids
 			transform.Span[0].Configuration = WingsConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
 			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
 
-			// BaseObject struct
-			ComponentStore<BaseObject> storeBaseObjs = EntryClass.mCStoreCol.CheckOut<BaseObject>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-			int baseObjInternalIndex = -1;
-			Memory<BaseObject> memComp = storeBaseObjs.CheckOut(out baseObjInternalIndex);
-			wings.AddUserStruct(typeof(BaseObject), memComp, baseObjInternalIndex);
-			storeBaseObjs.Span[baseObjInternalIndex].Configuration = WingsConfiguration;
-			storeBaseObjs.Span[baseObjInternalIndex].EntityArrayIndex = arrayIndex;
+			// BaseObjects are created internally during EntityNode ctor for now, so no need to call .AddUserStruct()
+			int baseObjsIndex = -1;
+			Memory<BaseObject> memBaseObj = (Memory<BaseObject>)wings.GetUserStruct(typeof(BaseObject), out baseObjsIndex); 
+			memBaseObj.Span[0].Configuration = WingsConfiguration;
+			memBaseObj.Span[0].EntityArrayIndex = arrayIndex;
 
 			// powerconsumer struct
 			ComponentStore<PowerConsumer> storeWings = EntryClass.mCStoreCol.CheckOut<PowerConsumer>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
 			int powerConsumerInternalIndex = -1;
 			Memory<PowerConsumer> memWings = storeWings.CheckOut(out powerConsumerInternalIndex);
 			wings.AddUserStruct(typeof(PowerConsumer), memWings, powerConsumerInternalIndex);
-			storeWings.Span[powerConsumerInternalIndex].Configuration = WingsConfiguration;
-			storeWings.Span[powerConsumerInternalIndex].EntityArrayIndex = arrayIndex;
+			memWings.Span[0].Configuration = WingsConfiguration;
+			memWings.Span[0].EntityArrayIndex = arrayIndex;
 			
 			// each Wing CONSUMES PRODUCT.ElectricalPower from our Battery (a Producer)
 			Consumption c;
@@ -1472,14 +1500,18 @@ namespace HelloBoids
 						
 			//CONFIGURATION LaserConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.Weapon | CONFIGURATION.Laser;
 			
-			// Base Object
-			ComponentStore<BaseObject> storeBaseObjs = EntryClass.mCStoreCol.CheckOut<BaseObject>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-            int baseObjIndex = -1;
-            Memory<BaseObject> memBaseObjs = storeBaseObjs.CheckOut(out baseObjIndex);
-			laser.AddUserStruct(typeof(BaseObject), memBaseObjs, baseObjIndex);
-			storeBaseObjs.Span[checkOutIndex].Configuration = LaserConfiguration;
-			storeBaseObjs.Span[checkOutIndex].EntityArrayIndex = laser.EntityArrayIndex;
-			
+			// BaseObjects are created internally during EntityNode ctor for now, so no need to call .AddUserStruct()
+			int baseObjsIndex = -1;
+			Memory<BaseObject> memBaseObj = (Memory<BaseObject>)laser.GetUserStruct(typeof(BaseObject), out baseObjsIndex); 
+			memBaseObj.Span[0].Configuration = LaserConfiguration;
+			memBaseObj.Span[0].EntityArrayIndex = arrayIndex;
+			//memBaseObj.Span[0].HitPoints = 100;
+			//memBaseObj.Span[0].DR = 20;  // todo: if we use complex armor, is DR (damage resistance) used?
+			//memBaseObj.Span[chec0kOutIndex].Cost = 10d;
+			//memBaseObj.Span[0].Weight = 2.5d;
+			//memBaseObj.Span[0].SurfaceArea = 1d;
+			//memBaseObj.Span[0].Volume = 0.2d;
+            
 			// transform struct
 			int transformIndex;
 			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)laser.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
@@ -1491,47 +1523,42 @@ namespace HelloBoids
             int checkOutIndex = -1;
             Memory<Component> memCmp = storeComp.CheckOut(out checkOutIndex);
 			laser.AddUserStruct(typeof(Component), memCmp, checkOutIndex);
-			storeComp.Span[checkOutIndex].Level = 1;
-			//storeComp.Span[checkOutIndex].Quality = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
-			storeComp.Span[checkOutIndex].Ruggedized = true;
-			//storeComp.Span[checkOutIndex].HitPoints = 100;
-			//storeComp.Span[checkOutIndex].DR = 20;  // todo: if we use complex armor, is DR (damage resistance) used?
-			//storeComp.Span[checkOutIndex].Cost = 10d;
-			//storeComp.Span[checkOutIndex].Weight = 2.5d;
-			//storeComp.Span[checkOutIndex].SurfaceArea = 1d;
-			//storeComp.Span[checkOutIndex].Volume = 0.2d;
+			memCmp.Span[0].Level = 1;
+			//memCmp.Span[checkOutIndex].Quality = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
+			memCmp.Span[0].Ruggedized = true;
+			
 
 			// powerconsumer struct
 			ComponentStore<PowerConsumer> storePowerConsumer = EntryClass.mCStoreCol.CheckOut<PowerConsumer>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
 			int powerConsumerInternalIndex = -1;
 			Memory<PowerConsumer> memPowerConsumer = storePowerConsumer.CheckOut(out powerConsumerInternalIndex);
 			laser.AddUserStruct(typeof(PowerConsumer), memPowerConsumer, powerConsumerInternalIndex);
-			storePowerConsumer.Span[powerConsumerInternalIndex].Configuration = WingsConfiguration;
-			storePowerConsumer.Span[powerConsumerInternalIndex].EntityArrayIndex = arrayIndex;
+			memPowerConsumer.Span[0].Configuration = WingsConfiguration;
+			memPowerConsumer.Span[0].EntityArrayIndex = arrayIndex;
 			
 			// weapon struct
 			ComponentStore<Weapon> storeWeapon = EntryClass.mCStoreCol.CheckOut<Weapon>(EntryClass.NUM_ENTRIES);
             checkOutIndex = -1;
             Memory<Weapon> memWep = storeWeapon.CheckOut(out checkOutIndex);
 			laser.AddUserStruct(typeof(Weapon), memWep, checkOutIndex);	
-			storeWeapon.Span[checkOutIndex].EntityArrayIndex = laser.EntityArrayIndex;
-			storeWeapon.Span[checkOutIndex].Configuration = LaserConfiguration;
-			storeWeapon.Span[checkOutIndex].Reliable = true;
-			storeWeapon.Span[checkOutIndex].Compact = true;
+			memWep.Span[0].EntityArrayIndex = laser.EntityArrayIndex;
+			memWep.Span[0].Configuration = LaserConfiguration;
+			memWep.Span[0].Reliable = true;
+			memWep.Span[0].Compact = true;
 			
-			storeWeapon.Span[checkOutIndex].Accuracy = 10;
-			storeWeapon.Span[checkOutIndex].SnapShot = 2;
+			memWep.Span[0].Accuracy = 10;
+			memWep.Span[0].SnapShot = 2;
 			
-			storeWeapon.Span[checkOutIndex].Malfunction = 0.2f; // todo: this may be not needed if Malfunction is calculated at runtime to include Damage to the weapon when firing) // range 0.0 - 1.0, Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
+			memWep.Span[0].Malfunction = 0.2f; // todo: this may be not needed if Malfunction is calculated at runtime to include Damage to the weapon when firing) // range 0.0 - 1.0, Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
 
 			
-			storeWeapon.Span[checkOutIndex].NumShots = 3;  // todo: Needs to be like HitPoints with .Base and .Current   eg. how many bullets are in a magazine 
-			storeWeapon.Span[checkOutIndex].ReloadCoolDown = 3.0f; //
-			storeWeapon.Span[checkOutIndex].CoolDown = 0.3f; // This is Rate-of-Fire.  This is the cooldown between when this weapon can be fired again.  It is RoF and perhaps CyclicRate too ultimately. Any "ANIMATION" of the weapon firing should last less than the time of this cooldown!
+			memWep.Span[0].NumShots = 3;  // todo: Needs to be like HitPoints with .Base and .Current   eg. how many bullets are in a magazine 
+			memWep.Span[0].ReloadCoolDown = 3.0f; //
+			memWep.Span[0].CoolDown = 0.3f; // This is Rate-of-Fire.  This is the cooldown between when this weapon can be fired again.  It is RoF and perhaps CyclicRate too ultimately. Any "ANIMATION" of the weapon firing should last less than the time of this cooldown!
 
 			
 			// todo: PowerReqt should be part of PowerUsing struct?
-//			storeWeapon.Span[checkOutIndex].PowerReqt = 0.0f;
+//			storeWmemWepeapon.Span[0].PowerReqt = 0.0f;
 
 
 			// TODO: these are like "internal" items and can be used if another power source is no longer connected
@@ -1540,13 +1567,13 @@ namespace HelloBoids
 //			double PowerCellWeight;
 			
 			// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
-//			storeWeapon.Span[checkOutIndex].TypeDamage = DAMAGE_TYPE.Burning;     // TOOD: Need an ENUM
-			storeWeapon.Span[checkOutIndex].AverageDamage = 32;       
+//			memWep.Span[0].TypeDamage = DAMAGE_TYPE.Burning;     // TOOD: Need an ENUM
+			memWep.Span[0].AverageDamage = 32;       
 //			double KEDamage = 3.0d;
-			storeWeapon.Span[checkOutIndex].FallOffStart = 25; 
+			memWep.Span[0].FallOffStart = 25; 
 //			double VacuumFallOffStart;
-			storeWeapon.Span[checkOutIndex].Range = 10;   
-			storeWeapon.Span[checkOutIndex].RangeSquared = storeWeapon.Span[checkOutIndex].Range * storeWeapon.Span[checkOutIndex].Range;
+			memWep.Span[0].Range = 10;   
+			memWep.Span[0].RangeSquared = memWep.Span[0].Range * memWep.Span[0].Range;
 //			public double MaxRange2;
 //			public double VacuumMaxRange;
 //			public double VacuumMaxRange2;
@@ -1558,13 +1585,13 @@ namespace HelloBoids
             checkOutIndex = -1;
             Memory<Laser_Struct>memLaser = storeLasers.CheckOut(out checkOutIndex);
             laser.AddUserStruct(typeof(Laser_Struct), memLaser, checkOutIndex);
-			storeLasers.Span[checkOutIndex].EntityArrayIndex = laser.EntityArrayIndex;
-			storeLasers.Span[checkOutIndex].Configuration = LaserConfiguration;
-			storeLasers.Span[checkOutIndex].Type = 1;     
-			storeLasers.Span[checkOutIndex].EnergyDrill = false;
-			storeLasers.Span[checkOutIndex].FTL = true;
-			storeLasers.Span[checkOutIndex].BeamOutput = 10f; // kW
-			storeLasers.Span[checkOutIndex].CyclicRate = 1;
+			memLaser.Span[0].EntityArrayIndex = laser.EntityArrayIndex;
+			memLaser.Span[0].Configuration = LaserConfiguration;
+			memLaser.Span[0].Type = 1;     
+			memLaser.Span[0].EnergyDrill = false;
+			memLaser.Span[0].FTL = true;
+			memLaser.Span[0].BeamOutput = 10f; // kW
+			memLaser.Span[0].CyclicRate = 1;
 					
 			// each Laser CONSUMES PRODUCT.ElectricalPower from our Battery (a Producer)
 			Consumption c;
@@ -1591,13 +1618,11 @@ namespace HelloBoids
 			
 			//CONFIGURATION TacticalStationConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.TacticalStation;
 
-			// Base Object
-			ComponentStore<BaseObject> storeBaseObjs = EntryClass.mCStoreCol.CheckOut<BaseObject>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-            int baseObjIndex = -1;
-            Memory<BaseObject> memBaseObjs = storeBaseObjs.CheckOut(out baseObjIndex);
-			station.AddUserStruct(typeof(BaseObject), memBaseObjs, baseObjIndex);
-			storeBaseObjs.Span[checkOutIndex].Configuration = TacticalStationConfiguration;
-			storeBaseObjs.Span[checkOutIndex].EntityArrayIndex = station.EntityArrayIndex;		
+			// BaseObjects are created internally during EntityNode ctor for now, so no need to call .AddUserStruct()
+			int baseObjsIndex = -1;
+			Memory<BaseObject> memBaseObj = (Memory<BaseObject>)station.GetUserStruct(typeof(BaseObject), out baseObjsIndex); 
+			memBaseObj.Span[0].Configuration = TacticalStationConfiguration;
+			memBaseObj.Span[0].EntityArrayIndex = arrayIndex;
 			
 			// transform struct
 			int transformIndex;
@@ -1694,13 +1719,11 @@ namespace HelloBoids
 			
 			//CONFIGURATION BatteryConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerProducer;
 			
-			// Base Object
-			ComponentStore<BaseObject> storeBaseObjs = EntryClass.mCStoreCol.CheckOut<BaseObject>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
-            int baseObjIndex = -1;
-            Memory<BaseObject> memBaseObjs = storeBaseObjs.CheckOut(out baseObjIndex);
-			battery.AddUserStruct(typeof(BaseObject), memBaseObjs, baseObjIndex);
-			storeBaseObjs.Span[checkOutIndex].Configuration = BatteryConfiguration;
-			storeBaseObjs.Span[checkOutIndex].EntityArrayIndex = battery.EntityArrayIndex;
+			// BaseObjects are created internally during EntityNode ctor for now, so no need to call .AddUserStruct()
+			int baseObjsIndex = -1;
+			Memory<BaseObject> memBaseObj = (Memory<BaseObject>)battery.GetUserStruct(typeof(BaseObject), out baseObjsIndex); 
+			memBaseObj.Span[0].Configuration = BatteryConfiguration;
+			memBaseObj.Span[0].EntityArrayIndex = arrayIndex;
 			
 			
 			// transform struct
@@ -1807,22 +1830,21 @@ namespace HelloBoids
 			EntityNode humanOperator = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
 			humanOperator.Configuration = (uint)HumanOperatorConfiguration;
 			
-			// BASE OBJECT
-			int baseObjIndex;
-			Memory<BaseObject> baseObj = (Memory<BaseObject>)humanOperator.GetUserStruct(typeof(BaseObject), out baseObjIndex); 
-			baseObj.Span[baseObjIndex].Configuration = HumanOperatorConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
-			baseObj.Span[baseObjIndex].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
-			baseObj.Span[baseObjIndex].HitPoints =  new Stat(){ Base = 100, Current = 100};
-			baseObj.Span[baseObjIndex].Configuration = HumanOperatorConfiguration;
+            // BaseObjects are created internally during EntityNode ctor for now, so no need to call .AddUserStruct()
+			int baseObjsIndex = -1;
+			Memory<BaseObject> memBaseObj = (Memory<BaseObject>)humanOperator.GetUserStruct(typeof(BaseObject), out baseObjsIndex); 
+			memBaseObj.Span[0].Configuration = HumanOperatorConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
+			memBaseObj.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
+            memBaseObj.Span[0].HitPoints =  new Stat(){ Base = 100, Current = 100};
 			
 			double volume = 2.2d;
 			BoundingBox box = new BoundingBox (Vector3d.Zero(), volume);
-			baseObj.Span[baseObjIndex].Armor = new Armor(box);
+			memBaseObj.Span[0].Armor = new Armor(box);
 			
 			// TRANSFORM
-			//int transformIndex;
-			//Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)humanOperator.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
-			
+			int transformIndex;
+			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)humanOperator.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
+			transform.Span[0].Configuration = HumanOperatorConfiguration;
 		
 			// LIVING ENTITY
 			ComponentStore<LifeForm> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LifeForm>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
@@ -1956,7 +1978,7 @@ namespace HelloBoids
 	#if USE_MEMORY_T == false
 				// TEST CLASSES (Object Oriented Technique)
 				// =====================
-				this.UpdateClasses(gt); 
+				//this.UpdateClasses(gt); 
 				
 				/*
 								   this.Boids,
@@ -1973,14 +1995,17 @@ namespace HelloBoids
 
 				// TEST MEMORY<T> (Data Oriented Technique)
 				// ====================
-				
+
+                int lineNum = 0;		
+                
 				try
 				{
 					// CLEAR
-									
-					mDamageSystem.Clear();
-					mDamageOverTimeSystem.Clear();
 					
+					mDamageSystem.Clear();
+                    lineNum = 1;
+					mDamageOverTimeSystem.Clear();
+					lineNum = 2;
 					
 					// production that occurs every frame
 					UpdateProduction(gt);
@@ -1994,7 +2019,7 @@ namespace HelloBoids
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine("Update() - UpdateProduction() - " + ex.Message);
+					Console.WriteLine("Update() - UpdateProduction() - " + lineNum.ToString() + " " + ex.Message);
 				}
 				
 
@@ -2005,7 +2030,8 @@ namespace HelloBoids
 					//       will not be initialized during this first call to Do_Tactical_Logic()!
 					Do_Tactical_Logic (Seeds.Master, elapsedSeconds, gt);
 					linePos = 2;
-				}
+                    //Console.WriteLine("Update() - Do_Droid_Logic() completed.");
+                }
 				catch (Exception ex)
 				{
 					Console.WriteLine("Update() - Do_Droid_Logic() " + ex.Message);
@@ -2019,6 +2045,7 @@ namespace HelloBoids
 				{
 					mSkillModificationSystem.Process(livingEntityStore, null, Seeds.Master, gt);
 					linePos = 3;
+                    //Console.WriteLine("Update() - mSkillModificationSystem() completed.");
 				}
 				catch (Exception ex)
 				{
@@ -2032,6 +2059,7 @@ namespace HelloBoids
 				{
 					mDamageSystem.Process(baseObjStore, null, Seeds.Master, gt);
 					linePos = 4;
+                    //Console.WriteLine("Update() - mDamageSystem() completed.");
 				}
 				catch (Exception ex)
 				{
@@ -2042,6 +2070,7 @@ namespace HelloBoids
 				{
 					mDamageOverTimeSystem.Process(baseObjStore, null, Seeds.Master, gt);
 					linePos = 5;
+                    //Console.WriteLine("Update() - mDamageOverTimeSystem() completed.");
 				}
 				catch (Exception ex)
 				{
@@ -2056,6 +2085,7 @@ namespace HelloBoids
 					// OPTICAL_SENSING <- creation of mNeighbors<> adjacency 
 					// FLOCKING
 					mDataProcessor.Update(gt, Boids.ToArray());
+                    //Console.WriteLine("Update() - mDataProcessor() completed.");
 					linePos = 6;
 					// mProductionProcessor.Update(gt, Boids.ToArray());
 					// POWER_PRODUCTION
@@ -2110,143 +2140,144 @@ namespace HelloBoids
 		/// </summary>
         //public void UpdateClasses(GameTime gt, List<Boid> allBoids, double separationDistance, double separationFactor, double alignmentDistance, double alignmentFactor, 
 		//						  double cohesionDistance, double cohesionFactor, double maxSpeed, double turnFactor)
-		
-		public void UpdateClasses(GameTime gt)
-		{
-									  
-            //////////////////////////////////////////////////////////////////
-            // Life Cycle
-            //////////////////////////////////////////////////////////////////
-			/*
-			sting entityKey = currentBoid.EntityKey;
-            bool spawnReady = mIntervalTimers.IsReady(entityKey, "droid_spawn");
-            if (spawnReady)
-            {
-				
-                //Console.WriteLine("Spawn Ready == " + spawnReady.ToString());
-                mIntervalTimers.Reset(entityKey, "droid_spawn");
-            }
-			*/
+
+
+//		public void UpdateClasses(GameTime gt)
+//		{
+//									  
+//           //////////////////////////////////////////////////////////////////
+//            // Life Cycle
+//           //////////////////////////////////////////////////////////////////
+//			/*
+//			sting entityKey = currentBoid.EntityKey;
+//            bool spawnReady = mIntervalTimers.IsReady(entityKey, "droid_spawn");
+//            if (spawnReady)
+//            {
+//				
+//                //Console.WriteLine("Spawn Ready == " + spawnReady.ToString());
+//                mIntervalTimers.Reset(entityKey, "droid_spawn");
+//            }
+//			*/
 			
-            //////////////////////////////////////////////////////////////////
-            // Flocking
-            //////////////////////////////////////////////////////////////////		
-			
-			int count = Boids.Count;
-            System.Threading.Tasks.Parallel.For(0, count, i => 
-            //for (int i = 0; i < Boids.Count; i++)
-            {
-				if (Boids[(int)i] is Boid == false) return;
-				
-				
-                List<int> found;
-                List<Boid> neighbors;
-
-				double separationDistance = EntryClass.SEPERATION_DISTANCE;
-				double alignmentDistance = EntryClass.ALIGNMENT_DISTANCE;
-				double cohesionDistance = EntryClass.COHESION_DISTANCE;
-
-				// more parameters
-				double separationFactor = EntryClass.SEPARATION_FACTOR;
-				double alignmentFactor = EntryClass.ALIGNMENT_FACTOR;
-				double cohesionFactor = EntryClass.COHESION_FACTOR;
-				double turnFactor =  EntryClass.TURN_FACTOR; // For boundary avoidance
-				double maxSpeed = EntryClass.MAX_SPEED;
-				
-				double seperatationDistanceSquare = separationDistance * separationDistance;
-				double alignmentDistanceSquared = alignmentDistance * alignmentDistance;
-				double cohesionDistanceSquared = cohesionDistance * cohesionDistance;
-				
-				double elapsedSeconds = gt.ElapsedSeconds;
-            	double largestDistance = Utils.GetMax(this.SeparationDistance, this.AlignmentDistance, this.CohesionDistance);
-            	double largestDistanceSquared = largestDistance * largestDistance;
-            
-				
-                using (EntryClass.CodeProfiler.HookUp("GetNeighbors"))
-                {
-                    // WARNING: here we pass in entire list of
-                    // boids to each boid, which is super slow until we have spatial
-                    // partitioning
-                    found = GetNeighbors((Boid)Boids[i], largestDistance, largestDistanceSquared);
-
-                    if (found == null || found.Count == 0) 
-                   	{ 
-					   //Console.WriteLine("UpdateClasses() - Found Count == 0");
-						neighbors = null;
-					}
-                    else
-					{
-						//Console.WriteLine("UpdateClasses() - Found Count == 0");
-
-						neighbors = new List<Boid>(found.Count);
-						for (int j = 0; j < found.Count; j++)
-						{
-							neighbors.Add((Boid)Boids[found[j]]);
-						}
-					}
-				} // end Using "GetNeighbors"
-               
-
-				//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-				// Apply Flocking Rules
-				//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-                using (EntryClass.CodeProfiler.HookUp("FlockingRules"))
-               	{
-					// Apply Rules
-					//var (sepX, sepY) = Boid.Separate(elapsedSeconds, Boids, Boids[i], separationDistance, separationFactor);
-					double sepX = 0d; double sepY = 0d;
-					if (neighbors != null)
-					 (sepX, sepY) = Boid.Separate(elapsedSeconds, Boids, (Boid)Boids[(int)i], separationDistance, separationFactor, neighbors);
-
-					//var (alignX, alignY) = Boid.Align(elapsedSeconds, Boids, Boids[i], alignmentDistance, alignmentFactor);
-					double alignX = 0d; double alignY = 0d;
-					if (neighbors != null)
-						(alignX, alignY) = Boid.Align(elapsedSeconds, Boids, (Boid)Boids[(int)i], alignmentDistance, alignmentFactor, neighbors);
-
-					//var (cohX, cohY) = Boid.Cohese(elapsedSeconds, Boids, Boids[i], cohesionDistance, cohesionFactor);
-					double cohX = 0d; double cohY = 0d;
-
-					if (neighbors != null)
-						(cohX, cohY) = Boid.Cohese(elapsedSeconds, Boids, (Boid)Boids[(int)i], cohesionDistance, cohesionFactor, neighbors);
-
-					// Sum forces
-					Vector3d v;
-					v.x = sepX + alignX + cohX;
-					v.y = sepY + alignY + cohY;
-					v.z = 0.0d;
-
-					// Apply speed limits
-					double speed = v.Length;
-
-					if (speed > maxSpeed && maxSpeed != 0)
-					{
-						v = (v / speed) * maxSpeed;
-					}
-
-					// ... (Optional: Implement min speed if needed)
-
-					// Update position
-					v *= elapsedSeconds;
-					Boids[(int)i].Velocity += v;
-					Boids[(int)i].Translation += Boids[i].Velocity;
-					
-			#if SPATIAL_MOVE_UPDATES // this define needs to remain FALSE because currently Octree is NOT THREAD SAFE
-					Boids[(int)i].SpatialNode.OnEntityNode_Moved(Boids[(int)i]);
-			#endif
-
-			#if DEBUG_OUTPUT
-					const string SEPERATOR = "|";
-					Utils.AppendText(EntryClass.mSimulationOutputFile, Boids[i].Translation.ToString() + SEPERATOR + Boids[i].Velocity.ToString());
-			#endif
-					
-					// Apply boundary rules (wrap around)
-					// (You'd need to define boundary dimensions here)
-					// If X > maxX, X = minX, etc.
-
-				} // end for loop
-			});  // end using "FlockingRules"   NOTE: Close Parenthesis and Semicolon here is needed after close curly brace only when using Parallel.For()
-        } 
-
+ //           //////////////////////////////////////////////////////////////////
+ //           // Flocking
+ //           //////////////////////////////////////////////////////////////////		
+//			
+//			int count = Boids.Count;
+//           System.Threading.Tasks.Parallel.For(0, count, i => 
+//            //for (int i = 0; i < Boids.Count; i++)
+//            {
+//				if (Boids[(int)i] is Boid == false) return;
+//				
+//				
+//                List<int> found;
+//               List<Boid> neighbors;
+//
+//				double separationDistance = EntryClass.SEPERATION_DISTANCE;
+//				double alignmentDistance = EntryClass.ALIGNMENT_DISTANCE;
+//				double cohesionDistance = EntryClass.COHESION_DISTANCE;
+//
+//				// more parameters
+//				double separationFactor = EntryClass.SEPARATION_FACTOR;
+//				double alignmentFactor = EntryClass.ALIGNMENT_FACTOR;
+//				double cohesionFactor = EntryClass.COHESION_FACTOR;
+//				double turnFactor =  EntryClass.TURN_FACTOR; // For boundary avoidance
+//				double maxSpeed = EntryClass.MAX_SPEED;
+//				
+//				double seperatationDistanceSquare = separationDistance * separationDistance;
+//				double alignmentDistanceSquared = alignmentDistance * alignmentDistance;
+//				double cohesionDistanceSquared = cohesionDistance * cohesionDistance;
+//				
+//				double elapsedSeconds = gt.ElapsedSeconds;
+//           	double largestDistance = Utils.GetMax(this.SeparationDistance, this.AlignmentDistance, this.CohesionDistance);
+//            	double largestDistanceSquared = largestDistance * largestDistance;
+//           
+//				
+//               using (EntryClass.CodeProfiler.HookUp("GetNeighbors"))
+//                {
+//                    // WARNING: here we pass in entire list of
+//                    // boids to each boid, which is super slow until we have spatial
+//                   // partitioning
+//                    found = GetNeighbors((Boid)Boids[i], largestDistance, largestDistanceSquared);
+//
+//                    if (found == null || found.Count == 0) 
+//                   	{ 
+//					   //Console.WriteLine("UpdateClasses() - Found Count == 0");
+//						neighbors = null;
+//					}
+//                    else
+//					{
+//						//Console.WriteLine("UpdateClasses() - Found Count == 0");
+//
+//						neighbors = new List<Boid>(found.Count);
+//						for (int j = 0; j < found.Count; j++)
+//						{
+//							neighbors.Add((Boid)Boids[found[j]]);
+//						}
+//					}
+//				} // end Using "GetNeighbors"
+//            
+//
+//				///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//				// Apply Flocking Rules
+//				//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//               using (EntryClass.CodeProfiler.HookUp("FlockingRules"))
+//               	{
+//					// Apply Rules
+//					//var (sepX, sepY) = Boid.Separate(elapsedSeconds, Boids, Boids[i], separationDistance, separationFactor);
+//					double sepX = 0d; double sepY = 0d;
+//					if (neighbors != null)
+//					 (sepX, sepY) = Boid.Separate(elapsedSeconds, Boids, (Boid)Boids[(int)i], separationDistance, separationFactor, neighbors);
+//
+//					//var (alignX, alignY) = Boid.Align(elapsedSeconds, Boids, Boids[i], alignmentDistance, alignmentFactor);
+//					double alignX = 0d; double alignY = 0d;
+//					if (neighbors != null)
+//						(alignX, alignY) = Boid.Align(elapsedSeconds, Boids, (Boid)Boids[(int)i], alignmentDistance, alignmentFactor, neighbors);
+//
+//					//var (cohX, cohY) = Boid.Cohese(elapsedSeconds, Boids, Boids[i], cohesionDistance, cohesionFactor);
+//					double cohX = 0d; double cohY = 0d;
+//
+//					if (neighbors != null)
+//						(cohX, cohY) = Boid.Cohese(elapsedSeconds, Boids, (Boid)Boids[(int)i], cohesionDistance, cohesionFactor, neighbors);
+//
+//					// Sum forces
+//					Vector3d v;
+//					v.x = sepX + alignX + cohX;
+//					v.y = sepY + alignY + cohY;
+//					v.z = 0.0d;
+//
+//					// Apply speed limits
+//					double speed = v.Length;
+//
+//					if (speed > maxSpeed && maxSpeed != 0)
+//					{
+//						v = (v / speed) * maxSpeed;
+//					}
+//
+//					// ... (Optional: Implement min speed if needed)
+//
+//					// Update position
+//					v *= elapsedSeconds;
+//					Boids[(int)i].Velocity += v;
+//					Boids[(int)i].Translation += Boids[i].Velocity;
+//					
+//			#if SPATIAL_MOVE_UPDATES // this define needs to remain FALSE because currently Octree is NOT THREAD SAFE
+//					Boids[(int)i].SpatialNode.OnEntityNode_Moved(Boids[(int)i]);
+//			#endif
+//
+//			#if DEBUG_OUTPUT
+//					const string SEPERATOR = "|";
+//					Utils.AppendText(EntryClass.mSimulationOutputFile, Boids[i].Translation.ToString() + SEPERATOR + Boids[i].Velocity.ToString());
+//			#endif
+//					
+//					// Apply boundary rules (wrap around)
+//					// (You'd need to define boundary dimensions here)
+//					// If X > maxX, X = minX, etc.
+//
+//				} // end for loop
+//			});  // end using "FlockingRules"   NOTE: Close Parenthesis and Semicolon here is needed after close curly brace only when using Parallel.For()
+//       } 
+//   */
 #if USE_MEMORY_T
 		
 	
@@ -2537,15 +2568,12 @@ namespace HelloBoids
 			
 		
 		// https://github.com/MonoGame/MonoGame/blob/db9e544dfb3f1c1e8bfc2ea08fec31c1c17a9033/MonoGame.Framework/Game.cs#L539
-        private void DoLifeCycle(ComponentStore<LifeForm> store, object[] parameters, int seed, GameTime gt)
+        private void DoLifeCycle(ComponentStore<BaseObject> store, object[] parameters, int seed, GameTime gt)
         {
-			ComponentStore<LifeForm> testLEComp = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
-			//Console.WriteLine("DoLifeCycle() - Stores are the same == " + (store == testLEComp).ToString());
-			
-			// TODO: until both paths use DoLifeCycle(), this will throw off deterministism for Memory<T> path
-    		return;
-    
-			Span<LifeForm> livingEntitySpan = store.Span;
+			return;
+
+			ComponentStore<LifeForm> lfs = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);    
+			Span<BaseObject> baseObj = store.Span;
 	
 			int recordCount = (int)store.Count;
 			
@@ -2557,7 +2585,7 @@ namespace HelloBoids
             for (int i = 0; i < recordCount; i++)
 			{
 				// NOTE: this timerID is taken from the LivingEntity struct's spanIndex
-				int index = livingEntitySpan[i].EntityArrayIndex;
+				int index = baseObj[i].EntityArrayIndex;
 				string entityKey = Boids[index].EntityKey; 
 				
 				bool spawnReady = mIntervalTimers.IsReady(entityKey, "droid_spawn");
@@ -2569,8 +2597,8 @@ namespace HelloBoids
 				
 				// todo: i think we need to check to see if this record is for
 				//       an Entity that is enabled
-				double age = gt.ElapsedSeconds - livingEntitySpan[i].CreationDateTime;// Utils.GetAge(memSpan[i].CreationDateTime);
-				livingEntitySpan[i].Age = age;
+				double age = gt.ElapsedSeconds - lfs.Span[i].CreationDateTime;// Utils.GetAge(memSpan[i].CreationDateTime);
+				lfs.Span[i].Age = age;
 				if (age >= maxAge)
 				{
 					// TODO: there is a bug here in CheckIn and Destroy()... we are not managing the entity.Index and entity.SpanIndex properly
@@ -2592,7 +2620,7 @@ namespace HelloBoids
 			{
 				// todo: i think we need to check to see if this record is for
 				//       an Entity that is enabled
-				double age = gt.TotalElapsedSeconds - livingEntitySpan[i].CreationDateTime;
+				double age = gt.TotalElapsedSeconds - lfs.Span[i].CreationDateTime;
 				Random mTHRandom = ThreadedRandom.Instance;  //(this.Seeds.Master);
 				
 				Spawn(mTHRandom, i, width, height, depth);
@@ -2661,10 +2689,12 @@ namespace HelloBoids
 				if (allTransforms[(int)i].Configuration != BoidConfiguration)
 				//if ((allTransforms[(int)i].Configuration & BoidConfiguration) != BoidConfiguration) 
 				{
-					//Console.WriteLine("Transform_Struct.Configuration == " + memSpan[(int)i].Configuration.ToString());
+					//Console.WriteLine("Transform_Struct.Configuration (INCORRECT)== " + allTransforms[(int)i].Configuration.ToString());
 					return;
 				}
 				
+                //Console.WriteLine("Transform_Struct.Configuration == (CORRECT) " + allTransforms[(int)i].Configuration.ToString());
+
 				//EntityNode currentBoid = ; // Boids[(int)i];
 				int currentEntityArrayIndex = allTransforms[(int)i].EntityArrayIndex;
 				System.Diagnostics.Debug.Assert(Boids[allTransforms[(int)i].EntityArrayIndex] is Boid);
@@ -2752,8 +2782,11 @@ namespace HelloBoids
 									EntityNode potentialNeighbor = ents[j];
 									if (Boids[currentEntityArrayIndex] == potentialNeighbor) continue;
 									System.Diagnostics.Debug.Assert (potentialNeighbor.Configuration != 0, "ProcessOpticalSensors() - CONFIGURATION for Entity '" + potentialNeighbor.EntityKey + "' is set to 'None' and is likely an ERROR.");
+
+                                    //Console.WriteLine ("aaaa");			
 									if (potentialNeighbor.Configuration != (uint)BoidConfiguration) continue;
-																		
+
+                                    //Console.WriteLine ("bbb");						
 									int potentialInternalTransformIndex = potentialNeighbor.GetUserStructIndex(typeof(Transform.Transform_Struct));
 									int potentialArrayIndex = allTransforms[potentialInternalTransformIndex].EntityArrayIndex;
 
@@ -2762,6 +2795,7 @@ namespace HelloBoids
 									if (!potentialNeighbor.BoundingBox.Intersects(searchArea)) 
 										continue;
 
+                                    //Console.WriteLine ("cccc");			
 									double distanceToNeighboringBoidSquared;
 									// TODO: if i stored the SpanIndex in the Octree instead of the EntityNode perhaps that would help?
 									//using (EntryClass.CodeProfiler.HookUp("GetDistanceSquared"))
@@ -3204,16 +3238,17 @@ namespace HelloBoids
 						bool success = mNeighbors.TryGetValue(attackerEntityArrayIndex, out neighbors);
 						if (!success) 
 						{
+                            //Console.WriteLine ("Do_Tactical_Logic() - No adjacents detected.");
 							//System.Diagnostics.Debug.Assert(mNeighbors.Count > 0, "Do_Tactical_Logic() - ASSERTION FAILED - Check that optical Sensors[] list is being filled via Spawn().");
 							//Console.WriteLine("Do_Tactical_Logic() -  No neighbors exist in mNeighbors! This usually occurs during the very first frame since Droid Logic occurs before ProcessOpticalSensing()");
 							return;
 						}
 						
-						EntityNode tacticalStation = GetTacticalStations(i)[0]; 
-						List<Target> targets = tacticalStation.GetTargets();
+                        //Console.WriteLine ("Do_Tactical_Logic() - Attempting to find targets....");
+						List<Target> targets = tacticalStationEnts[0].GetTargets();
 						if (targets == null || targets.Count == 0) return;
 					
-						
+						Console.WriteLine("Do_Tactical_Logic() -  " + targets.Count.ToString() + " Targets In TacticalStation.");
 						// NOTE: TacticalStation.CanHit() returns true if a hit WILL RESULT from the fired shot
 						//       even if the HIT is not the expected location on a Target or even on the correct Target!
 						//       Otherwise it is a total MISS.  We log the hit/miss EVENT either way... typically as a 
@@ -3238,6 +3273,7 @@ namespace HelloBoids
 				}
 			});
 			
+            Console.WriteLine ("Do_Tactical_Logic() - Method Completed.");
 			// see Keystone.Game01.Messages.   public class AttackResults since
 			// we need results going over the network
 		}
@@ -3278,7 +3314,7 @@ namespace HelloBoids
 				EntityNode currentStation = Boids[currentStationArrayIndex]; // <-- if we can get the Sensors without having to get the current Boid... hmm...
 				List<SensorContact> contacts = new List<SensorContact>();
 				
-				System.Diagnostics.Debug.Assert(currentStation.EntityKey.Contains("tactical"), "ProcessOpticalSensors() - Entity is NOT a TacticalStation.");
+				System.Diagnostics.Debug.Assert(currentStation.EntityKey.Contains("tactical"), "CreateContactListFromAdjacents() - Entity is NOT a TacticalStation.");
 				
 				int currentBoidArrayIndex = currentStation.EntityArrayIndex - TACTICAL_STATION_OFFSET;
 				EntityNode attackingShip = Boids[currentBoidArrayIndex];
@@ -3713,7 +3749,7 @@ namespace HelloBoids
 				EntityNode sensor = Boids[sensorArrayIndex];
 				Memory<Sensor> sensorStruct = (Memory<Sensor>)sensor.GetUserStruct(typeof(Sensor), out sensorSpanIndex);
 
-				double currentTargetDistanceSquared = targets[i].DistanceSquared; //  selectedIndex];
+				double currentTargetDistanceSquared = targets[i].DistanceSquared; 
 				// inverse square law for Optical Sensors
 				double detectionProbability = Math.Sqrt(sensorStruct.Span[0].RangeSquared) * (1 / currentTargetDistanceSquared); 
 
@@ -3735,34 +3771,78 @@ namespace HelloBoids
 				ComponentStore<BaseObject> allBaseObjs = (ComponentStore<BaseObject>) EntryClass.mCStoreCol.CheckOut<BaseObject>(); //  attackingTacticalStation.GetUserStruct(typeof(BaseObject), out tacticalStationIndex); 
 				
 				EntityNode droid = Boids[targets[i].EntityArrayIndex];
-				int hullIndex = droid.GetUserStructIndex(typeof(BaseObject));
-				
-				
-				
+				int hullIndex = droid.GetUserStructIndex(typeof(BaseObject));			
 				EntityNode wings = Boids[targets[i].EntityArrayIndex + WINGS_OFFSET];
+                int wingsIndex = wings.GetUserStructIndex(typeof(BaseObject));
 				EntityNode tacticalStation = Boids[targets[i].EntityArrayIndex + TACTICAL_STATION_OFFSET];
-				EntityNode laser = Boids[targets[i].EntityArrayIndex + LASER_OFFSET];
-				EntityNode battery = Boids[targets[i].EntityArrayIndex + BATTERY_OFFSET];
+                System.Diagnostics.Debug.Assert(attackingTacticalStation == tacticalStation, "HitHasOccurred() - TacticalStations do not match.");
+                
+                int tacticalStationIndex = tacticalStation.GetUserStructIndex(typeof(BaseObject));
 				EntityNode opticalSensor = Boids[targets[i].EntityArrayIndex + OPTICAL_SENSOR_OFFSET];
+                int opticalSensorIndex = opticalSensor.GetUserStructIndex(typeof(BaseObject));
+                EntityNode laser = Boids[targets[i].EntityArrayIndex + LASER_OFFSET];
+                int laserIndex = laser.GetUserStructIndex(typeof(BaseObject));
+				EntityNode battery = Boids[targets[i].EntityArrayIndex + BATTERY_OFFSET];
+                int batteryIndex = battery.GetUserStructIndex(typeof(BaseObject));
 				EntityNode humanOperator = Boids[targets[i].EntityArrayIndex + HUMAN_OPERATOR_OFFSET];
+                int humanOperatorIndex = humanOperator.GetUserStructIndex(typeof(BaseObject));
 				
-				double totalVolume = 0;
-				weights[0] = allBaseObjs.Span[hullIndex].Volume / totalVolume;
-				
-				
-				
-				// Hull(Boid)
+                
+				double totalVolume = allBaseObjs.Span[hullIndex].Volume + 
+                                    allBaseObjs.Span[wingsIndex].Volume + 
+                                    allBaseObjs.Span[tacticalStationIndex].Volume +
+                                    allBaseObjs.Span[opticalSensorIndex].Volume +
+                                    allBaseObjs.Span[laserIndex].Volume + 
+                                    allBaseObjs.Span[batteryIndex].Volume + 
+                                    allBaseObjs.Span[humanOperatorIndex].Volume;
+                Console.WriteLine ("HitHasOccurred() - WARNING: TotalVolume == '" + totalVolume.ToString() + "'");
+                System.Diagnostics.Debug.Assert (totalVolume > 0, "HitHasOccured() - 'totalVolume' must not be 0.");
+
+
+                // Hull(Boid)
 				// Wings
 				// CrewStation
 				// Laser
 				// OpticalSensor
 				// Battery
 				// Operator
+				weights[0] = allBaseObjs.Span[hullIndex].Volume / totalVolume;
+                Console.WriteLine ("Weight0 == " + weights[0].ToString());
+
+				weights[WINGS_OFFSET] = allBaseObjs.Span[wingsIndex].Volume / totalVolume;
+                Console.WriteLine ("Weight1 == " + weights[1].ToString());
+
+                weights[TACTICAL_STATION_OFFSET] = allBaseObjs.Span[tacticalStationIndex].Volume / totalVolume;
+                Console.WriteLine ("Weight2== " + weights[2].ToString());
+                weights[OPTICAL_SENSOR_OFFSET] = allBaseObjs.Span[opticalSensorIndex].Volume / totalVolume;
+                Console.WriteLine ("Weight3 == " + weights[3].ToString());
+                weights[LASER_OFFSET] = allBaseObjs.Span[laserIndex].Volume / totalVolume;
+                Console.WriteLine ("Weight4 == " + weights[4].ToString());
+                weights[BATTERY_OFFSET] = allBaseObjs.Span[batteryIndex].Volume / totalVolume;
+                Console.WriteLine ("Weight5 == " + weights[5].ToString());
+                weights[HUMAN_OPERATOR_OFFSET] = allBaseObjs.Span[humanOperatorIndex].Volume / totalVolume;
+				Console.WriteLine ("Weight6 == " + weights[6].ToString());
+
+                double randomPoint = rand.NextDouble();
+
+                // Iterate through the weights in reverse order (since our weights
+                // are in order of largest to smallest) to find which index the random point belongs to.
+                selectedIndex = 0;  
+                for (int j = weights.Length - 1; j >= 0; j--)
+                {
+                    if (randomPoint < weights[j])
+                    {
+                        selectedIndex = j; 
+                        break;
+                    }
+                }
+
+				Console.WriteLine("HitHasOccurred() - Hit at subassembly or opponent index '" + selectedIndex.ToString() + "'");
 				
 				// the selectedTargets are all the Entities (including sub-Entities within a Ship like sensors, computers, power generators, life support systems, bunks, etc)
 				// that have been "hit" by the weapon being used by the attackingShip
 				List<EntityNode> selectedTargets = new List<EntityNode>();
-				selectedTargets.Add(Boids[targets[0].EntityArrayIndex]);
+				selectedTargets.Add(Boids[selectedIndex]);
 				bool hasHit = true; // <- temp hack.  Run formula using above coefficients and such to determine if we hit and what we hit
 
 
@@ -3770,7 +3850,6 @@ namespace HelloBoids
 				{
 					for (int j = 0; j < selectedTargets.Count; j++)
 					{
-						int tacticalStationIndex = attackingShip.EntityArrayIndex + OPTICAL_SENSOR_OFFSET;
 						//Memory<TacticalStation> tacticalStation = (Memory<TacticalStation>)attackingTacticalStation.GetUserStruct(typeof(TacticalStation), out tacticalStationIndex); 
 
 						Vector3d start = attackingShip.Translation;   // todo: if hierarchical and if this is the Weapon and not the Droid, it should be .DerivedTranslation
@@ -3796,7 +3875,6 @@ namespace HelloBoids
 					miss.WeaponUsed = weaponEntity; // todo: need to potentially lease an Explosion or Fire volume or Radiation volume, etc, from object Pool and spawn it
 					miss.Location = Vector3d.Zero();    
 					miss.DistanceSquared = targets[i].DistanceSquared;
-				
 					hits.Add(miss);
 				}
 			}
@@ -3813,8 +3891,8 @@ namespace HelloBoids
 			{
 				EntityNode attacker = hits[currentHitIndex].Owner;
 				EntityNode currentTarget = hits[currentHitIndex].Target;
-				
 				// NOTE: hit.Owner is always the containing Starship/Container/Vehicle/Building
+                
 				EntryClass.mUserDataStore[attacker.EntityKey].IncrementInteger("shotsfired");
 				//Console.WriteLine("ProcessHits() - Attacker Droid @ Array Index '" + currentArrayIndex.ToString() + "' firing shot # " + EntryClass.mUserDataStore[attacker.EntityKey].IncrementInteger("shotsfired").ToString() + " on Droid @ Array Index '" + currentTarget.EntityArrayIndex.ToString() + "'");
 
@@ -3868,6 +3946,7 @@ namespace HelloBoids
 					//       may for example receive kinetic damage AND on-going fire damage, and/or other damages.
 					damages = CalculateDamage(stationOperator, specificSubTarget, hits[currentHitIndex].DistanceSquared, baseObjForWeaponEntity, componentStructForWeaponEntity, weaponStruct, gt, random, out critMalfunctionHasOccurred); // <-- returns 1 or more Products (eg Damage eg: impaling damage and/or DamageOverTime eg fire damage until fire is extinguished)
 
+
 					//TODO: IF 0 Damage occurs because the Target was able to resist the attack with armor or passive defenses
 					//      the result of damage should return 0 and not NULL or anything because resisting an attack is valid information to know in an event log
 					//
@@ -3897,7 +3976,6 @@ namespace HelloBoids
 						{
 							mDamageOverTimeSystem.Add ((DamageOverTimeSystem.DamageOverTime)damages[j]);
 							damageAmounts[j] = ((DamageOverTimeSystem.DamageOverTime)damages[j]).Amount;
-
 						}
 						else 
 							throw new Exception("ProcessHits() - Unexpected Damge type. " + damages[j].GetType().Name);
@@ -3921,6 +3999,7 @@ namespace HelloBoids
 					r.HitPoints = GetHitPoints(r.TargetArrayIndices);
 					//Console.WriteLine ("ProcessHits() - Publishing HIT RESULTS - 2");	
 					r.Damage = damageAmounts;
+
 					mSimEventManager.PublishEvent(attacker, actionID, r);
 				}
 			}
@@ -4354,7 +4433,7 @@ namespace HelloBoids
 				bool flagValue = canFire;
 				
 				int componentIndex;
-				Memory<BaseObject> baseObj = (Memory<Component>)weapon.GetUserStruct(typeof(BaseObject), out componentIndex);
+				Memory<BaseObject> baseObj = (Memory<BaseObject>)weapon.GetUserStruct(typeof(BaseObject), out componentIndex);
 				baseObj.Span[0].SetUserStructFlag(USER_STRUCT_FLAG_1, flagValue);
 				bool hasStruct = baseObj.Span[0].GetUserStructFlag(USER_STRUCT_FLAG_1);
 				baseObj.Span[0].SetUserRuntimeFlag(USER_RUNTIME_FLAG_1, flagValue);
@@ -4655,7 +4734,9 @@ namespace HelloBoids
 			{	
 				productID = entry.Key;
 				List<Production> production = entry.Value;
-				
+
+                int lineNum = 0;
+            
 				//Console.WriteLine("UpdateProduction() - Running production for " + ((PRODUCTS)productID).ToString());
 				
 				// March.10.2026 - Production now always occurs automatically without every needing to call Script.OnUpdate()
@@ -4666,13 +4747,13 @@ namespace HelloBoids
 				for (int i = 0; i < production.Count; i++)
 				{
 					Production currentProduction = production[i];
-					
+					lineNum = 1;
 					List<Consumption> consumers = mConsumption[productID];
 					if (consumers == null) continue;
-
+    
 					int[] distributionList = currentProduction.DistributionList;
-					if (distributionList ==  null || distributionList.Length == 0) continue; // return if using parallel.For
-
+    				if (distributionList ==  null || distributionList.Length == 0) continue; // return if using parallel.For
+                    lineNum = 2;
 					try
 					{
 						// Parallelizing the INNER LOOP is typically not recommended because
@@ -4699,6 +4780,7 @@ namespace HelloBoids
 							//       based on the ProductID.
 							//       
 							Consumption currentConsumption = consumers[distributionList[j]];
+                            lineNum = 3;
 							if (currentConsumption.Equals(default(Consumption)))
 							{
 								Console.WriteLine("UpdateProduction() - Consumption '" + distributionList[j] + "'  is not registered.");
@@ -4709,7 +4791,7 @@ namespace HelloBoids
 							{							
 								EntityNode consumerEntity =  Boids[currentConsumption.ConsumerEntityArrayIndex];
 								if (consumerEntity == null) continue;
-								
+								lineNum = 4;
 								ProcessConsumption(currentProduction, currentConsumption);
 							}
 							catch (Exception ex)
@@ -4720,7 +4802,7 @@ namespace HelloBoids
 					}
 					catch (Exception ex)
 					{
-						Console.WriteLine("UpdateProduction() - " + ex.Message);
+						Console.WriteLine("UpdateProduction() - " + lineNum.ToString() " " + ex.Message );
 					}
 
 				} // end for of current List<production>
@@ -4890,22 +4972,22 @@ namespace HelloBoids
 			List<Consumption> mRecords;
 			List<SkillSystem.ModificationResult> mSkillModResults;
 			
-			public SkillModificationSystem()
-			{
-				mRecords = new List<Consumption>();
-				mSkillModResults = new List<SkillSystem.ModificationResult>();
-			}
-			
 			public void Add (Consumption d)
 			{
+                if (mRecords == null) mRecords = new List<Consumption>();
+                
 				mRecords.Add (d);
 				//Console.WriteLine ("SkillModificationSystem.Add() - Record count == " + mRecords.Count.ToString());
 			}
 			
 			public void Clear()
 			{
-				mRecords.Clear();
-				mSkillModResults.Clear();
+                if (mRecords != null)
+    				mRecords.Clear();
+                if (mSkillModResults == null)
+                    mSkillModResults = new List<SkillSystem.ModificationResult>();
+                else
+    				mSkillModResults.Clear();
 			}
 					
 			public void Process(ComponentStore<LifeForm> store, object[] parameters, int seed, GameTime gt)
@@ -4954,8 +5036,8 @@ namespace HelloBoids
 
 		public interface ISimEventRecord
 		{
-			public int ActionID {get; set;}
-			public double Time {get; set;}
+			int ActionID {get; set;}
+			double Time {get; set;}
 		}
 		
 		public struct CombatEventRecord : ISimEventRecord
@@ -5115,17 +5197,13 @@ namespace HelloBoids
 			
 			System.Collections.Concurrent.ConcurrentQueue<Damage> mRecords;
 			List<HealthSystem.DamageResult> mDamageResults;
-			
-			public DamageSystem()
-			{
-				mRecords = new System.Collections.Concurrent.ConcurrentQueue<Damage>();
-				mDamageResults = new List<HealthSystem.DamageResult>();
-			}
-			
+
 			public void Add (Damage d)
 			{
 				try
 				{
+                    if (mRecords == null) mRecords = new System.Collections.Concurrent.ConcurrentQueue<Damage>();
+                    
 					mRecords.Enqueue(d);
 				}
 				catch (Exception ex)
@@ -5136,8 +5214,12 @@ namespace HelloBoids
 			
 			public void Clear()
 			{
-				mRecords.Clear();
-				mDamageResults.Clear();
+                if (mRecords != null)
+    				mRecords.Clear();
+                if (mDamageResults == null) 
+                    mDamageResults = new List<HealthSystem.DamageResult>();
+                else
+    				mDamageResults.Clear();
 			}
 					
 			public void Process(ComponentStore<BaseObject> store, object[] parameters, int seed, GameTime gt)
@@ -5181,19 +5263,16 @@ namespace HelloBoids
 			
 			System.Collections.Concurrent.ConcurrentQueue<DamageOverTime> mRecords;
 			List<HealthSystem.DamageResult> mDamageResults;
-			
-			
-			public DamageOverTimeSystem()
-			{
-				mRecords = new System.Collections.Concurrent.ConcurrentQueue<DamageOverTime>();
-				mDamageResults = new List<HealthSystem.DamageResult>();
-			}
+
 			
 			public void Add (DamageOverTime d)
 			{
 				try
 				{
-					mRecords.Enqueue(d);
+                    if (mRecords == null) 
+                        mRecords = new System.Collections.Concurrent.ConcurrentQueue<DamageOverTime>();
+					
+                    mRecords.Enqueue(d);
 					//Console.WriteLine ("DamageOverTimeSystem.Add() - Record count == " + mRecords.Count.ToString());
 				}
 				catch (Exception ex)
@@ -5204,8 +5283,12 @@ namespace HelloBoids
 					
 			public void Clear()
 			{
-				mRecords.Clear();
-				mDamageResults.Clear();
+            if (mRecords != null)
+    				mRecords.Clear();
+                if (mDamageResults == null)            
+                    mDamageResults = new List<HealthSystem.DamageResult>();
+                else
+                    mDamageResults.Clear();
 			}
 			
 			/// <summary>
@@ -5271,15 +5354,20 @@ namespace HelloBoids
 				//else
 				//{
 	            	//List<Production> production = mProduction.GetOrAdd(productID, (key) =>  new List<Production>());
-            		ComponentStore<Production> production = mProduction.GetOrAdd (productID, (key) =>  EntryClass.mCStoreCol.CheckOut<Production>(EntryClass.NUM_ENTRIES, (int)p.ProductID));
+            		ComponentStore<Production> productionStore = mProduction.GetOrAdd (productID, (key) =>  EntryClass.mCStoreCol.CheckOut<Production>(EntryClass.NUM_ENTRIES, (int)p.ProductID));
 					Predicate<Production> productionForThisEntityAndProductAlreadyExists = x => x.ProductID == p.ProductID && x.ProducerEntityArrayIndex == p.ProducerEntityArrayIndex;
-					Production search = production.Find(productionForThisEntityAndProductAlreadyExists);
+					Production search = productionStore.Find(productionForThisEntityAndProductAlreadyExists);
 				
 					if (search.Equals(default(Production)))
 					{
 						int index;
-						Memory<Production> mem = production.CheckOut(out index);
-						mem.Span[0] = p;
+						Memory<Production> mem = (Memory<Production>)productionStore.CheckOut(out index);
+
+                        // TODO: c# 10 does not require the following two lines and instead we can just use mem.Span[0] = p;
+                        Span<Production> span = mem.Span;
+                        span[0] = p;
+						
+
 						//Console.WriteLine("RegisterProduction() - PRODUCTION '" + ((PRODUCTS)productID).ToString() + "' REGISTERED>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
 						
 					}
@@ -5302,15 +5390,19 @@ namespace HelloBoids
 				int productID = c.ProductID;
 				//Console.WriteLine ("RegisterConsumption()  - productID == " + productID.ToString());
             	//List<Consumption> consumption = mConsumption.GetOrAdd (productID, (key) =>  new List<Consumption>());
-				ComponentStore<Consumption> consumption = mConsumption.GetOrAdd (productID, (key) =>  EntryClass.mCStoreCol.CheckOut<Consumption>(EntryClass.NUM_ENTRIES, (int)c.ProductID));
+				ComponentStore<Consumption> consumptionStore = mConsumption.GetOrAdd (productID, (key) =>  EntryClass.mCStoreCol.CheckOut<Consumption>(EntryClass.NUM_ENTRIES, (int)c.ProductID));
 				Predicate<Consumption> consumptionForThisEntityAndProductAlreadyExists = x => x.ProductID == c.ProductID && x.ConsumerEntityArrayIndex == c.ConsumerEntityArrayIndex;
-				Consumption search = consumption.Find(consumptionForThisEntityAndProductAlreadyExists);
+				Consumption search = consumptionStore.Find(consumptionForThisEntityAndProductAlreadyExists);
 				
 				if (search.Equals(default(Consumption)))
 				{
 					int index;
-					Memory<Consumption> mem = consumption.CheckOut(out index);
-					mem.Span[0] = c;
+					Memory<Consumption> mem = consumptionStore.CheckOut(out index);
+                    // consumption.Span[0] = c; // <- we would need the exact index already for assigment of ComponentStore.Span[index]  to work
+					
+                     // TODO: c# 10 does not require the following two lines and instead we can just use mem.Span[0] = c;
+                    Span<Consumption> span = mem.Span;
+                    span[0] = c;
 				}
 				else 
 					Console.WriteLine("RegisterConsumption() - Consumption '" + ((PRODUCTS)c.ProductID).ToString() + " for Entity " + c.ConsumerEntityArrayIndex + "' already exists.");
@@ -6166,14 +6258,17 @@ return (0,0);
 			mUserData = EntryClass.mUserDataStore.CheckOut(mID);
 				
 			Skills = new Dictionary<SKILLS, Skill>();	
-				
-			ComponentStore<BaseObject> store = EntryClass.mCStoreCol.CheckOut<BaseObject>(EntryClass.NUM_ENTRIES * 2); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
-            int index = -1;
-            mMemStore_BaseObject = store.CheckOut(out index);
-			AddUserStruct(typeof(BaseObject), mMemStore_BaseObject, index);
-	
-			//mMemStore_BaseObject.Span[0].InternalTransformIndex = index; // <-- Important to do this here. Eventually we need to be able to modify these when/if our Memory<T> records are ordered differently at runtime
-				
+
+            uint ENTITIES_PER_ENTRY = 7;
+            
+			ComponentStore<BaseObject> store = EntryClass.mCStoreCol.CheckOut<BaseObject>(EntryClass.NUM_ENTRIES * ENTITIES_PER_ENTRY); // Repository.StoresCollection.CheckOut<Transform_Struct>(EntryClass.NUM_ENTRIES);
+            int baseObjectIndex = -1;
+            mMemStore_BaseObject = store.CheckOut(out baseObjectIndex);
+            mMemStore_BaseObject.Span[0].EntityArrayIndex = arrayIndex;
+			AddUserStruct(typeof(BaseObject), mMemStore_BaseObject, baseObjectIndex);
+                
+			//mMemStore_BaseObject.Span[0].EntityArrayIndex = arrayIndex; // <-- Important to do this here. Eventually we need to be able to modify these when/if our Memory<T> records are ordered differently at runtime
+           
         }
 		
 		public string EntityKey { get {return mID;}}
@@ -6188,7 +6283,13 @@ return (0,0);
         {
             get { return _box; }
 			//TEMP HACK allow Set here since we have no meshes to compute automatically
-			set { _box = value;}
+			set 
+            { 
+                _box = value;
+                int index = 0;
+                Memory<BaseObject> baseObj = (Memory<BaseObject>)GetUserStruct(typeof(BaseObject), out index);
+                baseObj.Span[0].Volume = Utils.GetVolume (_box);
+            }
         }
 
 		public OctreeOctant SpatialNode
@@ -8830,6 +8931,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		public Stat (float baseValue)
 		{
 			Base = baseValue;
+			Current = baseValue;
+			Label = null;
 		}
 			
 		public override string ToString()
@@ -9031,8 +9134,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
 			errorReason = null;
 			
-			ComponentStore<BaseObject> allLivingEntities = EntryClass.mCStoreCol.CheckOut<BaseObject>(0);
-			//ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
+			//ComponentStore<LifeForm> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
+			ComponentStore<BaseObject> allBaseObjects  = EntryClass.mCStoreCol.CheckOut<BaseObject>(0);
 			//ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 						
 			// NOTE: if this station requires an AI operator at the very least, then NumOperators will be == 1.
@@ -9048,20 +9151,24 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 					{
 						int index = this.OperatorIDs[i];
 						
-						float percentage = allLivingEntities.Span[index].HitPoints.Current / allLivingEntities.Span[index].HitPoints.Base;
+						float percentage = allBaseObjects.Span[index].HitPoints.Current / allBaseObjects.Span[index].HitPoints.Base;
 						if (percentage <= DAMAGE_PERCENT_THRESHOLD)
 						{
-							errorReason = "Operator '" + allLivingEntities.Span[index].FullName + "' is not Healthy enough to operate this Component.";
+							errorReason = "Operator '" + allBaseObjects.Span[index].FullName + "' is not Healthy enough to operate this Component.";
 							return false;
 						}
 						
 						
 						if (this.RequiredSkills != null)
 						{
-							string name = allLivingEntities.Span[index].FullName;
+							string name = allBaseObjects.Span[index].FullName;
 							
 							// operator has necessary skills to use this Component\Station
-							Skill[] operatorSkills = allLivingEntities.Span[index].Skills;
+							EntityNode stationOperator = EntryClass.bSim.Boids[allBaseObjects.Span[i].EntityArrayIndex];
+							int operatorIndex;
+							Memory<LifeForm> tacticalStationOpStruct = (Memory<LifeForm>)stationOperator.GetUserStruct(typeof(LifeForm), out operatorIndex);
+							Skill[] operatorSkills = tacticalStationOpStruct.Span[0].Skills;
+
 							if (operatorSkills == null)
 							{
 								errorReason = "Operator '" + name + "' does not have the required skills to operate this Component";
@@ -9413,7 +9520,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		#endif
 				
 				
-			if (!cmp.IsEmpty)
+			if (!baseObj.IsEmpty)
 			{
 				string name = baseObj.Span[0].FullName;
 				int max = MaxActions;
@@ -9689,8 +9796,31 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		}
 		
 
-		public double Cost;
-		public double Weight;
+		public double Cost
+        {
+           get 
+            {
+                double result = 0;
+
+                for (int i = 0; i < Faces.Length; i++)
+                    result += Faces[i].Cost;
+
+                return result;
+            }
+        }
+
+		public double Weight 
+        {
+            get 
+            {
+                double result = 0;
+
+                for (int i = 0; i < Faces.Length; i++)
+                    result += Faces[i].Weight;
+
+                return result;
+            }
+        }
 		
 		// average DR of all layers on all Faces
 		public int AverageDR 
@@ -9720,11 +9850,10 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			
 			for (int i = 0; i < numFaces; i++)
 			{
-				double surfaceArea = GetArmorFaceSurfaceArea ((BoundingBox.BOX_FACES)i, box);
-				
 				Faces[i] = new ArmorFace(box, i);
 				Faces[i].SurfaceAttributes = ArmorFace.SURFACE_ATTRIBUTES.None;
-				    
+				
+
 				Faces[i].Defense = 50; // passive defense... 
 				Faces[i].Layers = new ArmorLayer[numLayers];
 					for (int j = 0; j < numLayers; j++)
@@ -9747,47 +9876,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			}
 		}
 		
-		public double GetArmorFaceSurfaceArea (BoundingBox.BOX_FACES side, BoundingBox box)
-		{
-			double result = 0;
-			
-			
-			// TODO: make sure our ArmorFace[] array indices match those of our BoundingBox
-			//       WARNING: See BoundingBox.GetQuadFaceVertices()  because i think
-			//       there we grab the vertices for each face and we are using different
-			//       indices for each Face.  They need to be the same.
-			// Face0 (the end that points +z from camera) = FRONT = WIDTH * HEIGHT
-			// Face1 (the end that points -z toward camera) = BACK = WIDTH * HEIGHT
-			// Face2 = (the end that points +x to right of camera) = RIGHT = DEPTH * HEIGHT
-			// Face3 = (the end that points -x to left of camera) = LEFT = DEPTH * HEIGHT
-			// Face4 = top +y = TOP = WIDTH * DEPTH
-			// Face5 = bottom -y = BOTTOM = WIDTH * DEPTH
-			
-			BoundingBox.BOX_FACES eSide = (BoundingBox.BOX_FACES)side;
-			
-			switch (eSide)
-			{
-				case BoundingBox.BOX_FACES.RIGHT:
-				case BoundingBox.BOX_FACES.LEFT:
-					result = box.Height * box.Depth;
-					break;
-				case BoundingBox.BOX_FACES.TOP:
-				case BoundingBox.BOX_FACES.BOTTOM:
-					result = box.Width * box.Depth;
-					break;
-				case BoundingBox.BOX_FACES.FRONT: // <--NOTE: "FRONT" (+z) denotes facing INTO the camera.  So if you place an Actor into the scene, the eyes of that actor will be facing away from you and into the Camera unless you apply a 180 y axis rotation in the assetplacementtgool logic
-				case BoundingBox.BOX_FACES.BACK:
-					result = box.Width * box.Height;
-					break;
-			}
-				
-			
-			// and for any given one side surfaceArea = LW or surfaceArea = LH or surfaceArea = WH 
-			// or a 
-			// volume in cubic meters where surfaceArea = 6 x (cube root of (volume))^2 
-			
-			return result;
-		}
 		
 		/// <summary>
 		/// surfaceAreaCubicMeters
@@ -9897,10 +9985,16 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		private BoundingBox mBox;
 		public ArmorFace(BoundingBox box, int faceIndex)
 		{
+
 			mBox = box;
 			mFaceIndex = faceIndex; // the faceIndex of the BoundingBox (see BoundingBox.GetFaceVertices())
 			
 			Vertices = BoundingBox.GetQuadFaceVertices(mBox);
+            SurfaceAttributes = SURFACE_ATTRIBUTES.None;
+            //SurfaceArea = GetArmorFaceSurfaceArea ((BoundingBox.BOX_FACES)mFaceIndex, mBox);
+            Layers = null;
+            Slope = 0;
+            Defense = 0;
 		}
 		
 		public ArmorLayer[] Layers;
@@ -9964,38 +10058,52 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		{
 			get 
 			{
-				double result = 0;
-				// todo: to compute the surface area of each face, we should pass in a 
-				// box primitive where surfaceArea = 2 * (WH + DH + WD)  
-				double D = mBox.Depth;
-				double W = mBox.Width;
-				double H = mBox.Height;
-
-				// the face indices match those of BoundingBox.GetQuadFaceVerices()
-				// This also matches enums for TV3D CUBEMAP faces.
-				// 0: Positive X (Right)1: Negative X (Left)2: Positive Y (Top)3: Negative Y (Bottom)4: Positive Z (Front)5: Negative Z (Back)
-					
-				switch (mFaceIndex)
-				{
-					case 0: // RIGHT (+x)
-					case 1: // LEFT (-x)
-						result = W * D;
-						break;
-					
-					case 2: // TOP (+y)
-					case 3: // BOTTOM (-y)
-						result = H * D;
-						break;
-						
-					case 4: // FRONT (+z) <--NOTE: "FRONT" (+z) denotes facing INTO the camera.  So if you place an Actor into the scene, the eyes of that actor will be facing away from you and into the Camera unless you apply a 180 y axis rotation in the assetplacementtgool logic
-					case 5: // BACK (-z)
-						result = W*H;
-						break;
-				}
-			
-				return result;
-			}
+                return GetArmorFaceSurfaceArea((BoundingBox.BOX_FACES)mFaceIndex, mBox);
+            }
 		}
+
+        public double GetArmorFaceSurfaceArea (BoundingBox.BOX_FACES side, BoundingBox box)
+		{
+			double result = 0;
+			
+			
+			// TODO: make sure our ArmorFace[] array indices match those of our BoundingBox
+			//       WARNING: See BoundingBox.GetQuadFaceVertices()  because i think
+			//       there we grab the vertices for each face and we are using different
+			//       indices for each Face.  They need to be the same.
+			// Face0 (the end that points +z from camera) = FRONT = WIDTH * HEIGHT
+			// Face1 (the end that points -z toward camera) = BACK = WIDTH * HEIGHT
+			// Face2 = (the end that points +x to right of camera) = RIGHT = DEPTH * HEIGHT
+			// Face3 = (the end that points -x to left of camera) = LEFT = DEPTH * HEIGHT
+			// Face4 = top +y = TOP = WIDTH * DEPTH
+			// Face5 = bottom -y = BOTTOM = WIDTH * DEPTH
+			
+			BoundingBox.BOX_FACES eSide = (BoundingBox.BOX_FACES)side;
+			
+			switch (eSide)
+			{
+				case BoundingBox.BOX_FACES.RIGHT:
+				case BoundingBox.BOX_FACES.LEFT:
+					result = box.Height * box.Depth;
+					break;
+				case BoundingBox.BOX_FACES.TOP:
+				case BoundingBox.BOX_FACES.BOTTOM:
+					result = box.Width * box.Depth;
+					break;
+				case BoundingBox.BOX_FACES.FRONT: // <--NOTE: "FRONT" (+z) denotes facing INTO the camera.  So if you place an Actor into the scene, the eyes of that actor will be facing away from you and into the Camera unless you apply a 180 y axis rotation in the assetplacementtgool logic
+				case BoundingBox.BOX_FACES.BACK:
+					result = box.Width * box.Height;
+					break;
+			}
+				
+			
+			// and for any given one side surfaceArea = LW or surfaceArea = LH or surfaceArea = WH 
+			// or a 
+			// volume in cubic meters where surfaceArea = 6 x (cube root of (volume))^2 
+			
+			return result;
+		}
+		
 		
         public double Weight 
 		{
@@ -10174,6 +10282,12 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
     }
 	#endregion // USER STRUCTS 
 
+    public struct EntitySystemUpdateContext
+    {
+       	// see SelectionNode or Elements.SwitchNode for help
+			
+			
+    }
     public interface IEntitySystem
     {
         // 1) an IEntitySystem of type "City{World.Country.Province.County}" might include many different types of child IEntitySystem within it.
@@ -10185,12 +10299,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         //        - these Systems also CONSUME from "Stores"... how do we assign Stores and make them available to something like a "City?"
         // 2) Stores - food, supplies, medicines, clothing, energy
         // 3) Do we need to support rendering Proxies here (2D and 3D?)
-		public struct EntitySystemUpdateContext
-    	{
-        	// see SelectionNode or Elements.SwitchNode for help
-			
-			
-    	}
+		
 	
         int Seed { get; }
         int EntityCount { get; }
@@ -10221,7 +10330,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
     {
         public delegate IProcGeneratedItem CreateEntityHandler(int seed, string path);
         public delegate void GenerateSystemHandler(int seed);
-        public delegate void UpdateHandler(double elapsedSeconds, IEntitySystem.EntitySystemUpdateContext context);
+        public delegate void UpdateHandler(double elapsedSeconds, EntitySystemUpdateContext context);
 
         // private variables
         protected string mPath;
@@ -10246,7 +10355,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			
 		}
 		
-        public virtual void Update(double elapsedSeconds, IEntitySystem.EntitySystemUpdateContext context)
+        public virtual void Update(double elapsedSeconds, EntitySystemUpdateContext context)
         {
             // select from mUpdateHandlers based on context... its essentially like update LOD where the
             // update simulation can be simpler when this IEntitySystem is far away or has no players near it...
@@ -10426,7 +10535,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         {
         }
 
-        public override void Update(double elapsedSeconds, IEntitySystem.EntitySystemUpdateContext context)
+        public override void Update(double elapsedSeconds, EntitySystemUpdateContext context)
         {
 
         }
@@ -10509,7 +10618,21 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		{
 			if (string.IsNullOrEmpty(buildScriptRelativeResourcePath)) throw new ArgumentOutOfRangeException("Builder.ctor() - Build Script relative path cannot be null.");
 			mBuildScriptRelativeResourcePath = buildScriptRelativeResourcePath;
+            UserTypeID = -1;
+            
+            BuildPersistString = null;
+            
+            Configuration = CONFIGURATION.None;
+            
+            mBuildSpecificPropertyValues = new Dictionary<string, object>();
 
+            mBuildScript = null;
+            mComponetScript = null;
+            mComponent = null;
+            mPropertyChanged = true;
+            mBuildChanged = true;
+            mBuildScriptInitialized = false;
+            
 			// TODO: Load this Build Script.  This script CAN be shared because the Values of the 
 			//       Build properties are stored inm the Component
 			//mBuildScript = Repository.Create("Builder", mBuildScriptRelativeResourcePath);
@@ -10829,6 +10952,11 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
         public override string ToString()
         {
+            return null;
+                    
+                /* TODO: Commented out the following only because DotNetFiddle is not working for me in San Fran Library
+                         but mycompiler.io/new/csharp   is but it does not use c# 10 and so Json namespace doesnt exist.
+                    
             // NOTE: we only need to write out the build parameters and from that we can
             //       reconstitute the full entity
 
@@ -10843,6 +10971,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			PropertySpec[] buildSpecificProperties = GetProperties(out buildSpecificPropertyValues);
 			
 			// JSon == javascript object notation
+            
 			var options = new System.Text.Json.JsonSerializerOptions 
 			{ 
     			DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull    |
@@ -10864,6 +10993,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			Console.WriteLine("Builder.ToString() - DESERIALIZE count = " + buildSpecificProperties.Length.ToString());
 			Console.WriteLine("Build.ToString() - COMPLETED.");
             return jsonString;
+            */
 		}
 #endregion
 	}
@@ -10979,9 +11109,9 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
   		                flocking.Invoke(store0, args, seed, gt);
 						break;
 					case "LIFECYCLE":
-						Processor<LifeForm> life = (Processor<LifeForm>)func;
-				   		ComponentStore<LifeForm> store1 = mComponentStoreCollection.CheckOut<LifeForm>(0);
- 						life.Invoke(store1, args, seed, gt);
+						Processor<BaseObject> baseObj = (Processor<BaseObject>)func;
+				   		ComponentStore<BaseObject> store1 = mComponentStoreCollection.CheckOut<BaseObject>(0);
+ 						baseObj.Invoke(store1, args, seed, gt);
 						break;
 					case "LASERS":
 						Processor<Laser_Struct> lazer = (Processor<Laser_Struct>)func;
@@ -21535,28 +21665,43 @@ public abstract class PlanedFrustum
 			return damageAmountWithVariance;
 		}
 		
+        public static double  GetVolume (BoundingBox box)
+        {
+            return box.Depth * box.Width * box.Height;
+        }
+
 		public static byte[] CompressWithBrotli(byte[] inputBytes)
 		{
+
+            throw new NotImplementedException(); 
+            
+            
+            /* c# 10
 			using var outputStream = new MemoryStream();
 			using (var brotliStream = new System.IO.Compression.BrotliStream(outputStream, System.IO.Compression.CompressionLevel.Optimal))
 			{
 				brotliStream.Write(inputBytes, 0, inputBytes.Length);
 			}
-			return outputStream.ToArray();
+            return outputStream.ToArray();
+		    */
 		}
 		
 		public static byte[] DecompressWithBrotli(byte[] compressedData)
 		{
-			using var inputStream = new MemoryStream(compressedData);
-			using var outputStream = new MemoryStream();
-			
-			using (var brotliStream = new System.IO.Compression.BrotliStream(inputStream, System.IO.Compression.CompressionMode.Decompress))
-			{
-				brotliStream.CopyTo(outputStream);
-			}
-			return  outputStream.ToArray();
-			
-			
+             throw new NotImplementedException(); 
+            /*
+			using (var inputStream = new MemoryStream(compressedData))
+            {
+    			using (var outputStream = new MemoryStream())
+    			{
+        			using (var brotliStream = new System.IO.Compression.BrotliStream(inputStream, System.IO.Compression.CompressionMode.Decompress))
+        			{
+        				brotliStream.CopyTo(outputStream);
+        			}
+        			return  outputStream.ToArray();
+                }
+            }
+			*/
 		}
 		
 		// ArrayExtensions from KeystoneStandardLibrary.Extensions.ArrayExtensions

@@ -734,10 +734,7 @@ namespace HelloBoids
         private double TurnFactor; // For boundary avoidance
 
 		private float MAX_LEVEL = 10.0f;
-					
-		// our LEVELs will be floating points and allow for 0.1, 0.2, ... 2.5...etc -> 10.0
-
-        private float MAX_SKILL_LEVEL = 100f;
+		private float MAX_SKILL = 100.0f;
 
 
         public OctreeOctant Octree { get; }
@@ -1529,7 +1526,7 @@ namespace HelloBoids
             Memory<Component> memCmp = storeComp.CheckOut(out checkOutIndex);
 			laser.AddUserStruct(typeof(Component), memCmp, checkOutIndex);
 			memCmp.Span[0].Level = 1;
-			memCmp.Span[0].Craftsmanship = 0.5f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
+			//memCmp.Span[checkOutIndex].Quality = 1.0f;  // a coefficient with 1.0f being finely crafted and 0.0 being barely MacGuyvered together and may only last one shot
 			memCmp.Span[0].Ruggedized = true;
 			
 
@@ -1551,7 +1548,7 @@ namespace HelloBoids
 			memWep.Span[0].Reliable = true;
 			memWep.Span[0].Compact = true;
 			
-			memWep.Span[0].Accuracy = 10; // todo: this should be computed at runtime since damage to the weapon itself can affect its accuracy
+			memWep.Span[0].Accuracy = 10;
 			memWep.Span[0].SnapShot = 2;
 			
 			memWep.Span[0].Malfunction = 0.2f; // todo: this may be not needed if Malfunction is calculated at runtime to include Damage to the weapon when firing) // range 0.0 - 1.0, Malfunction with 1.0 being maximum meaning it would malfunction every time and 0.0f never.
@@ -3716,123 +3713,101 @@ namespace HelloBoids
 			// TODO: we may not need to loop here exactly through Targets... all of these "targets" can potentially be hit at once with one weapon... say a large nuke.
 			for (int i = 0; i < targets.Count; i++)
 			{
-                double[] weights = new double[10];
-
-				// weapon accuracy is based on Level and Craftsmanship. (verify this also includes effects of any existing damage to this weapon)
+		
                 int baseObjIndex;
 				int componentIndex;
 				int weaponIndex;
 
 				Memory<BaseObject> baseObj = (Memory<BaseObject>)weaponEntity.GetUserStruct(typeof(BaseObject), out baseObjIndex);
+                Memory<Component> weaponComponent = (Memory<Component>)weaponEntity.GetUserStruct(typeof(Component), out componentIndex);
 				Memory<Weapon> weaponStruct = (Memory<Weapon>)weaponEntity.GetUserStruct(typeof(Weapon), out weaponIndex);
-                Memory<Component> weaponComponentStruct = (Memory<Component>)weaponEntity.GetUserStruct(typeof(Component), out componentIndex);
 
-
-                float levelCoeff = weaponComponentStruct.Span[0].Level / EntryClass.bSim.MAX_LEVEL;
-                levelCoeff = (float)Utils.CalculateExponentialDecay(1, 
-                                                                    0.5, 
-                                                                    weaponComponentStruct.Span[0].Level);
-
-
-                Console.WriteLine ("LEVEL COEFFICIENT == " + levelCoeff.ToString());
-
-
-                // very low craftsmanship seriously effects accuracy, but the higher the
-                // craftsmanship, the advantage starts to fall off... diminishing returns
-                float craftsmanShipCoeff = weaponComponentStruct.Span[0].Craftsmanship;
-                craftsmanShipCoeff = (float)Utils.CalculateExponentialDecay(0.01, 
-                                                                    0.5, 
-                                                                    craftsmanShipCoeff);
-
-                
-                Console.WriteLine ("CRAFTSMANSHIP COEFFICIENT == " + craftsmanShipCoeff.ToString());
-
-				float weaponsOwnDamage = (float)(baseObj.Span[0].HitPoints.Base > 0 ? baseObj.Span[0].HitPoints.Current / baseObj.Span[0].HitPoints.Base : 0);
-
-
-                // weaponsOwnDamage = 
-                
-
-                // TODO: 
-                // 1- initial test against final probability will determine HIT or MISS
-                // 2- if HIT, then we determine did we HIT the desired target or some other component
-                //    on the target?
-                // 3- if a MISS, did we HIT something else entirely like a friendly with an errant shot?
-                // base on type of weapon used, how many components did get hIT?
-                // 
-
-
-				// OPERATOR TARGETING SKILL LEVEL  
-                // skill levels range from 0 - 99 with 
-                // 0 - 10 Novice
-                // 11 - 20 Intermediate
-                // 21 - 30 Average
-                // 31 - 40 Advanced
-                // 41 - 50 Professional
-                // 51 - 60 Expert
-                // 61 - 70 Master
-                // 71 - 80 Heroic
-                // 81 - 90 Legendary
-                // 91 - 100 Supernatural
-
-				Skill targetingSkill = attackingOperator.Skills[SKILLS.Targeting];
-                double skillCoefficient = targetingSkill.EffectiveValue / MAX_SKILL_LEVEL;
-
-
-
-				// OPERATOR HEALTH
-				baseObj = (Memory<BaseObject>)attackingOperator.GetUserStruct(typeof(BaseObject), out baseObjIndex);
+                // WEAPON ACCURACY (craftsmanship, level, damage to weapon)
+                // --------------------------------------------------------------
+                double craftsmanShipCoeff = weaponComponent.Span[0].Craftsmanship;  
+                float levelCoeff = weaponComponent.Span[0].Level / EntryClass.bSim.MAX_LEVEL;
+				double weaponsOwnDamage = baseObj.Span[0].HitPoints.Base > 0 ? baseObj.Span[0].HitPoints.Current / baseObj.Span[0].HitPoints.Base : 0;
 				
-				int lfIndex;
-				Memory<LifeForm> lfOperator = (Memory<LifeForm>)attackingOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
-				double operatorHealthCoeff = baseObj.Span[0].HitPoints.Base > 0 ? baseObj.
-                
-                // OPERATOR FATIGUE
-                Span[0].HitPoints.Current / baseObj.Span[0].HitPoints.Base : 0;
-				double fatigue = lfOperator.Span[0].Fatigue.Base > 0 ? lfOperator.Span[0].Fatigue.Current / lfOperator.Span[0].Fatigue.Base : 0;
-
-
-
-                //double probability = Utils.CalculateProbability(stats, weights, bias);
-
-				// TARGET HAS STEALTH TECHNOLOGY
-
-
-				// TARGET PREVIOUSLY ACQUIRED - previous aquisition makes it easier to re-aquire
-				// STATISTICS search
-
-				// aka durationOfSensorAquistion) // how much time has this  target been tracked by sensors already
-
-				// TODO: TARGETS must be based off the list of Targets in the TacticalStation that were found and added in 
-
-
-				// TARGET PROXIMITY	
+				// TARGET DETAILS (distance, size, stealthy hull/wings)
+                // --------------------------------------------------------------
 				int sensorArrayIndex = attackingShip.EntityArrayIndex + OPTICAL_SENSOR_OFFSET;
 				int sensorSpanIndex; 
 				EntityNode sensor = Boids[sensorArrayIndex];
 				Memory<Sensor> sensorStruct = (Memory<Sensor>)sensor.GetUserStruct(typeof(Sensor), out sensorSpanIndex);
-
 				double currentTargetDistanceSquared = targets[i].DistanceSquared; 
-				// inverse square law for Optical Sensors
-				double detectionProbability = Math.Sqrt(sensorStruct.Span[0].RangeSquared) * (1 / currentTargetDistanceSquared); 
+				// - distance - uses inverse square law for Optical Sensors
+				double hitProbability = Math.Sqrt(sensorStruct.Span[0].RangeSquared) * (1 / currentTargetDistanceSquared); 
+                //  - size
+                int targetBaseObjIndex;
+                Memory<BaseObject> targetBaseObj = (Memory<BaseObject>)Boids[targets[i].EntityArrayIndex].GetUserStruct(typeof(BaseObject), out targetBaseObjIndex);
+                double targetSize = targetBaseObj.Span[0].Volume;
 
-				// TARGET USING EVASIVE MANEUVERS
+                // - stealth (only applies for assemblies)
+                ArmorFace.SURFACE_ATTRIBUTES sa = targetBaseObj.Span[0].Armor.SurfaceAttributes;
+
+                // Memory<Assembly> targetAssemblyObj;
+                // 5 levels for all types
+                // - steamlining ([0 - 5] - fair, good, very good, excellent, radical )
+                // - heat reduction
+                // - noise reduction
+                // - radar reduction (materials, shapes)
+                // - optical reduction (eg paint, chameleon systems, camaflauge)
+                // - Electronic Jammer components that are enabled
+                // 
+
+                // TACTICS (evasive, counter-measures, time acquired by sensors)
+                // --------------------------------------------------------------
+				// target evasive
 				// COMPARE VELOCITY MAGNITUDE CHANGES OVER X SECONDS PERIOD OF TIME
+                // each second of "evasive" after 1 full second, adds -5% chance 'to-hit' by the attacking ship. (MAX -15% chance)
+
+				// target deployed counter measures within X time (time * fallOff aka call it 'attenuation') - STATISTICS SEARCH
+
+				// target last acquisition - previous aquisition makes it easier to re-aquire
+				// STATISTICS search
+
+				// sensorLockOfTargetTimeElapsed (aka durationOfSensorAquistion) // how much time has this  target been tracked by sensors already
+
+
+                // OPERATOR (skill, health, fatigue)
+                // --------------------------------------------------------------
+                // - operator skill  
+				Skill targetingSkill = attackingOperator.Skills[SKILLS.Targeting];
+                float operatorSkill = targetingSkill.EffectiveValue / EntryClass.bSim.MAX_SKILL;
+                // - operator Health
+				baseObj = (Memory<BaseObject>)attackingOperator.GetUserStruct(typeof(BaseObject), out baseObjIndex);
+				double operatorHealthCoeff = baseObj.Span[0].HitPoints.Base > 0 ? baseObj.Span[0].HitPoints.Current / baseObj.Span[0].HitPoints.Base : 0;
+				int lfIndex;
+                // - operator Fatigue
+				Memory<LifeForm> lfOperator = (Memory<LifeForm>)attackingOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
+                double fatigue = lfOperator.Span[0].Fatigue.Base > 0 ? lfOperator.Span[0].Fatigue.Current / lfOperator.Span[0].Fatigue.Base : 0;
 
 
 
-				// TARGET DEPLOYED COUNTER MEASURES within X time (time * fallOff aka call it 'attenuation')
-				// - STATISTICS SEARCH
-			
+                // ---------------------
+                // float hitProbability =  accuracy + targetCoeff + 
+                //                         operatorCoef + tacticsCoeff
+                // --------------------------
 
-                // TODO: we havent picked an INITIAL  item to Target on the ship... based on POLICY.
-                //  For instance, do we just want to disable this ship?
+                // float accuracy = weaponLevel + craftsmanShipCoeff + weaponsOwnDamage;
+                
+                // float targetCoeff =  targetProximity + targetSize + targetStealth; // "stealth" has the effect of decreasing the targetSize in the eyes of the sensor attempting to do the detection.
+
+                // float tacticsCoeff = targetCountermeasuresDeployed + targetEvasive + targetSecondsAcquired (each 1 full second acquired adds +5% chance to a successful 'hit.')
+
+                // float operatorCoef = operatorHealth + operatorFatigue + operatorSkill (each targeting skill point adds 5% to probability of a successful 'hit'.  NOTE: skill points get much more expensive the higher the closer one gets to 'Legendary' status)
+
+           
+                 
+ 
+                                   
+
 
 				// TODO:  find the actual target that was hit... we may be aiming for an assembly or component and may hit something different, such as a different Component or Operator or even a different Starship or Droid or NOTHING
 				// TODO:  Alternatively, we may have hit another Ship(s) (or one or more of it's assemblies and/or components and/or LifeForms on board)
 				//        Or we may have MISSED altogether
 
-				weights = new double[7];
+				double[] weights = new double[7];
 				ComponentStore<BaseObject> allBaseObjs = (ComponentStore<BaseObject>) EntryClass.mCStoreCol.CheckOut<BaseObject>(); //  attackingTacticalStation.GetUserStruct(typeof(BaseObject), out tacticalStationIndex); 
 				
 				EntityNode droid = Boids[targets[i].EntityArrayIndex];
@@ -3904,11 +3879,6 @@ namespace HelloBoids
 
 				Console.WriteLine("HitHasOccurred() - Hit at subassembly or opponent index '" + selectedIndex.ToString() + "'");
 				
-
-                
-
-
-
 				// the selectedTargets are all the Entities (including sub-Entities within a Ship like sensors, computers, power generators, life support systems, bunks, etc)
 				// that have been "hit" by the weapon being used by the attackingShip
 				List<EntityNode> selectedTargets = new List<EntityNode>();
@@ -4248,9 +4218,10 @@ namespace HelloBoids
 			broken weapon
 			*/
 			
-			criticalMalfunctionHasOccurred = false;              
-
-
+			criticalMalfunctionHasOccurred = false;
+			
+			// our LEVELs will be floating points and allow for 0.1, 0.2, ... 2.5...etc -> 10.0
+			const double MAX_LEVEL = 10d;
 			// malfChance is variable based on weapon craftsmanship, factor is tweakable.
 			// the higher the "factor" and "malfChance" (exponent), the smaller the resulting
 			// Pow() expression result which will make rand.NextDouble() increasingly
@@ -4258,7 +4229,7 @@ namespace HelloBoids
 			
 			double weaponDamageCoefficient = baseObj.Span[0].HitPoints.Base > 0 ? baseObj.Span[0].HitPoints.Current / baseObj.Span[0].HitPoints.Base : 0;
 			double weaponQualityCoefficient = componentStruct.Span[0].MaterialQuality;   
-			double weaponLevelCoefficient = componentStruct.Span[0].Level / EntryClass.bSim.MAX_LEVEL;
+			double weaponLevelCoefficient = componentStruct.Span[0].Level / MAX_LEVEL;
 			double weaponCraftsmanshipCoefficient = componentStruct.Span[0].Craftsmanship;
 			
 			// multiply all coefficients together
@@ -9140,6 +9111,17 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
 		public InternalStructure Internals; 	
 		
+        
+		// TODO: BEGINNING -> struct Assembly { InternalStructure Internals; }
+		    public InternalStructure Internals; 	// InternalStructure is really only for Assemblies, not for Components
+
+		    // Body, SuperStructure, Masts, Turret, Wings, Rotor, Wheels, Tracks.
+	    	public AssemblyFeatures AssemblyFeatures;
+
+		// END 	
+
+
+
 		
         // runtime
 		public int[] OperatorIDs;
@@ -9770,7 +9752,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 
 		public DAMAGE_TYPE DamageType;
         public int AverageDamage; // amount of damage it can inflict
-        //   Kinetic Energy (KE) damage in GURPS—or more accurately, calculating damage based on muzzle energy or impact velocity—is primarily needed to bridge the gap between abstract gameplay mechanics and realistic, simulation-heavy ballistics. While the GURPS Basic Set provides simplified damage values for common weapons, a formal KE system is needed to:Standardize Weapon Stats: It ensures that damage across different guns, especially experimental or high-TL weapons, is mathematically consistent rather than based on guesswork.Accurately Model Armor Penetration: Penetration in reality scales with KE divided by the cross-sectional area of the projectile. A formal system allows for precise calculation of how a bullet interacts with DR (Damage Resistance).Bridge TL Gaps: It allows for realistic conversions between different technological levels (TL), ensuring a TL7 rifle feels correctly powered compared to a TL9 railgun, based on actual energy output.Why a Specific KE System is UsedThe need for this arises because simply scaling damage linearly with velocity does not work.Consistency: The GURPS 4th Edition Basic Set allows for varied wounding modifiers based on caliber (e.g., \(pi-\), \(pi\), \(pi+\), \(pi++\)).Realism over Fiat: Instead of a writer guessing that a gun does \(2d+2\), developers or GMs use projectile velocity and mass to calculate KE and map that to a realistic GURPS damage die.Collisions: KE calculation is vital for determining damage in massive impacts, such as vehicle crashes or huge monsters falling, which is not easily covered by standard weapon stats.Summary of UtilityHigh-Tech Campaigns: Essential for balancing modern and futuristic firearms (High-Tech, Ultra-Tech).Detailed Simulation: Used by GMs who want armor penetration to follow physical laws rather than abstract tables.Vehicular Combat: Used to calculate damage from collisions (e.g., GURPS Vehicles 2nd Ed).In short, while not needed for cinematic games, a formal Kinetic Energy formula is needed to keep damage realistic and consistent when dealing with high-velocity weapons or physics-heavy scenarios.
+        //   Kinetic Energy (KE) damage in GURPSâ€”or more accurately, calculating damage based on muzzle energy or impact velocityâ€”is primarily needed to bridge the gap between abstract gameplay mechanics and realistic, simulation-heavy ballistics. While the GURPS Basic Set provides simplified damage values for common weapons, a formal KE system is needed to:Standardize Weapon Stats: It ensures that damage across different guns, especially experimental or high-TL weapons, is mathematically consistent rather than based on guesswork.Accurately Model Armor Penetration: Penetration in reality scales with KE divided by the cross-sectional area of the projectile. A formal system allows for precise calculation of how a bullet interacts with DR (Damage Resistance).Bridge TL Gaps: It allows for realistic conversions between different technological levels (TL), ensuring a TL7 rifle feels correctly powered compared to a TL9 railgun, based on actual energy output.Why a Specific KE System is UsedThe need for this arises because simply scaling damage linearly with velocity does not work.Consistency: The GURPS 4th Edition Basic Set allows for varied wounding modifiers based on caliber (e.g., \(pi-\), \(pi\), \(pi+\), \(pi++\)).Realism over Fiat: Instead of a writer guessing that a gun does \(2d+2\), developers or GMs use projectile velocity and mass to calculate KE and map that to a realistic GURPS damage die.Collisions: KE calculation is vital for determining damage in massive impacts, such as vehicle crashes or huge monsters falling, which is not easily covered by standard weapon stats.Summary of UtilityHigh-Tech Campaigns: Essential for balancing modern and futuristic firearms (High-Tech, Ultra-Tech).Detailed Simulation: Used by GMs who want armor penetration to follow physical laws rather than abstract tables.Vehicular Combat: Used to calculate damage from collisions (e.g., GURPS Vehicles 2nd Ed).In short, while not needed for cinematic games, a formal Kinetic Energy formula is needed to keep damage realistic and consistent when dealing with high-velocity weapons or physics-heavy scenarios.
 		//public double KEDamage; (Crushing or Impaling damage formula specifically =  KEDamage = Damage * Velocity * Acceleration * Weight
 		
 		public int FallOffStart; // distance in meters at which the damage inflicted begins to be reduced
@@ -9842,12 +9824,93 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 	}
 
 
-	
+	 public struct InternalStructure
+    {
+		[Flags]
+		public enum STRUCTURE_ATTRIBUTES : byte
+		{
+			None = 0,                // 0
+    		Robotic = 1 << 0,            // 1
+    		Biomechanical = 1 << 1,    // 2
+    		Responsive = 1 << 2, // 4
+    		LivingMetal = 1 << 3,   // 8
+    		All = Robotic | Biomechanical | Responsive | LivingMetal
+		}
+		
+		public STRUCTURE_ATTRIBUTES StructureAttributes;
+        public int MaterialType; // wood, metal, composite
+        // public float MaterialQuality?
+        // 
+        public float Strength;  // frame strength
+        			
+        // TODO: i think Slope is only for 'struct Assembly'.  Only 
+        //       Assemblies like Body, Superstructure and Turret can have Slope yes?
+        public byte SlopeLeft; // note: slope uses constants to represent 0, 30 or 60
+        public byte SlopeRight;
+        public byte SlopeFront;
+        public byte SlopeBack;
+        
+        // todo: is this correct place to have streamlining?  It would have to be set individually for each subassembly?
+        // public AssemblyFeatures (BodyFeatures)
+        //      - these can be treated like Skills that have modifiers to cost, weight, and things like RadarDetection, etc.
+        
+        public string StreamLining; // todo:  need enums or perhaps a coefficient value instead AND THE GUI can interpet this coefficient into a string if desired
+        // NOTE: hitpoints I think is fine for inanimate objects,
+        //       but not good for living things. 
+        //       https://www.youtube.com/watch?v=sMWMB9bjFGo
+        public Stat HitPoints;		
+		
+		public bool Robotic 
+		{
+			get {return (StructureAttributes & STRUCTURE_ATTRIBUTES.Robotic) == STRUCTURE_ATTRIBUTES.Robotic;}
+			set 
+			{
+				if (value)
+                	StructureAttributes |= STRUCTURE_ATTRIBUTES.Robotic;
+                else
+                    StructureAttributes &= ~STRUCTURE_ATTRIBUTES.Robotic;
+			}
+		}
+		
+		public bool Biomechanical 
+		{
+			get {return (StructureAttributes & STRUCTURE_ATTRIBUTES.Biomechanical) == STRUCTURE_ATTRIBUTES.Biomechanical;}
+			set 
+			{
+				if (value)
+                	StructureAttributes |= STRUCTURE_ATTRIBUTES.Biomechanical;
+                else
+                    StructureAttributes &= ~STRUCTURE_ATTRIBUTES.Biomechanical;
+			}
+		}
+		
+		public bool Responsive 
+		{
+			get {return (StructureAttributes & STRUCTURE_ATTRIBUTES.Responsive) == STRUCTURE_ATTRIBUTES.Responsive;}
+			set 
+			{
+				if (value)
+                	StructureAttributes |= STRUCTURE_ATTRIBUTES.Responsive;
+                else
+                    StructureAttributes &= ~STRUCTURE_ATTRIBUTES.Responsive;
+			}
+		}
+		
+		public bool LivingMetal 
+		{
+			get {return (StructureAttributes & STRUCTURE_ATTRIBUTES.LivingMetal) == STRUCTURE_ATTRIBUTES.LivingMetal;}
+			set 
+			{
+				if (value)
+                	StructureAttributes |= STRUCTURE_ATTRIBUTES.LivingMetal;
+                else
+                    StructureAttributes &= ~STRUCTURE_ATTRIBUTES.LivingMetal;
+			}
+		}
+    }
 	
 	public struct Armor
     {
-	
-		
         public const int MAX_ARMOR_LAYERS = 5;
         public const int NUM_ARMOR_FACES = 6; //4 = front, back, left, right.  6 adds 'top' and 'back'.
         public ArmorFace[] Faces;
@@ -9956,40 +10019,40 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			switch (material)
 			{
 				/*  https://www.quora.com/What-is-the-cost-of-one-cubic-meter-of-low-carbon-steel
-				I don’t know of any steel plant that could cast 1 cubic metre in a single block
+				I donâ€™t know of any steel plant that could cast 1 cubic metre in a single block
 				(and I know the industry very well). However, if the 1 cubic metre were made up 
-				of 4 slabs, each 250mm (1/4 meter) thick, then you could have a “block” 1 cubic metre thick. 
-				This block would weigh 7,850kg = 7.85 tonnes. The current price of slabs – Brazil,
-				FOB port – is $US490 to $US505 per tonne, so your 1 cubic metre would cost 
+				of 4 slabs, each 250mm (1/4 meter) thick, then you could have a â€œblockâ€ 1 cubic metre thick. 
+				This block would weigh 7,850kg = 7.85 tonnes. The current price of slabs â€“ Brazil,
+				FOB port â€“ is $US490 to $US505 per tonne, so your 1 cubic metre would cost 
 				approximately $US3,905.
 				*/
 					
 				/*  https://www.quora.com/What-is-the-cost-of-one-cubic-meter-of-low-carbon-steel
-				Price of one cubic meter of low‑carbon steel varies by grade, form, market and region. As of mid‑2024 typical ranges and how to compute cost:
+				Price of one cubic meter of lowâ€‘carbon steel varies by grade, form, market and region. As of midâ€‘2024 typical ranges and how to compute cost:
 
 				Key inputs
 
-				Density (approximate): 7,850 kg/m³ (commonly used value for mild/low‑carbon steels).
+				Density (approximate): 7,850 kg/mÂ³ (commonly used value for mild/lowâ€‘carbon steels).
 				Price basis: usually quoted in currency per tonne (metric ton = 1,000 kg).
-				Conversion: 1 m³ ≈ 7.85 tonnes, so multiply price per tonne by 7.85.
-				Typical market price examples (approximate, mid‑2024 observations)
+				Conversion: 1 mÂ³ â‰ˆ 7.85 tonnes, so multiply price per tonne by 7.85.
+				Typical market price examples (approximate, midâ€‘2024 observations)
 
-				Commodity mild/low‑carbon steel (rolled coil, bulk domestic): US$600–1,000 per tonne → US$4,700–7,850 per m³.
-				Structural/plate mild steel (common commercial grades): US$700–1,200 per tonne → US$5,500–9,420 per m³.
-				Low‑carbon specialty or alloyed variants: higher; US$1,200–2,000+ per tonne → US$9,420–15,700+ per m³.
+				Commodity mild/lowâ€‘carbon steel (rolled coil, bulk domestic): US$600â€“1,000 per tonne â†’ US$4,700â€“7,850 per mÂ³.
+				Structural/plate mild steel (common commercial grades): US$700â€“1,200 per tonne â†’ US$5,500â€“9,420 per mÂ³.
+				Lowâ€‘carbon specialty or alloyed variants: higher; US$1,200â€“2,000+ per tonne â†’ US$9,420â€“15,700+ per mÂ³.
 				How to get an exact current cost
 
-				Identify the exact grade and product form (sheet, plate, ingot, billet) — processing and yield affect price.
+				Identify the exact grade and product form (sheet, plate, ingot, billet) â€” processing and yield affect price.
 				Check spot prices on commodity services (Metal Bulletin, Fastmarkets, Platts) or regional steel distributors.
-				Convert by multiplying quoted price per tonne by 7.85 to get per‑m³ cost.
+				Convert by multiplying quoted price per tonne by 7.85 to get perâ€‘mÂ³ cost.
 				Add applicable extras: freight, customs/duties, cutting/processing, taxes, and volume discounts.
 				Example calculation
 
-				If supplier quote = US$850/tonne for mild steel: 850 × 7.85 = US$6,672.50 per m³ (plus logistics and processing).
+				If supplier quote = US$850/tonne for mild steel: 850 Ã— 7.85 = US$6,672.50 per mÂ³ (plus logistics and processing).
 				Regional note
 
 				Prices fluctuate with scrap/iron ore markets, energy costs and local trade policy; use local supplier quotes for procurement decisions.
-				If a precise, up‑to‑date number is required for budgeting, obtain current per‑tonne quotes from local mills or distributors and apply the 7.85 multiplier.
+				If a precise, upâ€‘toâ€‘date number is required for budgeting, obtain current perâ€‘tonne quotes from local mills or distributors and apply the 7.85 multiplier.
 				*/
 					
 				case "iron":
@@ -10072,8 +10135,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			Common armor slopes, particularly in armored fighting vehicle (AFV) design, typically range from 30 to over 80 degrees back from the vertical to increase the effective line-of-sight thickness and improve deflection chances. The most iconic design is the 60-degree slope, which doubles the effective thickness of the armour compared to its nominal thickness. 
 			Common Armor Slope Angles (from Vertical)
             	60 Degrees: The standard "optimal" slope for WWII-era vehicles, such as the T-34's glacis plate, which provides 2x the effective thickness ( 45mm / cos(60 degrees) = 90mm  ).
-				45–55 Degrees: Frequently used on intermediate armored vehicle designs, such as the Panzer V Panther (approx. 55°), which offers a roughly effectiveness multiplier to the line-of-sight thickness, depending on the research source.
-            	75–82+ Degrees: Highly sloped, nearly horizontal angles found on "pike nose" designs (IS-3) or the front glacis of modern main battle tanks like the M1 Abrams, which can reach 80+ degrees, making the armor extremely effective against horizontal fire
+				45â€“55 Degrees: Frequently used on intermediate armored vehicle designs, such as the Panzer V Panther (approx. 55Â°), which offers a roughly effectiveness multiplier to the line-of-sight thickness, depending on the research source.
+            	75â€“82+ Degrees: Highly sloped, nearly horizontal angles found on "pike nose" designs (IS-3) or the front glacis of modern main battle tanks like the M1 Abrams, which can reach 80+ degrees, making the armor extremely effective against horizontal fire
 		*/
 		
 		public byte Slope;
@@ -10272,83 +10335,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
     }
 	
 
-    public struct InternalStructure
-    {
-		[Flags]
-		public enum STRUCTURE_ATTRIBUTES : byte
-		{
-			None = 0,                // 0
-    		Robotic = 1 << 0,            // 1
-    		Biomechanical = 1 << 1,    // 2
-    		Responsive = 1 << 2, // 4
-    		LivingMetal = 1 << 3,   // 8
-    		All = Robotic | Biomechanical | Responsive | LivingMetal
-		}
-		
-		public STRUCTURE_ATTRIBUTES StructureAttributes;
-        public int MaterialType; // wood, metal, composite
-        public float Strength;  // frame strength
-        			
-        public byte SlopeLeft; // note: slope uses constants to represent 0, 30 or 60
-        public byte SlopeRight;
-        public byte SlopeFront;
-        public byte SlopeBack;
-        
-        // todo: is this correct place to have streamlining?  It would have to be set individually for each subassembly?
-        public string StreamLining; // todo:  need enums or perhaps a coefficient value instead AND THE GUI can interpet this coefficient into a string if desired
-        // NOTE: hitpoints I think is fine for inanimate objects,
-        //       but not good for living things. 
-        //       https://www.youtube.com/watch?v=sMWMB9bjFGo
-        public Stat HitPoints;		
-		
-		public bool Robotic 
-		{
-			get {return (StructureAttributes & STRUCTURE_ATTRIBUTES.Robotic) == STRUCTURE_ATTRIBUTES.Robotic;}
-			set 
-			{
-				if (value)
-                	StructureAttributes |= STRUCTURE_ATTRIBUTES.Robotic;
-                else
-                    StructureAttributes &= ~STRUCTURE_ATTRIBUTES.Robotic;
-			}
-		}
-		
-		public bool Biomechanical 
-		{
-			get {return (StructureAttributes & STRUCTURE_ATTRIBUTES.Biomechanical) == STRUCTURE_ATTRIBUTES.Biomechanical;}
-			set 
-			{
-				if (value)
-                	StructureAttributes |= STRUCTURE_ATTRIBUTES.Biomechanical;
-                else
-                    StructureAttributes &= ~STRUCTURE_ATTRIBUTES.Biomechanical;
-			}
-		}
-		
-		public bool Responsive 
-		{
-			get {return (StructureAttributes & STRUCTURE_ATTRIBUTES.Responsive) == STRUCTURE_ATTRIBUTES.Responsive;}
-			set 
-			{
-				if (value)
-                	StructureAttributes |= STRUCTURE_ATTRIBUTES.Responsive;
-                else
-                    StructureAttributes &= ~STRUCTURE_ATTRIBUTES.Responsive;
-			}
-		}
-		
-		public bool LivingMetal 
-		{
-			get {return (StructureAttributes & STRUCTURE_ATTRIBUTES.LivingMetal) == STRUCTURE_ATTRIBUTES.LivingMetal;}
-			set 
-			{
-				if (value)
-                	StructureAttributes |= STRUCTURE_ATTRIBUTES.LivingMetal;
-                else
-                    StructureAttributes &= ~STRUCTURE_ATTRIBUTES.LivingMetal;
-			}
-		}
-    }
+   
 	#endregion // USER STRUCTS 
 
     public struct EntitySystemUpdateContext
@@ -13811,13 +13798,13 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         }
 
         // http://keithmaggio.wordpress.com/2011/02/15/math-magician-lerp-slerp-and-nlerp/
-        // Nlerp: Nlerp is our solution to Slerp�s computational cost. Nlerp also handles 
-        // rotation and is much less computationally expensive, however it, too has it�s drawbacks.
+        // Nlerp: Nlerp is our solution to Slerpï¿½s computational cost. Nlerp also handles 
+        // rotation and is much less computationally expensive, however it, too has itï¿½s drawbacks.
         // Both travel a torque-minimal path, but Nlerp is commutative where Slerp is not, and 
         // Nlerp aslo does not maintain a constant velocity, which, in some cases, may be a 
         // desired effect. Implementing Nlerp in place of some Slerp calls may produce the same 
         // effect and even save on some FPS. However, with every optimization, using this improperly
-        // may cause undesired effects. Nlerp should be used more, but it doesn�t mean cut out Slerp 
+        // may cause undesired effects. Nlerp should be used more, but it doesnï¿½t mean cut out Slerp 
         // all together. Nlerp is very easy, too. Just normalize the result from Lerp()!
         public static Vector3d NLerp(Vector3d start, Vector3d end, double weight)
         {
@@ -15531,23 +15518,23 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         //
         //Updating the dynamical state of a rigid body is referred to as integration. If you represent the orientation of this body with a quaternion, you will need to know how to update it. This is done with the following quaternion formula.
         //
-        //q' = Δq q
+        //q' = Î”q q
         //
-        //We calculate Δq using a 3D vector ω whose magnitude represents the angular velocity, and whose direction represents the axis of the angular velocity. We also use the time step Δt over which the velocity should be applied. Δq is still a rotation quaternion, and has the same form involving sines and cosines of a half angle. We use the angular velocity and time step to construct a vector θ, whose magnitude is the half angle, and whose direction is the axis.
+        //We calculate Î”q using a 3D vector Ï‰ whose magnitude represents the angular velocity, and whose direction represents the axis of the angular velocity. We also use the time step Î”t over which the velocity should be applied. Î”q is still a rotation quaternion, and has the same form involving sines and cosines of a half angle. We use the angular velocity and time step to construct a vector Î¸, whose magnitude is the half angle, and whose direction is the axis.
         //
-        //θ = ωΔt/2
+        //Î¸ = Ï‰Î”t/2
         //
         //Note: I've included the factor of 1/2, which shows up inside the trig functions of the rotation quaternion. Expressing the rotation quaternion in terms of this vector you have
         //
-        //Δq = ( cos(θ), (θ/|θ|) sin(θ) )
+        //Î”q = ( cos(Î¸), (Î¸/|Î¸|) sin(Î¸) )
         //
-        //This works well, however this formula becomes numerically unstable as |θ| approaches zero. If we can detect that |θ| is small, we can safely use the Taylor series expansion of the sin and cos functions. The "low angle" version of this formula is
+        //This works well, however this formula becomes numerically unstable as |Î¸| approaches zero. If we can detect that |Î¸| is small, we can safely use the Taylor series expansion of the sin and cos functions. The "low angle" version of this formula is
         //
-        //Δq = (1 - |θ|2/2, θ - θ|θ|2/6)
+        //Î”q = (1 - |Î¸|2/2, Î¸ - Î¸|Î¸|2/6)
         //
         //We use the first 3 terms of the Taylor series expansion, so we should ensure that the fourth term is less than machine precision before we use the "low angle" version. The fourth term of the expansion is
         //
-        //|θ|4/24 < ε
+        //|Î¸|4/24 < Îµ
         //
         //Here is a sample function for integrating a quaternion with a given angular velocity and time step
         //
@@ -18668,8 +18655,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         //Pre-processes the input point cloud by converting it to a unit-normal cube. 
         //Duplicate vertices are removed based on a normalized tolerance
         // level (i.e. 0.1 means collapse vertices within 1/10th the width/breadth/depth of any side. 
-        //This is extremely useful in eliminating slivers. When cleaning up �duplicates and/or nearby neighbors� 
-        //it also keeps the one which is �furthest away� from the centroid of the volume.
+        //This is extremely useful in eliminating slivers. When cleaning up ï¿½duplicates and/or nearby neighborsï¿½ 
+        //it also keeps the one which is ï¿½furthest awayï¿½ from the centroid of the volume.
         public static ConvexHull GetStanHull(TVMesh m)
         {
            
@@ -19111,8 +19098,8 @@ public abstract class PlanedFrustum
                 // that each edge in a convex hull connects exactly two faces. The algorithm is this:
 
                 // 1. Iterate through all polygons, and detect whether a polygon faces the viewer. 
-                // (To detect whether a polygon faces the viewer, use the dot product of the polygon�s
-                // normal and direction to any of the polygon�s vertices. When this is less than 0, 
+                // (To detect whether a polygon faces the viewer, use the dot product of the polygonï¿½s
+                // normal and direction to any of the polygonï¿½s vertices. When this is less than 0, 
                 // the polygon faces the viewer.)
 
                 for (int i = 0; i < Hull.Triangles.Length; i++)
@@ -19140,15 +19127,15 @@ public abstract class PlanedFrustum
                     UpdateEdges(e);
                 }
 
-                // After this, we should have collected all the edges forming the occluder�s contour, as seen
-                // from the viewer�s position. Once you�ve got it, it�s time to build the occlusion frustum itself,
+                // After this, we should have collected all the edges forming the occluderï¿½s contour, as seen
+                // from the viewerï¿½s position. Once youï¿½ve got it, itï¿½s time to build the occlusion frustum itself,
                 // as shown in Figure 7 (note that this figure shows a 2D view of the situation). The frustum is a 
                 // set of planes defining a volume being occluded. The property of this occlusion volume is that any 
                 // point lying behind all planes of this volume is inside of the volume, and thus is occluded. 
                 // So in order to define an occlusion volume, we just need a set of planes forming the occlusion volume.
 
-                //Looking closer, we can see that the frustum is made of all of the occluder�s polygons facing the
-                // viewer, and from new planes made of edges and the viewer�s position. So we will do the following:
+                //Looking closer, we can see that the frustum is made of all of the occluderï¿½s polygons facing the
+                // viewer, and from new planes made of edges and the viewerï¿½s position. So we will do the following:
 
                 //1. Add planes of all facing polygons of the occluder.
                 int count;
@@ -19171,7 +19158,7 @@ public abstract class PlanedFrustum
                     }
                 }
 
-                //2. Construct planes from the two points of each edge and the view-er�s position.
+                //2. Construct planes from the two points of each edge and the view-erï¿½s position.
                 for (int i = 0; i < _edges.Count; i++)
                 {
                     int j;
@@ -19183,7 +19170,7 @@ public abstract class PlanedFrustum
                     _planes[j].Negate();
                 }
 
-                //If you�ve gotten this far and it�s all working for you, there�s one useful optimization to implement 
+                //If youï¿½ve gotten this far and itï¿½s all working for you, thereï¿½s one useful optimization to implement 
                 // at this point. It lies in minimizing the number of facing planes (which will speed up intersection 
                 // detection). You may achieve this by collapsing all the facing planes into a single plane, with a 
                 // normal made of the weighted sum of all the facing planes. Each participating normal is weighted by 
@@ -19616,7 +19603,7 @@ public abstract class PlanedFrustum
 
         
         /// <summary>
-        /// Tomas M�ller's RayTri collision test.
+        /// Tomas Mï¿½ller's RayTri collision test.
         /// usage - itterate through triangles passing the verts
         /// and depending on whether we want first contact exit or to build an entire list of hits
         /// we continue itterating.
@@ -20092,7 +20079,7 @@ public abstract class PlanedFrustum
         {
             if (a == b) return a; // zero length line segment
 
-            // Determine t (the length of the vector from �a� to �p�)
+            // Determine t (the length of the vector from ï¿½aï¿½ to ï¿½pï¿½)
             Vector3d c = p - a;
             Vector3d V = b - a;
 
@@ -20101,11 +20088,11 @@ public abstract class PlanedFrustum
             V = Vector3d.Normalize(V);
             double t = Vector3d.DotProduct(V, c);
             
-            // Check to see if �t� is beyond the extents of the line segment
+            // Check to see if ï¿½tï¿½ is beyond the extents of the line segment
             if (t < 0.0f) return (a);
             if (t > d) return (b);
             
-            // Return the point between �a� and �b�
+            // Return the point between ï¿½aï¿½ and ï¿½bï¿½
             //set length of V to t. V is normalized so this is easy
             V.x = V.x * t;
             V.y = V.y * t;
@@ -20118,7 +20105,7 @@ public abstract class PlanedFrustum
         {
             if (a == b) return a; // zero length line segment
 
-            // Determine t (the length of the vector from �a� to �p�)
+            // Determine t (the length of the vector from ï¿½aï¿½ to ï¿½pï¿½)
             Vector3d c = p - a;
             Vector3d axis = b - a;
 
@@ -21453,8 +21440,8 @@ public abstract class PlanedFrustum
 		}
 		
 		/*
-		// NOTE: the use of the "ThreadLocal<>" generic  provides a thread-local Random instance , meaning each thread that accesses the variable mRandom, gets an independently initialized copy of the variable.
-		// This mechanism ensures data isolation between threads, eliminating the need for synchronization and thus improving performance and simplifying concurrent programming. 
+		// NOTE: the use of the "ThreadLocal<>" generic Â provides a thread-local Random instance , meaning each thread that accesses the variable mRandom, gets an independently initialized copy of the variable.
+		//Â This mechanism ensures data isolation between threads, eliminating the need for synchronization and thus improving performance and simplifying concurrent programming.Â 
 		private readonly System.Threading.ThreadLocal<Random> mTLRandom =
 			new System.Threading.ThreadLocal<Random>(() => new Random(System.Threading.Interlocked.Increment(ref mSeed)));
 
@@ -21734,36 +21721,6 @@ public abstract class PlanedFrustum
 			return damageAmountWithVariance;
 		}
 		
-        /// <summary> Exponential Decay
-        /// f(x) = f0 * e^(-r * x)
-        /// </summary>
-        public static double CalculateExponentialDecay(double f0, double r, double x)
-        {
-            // f0 = initial value at time/distance 0
-            // r = decay rate constant (eg 0.5)
-            // x = usually time or distance
-            return f0 * Math.Exp(-r * x);
-        }
-
-
-        /// <summary>
-        /// Google AI "To calculate a probability value from statistical coefficients in C#, you can use a weighted sum (linear combination) followed by a sigmoid function. This method is commonly used in logistics regression to convert raw scores (logits) into a probability between 0 and 1."
-        /// </summary>
-        public static double CalculateProbability(double[] stats, double[] coefficients, double bias)
-        {
-            // 1. Calculate the weighted sum (logit)
-            double z = bias;
-            for (int i = 0; i < stats.Length; i++)
-            {
-                z += stats[i] * coefficients[i];
-            }
-
-            // 2. Apply the sigmoid function to get the probability
-            double probability = 1.0 / (1.0 + Math.Exp(-z));
-            return probability;
-        }
-
-
         public static double  GetVolume (BoundingBox box)
         {
             return box.Depth * box.Width * box.Height;
@@ -23678,4 +23635,4 @@ public abstract class PlanedFrustum
 	}
    #endregion  */
 
-}
+}                                                                                                   

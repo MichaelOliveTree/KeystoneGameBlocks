@@ -1869,15 +1869,21 @@ namespace HelloBoids
 			targetingSkill.BaseValue = 1;
 			targetingSkill.EffectiveValue = 0;
 			
+            // TODO: The TargetingSkillModifier seems to be correctly registerinig
+            //       it's Modifier, but the SKILL added to the HumanOperator does not.
+            //       It doesn't really do anything atm. Indeed we do not even call
+            //       RegisterProduction() even though a SKILL is producing for instance
+            //       a bonus to AIM during HasHitsOccurrred()
+
 			// add the modifier(s) to this skill.  Recall that modifiers behave just like any other type of PRODUCTION and must be registered as PRODUCTION 
 			// at the appropriate time (eg On USE of the Skill, or on EQUIP of an Item, etc.)
 			targetingSkill.AddProduction(lfID, PRODUCTS.TargetingSkillModifier, 1, true, -1);
 
-
-			// add the skill to the DROID as if it was being added to an OPERATOR for a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
 			humanOperator.Skills.Add(targetingSkill.SkillType, targetingSkill);
 			
-			// each Operator can Produce a TargetingSkillModifier
+			// ABOVE IS THE SKILL, 
+            // BELOW IS THE MODIFIER TO THAT SKILL.
+            // each Operator can Produce a TargetingSkillModifier
 			Production p;
 			p.ProducerEntityArrayIndex = humanOperator.EntityArrayIndex;
 			p.ProducerEntityInternalIndex = lfID;
@@ -3742,8 +3748,13 @@ namespace HelloBoids
                 Memory<BaseObject> targetBaseObj = (Memory<BaseObject>)Boids[targets[i].EntityArrayIndex].GetUserStruct(typeof(BaseObject), out targetBaseObjIndex);
                 double targetSize = targetBaseObj.Span[0].Volume;
 
+                // TODO: FINISH THE FOLLOWING
                 // - stealth (only applies for assemblies)
-                ArmorFace.SURFACE_ATTRIBUTES sa = targetBaseObj.Span[0].Armor.SurfaceAttributes;
+                // NOTE: we are handling this differently... AssemblyFeature[] Features
+                // like Radar Signature modifiers are added similarly to Skills for a 
+                // Human or a Component and are registered as Consumption modifiers.
+
+       //         ArmorFace.SURFACE_ATTRIBUTES sa = targetBaseObj.Span[0].Armor.SurfaceAttributes;
 
                 // Memory<Assembly> targetAssemblyObj;
                 // 5 levels for all types
@@ -8982,12 +8993,150 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
 	}
 	
+    /// <summary>
+    /// Assembly features like "Radical Streamlining" or "Radical Stealth System" or
+    /// "Very Good Heat Signature Masking System" adds Cost and Weight to the assembly
+    /// it's attached to, and is processed as Modifiers at run-time.
+    /// </summary>
+    public struct AssemblyFeature
+    {
+        public string Name;
+        public EntityNode Assembly; // the Assembly this feature is attached to.
+
+        // A feature can potenitally modify more than one thing such as
+        // starship top speed in atmosphere and optical signature reduction bonus. 
+        public SkillModifier[] Modifiers;
+
+        // todo: we need a generic Modifier struct I think and to then have different
+        //       kinds... Skills, Starship Performance, P
+        public void Add (SkillModifier modifier)
+        {
+            // see line 8357 for struct Production
+            // and line 1876 for where this struct is used for
+            //    adding HumanOperator's TargetingSkillModifier 
+            Production p;
+
+
+
+            Modifiers = Utils.ArrayAppend(Modifiers, modifier);
+            EntryClass.bSim.RegisterProduction(this.Assembly, modifier);   
+        }
+
+        public void Remove(SkillModifier modifier)
+        {
+
+        }
+
+    }
+
+
+	public struct InternalStructure
+    {
+		[Flags]
+		public enum STRUCTURE_ATTRIBUTES : byte
+		{
+			None = 0,                // 0
+    		Robotic = 1 << 0,            // 1
+    		Biomechanical = 1 << 1,    // 2
+    		Responsive = 1 << 2, // 4
+    		LivingMetal = 1 << 3,   // 8
+    		All = Robotic | Biomechanical | Responsive | LivingMetal
+		}
+		
+		public STRUCTURE_ATTRIBUTES StructureAttributes;
+        public int MaterialType; // wood, metal, composite
+        // public float MaterialQuality?
+        // 
+        public float Strength;  // frame strength
+        			
+        // TODO: i think Slope is only for 'struct Assembly'.  Only 
+        //       Assemblies like Body, Superstructure and Turret can have Slope yes?
+        public byte SlopeLeft; // note: slope uses constants to represent 0, 30 or 60
+        public byte SlopeRight;
+        public byte SlopeFront;
+        public byte SlopeBack;
+        
+        // NOTE: hitpoints I think is fine for inanimate objects,
+        //       but not good for living things. 
+        //       https://www.youtube.com/watch?v=sMWMB9bjFGo
+        public Stat HitPoints;		
+		
+		public bool Robotic 
+		{
+			get {return (StructureAttributes & STRUCTURE_ATTRIBUTES.Robotic) == STRUCTURE_ATTRIBUTES.Robotic;}
+			set 
+			{
+				if (value)
+                	StructureAttributes |= STRUCTURE_ATTRIBUTES.Robotic;
+                else
+                    StructureAttributes &= ~STRUCTURE_ATTRIBUTES.Robotic;
+			}
+		}
+		
+		public bool Biomechanical 
+		{
+			get {return (StructureAttributes & STRUCTURE_ATTRIBUTES.Biomechanical) == STRUCTURE_ATTRIBUTES.Biomechanical;}
+			set 
+			{
+				if (value)
+                	StructureAttributes |= STRUCTURE_ATTRIBUTES.Biomechanical;
+                else
+                    StructureAttributes &= ~STRUCTURE_ATTRIBUTES.Biomechanical;
+			}
+		}
+		
+		public bool Responsive 
+		{
+			get {return (StructureAttributes & STRUCTURE_ATTRIBUTES.Responsive) == STRUCTURE_ATTRIBUTES.Responsive;}
+			set 
+			{
+				if (value)
+                	StructureAttributes |= STRUCTURE_ATTRIBUTES.Responsive;
+                else
+                    StructureAttributes &= ~STRUCTURE_ATTRIBUTES.Responsive;
+			}
+		}
+		
+		public bool LivingMetal 
+		{
+			get {return (StructureAttributes & STRUCTURE_ATTRIBUTES.LivingMetal) == STRUCTURE_ATTRIBUTES.LivingMetal;}
+			set 
+			{
+				if (value)
+                	StructureAttributes |= STRUCTURE_ATTRIBUTES.LivingMetal;
+                else
+                    StructureAttributes &= ~STRUCTURE_ATTRIBUTES.LivingMetal;
+			}
+		}
+    }
 	
+    
+    /// <summary>
+    /// eg. Body, SuperStructure, Masts, Turret, Wings, Rotor, Wheels, Tracks.
+    /// </summary>
+    public struct Assembly
+    {
+        
+        public AssemblyFeature[] Features;
+        //      - these can be treated like Skills that have modifiers to cost, weight, and things like RadarDetection, etc.
+        
+        public string StreamLining; // todo:  need enums or perhaps a coefficient value instead AND THE GUI can interpet this coefficient into a string if desired
+
+
+		public InternalStructure Internals; 	
+
+
+
+    }
+
+    /// <summary>
+    /// BaseObject is used by all Entities including those that include 'struct LifeForms' as well as 'struct Components'
+    /// </summary>
 	public struct BaseObject
 	{
 		public int EntityArrayIndex;
 		public CONFIGURATION Configuration;
-		  public string FullName;
+		public string FullName;
 		
 		
 		// stats
@@ -9030,65 +9179,15 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			return (flag & mUserRuntimeFlags) != 0;	
 		}
 		
-		
 	}
-	
-	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
-	public struct LifeForm
-	{
-	
-		// These will serve as Station Operators for now
-		public double CreationDateTime;
-		
-		
-		// STATS?
-		// 
-		public double Age;            // technically, this probably doesnt need to be stored... we only need the CreationDate?  // assign using Utils.GetAge() and find Age via 'age = Utils.GetAge(entity.CreationDate);'
-		public double MaxAge;
-		
-		
-		// todo: what about various stats like STR, CON, Fatigue, Stamina, DEX, INT, CHARISMA, etc?
-		
-		// GG-AI-OV - In RPG design, Stamina and Fatigue are two distinct mechanics used to manage player action, pace combat, and encourage strategic resource management.
-		// While often used interchangeably, they typically represent short-term exertion versus long-term penalties.
-		//
-		// Stamina: Short-Term Exertion
-		// Definition: A replenishable resource used for immediate actions like running, dodging, or attacking.
-		// Behavior: Depletes rapidly during action and recovers quickly, often automatically when out of combat.
-		// Goal: Limits the "15-minute work day," ensuring players cannot perform high-power actions indefinitely.
-		// Example: A white bar that empties while sprinting in Ghost Recon.
-		public Stat Stamina;
-		
-		// Fatigue: Long-Term Penalty
-		// Definition: A negative status effect or reduced capacity that accumulates when stamina is overused, or through illness, hunger, or long travel.
-		// Behavior: Accumulates gradually. It acts as a "penalty" that reduces the maximum stamina capacity, meaning the character recovers less over time.
-			// Goal: Encourages resting and tactical pacing.Example: In Story of Seasons, fatigue builds up while working and causes the character to pass out if it reaches 100
-		public Stat Fatigue;
-		
-		
-				
-		
-		public Membership[] Memberships;
-		public Skill[] Skills;
-		
-		
-	
-		public double GetAge(double currentTime)
-		{
-			return currentTime - CreationDateTime;
-		}
-	}
-			
-		
+
 	// NOTE: Production and Consumption belong in Entity, not in Component. 
     //public Production[] Production;   // eg. even a painting on a wall can produce +0.2 aesthic bonus to morale or happiness to crew
 	//public Consumption[] Consumption; // eg. all components can consume damage.  
 	public struct Component  // aka: "Useable Component"
     {
 		public int EntityArrayIndex;
-		
-     
-		
+			
 		public float Level; // technological level. 
 		
         public float MaterialQuality; // cheap vs very fine materials (eg poorly refined steel vs damascus steel)
@@ -9109,17 +9208,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		/// </summary>
 		public Skill[] RequiredSkills;
 		
-		public InternalStructure Internals; 	
 		
-        
-		// TODO: BEGINNING -> struct Assembly { InternalStructure Internals; }
-		    public InternalStructure Internals; 	// InternalStructure is really only for Assemblies, not for Components
-
-		    // Body, SuperStructure, Masts, Turret, Wings, Rotor, Wheels, Tracks.
-	    	public AssemblyFeatures AssemblyFeatures;
-
-		// END 	
-
 
 
 		
@@ -9388,6 +9477,54 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
 	}
 	
+
+	//[StructLayout(LayoutKind.Sequential)]  // NOTE: "ideal" total struct size for L1 cache row purposes is 64 bytes.
+	public struct LifeForm
+	{
+	
+		// These will serve as Station Operators for now
+		public double CreationDateTime;
+		
+		
+		// STATS?
+		// 
+		public double Age;            // technically, this probably doesnt need to be stored... we only need the CreationDate?  // assign using Utils.GetAge() and find Age via 'age = Utils.GetAge(entity.CreationDate);'
+		public double MaxAge;
+		
+		
+		// todo: what about various stats like STR, CON, Fatigue, Stamina, DEX, INT, CHARISMA, etc?
+		
+		// GG-AI-OV - In RPG design, Stamina and Fatigue are two distinct mechanics used to manage player action, pace combat, and encourage strategic resource management.
+		// While often used interchangeably, they typically represent short-term exertion versus long-term penalties.
+		//
+		// Stamina: Short-Term Exertion
+		// Definition: A replenishable resource used for immediate actions like running, dodging, or attacking.
+		// Behavior: Depletes rapidly during action and recovers quickly, often automatically when out of combat.
+		// Goal: Limits the "15-minute work day," ensuring players cannot perform high-power actions indefinitely.
+		// Example: A white bar that empties while sprinting in Ghost Recon.
+		public Stat Stamina;
+		
+		// Fatigue: Long-Term Penalty
+		// Definition: A negative status effect or reduced capacity that accumulates when stamina is overused, or through illness, hunger, or long travel.
+		// Behavior: Accumulates gradually. It acts as a "penalty" that reduces the maximum stamina capacity, meaning the character recovers less over time.
+			// Goal: Encourages resting and tactical pacing.Example: In Story of Seasons, fatigue builds up while working and causes the character to pass out if it reaches 100
+		public Stat Fatigue;
+		
+		
+				
+		
+		public Membership[] Memberships;
+		public Skill[] Skills;
+		
+		
+	
+		public double GetAge(double currentTime)
+		{
+			return currentTime - CreationDateTime;
+		}
+	}
+			
+		
 	
 	// See Game01.Components
 	public struct PowerProducer
@@ -9824,90 +9961,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 	}
 
 
-	 public struct InternalStructure
-    {
-		[Flags]
-		public enum STRUCTURE_ATTRIBUTES : byte
-		{
-			None = 0,                // 0
-    		Robotic = 1 << 0,            // 1
-    		Biomechanical = 1 << 1,    // 2
-    		Responsive = 1 << 2, // 4
-    		LivingMetal = 1 << 3,   // 8
-    		All = Robotic | Biomechanical | Responsive | LivingMetal
-		}
-		
-		public STRUCTURE_ATTRIBUTES StructureAttributes;
-        public int MaterialType; // wood, metal, composite
-        // public float MaterialQuality?
-        // 
-        public float Strength;  // frame strength
-        			
-        // TODO: i think Slope is only for 'struct Assembly'.  Only 
-        //       Assemblies like Body, Superstructure and Turret can have Slope yes?
-        public byte SlopeLeft; // note: slope uses constants to represent 0, 30 or 60
-        public byte SlopeRight;
-        public byte SlopeFront;
-        public byte SlopeBack;
-        
-        // todo: is this correct place to have streamlining?  It would have to be set individually for each subassembly?
-        // public AssemblyFeatures (BodyFeatures)
-        //      - these can be treated like Skills that have modifiers to cost, weight, and things like RadarDetection, etc.
-        
-        public string StreamLining; // todo:  need enums or perhaps a coefficient value instead AND THE GUI can interpet this coefficient into a string if desired
-        // NOTE: hitpoints I think is fine for inanimate objects,
-        //       but not good for living things. 
-        //       https://www.youtube.com/watch?v=sMWMB9bjFGo
-        public Stat HitPoints;		
-		
-		public bool Robotic 
-		{
-			get {return (StructureAttributes & STRUCTURE_ATTRIBUTES.Robotic) == STRUCTURE_ATTRIBUTES.Robotic;}
-			set 
-			{
-				if (value)
-                	StructureAttributes |= STRUCTURE_ATTRIBUTES.Robotic;
-                else
-                    StructureAttributes &= ~STRUCTURE_ATTRIBUTES.Robotic;
-			}
-		}
-		
-		public bool Biomechanical 
-		{
-			get {return (StructureAttributes & STRUCTURE_ATTRIBUTES.Biomechanical) == STRUCTURE_ATTRIBUTES.Biomechanical;}
-			set 
-			{
-				if (value)
-                	StructureAttributes |= STRUCTURE_ATTRIBUTES.Biomechanical;
-                else
-                    StructureAttributes &= ~STRUCTURE_ATTRIBUTES.Biomechanical;
-			}
-		}
-		
-		public bool Responsive 
-		{
-			get {return (StructureAttributes & STRUCTURE_ATTRIBUTES.Responsive) == STRUCTURE_ATTRIBUTES.Responsive;}
-			set 
-			{
-				if (value)
-                	StructureAttributes |= STRUCTURE_ATTRIBUTES.Responsive;
-                else
-                    StructureAttributes &= ~STRUCTURE_ATTRIBUTES.Responsive;
-			}
-		}
-		
-		public bool LivingMetal 
-		{
-			get {return (StructureAttributes & STRUCTURE_ATTRIBUTES.LivingMetal) == STRUCTURE_ATTRIBUTES.LivingMetal;}
-			set 
-			{
-				if (value)
-                	StructureAttributes |= STRUCTURE_ATTRIBUTES.LivingMetal;
-                else
-                    StructureAttributes &= ~STRUCTURE_ATTRIBUTES.LivingMetal;
-			}
-		}
-    }
 	
 	public struct Armor
     {

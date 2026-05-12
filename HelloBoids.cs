@@ -36,6 +36,7 @@ using System.IO;
 //  /.salty
 //  /.theway
 //  /.fourfours
+//  /.heavensrock
 
 
 
@@ -702,27 +703,39 @@ namespace HelloBoids
     {
 #if USE_MEMORY_T
         public DataProcessorsStore mDataProcessor;
+        public static ComponentStore<Transform.Transform_Struct> Store;
 #endif
 
+        private System.Collections.Concurrent.ConcurrentDictionary<int, List<Tuple<int, double>>> mNeighbors = new System.Collections.Concurrent.ConcurrentDictionary<int, List<Tuple<int, double>>>();
+		internal System.Collections.Concurrent.ConcurrentDictionary<int, ComponentStore<Production>> mProduction;
+        internal System.Collections.Concurrent.ConcurrentDictionary<int, ComponentStore<Consumption>> mConsumption;
+
+
+        internal System.Collections.Concurrent.ConcurrentDictionary<int, ComponentStore<StatModifier>> mStatModifiers;
+        internal System.Collections.Concurrent.ConcurrentDictionary<int, ComponentStore<SkillModifier>> mSkillModifiers;
+
+
+
+
+        public static SkillModificationSystem mSkillModificationSystem = new SkillModificationSystem();
+
+		public static SkillSystem mSkillSystem = new SkillSystem();
+
+
+		public static DamageSystem mDamageSystem = new DamageSystem();
+		public static DamageOverTimeSystem mDamageOverTimeSystem = new DamageOverTimeSystem();
+		public static HealthSystem mHealthSystem = new HealthSystem();
 		
-		
+        				
+
+        public Seeds Seeds { get; set; }
 		
         public List<EntityNode> Boids { get; set; }
 					// NOTE: The statistics do not exist within each Droid and so we can keep them
 			//       when a Droid is Destroyed and then Respawned and the Statistics can continue
 			//       to accumulate with the newly spawned replacement for that Droid assuming its using
 			//       the same ID/Profile which is how I envision a screensaver type auto-play game would work.
-		public List<Statistics> Statistics {get; set;}
-		
-		
-		private System.Collections.Concurrent.ConcurrentDictionary<int, List<Tuple<int, double>>> mNeighbors = new System.Collections.Concurrent.ConcurrentDictionary<int, List<Tuple<int, double>>>();
-		internal System.Collections.Concurrent.ConcurrentDictionary<int, ComponentStore<Production>> mProduction;
-        internal System.Collections.Concurrent.ConcurrentDictionary<int, ComponentStore<Consumption>> mConsumption;
-		
-				
-
-        public Seeds Seeds { get; set; }
-						 
+		public List<Statistics> Statistics {get; set;}				 
 		
         private double SeparationDistance;
         private double SeparationFactor ;
@@ -741,16 +754,6 @@ namespace HelloBoids
         public static IntervalTimers mIntervalTimers;
 
 
-#if USE_MEMORY_T
-        public static ComponentStore<Transform.Transform_Struct> Store;
-#endif
-
-		public static DamageSystem mDamageSystem = new DamageSystem();
-		public static DamageOverTimeSystem mDamageOverTimeSystem = new DamageOverTimeSystem();
-		public static HealthSystem mHealthSystem = new HealthSystem();
-		public static SkillModificationSystem mSkillModificationSystem = new SkillModificationSystem();
-		public static SkillSystem mSkillSystem = new SkillSystem();
-		
 		private const CONFIGURATION HumanOperatorConfiguration = CONFIGURATION.Transform | CONFIGURATION.RigidBody |  CONFIGURATION.LifeForm | CONFIGURATION.Sentient | CONFIGURATION.Intelligent | CONFIGURATION.SelfPropelled;
 		private const CONFIGURATION BoidConfiguration = CONFIGURATION.Transform | CONFIGURATION.RigidBody | CONFIGURATION.LifeForm | CONFIGURATION.SelfPropelled;
 		private const CONFIGURATION OpticalSensorConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.Sensor;
@@ -1425,8 +1428,8 @@ namespace HelloBoids
 			c.Amount = 1;
 			c.Operations = null;
 			
-			RegisterProduction(opticalSensor, p);
-			RegisterConsumption(opticalSensor, c);
+			RegisterProduction(p);
+			RegisterConsumption(c);
 			
 			
 			// each OpticalSensor CONSUMES PRODUCT.ElectricalPower from our Battery (a Producer)
@@ -1438,7 +1441,7 @@ namespace HelloBoids
 			c.Amount = 1;
 			c.Operations = null;
 			
-			RegisterConsumption(opticalSensor, c);
+			RegisterConsumption(c);
 			
 			return opticalSensor;
 		}
@@ -1483,7 +1486,7 @@ namespace HelloBoids
 			c.Amount = 1;
 			c.Operations = null;
 			
-			RegisterConsumption(wings, c);
+			RegisterConsumption(c);
 			
 			return wings;
 		}
@@ -1605,7 +1608,7 @@ namespace HelloBoids
 			c.Amount = 1;
 			c.Operations = null;
 			
-			RegisterConsumption(laser, c);
+			RegisterConsumption(c);
 			
 			return laser;
 		}
@@ -1693,7 +1696,7 @@ namespace HelloBoids
 			c.Amount = 10; // 10 kW/h
 			c.Operations = null;
 			
-			RegisterConsumption(station, c);
+			RegisterConsumption(c);
 			
 			
 			// each Station can Consume a TargetingSkillModifier as if it had a TACTICAL CREW STATION from an Operator
@@ -1706,7 +1709,7 @@ namespace HelloBoids
 			c.Operations = null;
 
 			
-			RegisterConsumption(station, c);
+			RegisterConsumption(c);
 			
 			return station;
 		}
@@ -1819,7 +1822,7 @@ namespace HelloBoids
 			p.Consumers = new int[] {wingsConsumptionListIndex, eyesConsumptionListIndex, laserConsumptionListIndex, tacticalConsumptionListIndex};
 			
 				
-			RegisterProduction(battery, p);
+			RegisterProduction(p);
 			
 			return battery;
 		}
@@ -1908,7 +1911,7 @@ namespace HelloBoids
 			p.Consumers = new int[] {stationConsumerListIndex};
 			
 			
-			RegisterProduction(humanOperator, p);
+			RegisterProduction(p);
 					
 			return humanOperator;
 		}
@@ -5377,17 +5380,42 @@ namespace HelloBoids
             // FormMainBase.SendNetMessage(msg)
 		}
 		
-		public void RegisterProduction (EntityNode entity, Production[] production)
+
+        public void RegisterSkillModifier (SkillModifier modifier)
+        {
+
+        }
+
+        public void UnRegisterSkillModifier(SkillModifier modifier)
+        {
+
+        }
+
+        /// <summary>
+        /// Examples include Performance modifiers like Acceleration, Speed
+        /// 
+        /// </summary>
+        public void RegisterStatModifier(StatModifier modifier)
+        {
+
+        }
+
+        public void UnRegisterStatModifier(StatModifier modifier)
+        {
+
+        }
+
+		public void RegisterProduction (Production[] production)
 		{
 			if (production != null)
 				for (int i = 0; i < production.Length; i++)
-					 RegisterProduction(entity, production[i]);
+					 RegisterProduction(production[i]);
 		}
 
 		private static System.Threading.SemaphoreSlim mProductionSemaphore = new System.Threading.SemaphoreSlim(1);
 		private static System.Threading.SemaphoreSlim mConsumptionSemaphore = new System.Threading.SemaphoreSlim(1);
        	
-		public void RegisterProduction(EntityNode entity, Production p)
+		public void RegisterProduction(Production p)
         {
 		    try
 			{
@@ -5431,9 +5459,13 @@ namespace HelloBoids
 			}
             // todo: ideally this ISimulation implementation should be in the EXE because we need to know the game specific productIDs and what they refer to
             // todo: how and where is the Hz for each productID defined?  Perhaps its just the job of this Simulation implementation which should be implemented in the EXE, not Keystone.dll
+
+
+
+
         }
 
-        public void RegisterConsumption(EntityNode entity, Consumption c)
+        public void RegisterConsumption(Consumption c)
         {
 			try
 			{
@@ -8481,18 +8513,53 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 	// the distance between the laser and the target it hits.
 	//
 	
+    
+	public struct Stat
+	{
+		// GG-AI-OV - A 32-bit float (the System.Single type in .NET) uses 24 bits for its significand (including one implicit bit). 
+		// This means: Up to 16,777,216 (\(2^{24}\)): Every whole number can be represented exactly.
+		// Beyond 16,777,216: The "gap" between representable numbers increases. 
+		// For example, \(2^{24} + 1\) (16,777,217) cannot be represented exactly and will be rounded to 16,777,216 or 16,777,218.
+		// Larger Values: As the numbers grow, the gaps get wider. Eventually, a float can only represent multiples of 4, then multiples of 8, and so on.
+			
+		public float Base;
+		public float Current;
+		public string Label;
 		
-		public enum ModificationEffect // equivalent to distributionMode for Production
+		public Stat (float baseValue)
 		{
-			Individual,
-			List,
-			Party,
-			Area,
-			Region,
-			Faction
+			Base = baseValue;
+			Current = baseValue;
+			Label = null;
 		}
-
+			
+		public override string ToString()
+		{
+			return Label + ": " + Current.ToString() + "/" + Base.ToString();
+		}
+		
+	}
 	
+    public enum ModificationEffect // equivalent to distributionMode for Production
+    {
+        Individual,
+        List,
+        Party,
+        Area,
+        Region,
+        Faction
+    }
+
+	public struct StatModifier
+    {
+        public int EntityToTargetIndex;
+        public Stat StatToTarget;
+        public bool Enabled;
+        public int Amount;                  // can be negative or positive
+        public int NumUses;
+        public float CoolDownBetweenUses;
+    }
+
 	public struct SkillModifier
 	{ 
 		public int ProducerEntityArrayIndex; 
@@ -8504,6 +8571,12 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		public float CooldownBetweenUses;
 	}
 	
+
+    
+
+
+
+
 	// TODO: an Operator that has for example a targeting skill, (see struct LivingEntity)
 	//       will "PRODUCE" a bonus for that crew station every update.  It does not require
 	//       an "Update()" function within a script, it only needs the type of PRODUCTION defined
@@ -8967,32 +9040,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		IsUnJamming =        1 << 8 // denotes a quick fix in the field requiring less than 1 minute to resolve (isFixingMinorMalfunction), 
 	}
 	
-	public struct Stat
-	{
-		// GG-AI-OV - A 32-bit float (the System.Single type in .NET) uses 24 bits for its significand (including one implicit bit). 
-		// This means: Up to 16,777,216 (\(2^{24}\)): Every whole number can be represented exactly.
-		// Beyond 16,777,216: The "gap" between representable numbers increases. 
-		// For example, \(2^{24} + 1\) (16,777,217) cannot be represented exactly and will be rounded to 16,777,216 or 16,777,218.
-		// Larger Values: As the numbers grow, the gaps get wider. Eventually, a float can only represent multiples of 4, then multiples of 8, and so on.
-			
-		public float Base;
-		public float Current;
-		public string Label;
-		
-		public Stat (float baseValue)
-		{
-			Base = baseValue;
-			Current = baseValue;
-			Label = null;
-		}
-			
-		public override string ToString()
-		{
-			return Label + ": " + Current.ToString() + "/" + Base.ToString();
-		}
-		
-	}
-	
     /// <summary>
     /// Assembly features like "Radical Streamlining" or "Radical Stealth System" or
     /// "Very Good Heat Signature Masking System" adds Cost and Weight to the assembly
@@ -9016,17 +9063,14 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
             //    adding HumanOperator's TargetingSkillModifier 
             Production p;
 
-
-
             Modifiers = Utils.ArrayAppend(Modifiers, modifier);
-            EntryClass.bSim.RegisterProduction(this.Assembly, modifier);   
+            EntryClass.bSim.RegisterSkillModifier(modifier);   
         }
 
         public void Remove(SkillModifier modifier)
         {
-
+            EntryClass.bSim.UnRegisterSkillModifier(modifier);
         }
-
     }
 
 
@@ -9298,7 +9342,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 							return false;
 						}
 						
-						
+
 						if (this.RequiredSkills != null)
 						{
 							string name = allBaseObjects.Span[index].FullName;

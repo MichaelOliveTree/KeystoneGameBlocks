@@ -5397,7 +5397,38 @@ namespace HelloBoids
         /// </summary>
         public void RegisterStatModifier(StatModifier modifier)
         {
+            try
+			{
+				mStatModifierSemaphore.Wait(-1);
+                string statName = modifier.StatToTarget.Name;
+                
+                if  (mStatModifiers == null)
+                    mStatModifiers = new System.Collections.Concurrent.ConcurrentDictionary<int, ComponentStore<StatModifier>>();
 
+                // get or Add the ComponentStore<StatModifier>
+                ComponentStore<StatModifier> statModifierStore = mStatModifiers.GetOrAdd (statName.GetHashCode(), (key) =>  EntryClass.mCStoreCol.CheckOut<StatModifier>(EntryClass.NUM_ENTRIES, modifier.StatToTarget.Name.GetHashCode()));
+
+                // search for the specific StatModifier for a specific Entity within the ComponentStore
+                Predicate<StatModifier> statModifierForThisEntityAndStatNameAlreadyExists = x => x.StatToTarget.Name == modifier.StatToTarget.Name && x.EntityToTargetIndex == modifier.EntityToTargetIndex;
+                StatModifier searchResult = statModifierStore.Find(statModifierForThisEntityAndStatNameAlreadyExists);
+            
+                if (searchResult.Equals(default(StatModifier)))
+                {
+                    int index;
+                    Memory<StatModifier> mem = (Memory<StatModifier>)statModifierStore.CheckOut(out index);
+
+                    // TODO: c# 10 does not require the following two lines and instead we can just use mem.Span[0] = modifier;
+                    Span<StatModifier> span = mem.Span;
+                    span[0] = modifier;
+                    
+                    //Console.WriteLine("RegisterStatModifier() - StatModifier '" + ((STATS)statID).ToString() + "' REGISTERED>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+                    
+                }
+            }
+			finally
+			{
+				mProductionSemaphore.Release();
+			}
         }
 
         public void UnRegisterStatModifier(StatModifier modifier)
@@ -5412,6 +5443,7 @@ namespace HelloBoids
 					 RegisterProduction(production[i]);
 		}
 
+        private static System.Threading.SemaphoreSlim mStatModifierSemaphore = new System.Threading.SemaphoreSlim(1);
 		private static System.Threading.SemaphoreSlim mProductionSemaphore = new System.Threading.SemaphoreSlim(1);
 		private static System.Threading.SemaphoreSlim mConsumptionSemaphore = new System.Threading.SemaphoreSlim(1);
        	
@@ -5432,8 +5464,10 @@ namespace HelloBoids
 				//}
 				//else
 				//{
-	            	//List<Production> production = mProduction.GetOrAdd(productID, (key) =>  new List<Production>());
+	            	// get or Add the ComponentStore<Production>
             		ComponentStore<Production> productionStore = mProduction.GetOrAdd (productID, (key) =>  EntryClass.mCStoreCol.CheckOut<Production>(EntryClass.NUM_ENTRIES, (int)p.ProductID));
+
+                    // search for the specific Production for a specific Entity within the ComponentStore
 					Predicate<Production> productionForThisEntityAndProductAlreadyExists = x => x.ProductID == p.ProductID && x.ProducerEntityArrayIndex == p.ProducerEntityArrayIndex;
 					Production search = productionStore.Find(productionForThisEntityAndProductAlreadyExists);
 				
@@ -8524,18 +8558,18 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			
 		public float Base;
 		public float Current;
-		public string Label;
+		public string Name;
 		
-		public Stat (float baseValue)
+		public Stat (string name, float baseValue)
 		{
 			Base = baseValue;
 			Current = baseValue;
-			Label = null;
+			Name = null;
 		}
 			
 		public override string ToString()
 		{
-			return Label + ": " + Current.ToString() + "/" + Base.ToString();
+			return Name + ": " + Current.ToString() + "/" + Base.ToString();
 		}
 		
 	}

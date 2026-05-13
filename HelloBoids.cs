@@ -3723,6 +3723,39 @@ namespace HelloBoids
 			for (int i = 0; i < targets.Count; i++)
 			{
 		
+                       // TODO: FINISH THE FOLLOWING
+                // - stealth (only applies for assemblies)
+                // NOTE: we are handling this differently... vehAssembly.VehicleAssemblyFeature[] Features
+                // like PRODUCTS.RadarSignature modifiers are added similarly to Skills for a 
+                // Human or a Component and are registered as Consumption modifiers.
+                // The idea is, a Droid that PRODUCES a RadarSignature should first apply the modifer
+                // to it's Production?   Or does the Sensor that CONSUMES a RadarSignature also need to consume the RadarSignatureModifier (eg stealth VehicleAssemblyFeature for that Ship) for the ship it is attempting to detect.
+                // clearly, this needs to modify the PRODUCTION of RadarSignature by the Ship itself...
+                // - wait, is RadarSignatureModifier a PRODUCTION modifier or a SKILL modifier?
+                // - in GURPS, a SightingAndDetection SKILL check is performed and we determine modifiers like
+                //   the vehicle size, distance, delta speed between the sensor and vessel, and any stealth featurs of the vehicle.
+                // In KGB we first PRODUCE a "RadarSignature" and then any say, OPFOR sensors, can determine if they can see or detect this RadarSignature.  The Signature has no information with it then... as regards to Size and/or Stealth...   so currently the Sensor
+                // has to determine by querying the target for things like vehicle.Volume, vehicle.VehicleAssemblyFeaures["stealth"] and then apply this to the detection equation.
+
+                // i do still think this is preferable from a realism point of view, to having some kind of variable RadarSignature value
+                // that is not dependant on the Sensor doing the detection.  However, it prevents us from  just being able to modify the RadarSignature .Value\.Amount itself within the Production struct that is generated...
+                // So we would have the Sensor call a function that would accept the target vehicle and 
+                // it would check for any Stealth features for us...
+
+                // 
+                // 
+       //         ArmorFace.SURFACE_ATTRIBUTES sa = targetBaseObj.Span[0].Armor.SurfaceAttributes;
+
+                // Memory<Assembly> targetAssemblyObj;
+                // 5 levels for all types
+                // - steamlining ([0 - 5] - fair, good, very good, excellent, radical )
+                // - heat reduction
+                // - noise reduction
+                // - radar reduction (materials, shapes)
+                // - optical reduction (eg paint, chameleon systems, camaflauge)
+                // - Electronic Jammer components that are enabled
+
+
                 int baseObjIndex;
 				int componentIndex;
 				int weaponIndex;
@@ -3751,32 +3784,21 @@ namespace HelloBoids
                 Memory<BaseObject> targetBaseObj = (Memory<BaseObject>)Boids[targets[i].EntityArrayIndex].GetUserStruct(typeof(BaseObject), out targetBaseObjIndex);
                 double targetSize = targetBaseObj.Span[0].Volume;
 
-                // TODO: FINISH THE FOLLOWING
-                // - stealth (only applies for assemblies)
-                // NOTE: we are handling this differently... AssemblyFeature[] Features
-                // like Radar Signature modifiers are added similarly to Skills for a 
-                // Human or a Component and are registered as Consumption modifiers.
-
-       //         ArmorFace.SURFACE_ATTRIBUTES sa = targetBaseObj.Span[0].Armor.SurfaceAttributes;
-
-                // Memory<Assembly> targetAssemblyObj;
-                // 5 levels for all types
-                // - steamlining ([0 - 5] - fair, good, very good, excellent, radical )
-                // - heat reduction
-                // - noise reduction
-                // - radar reduction (materials, shapes)
-                // - optical reduction (eg paint, chameleon systems, camaflauge)
-                // - Electronic Jammer components that are enabled
-                // 
-
-                // TACTICS (evasive, counter-measures, time acquired by sensors)
+                // TACTICS (stealth, evasive, counter-measures + ECM, time acquired by sensors)
                 // --------------------------------------------------------------
-				// target evasive
-				// COMPARE VELOCITY MAGNITUDE CHANGES OVER X SECONDS PERIOD OF TIME
+				// target stealth - check the VehicleAssemblyFeatures for stealth features, of the target's OWNER 
+                //                  (which may already be the Droid/Ship iteself)
+                //                  and all other assemblies VehicleAssemblyFeatures
+                //
+                //
+                // target evasive (COMPARE VELOCITY MAGNITUDE CHANGES OVER X SECONDS PERIOD OF TIME
                 // each second of "evasive" after 1 full second, adds -5% chance 'to-hit' by the attacking ship. (MAX -15% chance)
 
 				// target deployed counter measures within X time (time * fallOff aka call it 'attenuation') - STATISTICS SEARCH
 
+                // ECM - eg. electronic jammers
+
+                
 				// target last acquisition - previous aquisition makes it easier to re-aquire
 				// STATISTICS search
 

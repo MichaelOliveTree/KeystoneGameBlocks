@@ -8584,6 +8584,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         Faction
     }
 
+    // stat modifiers often occur every frame
 	public struct StatModifier
     {
         public int EntityToTargetIndex;
@@ -8594,6 +8595,9 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         public float CoolDownBetweenUses;
     }
 
+    // skill modifiers tend to only be updated when an Entity is performing an Action
+    // such as Sighting/Detection Skill modifiers being applied to a Station from
+    // the Operator of that station during Sensor scans.
 	public struct SkillModifier
 	{ 
 		public int ProducerEntityArrayIndex; 
@@ -8604,10 +8608,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		public int NumUses;
 		public float CooldownBetweenUses;
 	}
-	
-
-    
-
 
 
 
@@ -9079,10 +9079,10 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
     /// "Very Good Heat Signature Masking System" adds Cost and Weight to the assembly
     /// it's attached to, and is processed as Modifiers at run-time.
     /// </summary>
-    public struct AssemblyFeature
+    public struct VehicleAssemblyFeatures
     {
         public string Name;
-        public EntityNode Assembly; // the Assembly this feature is attached to.
+        public EntityNode VehicleAssembly; // the Assembly this feature is attached to.
 
         // A feature can potenitally modify more than one thing such as
         // starship top speed in atmosphere and optical signature reduction bonus. 
@@ -9192,10 +9192,10 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
     /// <summary>
     /// eg. Body, SuperStructure, Masts, Turret, Wings, Rotor, Wheels, Tracks.
     /// </summary>
-    public struct Assembly
+    public struct VehicleAssembly
     {
         
-        public AssemblyFeature[] Features;
+        public VehicleAssembly[] Features;
         //      - these can be treated like Skills that have modifiers to cost, weight, and things like RadarDetection, etc.
         
         public string StreamLining; // todo:  need enums or perhaps a coefficient value instead AND THE GUI can interpet this coefficient into a string if desired

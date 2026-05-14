@@ -169,7 +169,7 @@ using System.IO;
 
 // 5 - procedural generation of a Colony : IEntitySystem -> both proc generation with seeds/THreaded<Random> and updates
 
-// 6 - Status Effect System - for both attributes (eg +2 morale to subordinates), spells, weapon uses (eg lasers), and items
+// 6 - Status Effect System - for both stats, skills/attributes (eg +2 morale to subordinates), spells, weapon uses (eg lasers), and items
 //     For KeystoneGameBlocks, the idea is to keep the code modified in the same way as our DataProcessor system.
 //
 //     https://www.gamedev.net/forums/topic/692150-status-effects-buffs-debuffs-in-an-ecs-architecture/
@@ -189,6 +189,49 @@ using System.IO;
 //       we use a method named FinalizeMovement()
 
 
+			// 1 - [DONE] - Calc Malfunction
+			// 2 - [DONE] - Distance effect on Damage (laser attenuation/falloff) 
+			//     - for kinetic say a ballistic projectile or catapult bolt in atmosphere... depends on atmosphere and perhaps gravity too \
+			//     - for laser, inverse square law 'intensity = intensity * ( 1 / d^2)' where for instance double the distance == 1/4 the intensity of the beam
+			//      if (distance > falloffStart) 
+			//		{
+    		//			float damageReduction = (distance - falloffStart) * damageDropPerUnit;
+    		//			currentDamage = Math.Max(minDamage, baseDamage - damageReduction);
+			//		}
+		
+			// 3 - Recursive / Cascading / Chain-Reaction Damage
+				// - PRODUCTION & CONSUMPTION should be used for propgating things like Fire and Radiation right?
+				//		- its kind of like cellular automata though isn't it? if the 
+			
+				// TODO: so for chained / recursive / cascading damage, where should we initiate that?
+					// We do know for an Explosion, an explosion ENtity can be retreived from an ObjectPool
+					// and then added to the Scene.  That Entity can be flagged as a MissionObject perhaps?
+					// 
+					// In KGB for Interiors, we can use our TileMaps and search x distance away using floodfill
+					// In space and in HelloBoids, we can use 
+					//  a) a bigger sub-set of the adjacents rather than one target to HasHitOccurred()... include the desired target along with some adjacents within X range of the Target perhaps.
+					//  b) we still need this sub-set for our Sensor detection where ships can mask their signatures somewhat by flying in formation in a column (from 
+					//     the target's point-of-view) towards the the target.
+					//  c) or we just re-search over again with Octree to find new adjacents... or
+					//     again, we can use the SensorContact data...
+			
+					// EntityPool for things like Explosions, RadiationFields, etc
+			
+			// 4 - [DONE] - variances for spawned Droid Size
+			// 5 - randomness of skill levels of operators
+			// 6 - [DONE] - armor of the Droid randomness based on the size of the Droid
+			
+			// 7 - [DONE] - armor option for Operators
+			// 8 - finish Statistics and Policies
+            // 9 - destruction of Droids upon lose of hitpoints
+			// 10 - double buffering of Data
+			// 11 - class Builder 
+			
+			
+			// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
+			// https://gamedev.stackexchange.com/questions/148961/how-to-design-a-damage-formula-in-an-rpg-which-keeps-weapons-with-different-atta
+			
+			
 
 // FIXES Feb.8.2026
 //   - started adding code for Laser fire damage effects processing 
@@ -200,6 +243,9 @@ using System.IO;
 // TODO: THE SAMPLE FROM GITHUB https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
 // and simply uses System.Drawing to draw the boids.  I will want to just use a simple 3d pyramid type boid .obj instead.
 // https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
+
+
+
 
 // NOTE: The primary purpose of this is to demonstrate the use of Memory<T>
 // via ComponentStore.cs (ComponentStore.ReadOnlySpan and ComponentStore.WriteOnlySpan)
@@ -221,26 +267,13 @@ namespace HelloBoids
         public static double WIDTH = 800d;
         public static double HEIGHT = 800d;
         public static double DEPTH = 800d;
-		public static double BOID_SIZE = 2d;             // since this is 2D, we need a size for the Octree's Z depth 
+		
 		public static uint NUM_ENTRIES = 768;
         public static uint NUM_ITERATIONS = 400;
         public static double MAX_RUNTIME_SECONDS = 5.5;
 		
-		// Note: the larger the various distance values below,
-        // the more cpu cycles needed. Tweak these values
-        // to find a good balance between performance and
-        // simulation/behavior quality
-		//public static double MAX_SEARCH_DISTANCE = 35d;
-		public static double SEPERATION_DISTANCE = 25.0d;
-		public static double ALIGNMENT_DISTANCE = 15.5d;
-		public static double COHESION_DISTANCE = 12.5d;
-		
-		public static double SEPARATION_FACTOR = 0.5d;
-		public static double ALIGNMENT_FACTOR = 0.2d;
-		public static double COHESION_FACTOR = 0.1d;
-		public static double TURN_FACTOR = 0.1d; // For boundary avoidance
-		public static double MAX_SPEED = 5d;
-				
+
+	
 		private static bool useOctree = false;
 		private static uint OctreeMaxDepth = 12;         // NOTE: this is ignored if Octree.EnforceMaxDepth == false in which case the splitthreshHold and radius of the entity being added is the main determinant
 		private static uint OctreeSplitThreshold = 8;
@@ -250,7 +283,7 @@ namespace HelloBoids
         public static BoidSimulation bSim;
 		
 		
-        public static double step;
+        public static double mStep;
         private static double mTotalRuntime;
         public static long mCurrentFrame;
 		
@@ -502,7 +535,7 @@ namespace HelloBoids
             double lastElapsedTime = sw.Elapsed.TotalSeconds;
 			GameTime gt = new GameTime();
 			double targetFrameRatePerSecond = 60d;
-            step = 1d / targetFrameRatePerSecond; // aka dt or "deltaTime"
+            mStep = 1d / targetFrameRatePerSecond; // aka dt or "deltaTime"
 
             // 100FPS uses a step of 1 / 100d == 0.01 seconds 
             // or 10.00 milliseconds per framer
@@ -533,8 +566,8 @@ namespace HelloBoids
                 double elapsedSeconds = totalElapsedSeconds - lastElapsedTime;
                 lastElapsedTime = totalElapsedSeconds;
 
-                //HACK - make the elapsedSeconds always equal to fixed step
-                elapsedSeconds = step;
+                //HACK - make the elapsedSeconds always equal to fixed-step
+                elapsedSeconds = mStep;
 				TimeSpan ts = TimeSpan.FromSeconds(elapsedSeconds);
 				gt.Update(ts);
 
@@ -737,15 +770,22 @@ namespace HelloBoids
 			//       the same ID/Profile which is how I envision a screensaver type auto-play game would work.
 		public List<Statistics> Statistics {get; set;}				 
 		
-        private double SeparationDistance;
-        private double SeparationFactor ;
-        private double AlignmentDistance;
-        private double AlignmentFactor;
-        private double CohesionDistance;
-        private double CohesionFactor;
-        private double MaxSpeed;
-        private double TurnFactor; // For boundary avoidance
 
+        // Note: the larger the various distance values below,
+        // the more cpu cycles needed. Tweak these values
+        // to find a good balance between performance and
+        // simulation/behavior quality
+		//public static double MAX_SEARCH_DISTANCE = 35d;
+		public static double SEPERATION_DISTANCE = 25.0d;
+		public static double ALIGNMENT_DISTANCE = 15.5d;
+		public static double COHESION_DISTANCE = 12.5d;
+		
+		public static double SEPARATION_FACTOR = 0.5d;
+		public static double ALIGNMENT_FACTOR = 0.2d;
+		public static double COHESION_FACTOR = 0.1d;
+		public static double TURN_FACTOR = 0.1d; // For boundary avoidance
+		public static double MAX_SPEED = 5d;
+        private double BOID_SIZE = 2d;
 		private float MAX_LEVEL = 10.0f;
 		private float MAX_SKILL = 100.0f;
 
@@ -790,17 +830,6 @@ namespace HelloBoids
         {
             Boids = new List<EntityNode>(); //NOTE: we do not preallocate the list here
 			Seeds = new Seeds(123);
-	
-						
-			SeparationDistance = EntryClass.SEPERATION_DISTANCE;
-        	SeparationFactor = EntryClass.SEPARATION_FACTOR;
-        	AlignmentDistance = EntryClass.ALIGNMENT_DISTANCE;
-        	AlignmentFactor = EntryClass.ALIGNMENT_FACTOR;
-        	CohesionDistance = EntryClass.COHESION_DISTANCE;
-        	CohesionFactor = EntryClass.COHESION_FACTOR;
-       		MaxSpeed = EntryClass.MAX_SPEED;
-        	TurnFactor = EntryClass.TURN_FACTOR; // For boundary avoidance
-	
 			// NOTE: mLimitedProduction may not be necessary as we now track the NumUses for any given Production and if
 			//       p.NumUses == 0, then we remove that production at the end of UpdateProduction();
 			//mLimitedProduction = new System.Collections.Concurrent.ConcurrentDictionary<uint, List<Production>>();
@@ -1141,21 +1170,25 @@ namespace HelloBoids
             double posY = rand.NextDouble() * height;
             double posZ= rand.NextDouble() * depth;
             
-            double vX = (rand.NextDouble() - 0.5d) * 2d;
-            double vY = (rand.NextDouble() - 0.5d) * 2d;
+            
+            double vX = Utils.RandomWithVariance(rand, BoidSimulation.MAX_SPEED, 0.5d); 
+            double vY = Utils.RandomWithVariance(rand, BoidSimulation.MAX_SPEED, 0.5d); 
+            double sizeWithVariance = Utils.RandomWithVariance(rand, this.BOID_SIZE, .25f);
+
+            Vector3d pos = new Vector3d(posX, posY, posZ);
+            
+
 
 			string entityKey = "boid_" + arrayIndex.ToString(); // prefix with "boid_" to not duplicate with "sensor_"
 			
             Boid b = null;
+            // todo: generate Droids with some variance for age
+            
 			try
 			{
 				b = new Boid(entityKey, arrayIndex, posX, posY, posZ, vX, vY);
+                b.BoundingBox = new BoundingBox(pos, sizeWithVariance);
 				b.Configuration = (uint)BoidConfiguration;
-				// NOTE: since each Droid will have an "Operator" and "TacticalStation" merged into it's blackboarddata,
-				//       all we really need to do is stick to a naming convention like "operator_#####"  and "tactical_#####" 
-				//       when adding those Keys.
-				
-				// todo: generate Droids with some variance for age, size, and speed
 
 				string factionColor = "Red";
 				factionColor = (rand.NextDouble() >= 0.5d) ? "Red" : "Blue";
@@ -1206,20 +1239,30 @@ namespace HelloBoids
                 memBaseObj.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
                 memBaseObj.Span[0].HitPoints =  new Stat(){ Base = 250, Current = 250};
     
+                					
+			    // ARMOR
+    			// memBaseObj.Span[0].Armor = new Armor(b.BoundingBox);
+                int DR = 50;
+                CONSTRUCTION_MATERIAL material = CONSTRUCTION_MATERIAL.IRON;
+                float quality = 0.5f;
+
+                memBaseObj.Span[0].Armor = 
+                        new Armor (b.BoundingBox, DR, material, quality);
+                    			
+    			//// ARMOR: (OBSOLETE?) this may require an array of checkOutIndices based on how many layers as determined from 
+    			////       component.ArmorLayersCount
+    			//ComponentStore<ArmorLayer> storeArmorLayers = EntryClass.mCStoreCol.CheckOut<ArmorLayer>(EntryClass.NUM_ENTRIES); 
+                //int checkOutIndex = -1;
+                //Memory<ArmorLayer> memArmor = storeArmorLayers.CheckOut(out checkOutIndex);
+    			//b.AddUserStruct(typeof(Armor), memArmor, checkOutIndex);
+
+
     			// LIFE FORM
     			ComponentStore<LifeForm> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LifeForm>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
                 int livingEntityID = -1;
                 Memory<LifeForm> memLivingEnt = storeLivingEntity.CheckOut(out livingEntityID);
     			b.AddUserStruct(typeof(LifeForm), memLivingEnt, livingEntityID);			
     			storeLivingEntity.Span[livingEntityID].Age = 1;
-    	
-    			
-    			// ARMOR: this may require an array of checkOutIndices based on how many layers as determined from 
-    			//       component.ArmorLayersCount
-    			ComponentStore<ArmorLayer> storeArmorLayers = EntryClass.mCStoreCol.CheckOut<ArmorLayer>(EntryClass.NUM_ENTRIES); 
-                int checkOutIndex = -1;
-                Memory<ArmorLayer> memArmor = storeArmorLayers.CheckOut(out checkOutIndex);
-    			b.AddUserStruct(typeof(Armor), memArmor, checkOutIndex);
     		}
 			catch (Exception ex)
 			{
@@ -1256,38 +1299,34 @@ namespace HelloBoids
 			// EYES
 			exLine = "Spawn() - CreateOpticalSensors 1";
 			EntityNode eyes = null;
-			try
-			{
-				eyes = CreateOpticalSensor(arrayIndex + OPTICAL_SENSOR_OFFSET);
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine(exLine + " " + ex.Message);
-			}
+            eyes = CreateOpticalSensor(arrayIndex + OPTICAL_SENSOR_OFFSET);
+            eyes.Translation = pos;
+            eyes.BoundingBox =  new BoundingBox (pos, sizeWithVariance * 0.1d); // HACK -direct BoundingBox assignment.  I need a BoundingBox set to insert into Octree since we dont have any geometry to auto compute one for us. 
+            eyes.Configuration |= (uint)CONFIGURATION.PowerUsing; // eyes are sensors so use power
 
             exLine = "Spawn() - CreateOpticalSensors 2";
 			////////////////////////////////////////////////////////////////////////////////////////////////////
 			// WINGS need power to fly
-			EntityNode wings = CreateWings(arrayIndex  + WINGS_OFFSET);
+			EntityNode wings = CreateWings(arrayIndex  + WINGS_OFFSET, new BoundingBox (pos, sizeWithVariance * .9d)); 
+            wings.Translation = pos;
+			wings.Configuration |= (uint)CONFIGURATION.PowerUsing; // wings flap so use power
 
             exLine = "Spawn() - CreateOpticalSensors 3";
 			// ////////////////////////////////////////////////////////////////////////////////////////////////////
-			// Laser
+			// LASER
 			EntityNode laser = CreateLaser(arrayIndex + LASER_OFFSET);
-			
+			laser.Translation = pos;
+			laser.BoundingBox =  new BoundingBox (pos, sizeWithVariance * 0.2d); 
+			laser.Configuration |= (uint)CONFIGURATION.PowerUsing; // lasers obviously use power
+
 			exLine = "Spawn() - CreateOpticalSensors 4";
 			////////////////////////////////////////////////////////////////////////////////////////////////////
 			// TACTICAL STATION
 			EntityNode tacticalStation = CreateTacticalStation(arrayIndex + TACTICAL_STATION_OFFSET);
-						
-	
-			//			AddProduction(e)
-			//	        AddConsumption(e);
-			//       }
-			
-			// TODO: finish creating the optical sensors for our Droids
-			// TODO: I think we need to remove all struct creation from within Boid or EntityNode because we are unable
-			//       to manage the Index values properly that way.
+			tacticalStation.Translation = pos;
+			tacticalStation.BoundingBox = new BoundingBox (pos, sizeWithVariance * 0.15d);// HACK
+			tacticalStation.Configuration |= (uint)CONFIGURATION.PowerUsing; // stations have fancy computer screens that use power
+
 
 			exLine = "Spawn() - CreateOpticalSensors 5";
 			////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1297,53 +1336,41 @@ namespace HelloBoids
             exLine = "Spawn() - CreateOpticalSensors 6";
 			////////////////////////////////////////////////////////////////////////////////////////////////////
 			// HUMAN OPERATOR for the tactical station
-			EntityNode humanOperator = CreateHumanOperator(arrayIndex + HUMAN_OPERATOR_OFFSET);
-			
-			exLine = "Spawn() - CreateOpticalSensors 7";
-	
-            
-            Vector3d pos = new Vector3d(posX, posY, posZ);
-            b.BoundingBox = new BoundingBox(pos, 2d);
-			
-			wings.Translation = pos;
-			wings.BoundingBox = new BoundingBox (pos, 1.25d); // HACK
-			wings.Configuration |= (uint)CONFIGURATION.PowerUsing; // wings flap so use power
-			
-			tacticalStation.Translation = pos;
-			tacticalStation.BoundingBox = new BoundingBox (pos, .4d);// HACK
-			tacticalStation.Configuration |= (uint)CONFIGURATION.PowerUsing; // stations have fancy computer screens that use power
-
-			eyes.Translation = pos;
-			eyes.BoundingBox =  new BoundingBox (pos, 0.2d); // HACK -direct BoundingBox assignment.  I need a BoundingBox set to insert into Octree since we dont have any geometry to auto compute one for us. 
-			eyes.Configuration |= (uint)CONFIGURATION.PowerUsing; // eyes are sensors so use power
-
-			laser.Translation = pos;
-			laser.BoundingBox =  new BoundingBox (pos, 0.15d); 
-			laser.Configuration |= (uint)CONFIGURATION.PowerUsing; // lasers obviously use power
-			
-			battery.Translation = pos;
-			battery.BoundingBox = new BoundingBox (pos, 0.1d); 
-			battery.Configuration = (uint)CONFIGURATION.PowerProducing;
-			
+			EntityNode humanOperator = CreateHumanOperator(arrayIndex + HUMAN_OPERATOR_OFFSET, new BoundingBox (pos, sizeWithVariance *  0.333d));
 			humanOperator.Translation = pos;
-			humanOperator.BoundingBox =  new BoundingBox (pos, 0.7d); 
 			humanOperator.Configuration = (uint)HumanOperatorConfiguration;
 
-            exLine = "Spawn() - CreateOpticalSensors 8";
-            //Console.WriteLine(exLine);
+			exLine = "Spawn() - CreateOpticalSensors 7";
+
+            Console.WriteLine(exLine);
             
+
 		    if (this.Octree != null)
             {
-           		Octree.Add((EntityNode)b);
-				// NOTE: in KGB these Entities would be children of the parent node Boid and then
-				//       the Boid would get added to the Octree and then any child entities would get
-				//       recursively added to the Octree automatically.
-				Octree.Add((EntityNode)eyes);
-				Octree.Add((EntityNode)wings);
-				Octree.Add((EntityNode)laser);
-				Octree.Add((EntityNode)tacticalStation);
-				Octree.Add((EntityNode)battery);
-				Octree.Add((EntityNode)humanOperator);
+                try
+                {
+                    Octree.Add((EntityNode)b);
+                    exLine = "a";
+                    // NOTE: in KGB these Entities would be children of the parent node Boid and then
+                    //       the Boid would get added to the Octree and then any child entities would get
+                    //       recursively added to the Octree automatically.
+                    Octree.Add((EntityNode)eyes);
+                    exLine = "b";
+                    Octree.Add((EntityNode)wings);
+                    exLine = "c";
+                    Octree.Add((EntityNode)laser);
+                    exLine = "d";
+                    Octree.Add((EntityNode)tacticalStation);
+                    exLine = "e";
+                    Octree.Add((EntityNode)battery);
+                    exLine = "f";
+                    Octree.Add((EntityNode)humanOperator);
+                    exLine = "g";
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(exLine + ex.Message);
+                }
             }
 
             exLine = "Spawn() - CreateOpticalSensors 9";
@@ -1405,7 +1432,7 @@ namespace HelloBoids
 				storeSensor.Span[sensorInternalIndex].EntityArrayIndex = arrayIndex;
 				//storeSensor.Span[sensorInternalIndex].InternalComponentIndex = -1; // TODO:  this should be from "Component" struct not sensorInternalIndex;
 				exLine = "CreateOpticalSensor 5";
-				storeSensor.Span[sensorInternalIndex].RangeSquared = Utils.GetMax(this.SeparationDistance, this.AlignmentDistance, this.CohesionDistance);
+				storeSensor.Span[sensorInternalIndex].RangeSquared = Utils.GetMax(BoidSimulation.SEPERATION_DISTANCE, BoidSimulation.ALIGNMENT_DISTANCE, BoidSimulation.COHESION_DISTANCE);
 				exLine = "CreateOpticalSensor 6";
 				storeSensor.Span[sensorInternalIndex].RangeSquared *= storeSensor.Span[sensorInternalIndex].RangeSquared; // square it
 				//storeSensor.Span[sensorInternalIndex].ScanRating = 2000; // <-- this is a computed stat based on TL and Power, that generally ranges from 10 - 40+  (google "gurps vehicles 2nd edition radar scan rating")
@@ -1469,13 +1496,14 @@ namespace HelloBoids
 			return opticalSensor;
 		}
 		
-		private EntityNode CreateWings(int arrayIndex)
+		private EntityNode CreateWings(int arrayIndex, BoundingBox bbox)
 		{
 			string exLine = "CreateWings 1";
 			string entityKey = "wings_" + arrayIndex.ToString(); // prefix with "laser_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!			
 			
 			EntityNode wings = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
-			wings.Configuration = (uint)WingsConfiguration;
+			wings.BoundingBox = bbox;
+            wings.Configuration = (uint)WingsConfiguration;
 			
 			//CONFIGURATION WingsConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing; // <- CONFIGURATION.Propulsion
 			
@@ -1497,6 +1525,13 @@ namespace HelloBoids
 			Memory<BaseObject> memBaseObj = (Memory<BaseObject>)wings.GetUserStruct(typeof(BaseObject), out baseObjsIndex); 
 			memBaseObj.Span[0].Configuration = WingsConfiguration;
 			memBaseObj.Span[0].EntityArrayIndex = arrayIndex;
+            					
+			// ARMOR
+            int DR = 25;
+            CONSTRUCTION_MATERIAL material = CONSTRUCTION_MATERIAL.STEEL;
+            float quality = 0.75f;
+			memBaseObj.Span[0].Armor = new Armor(wings.BoundingBox, DR, material, quality);
+
 
 			// powerconsumer struct
 			ComponentStore<PowerConsumer> storeWings = EntryClass.mCStoreCol.CheckOut<PowerConsumer>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
@@ -1518,6 +1553,8 @@ namespace HelloBoids
 			
 			RegisterConsumption(c);
 			
+
+
 			return wings;
 		}
 		
@@ -1857,12 +1894,13 @@ namespace HelloBoids
 			return battery;
 		}
 		
-		private EntityNode CreateHumanOperator(int arrayIndex)
+		private EntityNode CreateHumanOperator(int arrayIndex, BoundingBox bbox)
 		{
 			string exLine = "CreateHumanOperator 1";
 			string entityKey = "human_operator_" + arrayIndex.ToString(); // prefix with "laser_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!			
 			
 			EntityNode humanOperator = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); 
+            humanOperator.BoundingBox = bbox;
 			humanOperator.Configuration = (uint)HumanOperatorConfiguration;
 			
             // BaseObjects are created internally during EntityNode ctor for now, so no need to call .AddUserStruct()
@@ -1871,11 +1909,7 @@ namespace HelloBoids
 			memBaseObj.Span[0].Configuration = HumanOperatorConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
 			memBaseObj.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026		
             memBaseObj.Span[0].HitPoints =  new Stat(){ Base = 100, Current = 100};
-			
-			double volume = 2.2d;
-			BoundingBox box = new BoundingBox (Vector3d.Zero(), volume);
-			memBaseObj.Span[0].Armor = new Armor(box);
-			
+						
 			// TRANSFORM
 			int transformIndex;
 			Memory<Transform.Transform_Struct> transform = (Memory<Transform.Transform_Struct>)humanOperator.GetUserStruct(typeof(Transform.Transform_Struct), out transformIndex); 
@@ -1889,11 +1923,15 @@ namespace HelloBoids
 			
 			storeLivingEntity.Span[lfID].Age = 1;
 
+
 					
-			// Armor
-			//		
-			//Console.WriteLine ("CREATING DEFENSE == " + memLivingEnt.Span[0].Armor.Defense.ToString());
-			
+			// ARMOR
+            int DR = 10;
+            CONSTRUCTION_MATERIAL material = CONSTRUCTION_MATERIAL.IRON;
+            float quality = 0.45f;
+			memBaseObj.Span[0].Armor = new Armor(humanOperator.BoundingBox, DR, material, quality);
+
+            // SKILLS
 			Skill targetingSkill;
 			targetingSkill.SkillType = SKILLS.Targeting;
 			targetingSkill.Level = 3;     			// the level of this skill
@@ -1946,13 +1984,6 @@ namespace HelloBoids
 			return humanOperator;
 		}
 		
-		public Armor CreateArmor(BoundingBox bbox, uint numFaces = 6, uint numLayers = 1)
-		{
-			Armor result = new Armor (bbox, numFaces, numLayers);
-
-			return result;
-		}
-	
 		
 		
 		private int GetConsumerIndex (int productID, int entityArrayIndex)
@@ -3386,7 +3417,7 @@ namespace HelloBoids
 				//List<EntityNode> tmp = FindNearestTarget(currentBoid, MAX_SEARCH_DISTANCE); // TODO: Hopefully this FindNearestTarget() can be optimized.... spatial searches even with Octree is slow.
 				// This overloaded version of FindNearestTarget() returns the sorted list of neighbors from closest to furthest along with their distances to the current droid
 				double[] distancesSquared;
-				double maxSearchDistanceSquared = Utils.GetMax(EntryClass.bSim.AlignmentDistance, EntryClass.bSim.CohesionDistance, EntryClass.bSim.SeparationDistance); // we want a much narrower search for potential targets than that used to find neighbors/aka adjacencents
+				double maxSearchDistanceSquared = Utils.GetMax(BoidSimulation.ALIGNMENT_DISTANCE, BoidSimulation.COHESION_DISTANCE, BoidSimulation.SEPERATION_DISTANCE); // we want a much narrower search for potential targets than that used to find neighbors/aka adjacencents
 				maxSearchDistanceSquared *= maxSearchDistanceSquared;
 
 				List<EntityNode> potentialTargets = FindNearestTarget(attackingShip, neighbors, maxSearchDistanceSquared, out distancesSquared);
@@ -3642,49 +3673,6 @@ namespace HelloBoids
 			bool result = false;
 			hits = null;
 			
-			// 1 - [DONE] - Calc Malfunction
-			// 2 - [DONE] - Distance effect on Damage (laser attenuation/falloff) 
-			//     - for kinetic say a ballistic projectile or catapult bolt in atmosphere... depends on atmosphere and perhaps gravity too \
-			//     - for laser, inverse square law 'intensity = intensity * ( 1 / d^2)' where for instance double the distance == 1/4 the intensity of the beam
-			//      if (distance > falloffStart) 
-			//		{
-    		//			float damageReduction = (distance - falloffStart) * damageDropPerUnit;
-    		//			currentDamage = Math.Max(minDamage, baseDamage - damageReduction);
-			//		}
-		
-			// 3 - Recursive / Cascading / Chain-Reaction Damage
-				// - PRODUCTION & CONSUMPTION should be used for propgating things like Fire and Radiation right?
-				//		- its kind of like cellular automata though isn't it? if the 
-			
-				// TODO: so for chained / recursive / cascading damage, where should we initiate that?
-					// We do know for an Explosion, an explosion ENtity can be retreived from an ObjectPool
-					// and then added to the Scene.  That Entity can be flagged as a MissionObject perhaps?
-					// 
-					// In KGB for Interiors, we can use our TileMaps and search x distance away using floodfill
-					// In space and in HelloBoids, we can use 
-					//  a) a bigger sub-set of the adjacents rather than one target to HasHitOccurred()... include the desired target along with some adjacents within X range of the Target perhaps.
-					//  b) we still need this sub-set for our Sensor detection where ships can mask their signatures somewhat by flying in formation in a column (from 
-					//     the target's point-of-view) towards the the target.
-					//  c) or we just re-search over again with Octree to find new adjacents... or
-					//     again, we can use the SensorContact data...
-			
-					// EntityPool for things like Explosions, RadiationFields, etc
-			
-			// 4 - variances for spawned Droid Size
-			// 5 - randomness of skills of operators
-			// 6 - armor of the Droid randomness based on the size of the Droid
-			
-			// 7 - armor option for Operators
-			// 8 - destruction of Droids upon lose of hitpoints
-			// 9 - double buffering of Data
-			// 10 - finish Statistics and Policies
-			// 11 - class Builder 
-			
-			
-			// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
-			// https://gamedev.stackexchange.com/questions/148961/how-to-design-a-damage-formula-in-an-rpg-which-keeps-weapons-with-different-atta
-			
-			
 			//Console.WriteLine("HitHasOccurred() - Begin.");
 			System.Diagnostics.Debug.Assert (attackingOperator.Configuration == (uint)HumanOperatorConfiguration, "HitHasOccurred() - AttackerOperator is of incorrect CONFIGURATION.");
 										 
@@ -3778,8 +3766,6 @@ namespace HelloBoids
 
                 // Memory<Assembly> targetAssemblyObj;
                 
-
-
                 int baseObjIndex;
 				int componentIndex;
 				int weaponIndex;
@@ -3828,8 +3814,8 @@ namespace HelloBoids
                 VehicleAssemblyFeature[] vf = targetVehicleAssembly.Span[0].Features;
 
                 // TODO: the following needs to be made into a function... probably just need
-                //       a Dictionary by SKILLS to hold Modifiers instead of an array
-                // is there a stealth feature that will give us a reduction in probability to detect optically? eg camaflague
+                //       a Dictionary of SKILLS to hold Modifiers instead of an array
+                // is there a stealth feature that will give us a reduction in probability to detect optically? eg camaflauge
                 float reduction = 0;
                 if (vf != null)
                     for (int j = 0; j < vf.Length; j++)
@@ -3848,6 +3834,8 @@ namespace HelloBoids
 
                 // - evasive maneuvers (COMPARE VELOCITY MAGNITUDE CHANGES OVER X SECONDS PERIOD OF TIME
                 // each second of "evasive" after 1 full second, adds -5% chance 'to-hit' by the attacking ship. (MAX -15% chance)
+                //      - we can't store the velocity of every ship, every frame... or even every X second... 
+
 
 				// - Counter measures deployed within X time (time * fallOff aka call it 'attenuation') - STATISTICS SEARCH
                 //      ECM - eg. electronic jammers
@@ -3871,7 +3859,6 @@ namespace HelloBoids
                 // - operator Fatigue
 				Memory<LifeForm> lfOperator = (Memory<LifeForm>)attackingOperator.GetUserStruct(typeof(LifeForm), out lfIndex);
                 double fatigue = lfOperator.Span[0].Fatigue.Base > 0 ? lfOperator.Span[0].Fatigue.Current / lfOperator.Span[0].Fatigue.Base : 0;
-
 
 
                 // ---------------------
@@ -4657,7 +4644,7 @@ namespace HelloBoids
 						// find PowerConsumers within this bound volume
 						//Console.WriteLine ("SearchReferenceEntity is SET AND VALID == " + (production.Span[(int)i].SearchReferenceEntity != null).ToString());
 						BoundingBox searchBox = (BoundingBox)((EntityNode)production.Span[(int)i].SearchReferenceEntity).BoundingBox;
-						searchBox = new BoundingBox(searchBox.Center, Utils.GetMax(EntryClass.bSim.SeparationDistance, EntryClass.bSim.AlignmentDistance, EntryClass.bSim.CohesionDistance));
+						searchBox = new BoundingBox(searchBox.Center, Utils.GetMax(BoidSimulation.SEPERATION_DISTANCE, BoidSimulation.ALIGNMENT_DISTANCE, BoidSimulation.COHESION_DISTANCE));
 						
 						double maxDistanceSquared = 1;//searchBox.RadiusSquared;
 						
@@ -8408,7 +8395,18 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 ////////////////////////////////////////////////////////////////////////////////////////////////
 #region PRODUCTION AND CONSUMPTION //  NOTE: These all belong in Game01.dll
 	////////////////////////////////////////////////////////////////////////////////////////////////
-	public enum PRODUCTS : int
+	public enum CONSTRUCTION_MATERIAL : int
+    {
+        WOOD,
+        ALUMINUM,
+        IRON,
+        STEEL,
+        MOLYBDENMUM,  // a real metal
+        DURANIUM      // fantasy metal from Trek universe
+    }
+
+
+    public enum PRODUCTS : int
 	{
 		None = 0,
 
@@ -10181,11 +10179,12 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
 		//public int Defense;           // shortcut overall Passive Defense // Passive Defense is a type of defense that requires no active trying to defeat an attack against it
 		
-		// can be init with 5 or 6 sides, with each side having arbitrary number of layers with NO MINIMUM either... so one or more sides can be completely UN-ARMORED
-		public Armor(BoundingBox box, uint numFaces = 6, uint numLayers = 1)
+        /// <summary>
+        /// materialQuality -> 0.1 is very poor/cheap,  0.5 is average quality, 0.9 is Space-Grade, 1.0 is Advanced-Spec
+        /// </summary>
+		public Armor(BoundingBox box, int DR, CONSTRUCTION_MATERIAL material, float materialQuality, uint numFaces = 6, uint numLayers = 1)
 		{
 			if (numFaces != NUM_ARMOR_FACES) throw new ArgumentOutOfRangeException();
-			
 			Faces = new ArmorFace[numFaces];
 			
 			for (int i = 0; i < numFaces; i++)
@@ -10193,23 +10192,19 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 				Faces[i] = new ArmorFace(box, i);
 				Faces[i].SurfaceAttributes = ArmorFace.SURFACE_ATTRIBUTES.None;
 				
-
 				Faces[i].Defense = 50; // passive defense... 
 				Faces[i].Layers = new ArmorLayer[numLayers];
 					for (int j = 0; j < numLayers; j++)
 					{
-						int DR = 50;
-						string material = "iron";
-						float quality = 0.5f;  // 0.1 is very poor/cheap,  0.5 is average quality, 0.9 is Space-Grade, 1.0 is Advanced-Spec
-						double cost = GetArmorCost (DR, Faces[i].SurfaceArea, material, quality); // 100;
-						double weight = GetArmorWeight(DR, Faces[i].SurfaceArea, material, quality); // 2000
+						double cost = GetArmorCost (DR, Faces[i].SurfaceArea, material, materialQuality); 
+						double weight = GetArmorWeight(DR, Faces[i].SurfaceArea, material, materialQuality); 
 						
 						ArmorLayer layer;
 						layer.Cost = cost;
 						layer.Weight = weight;
 						layer.DR = DR;
 						layer.Material = material; // type of material should be enum (wood, metal, non-rigid, ablative, fireproof-ablative, composite, laminate
-						layer.Quality = quality; //  a coefficient with 1.0 being the highest possible quality material
+						layer.Quality = materialQuality; //  a coefficient with 1.0 being the highest possible quality material
 						
 						Faces[i].Layers[j] = layer;		
 					}
@@ -10220,7 +10215,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		/// <summary>
 		/// surfaceAreaCubicMeters
 		/// </summary>
-		public double GetArmorWeight (int damageResistance, double surfaceArea, string material, float quality)
+		public double GetArmorWeight (int damageResistance, double surfaceArea, CONSTRUCTION_MATERIAL material, float materialQuality)
 		{
 			double result = 0;
 
@@ -10262,8 +10257,11 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 				Prices fluctuate with scrap/iron ore markets, energy costs and local trade policy; use local supplier quotes for procurement decisions.
 				If a precise, upâ€‘toâ€‘date number is required for budgeting, obtain current perâ€‘tonne quotes from local mills or distributors and apply the 7.85 multiplier.
 				*/
-					
-				case "iron":
+				case CONSTRUCTION_MATERIAL.STEEL:
+                    result = 560 * surfaceArea * damageResistance;
+                    break;
+
+				case CONSTRUCTION_MATERIAL.IRON:
 					// DR = 2.75DR per 1mm of IRON thickness.  1 meter by 1 meter by 1mm thick iron plate = 7.85 kilograms
 					//
 					//      So we can let the user type in the thickness of the armor and we can compute the DR ourselves
@@ -10273,26 +10271,57 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 					//
 					result = 500d * surfaceArea * damageResistance;
 					break;
+                case CONSTRUCTION_MATERIAL.ALUMINUM:
+                    result = 100 * surfaceArea * damageResistance;
+                    break;
+                case CONSTRUCTION_MATERIAL.WOOD:
+                    result = 420 * surfaceArea * damageResistance;
+                    break;
+                
 				default:
+                    Console.WriteLine ("GetArmorWeight() - " + material.ToString() + "Not Yet Supported.");
 					break;
 			}
 
 			return result;
 		}
 
-		public double GetArmorCost (int damageResistance, double surfaceArea, string material, float quality)
+		public double GetArmorCost (int damageResistance, double surfaceArea, CONSTRUCTION_MATERIAL material, float materialQuality)
 		{
 			double result = 0;
 
 			switch (material)
 			{
-				case "iron":
+				case CONSTRUCTION_MATERIAL.STEEL:
+                {
+                    double thickness = damageResistance / 3.25d;
+					double pricePerKG = 2.0d; // 3.00 per kg for high-carbon/alloyed
+					// so we'd like materialQuality (0.0 - 1.0) to map linearly from 0.70 scrap to 3.00 highcarbon/alloyed  
+					result = pricePerKG * GetArmorWeight (damageResistance, surfaceArea, material, materialQuality);
+                    break;
+                }
+				case CONSTRUCTION_MATERIAL.IRON:
+                {
 					double thickness = damageResistance / 2.75d;
 					double pricePerKG = 0.70d; // 3.00 per kg for high-carbon/alloyed
 					// so we'd like quality (0.0 - 1.0) to map linearly from 0.70 scrap to 3.00 highcarbon/alloyed  
-					result = pricePerKG * GetArmorWeight (damageResistance, surfaceArea, material, quality);
+					result = pricePerKG * GetArmorWeight (damageResistance, surfaceArea, material, materialQuality);
 					break;
+                }
+                case CONSTRUCTION_MATERIAL.ALUMINUM:
+                {
+                    double pricePerKG = 3.65d;
+                    result = pricePerKG * GetArmorWeight (damageResistance, surfaceArea, material, materialQuality);
+                    break;
+                }
+                case CONSTRUCTION_MATERIAL.WOOD:
+                    {
+                    double pricePerKG = 1.15d;
+                    result = pricePerKG * GetArmorWeight (damageResistance, surfaceArea, material, materialQuality);
+                    break;
+                }
 				default:
+                    Console.WriteLine ("GetArmorCost() - " + material.ToString() + "Not Yet Supported.");
 					break;
 			}
 
@@ -10535,7 +10564,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 	
     public struct ArmorLayer
     {
-        public string Material;   // material type e.g metal // TODO: need enums
+        public CONSTRUCTION_MATERIAL Material;   // material type e.g metal // TODO: need enums
         public float Quality;    
         public double Weight;
         public double Cost; 
@@ -11435,25 +11464,25 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
                     break;
 				case "OPTICAL_SENSING":
 					result = new object[8];
-					result[0] = EntryClass.SEPERATION_DISTANCE;
-					result[1] = EntryClass.ALIGNMENT_DISTANCE;
-					result[2] = EntryClass.COHESION_DISTANCE;
-					result[3] = EntryClass.SEPARATION_FACTOR;
-					result[4] = EntryClass.ALIGNMENT_FACTOR;
-					result[5] = EntryClass.COHESION_FACTOR;
-					result[6] = EntryClass.TURN_FACTOR; // For boundary avoidance
-					result[7] = EntryClass.MAX_SPEED;
+					result[0] = BoidSimulation.SEPERATION_DISTANCE;
+					result[1] = BoidSimulation.ALIGNMENT_DISTANCE;
+					result[2] = BoidSimulation.COHESION_DISTANCE;
+					result[3] = BoidSimulation.SEPARATION_FACTOR;
+					result[4] = BoidSimulation.ALIGNMENT_FACTOR;
+					result[5] = BoidSimulation.COHESION_FACTOR;
+					result[6] = BoidSimulation.TURN_FACTOR; // For boundary avoidance
+					result[7] = BoidSimulation.MAX_SPEED;
                     break;
                 case "FLOCKING":
 					result = new object[8];
-					result[0] = EntryClass.SEPERATION_DISTANCE;
-					result[1] = EntryClass.ALIGNMENT_DISTANCE;
-					result[2] = EntryClass.COHESION_DISTANCE;
-					result[3] = EntryClass.SEPARATION_FACTOR;
-					result[4] = EntryClass.ALIGNMENT_FACTOR;
-					result[5] = EntryClass.COHESION_FACTOR;
-					result[6] = EntryClass.TURN_FACTOR; // For boundary avoidance
-					result[7] = EntryClass.MAX_SPEED;
+					result[0] = BoidSimulation.SEPERATION_DISTANCE;
+					result[1] = BoidSimulation.ALIGNMENT_DISTANCE;
+					result[2] = BoidSimulation.COHESION_DISTANCE;
+					result[3] = BoidSimulation.SEPARATION_FACTOR;
+					result[4] = BoidSimulation.ALIGNMENT_FACTOR;
+					result[5] = BoidSimulation.COHESION_FACTOR;
+					result[6] = BoidSimulation.TURN_FACTOR; // For boundary avoidance
+					result[7] = BoidSimulation.MAX_SPEED;
                     break;
 					
                 case "STEER":

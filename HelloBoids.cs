@@ -1176,6 +1176,29 @@ namespace HelloBoids
                 // AddUserStruct() is not needed because Transform_Struct is created in the Transform.ctor()
     			// b.AddUserStruct(typeof(Transform.Transform_Struct), memAllTransforms, transformIndex);
     
+                // VehicleAssembly
+                int vehicleAssemblyIndex;
+                ComponentStore<VehicleAssembly> storeAssemblies = EntryClass.mCStoreCol.CheckOut<VehicleAssembly>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+                Memory<VehicleAssembly> memAssembly = storeAssemblies.CheckOut(out vehicleAssemblyIndex);
+                b.AddUserStruct(typeof(VehicleAssembly), memAssembly, vehicleAssemblyIndex);
+
+                
+                SkillModifier opticalDetectionModifier;
+                opticalDetectionModifier.ProducerEntityArrayIndex = arrayIndex;
+                opticalDetectionModifier.SkillToTarget = SKILLS.Targeting;
+                opticalDetectionModifier.Enabled = true;
+                opticalDetectionModifier.Product = PRODUCTS.None;
+                opticalDetectionModifier.Amount = 10; // 10% TODO: 'Amount' needs to be turned into a float
+                opticalDetectionModifier.NumUses = -1;
+			    opticalDetectionModifier.CooldownBetweenUses = -1; 
+
+                VehicleAssemblyFeature opticalDetectionReduction;
+                opticalDetectionReduction.Name = "Camaflauge";
+                opticalDetectionReduction.VehicleAssembly = b;
+                opticalDetectionReduction.Modifiers = new SkillModifier[]{opticalDetectionModifier};
+                memAssembly.Span[0].Features = new VehicleAssemblyFeature[]{opticalDetectionReduction};
+
+
                 exLine = "Spawn() - baseObj creation 1";
     			int baseObjIndex;
     			Memory<BaseObject> memBaseObj = (Memory<BaseObject>)b.GetUserStruct(typeof(BaseObject), out baseObjIndex); 
@@ -1462,6 +1485,13 @@ namespace HelloBoids
 			transform.Span[0].Configuration = WingsConfiguration; //<-- critical to set this.  I dont like this design where forgtting such things is possible.  March.31.2026
 			transform.Span[0].EntityArrayIndex = arrayIndex; // <--  critical to set this.  I dont like this design where forgetting such things is possible. March.31.2026
 
+            // Wings are a type of VehicleAssembly
+            int vehicleAssemblyIndex;
+            ComponentStore<VehicleAssembly> storeAssemblies = EntryClass.mCStoreCol.CheckOut<VehicleAssembly>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
+			Memory<VehicleAssembly> memAssembly = storeAssemblies.CheckOut(out vehicleAssemblyIndex);
+            wings.AddUserStruct(typeof(VehicleAssembly), memAssembly, vehicleAssemblyIndex);
+
+
 			// BaseObjects are created internally during EntityNode ctor for now, so no need to call .AddUserStruct()
 			int baseObjsIndex = -1;
 			Memory<BaseObject> memBaseObj = (Memory<BaseObject>)wings.GetUserStruct(typeof(BaseObject), out baseObjsIndex); 
@@ -1471,10 +1501,10 @@ namespace HelloBoids
 			// powerconsumer struct
 			ComponentStore<PowerConsumer> storeWings = EntryClass.mCStoreCol.CheckOut<PowerConsumer>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
 			int powerConsumerInternalIndex = -1;
-			Memory<PowerConsumer> memWings = storeWings.CheckOut(out powerConsumerInternalIndex);
-			wings.AddUserStruct(typeof(PowerConsumer), memWings, powerConsumerInternalIndex);
-			memWings.Span[0].Configuration = WingsConfiguration;
-			memWings.Span[0].EntityArrayIndex = arrayIndex;
+			Memory<PowerConsumer> memPowerConsumer = storeWings.CheckOut(out powerConsumerInternalIndex);
+			wings.AddUserStruct(typeof(PowerConsumer), memPowerConsumer, powerConsumerInternalIndex);
+			memPowerConsumer.Span[0].Configuration = WingsConfiguration;
+			memPowerConsumer.Span[0].EntityArrayIndex = arrayIndex;
 			
 			// each Wing CONSUMES PRODUCT.ElectricalPower from our Battery (a Producer)
 			Consumption c;
@@ -3723,7 +3753,7 @@ namespace HelloBoids
 			for (int i = 0; i < targets.Count; i++)
 			{
 		
-                       // TODO: FINISH THE FOLLOWING
+                // TODO: FINISH THE FOLLOWING
                 // - stealth (only applies for assemblies)
                 // NOTE: we are handling this differently... vehAssembly.VehicleAssemblyFeature[] Features
                 // like PRODUCTS.RadarSignature modifiers are added similarly to Skills for a 
@@ -3747,13 +3777,7 @@ namespace HelloBoids
        //         ArmorFace.SURFACE_ATTRIBUTES sa = targetBaseObj.Span[0].Armor.SurfaceAttributes;
 
                 // Memory<Assembly> targetAssemblyObj;
-                // 5 levels for all types
-                // - steamlining ([0 - 5] - fair, good, very good, excellent, radical )
-                // - heat reduction
-                // - noise reduction
-                // - radar reduction (materials, shapes)
-                // - optical reduction (eg paint, chameleon systems, camaflauge)
-                // - Electronic Jammer components that are enabled
+                
 
 
                 int baseObjIndex;
@@ -3784,25 +3808,55 @@ namespace HelloBoids
                 Memory<BaseObject> targetBaseObj = (Memory<BaseObject>)Boids[targets[i].EntityArrayIndex].GetUserStruct(typeof(BaseObject), out targetBaseObjIndex);
                 double targetSize = targetBaseObj.Span[0].Volume;
 
-                // TACTICS (stealth, evasive, counter-measures + ECM, time acquired by sensors)
+                // TACTICAL FEATURES (stealth, evasive, counter-measures + ECM, time acquired by sensors)
                 // --------------------------------------------------------------
-				// target stealth - check the VehicleAssemblyFeatures for stealth features, of the target's OWNER 
+				// - stealth - check the VehicleAssemblyFeatures for stealth features, of the target's OWNER 
                 //                  (which may already be the Droid/Ship iteself)
                 //                  and all other assemblies VehicleAssemblyFeatures
-                //
-                //
-                // target evasive (COMPARE VELOCITY MAGNITUDE CHANGES OVER X SECONDS PERIOD OF TIME
+                //   5 levels for all types of VehicleAssemblyFeatures
+                //      - lifting body
+                //      - steamlining ([0 - 5] - fair, good, very good, excellent, radical )
+                //          - this effects topSpeed, acceleration, reduced atmospheric heat damage, space-2-atmospheric flight and vice-versa, radical version can be harder to hit because of a thinner (tear-drop) profile, and REDUCES structural volume
+                //      - heat detection probability reduction
+                //      - noise detection probability reduction
+                //      - radar detection probability reduction (materials, shapes)
+                //      - optical detection probability reduction (eg paint, chameleon systems, camaflauge)
+                //      - Electronic Jammer components that are enabled - detection probability reduction 
+                int targetVehicleAssemblyIndex;
+                Memory<VehicleAssembly> targetVehicleAssembly = (Memory<VehicleAssembly>)Boids[targets[i].EntityArrayIndex].GetUserStruct(typeof(VehicleAssembly), out targetVehicleAssemblyIndex);
+
+                VehicleAssemblyFeature[] vf = targetVehicleAssembly.Span[0].Features;
+
+                // TODO: the following needs to be made into a function... probably just need
+                //       a Dictionary by SKILLS to hold Modifiers instead of an array
+                // is there a stealth feature that will give us a reduction in probability to detect optically? eg camaflague
+                float reduction = 0;
+                if (vf != null)
+                    for (int j = 0; j < vf.Length; j++)
+                    {
+                        if (vf[j].Modifiers != null)
+                            for (int k = 0; k < vf[j].Modifiers.Length;k++)
+                            {
+                                if (vf[j].Modifiers[k].SkillToTarget == SKILLS.Targeting)
+                                {
+                                    reduction = (float)vf[j].Modifiers[k].Amount;
+                                }
+                            }
+                    }
+                
+                Console.WriteLine ("HitHasOccurred() - Detection Probability Reduction == '" + reduction.ToString() + "'");
+
+                // - evasive maneuvers (COMPARE VELOCITY MAGNITUDE CHANGES OVER X SECONDS PERIOD OF TIME
                 // each second of "evasive" after 1 full second, adds -5% chance 'to-hit' by the attacking ship. (MAX -15% chance)
 
-				// target deployed counter measures within X time (time * fallOff aka call it 'attenuation') - STATISTICS SEARCH
-
-                // ECM - eg. electronic jammers
+				// - Counter measures deployed within X time (time * fallOff aka call it 'attenuation') - STATISTICS SEARCH
+                //      ECM - eg. electronic jammers
 
                 
-				// target last acquisition - previous aquisition makes it easier to re-aquire
-				// STATISTICS search
+				// - total acquisition time (durationOfSensorAquisition) = last acquisition - initial aquisition (the greater this value, the bigger the bonus to detect again (easier to re-aquire)
+				//      STATISTICS search should give us the acquisition times
 
-				// sensorLockOfTargetTimeElapsed (aka durationOfSensorAquistion) // how much time has this  target been tracked by sensors already
+				// total tracking-sensor-lock-time  = lastLock - initialLock (aka durationOfSensorLock) // how much time has this TRACKING SENSOR been tracking this target already
 
 
                 // OPERATOR (skill, health, fatigue)
@@ -4104,7 +4158,8 @@ namespace HelloBoids
 			*/
 			
 			criticalMalfunctionHasOccurred = false;
-			bool malfunction = CalculateMalfunction(baseObjForWeapon, componentStructForWeaponEntity, weaponStruct, rand, out criticalMalfunctionHasOccurred);
+			bool malfunction = CalculateMalfunction(baseObjForWeapon,
+                                                   componentStructForWeaponEntity, weaponStruct, rand, out criticalMalfunctionHasOccurred);
 			
 			if (criticalMalfunctionHasOccurred)
 			{
@@ -4132,7 +4187,7 @@ namespace HelloBoids
 			
 			double output = laserStruct.Span[0].BeamOutput;
 			
-			double reqt = powerConsumer.Span[0].PowerRequirement; // 
+			double reqt = powerConsumer.Span[0].PowerRequirement;
 			double minimum = powerConsumer.Span[0].MinimumPower;  
 			
 			// todo: we need to establish the reqt based on output.  Output should be a Stat perhaps with a base and a current?
@@ -9101,13 +9156,13 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
     /// "Very Good Heat Signature Masking System" adds Cost and Weight to the assembly
     /// it's attached to, and is processed as Modifiers at run-time.
     /// </summary>
-    public struct VehicleAssemblyFeatures
+    public struct VehicleAssemblyFeature
     {
         public string Name;
-        public EntityNode VehicleAssembly; // the Assembly this feature is attached to.
+        public EntityNode VehicleAssembly; // the EntityNode representing the 'VehicleAssembly' this feature is attached to.
 
         // A feature can potenitally modify more than one thing such as
-        // starship top speed in atmosphere and optical signature reduction bonus. 
+        // 'Very Good' Streamlining increasing Performance top speed within an atmosphere and Sensor that is searching for PRODUCTS.OpticalSignature using 'Camaflague Stealth' sighting/detection skill reduction bonus. 
         public SkillModifier[] Modifiers;
 
         // todo: we need a generic Modifier struct I think and to then have different
@@ -9217,7 +9272,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
     public struct VehicleAssembly
     {
         
-        public VehicleAssembly[] Features;
+        public VehicleAssemblyFeature[] Features;
         //      - these can be treated like Skills that have modifiers to cost, weight, and things like RadarDetection, etc.
         
         public string StreamLining; // todo:  need enums or perhaps a coefficient value instead AND THE GUI can interpet this coefficient into a string if desired

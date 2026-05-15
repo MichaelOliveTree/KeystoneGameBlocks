@@ -54,6 +54,14 @@ using System.IO;
 // "SAD:Frontier"           <-- newtonian
 // "Children of Dead Earth" <-- newtonian + n-body gravitation, ship building, space combat
 
+// Skeletal Animation and SIMD
+//------------------------------
+// 1. Building the Animation Core: System.Numerics (SIMD)Modern .NET (via the RyuJIT compiler) natively maps vector and matrix arithmetic to CPU-specific SIMD instructions (SSE, AVX2, and NEON).Matrix & Vector Math: Use System.Numerics.Matrix4x4, Quaternion, and Vector4. By designing your animation blending and interpolation to use Vector4 and Matrix4x4 directly, the C# JIT compiler automatically vectorizes the operations without external dependencies.Approach: Most C# game developers choose data-oriented designs (DoD). You store skeleton bind poses and transforms in "Arrays of Structures" (AoS) or "Structures of Arrays" (SoA) and run linear algebra, blending, and IK algorithms over them in parallel batches.2. Loading and Preprocessing: AssimpNetSkeletal animation requires a skeleton hierarchy, joint weights, and animation keyframes.AssimpNet: This is the gold-standard C# wrapper for the Open Asset Import Library (Assimp). It easily loads skeletal animation data, bone hierarchies, and skinning weights from standard file types like FBX, glTF, and Collada. You use it to parse the asset offline, then export it to your own highly optimized runtime memory structures.3. Rendering and GPU Skinning: Silk.NET or VeldridOnce you have parsed the data and calculated the final bone transformation matrices on the CPU using SIMD, you generally pass those matrices to the GPU for mesh deformation (Hardware Skinning).Silk.NET: An ultra-fast, low-overhead C# binding library for OpenGL, Vulkan, and OpenCL.Veldrid: A low-level, cross-platform graphics library for .NET.Workflow: You pass the array of calculated bone matrices to a Uniform Buffer (or Compute Buffer) in your shader, allowing the GPU to apply the bone weights to the vertices in parallel.4. Direct C# Implementations to StudySince complete "black box" solutions are rare, the best way to implement a SIMD-accelerated C# animation system is to study open-source research and custom engine projects:Seán O'Flynn's Research Repo: A great C# educational project that demonstrates how to implement skeletal skinning, node hierarchies, and SLERP interpolation using foundational C# math types.Ozz-Animation Port: While the original ozz-animation is a C++ library focused on SIMD-optimized, low-level skeletal animations, studying its architectural patterns will guide you on how to structure arrays for SIMD blending and inverse kinematics in C#.For tips on how to implement node hierarchies, animation blending, and matrix calculations effectively:
+
+// https://github.com/SlimeYummy/ozz-animation-rs
+
+
+
 
 // NOTES: On Indices and GUIDS
 //   
@@ -1735,9 +1743,7 @@ namespace HelloBoids
 			storeTacticalStation.Span[checkOutIndex].MaxActions = 2;
 			storeTacticalStation.Span[checkOutIndex].NumActions = 0;
 			storeTacticalStation.Span[checkOutIndex].Actions = null;
-			storeTacticalStation.Span[checkOutIndex].Contacts = null;
 			storeTacticalStation.Span[checkOutIndex].ContactsHistory = null;
-			storeTacticalStation.Span[checkOutIndex].Targets = null;
 
 			// add a targetingSkill requirement to this TacticalStation
 			Skill targetingSkill;
@@ -3313,8 +3319,8 @@ namespace HelloBoids
 							return;
 						}
 						
-                        //Console.WriteLine ("Do_Tactical_Logic() - Attempting to find targets....");
-						List<Target> targets = tacticalStationEnts[0].GetTargets();
+                        //Console.WriteLine("Do_Tactical_Logic() -  Attempting to find targets for TacticalStationStruct referencing Entity Array Index == " + tacticalStationStruct.Span[0].EntityArrayIndex.ToString());
+						List<Target> targets = tacticalStationStruct.Span[0].GetTargets();
 						if (targets == null || targets.Count == 0) return;
 					
 						Console.WriteLine("Do_Tactical_Logic() -  " + targets.Count.ToString() + " Targets In TacticalStation.");
@@ -3336,8 +3342,8 @@ namespace HelloBoids
 					}
 					catch (Exception ex)
 					{
-						Console.WriteLine("Do_Tactical_Logic() -  Attacker Droid Array Index '" + attackerEntityArrayIndex.ToString() + "' does not exist. " + ex.Message);
-						Console.WriteLine ("Do_Tactical_Logic() - ERROR - " + ex.Message);
+						Console.WriteLine("Do_Tactical_Logic() -  Attacker Droid Array Index '" + attackerEntityArrayIndex.ToString() + "' does not exist. ERROR: " + ex.Message);
+						
 					}
 				}
 			});
@@ -3426,7 +3432,6 @@ namespace HelloBoids
 				// iterate through all the potential "contacts"
 				for (int j = 0; j < potentialTargets.Count; j++)
 				{			
-					
 					ComponentStore<Transform.Transform_Struct> allTransforms  = EntryClass.mCStoreCol.CheckOut<Transform.Transform_Struct>(0);
 					
 					double distanceSquared = distancesSquared[j];
@@ -3518,7 +3523,7 @@ namespace HelloBoids
 				// properly merging these SensorContacts with existing ones so as to maintain
 				// proper SensorContact histories for all detected Entities.
 				if (contacts != null)
-					currentStation.Add(contacts); 
+					allTacticalStations.Span[(int)i].Add(contacts); 
 			});
 			
 			//Console.WriteLine("CreateContactListFromAdjacents() - COMPLETED.");
@@ -3542,11 +3547,16 @@ namespace HelloBoids
                 Memory<TacticalStation> tacticalStationStruct = (Memory<TacticalStation>)tacticalStation.GetUserStruct(typeof(TacticalStation), out tacticalStructIndex);
 
 
-				List<SensorContact> contacts = tacticalStationStruct.GetSensorContacts(); //  tacticalStation.GetSensorContacts();
+				List<SensorContact> contacts = tacticalStationStruct.Span[0].GetSensorContacts(); //  tacticalStation.GetSensorContacts();
 				if (contacts == null || contacts.Count == 0) return;
 								
-				//List<Target> targets = tacticalStation.GetTargets();
-				tacticalStation.ClearTargets();
+                // NOTE: We DO NOT want to Clear existing Targets from previous frames because
+                //       we do things like track the target acquisition duration as well as whether
+                //       a contact has gone stale. 
+                //       TODO: in fact, we should probably "process targets" at the end of the loop
+                //       for each station so that it can in fact flag the targets that are stale.
+                //
+				//tacticalStationStruct.Span[0].ClearTargets();
 								
 				for (int j = 0; j < contacts.Count; j++)
 				{
@@ -3589,7 +3599,7 @@ namespace HelloBoids
 						// Targets are those SensorContacts that friendly forces will potentially fire upon.
 						// Whereas SensorContacts is all contacts regardless of FoF status.
 						Target t = new Target();
-						t = current.GetTarget(currentContact.ContactEntityArrayIndex);
+						t = tacticalStationStruct.Span[0].GetTarget(currentContact.ContactEntityArrayIndex);
 						if (t.Equals(default(Target)))
 						{
 
@@ -3606,13 +3616,12 @@ namespace HelloBoids
 						// It's really just a game thing and maybe we should just use visual observations of condition of ship instead
 						int componentIndex;
 						
-		
 						EntityNode b = Boids[currentContact.ContactEntityArrayIndex];
 						Memory<BaseObject>baseObj = (Memory<BaseObject>)Boids[currentContact.ContactEntityArrayIndex].GetUserStruct(typeof(BaseObject), out componentIndex);
 						t.HitPoints = baseObj.Span[0].HitPoints; 
 
 
-						tacticalStationStruct.Add(t); // tacticalStation.Add(t);
+						tacticalStationStruct.Span[0].Add(t); // tacticalStation.Add(t);
 
 						//Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY PASSED. Target added.");
 						
@@ -3734,10 +3743,7 @@ namespace HelloBoids
             Memory<TacticalStation> tacticalStationStruct = (Memory<TacticalStation>)attackingTacticalStation.GetUserStruct(typeof(TacticalStation), out tacticalStructIndex);
 
 
-            //List<Target> temp = tacticalStationStruct.GetTargets();
-            // TODO: i think the below call to GetTargets() should be moved to
-            //        tacticalStationStruct.GetTargets()
-			List<Target> targets = attackingTacticalStation.GetTargets();
+			List<Target> targets = tacticalStationStruct.Span[0].GetTargets();
 			
 			hits = new List<HIT>();
 
@@ -3752,8 +3758,6 @@ namespace HelloBoids
 			// risk the friendly anyway because there is little choice to wait where the enemy ship may be in position and time to fire a salvo.
 			
 			// NOTE: we do have neighbors passed in.
-			
-			
 			
 			
 			
@@ -3864,8 +3868,6 @@ namespace HelloBoids
 
                 
 
-
-
                 // TODO: when the target is added to the TacticalStation, the TacticalStation
                 //       should set the acquisition_time_ within the mUserDataStore
                 // TODO: when the target is lost, the acquisition time should be marked as stale, but re-acqisition then by the TacticalStation should not flag it as NOT stale or else this function will never get the correct state.
@@ -3875,10 +3877,10 @@ namespace HelloBoids
                 // These functions should reside in the TacticalStation itself so
                 // the responsibility of setting and checking these keys is self contained
                 
-                tacticalStationStruct.GetAquisitionDuration(targets[i], gt);
-                tacticalStationStruct.GetEvasiveManeuverDuration(targets[i], gt);
+                double test = tacticalStationStruct.Span[0].GetAquisitionDuration(targets[i], gt);
+                double test2 = tacticalStationStruct.Span[0].GetEvasiveManeuverDuration(targets[i], gt);
 
-
+                /*
 				// - total acquisition time (durationOfSensorAquisition) = last acquisition - initial aquisition (the greater this value, the bigger the bonus to detect again (easier to re-aquire)
 				//      STATISTICS search should give us the acquisition times
                 // mStats[tacticalStation.EntityIndex];
@@ -3886,20 +3888,20 @@ namespace HelloBoids
                 double diff = 0;
                 
                 
-
-                bool acquisitionStale = "aquisition_stale_" + targets[i].EntityArrayIndex.ToString();
+                string acquisitionStaleKey = "aquisition_stale_" + targets[i].EntityArrayIndex.ToString();
                 string acquisitionKey = "aquisition_time_" + targets[i].EntityArrayIndex.ToString();
 
-                bool isStale =  EntryClass.mUserDataStore[tacticalStation.EntityKey].GetBool(acquisitionStale);         
-                double foundTime = EntryClass.mUserDataStore[tacticalStation.EntityKey].GetDouble(aquisitionKey);
+                bool isStale =  EntryClass.mUserDataStore[attackingTacticalStation.EntityKey].GetBool(acquisitionStaleKey);         
+                double foundTime = EntryClass.mUserDataStore[attackingTacticalStation.EntityKey].GetDouble(acquisitionKey);
 
                 if (foundTime != currentTotalElapsedSeconds)
                 {
                     diff = currentTotalElapsedSeconds - foundTime;
                 }
 
-                float TEMP_GOOD_LOCK_TIME_AMOUNT_IN_SECONDS = 2.5d;
-                float acquisitionTimeCoeff = diff / TEMP_GOOD_LOCK_TIME_AMOUNT_IN_SECONDS ;
+                double TEMP_GOOD_LOCK_TIME_AMOUNT_IN_SECONDS = 2.5d;
+                float acquisitionTimeCoeff = (float)(diff / TEMP_GOOD_LOCK_TIME_AMOUNT_IN_SECONDS) ;
+                */
 
 
 				// total tracking-sensor-lock-time  = lastLock - initialLock (aka durationOfSensorLock) // how much time has this TRACKING SENSOR been tracking this target already
@@ -4484,12 +4486,15 @@ namespace HelloBoids
 				
 			Boid B = (Boid)Boids[currentEntityArrayIndex];
 			
-			EntityNode tactical = GetTacticalStations(currentEntityArrayIndex)[0];    
+			EntityNode tactical = GetTacticalStations(currentEntityArrayIndex)[0]; 
+            int tacticalStructIndex;
+            Memory<TacticalStation> tacticalStationStruct = (Memory<TacticalStation>)tactical.GetUserStruct(typeof(TacticalStation), out tacticalStructIndex);
+
 			// UserData data = tactical.BlackBoardData; // station operator
 					
 			
 			// the tacticalStation will have it's list of Contacts and Targets 
-			List<SensorContact> contacts = tactical.GetSensorContacts();
+			List<SensorContact> contacts = tacticalStationStruct.Span[0].GetSensorContacts();
 			int count = 0;
 			if (contacts != null) 
 				count = contacts.Count;
@@ -6547,100 +6552,6 @@ return (0,0);
 		}
 	#endregion
 
-				
-	#region PLACE_THIS_CODE_IN_SCRIPT_FOR_TACTICAL_STATION
-		private List<Target> mTargets;
-		public List<Target> GetTargets()
-		{
-			return mTargets;
-		}
-		
-		public void Add (Target t)
-		{
-			if (mTargets == null) mTargets = new List<Target>();
-			
-			// if the target already exists, replace it with current data?
-			int found = -1;
-			for (int i = 0; i < mTargets.Count; i++)
-				if (mTargets[i].EntityArrayIndex == t.EntityArrayIndex)
-				{
-					found = i;
-					break;
-				}
-			
-			if (found == -1)
-				mTargets.Add(t);
-			else
-				mTargets[found] = t;
-		}
-		
-		public void Add (Target[] t)
-		{
-			if (t == null || t.Length == 0) return;
-			
-			for (int i = 0; i < t.Length; i++)
-				Add(t[i]);
-		}
-		
-		public void ClearTargets()
-		{
-			if (mTargets != null)
-				mTargets.Clear();
-		}
-		
-		public Target GetTarget (int entityArrayIndex)
-		{
-			if (mTargets == null || mTargets.Count == 0) return default(Target);
-			
-			for (int i = 0; i < mTargets.Count; i++)
-				if (mTargets[i].EntityArrayIndex == entityArrayIndex)
-					return mTargets[i];
-			
-			return default(Target);
-		}
-		        
-		private List<SensorContact> mSensorContacts;
-		public List<SensorContact> GetSensorContacts()
-		{
-			return mSensorContacts;
-		}
-		
-		public void Add (SensorContact c)
-		{
-			
-			if (mSensorContacts == null) mSensorContacts = new List<SensorContact>();
-			//Console.WriteLine("EntityNode.Add(SensorContact) - 222 SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
-
-			int found = -1;
-			for (int i = 0; i < mSensorContacts.Count; i++)
-				if (mSensorContacts[i].Name == c.Name)
-				{
-					found = i;
-					break;
-				}
-			
-			//Console.WriteLine("EntityNode.Add(SensorContact) - 333 SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
-
-            // TODO: add acquisition time to userdata for the Entity represented by this struct
-
-			if (found == -1) 
-				mSensorContacts.Add (c);
-			else 
-				mSensorContacts[found].Add(c.Telemetry);
-			
-			//Console.WriteLine("EntityNode.Add(SensorContact) - 444 SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
-		}
-		
-		public void Add (List<SensorContact> contacts)
-		{
-			if (contacts == null) return;
-			for (int i = 0; i < contacts.Count; i++)
-				Add(contacts[i]);
-		}
-	#endregion
-		
-		
-		
 		
 		
 	#region IDisposable
@@ -9861,29 +9772,149 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		public int MaxActions;        // based on operator's max ability to handle so many simultaneously, tacticalstation TL, tacticalStation damage, and ability to perform that many actions in the first place (eg having enough weapons to use )
 
 		public System.Collections.Generic.Queue<List<SensorContact>> ContactsHistory;
-		public List<SensorContact> Contacts;
-		public List<Target> Targets;
-
-
-		public void AddContact(SensorContact c)
+		private List<Target> mTargets;
+        private List<SensorContact> mSensorContacts;
+        
+		public List<Target> GetTargets()
 		{
+			return mTargets;
 		}
+		
+		public void Add (Target t)
+		{
+			if (mTargets == null) mTargets = new List<Target>();
+			
+			// if the target already exists, replace it with current data?
+			int found = -1;
+			for (int i = 0; i < mTargets.Count; i++)
+				if (mTargets[i].EntityArrayIndex == t.EntityArrayIndex)
+				{
+					found = i;
+					break;
+				}
+			
+			if (found == -1)
+				mTargets.Add(t);
+			else
+            {
+				mTargets[found] = t;
+                Console.WriteLine ("TacticalStationStruct.Add() - Updating an existing Target.");
+                // 
+                // TODO: when the target is added to the TacticalStation, the TacticalStation
+                //       should set the acquisition_time_ within the mUserDataStore
+                // TODO: when the target is lost, the acquisition time should be marked as stale, but re-acqisition then by the TacticalStation should not flag it as NOT stale or else this function will never get the correct state.
+                // If a target is marked as STALE, we can try to predict it's current
+                // location based on previous telemetry (heading + velocity)
+                // 
+                // These functions should reside in the TacticalStation itself so
+                // the responsibility of setting and checking these keys is self contained
+                
+                double test = tacticalStationStruct.Span[0].GetAquisitionDuration(targets[i], gt);
+                double test2 = tacticalStationStruct.Span[0].GetEvasiveManeuverDuration(targets[i], gt);
 
-		public void RemoveContact()
+                /*
+				// - total acquisition time (durationOfSensorAquisition) = last acquisition - initial aquisition (the greater this value, the bigger the bonus to detect again (easier to re-aquire)
+				//      STATISTICS search should give us the acquisition times
+                // mStats[tacticalStation.EntityIndex];
+                double currentTotalElapsedSeconds = gt.TotalElapsedSeconds;
+                double diff = 0;
+                
+                
+                string acquisitionStaleKey = "aquisition_stale_" + targets[i].EntityArrayIndex.ToString();
+                string acquisitionKey = "aquisition_time_" + targets[i].EntityArrayIndex.ToString();
+
+                bool isStale =  EntryClass.mUserDataStore[attackingTacticalStation.EntityKey].GetBool(acquisitionStaleKey);         
+                double foundTime = EntryClass.mUserDataStore[attackingTacticalStation.EntityKey].GetDouble(acquisitionKey);
+
+                if (foundTime != currentTotalElapsedSeconds)
+                {
+                    diff = currentTotalElapsedSeconds - foundTime;
+                }
+
+                double TEMP_GOOD_LOCK_TIME_AMOUNT_IN_SECONDS = 2.5d;
+                float acquisitionTimeCoeff = (float)(diff / TEMP_GOOD_LOCK_TIME_AMOUNT_IN_SECONDS) ;
+                */
+
+
+		    }
+        }
+		
+		public void Add (Target[] t)
+		{
+			if (t == null || t.Length == 0) return;
+			
+			for (int i = 0; i < t.Length; i++)
+				Add(t[i]);
+		}
+		
+		public void ClearTargets()
+		{
+			if (mTargets != null)
+				mTargets.Clear();
+		}
+		
+		public Target GetTarget (int entityArrayIndex)
+		{
+			if (mTargets == null || mTargets.Count == 0) return default(Target);
+			
+			for (int i = 0; i < mTargets.Count; i++)
+				if (mTargets[i].EntityArrayIndex == entityArrayIndex)
+					return mTargets[i];
+			
+			return default(Target);
+		}
+		        
+		
+		public List<SensorContact> GetSensorContacts()
+		{
+			return mSensorContacts;
+		}
+		
+		public void Add (SensorContact c)
 		{
 			
+			if (mSensorContacts == null) mSensorContacts = new List<SensorContact>();
+			//Console.WriteLine("EntityNode.Add(SensorContact) - 222 SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
+
+			int found = -1;
+			for (int i = 0; i < mSensorContacts.Count; i++)
+				if (mSensorContacts[i].Name == c.Name)
+				{
+					found = i;
+					break;
+				}
+			
+			//Console.WriteLine("EntityNode.Add(SensorContact) - 333 SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
+
+            // TODO: add acquisition time to userdata for the Entity represented by this struct
+
+			if (found == -1) 
+				mSensorContacts.Add (c);
+			else 
+				mSensorContacts[found].Add(c.Telemetry);
+			
+			//Console.WriteLine("EntityNode.Add(SensorContact) - 444 SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
+		}
+		
+		public void Add (List<SensorContact> contacts)
+		{
+			if (contacts == null) return;
+			for (int i = 0; i < contacts.Count; i++)
+				Add(contacts[i]);
+		}
+
+		public void RemoveContact(SensorContact contact)
+		{
+            if (mSensorContacts != null)
+			    mSensorContacts.Remove(contact);
 		}
 
 		public void ClearContacts()
 		{
-			
+			if (mSensorContacts != null)
+				mSensorContacts.Clear();
 		}
 
-		public void AddTarget(Target t)
-		{
-			
-		}
-		
 		public void Add (StationAction a)
 		{
 			if (Actions == null) Actions = new List<StationAction>();
@@ -9896,6 +9927,23 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			if (Actions.Count == 0)
 				Actions = null;
 		}
+
+
+
+        public double GetAquisitionDuration(Target target, GameTime gt)
+        {
+            double result = 0;
+
+            return result;
+        }
+        
+        public double GetEvasiveManeuverDuration(Target target, GameTime gt)
+        {
+            double result = 0;
+
+            return result;
+        }
+
 
 		// todo: Actions that have completed need to be removed from a list?
 		///<summary>

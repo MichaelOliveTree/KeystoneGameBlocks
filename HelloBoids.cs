@@ -1194,6 +1194,10 @@ namespace HelloBoids
 				factionColor = (rand.NextDouble() >= 0.5d) ? "Red" : "Blue";
 				b.BlackBoardData.SetString("faction", factionColor);
 
+                // //EntryClass.mUserDataStore[entityKey].SetString("faction", factionColor);
+
+
+
 				//EntryClass.mUserDataStore[entityKey].SetString("faction", factionColor);
 				System.Diagnostics.Debug.Assert(b.BlackBoardData == EntryClass.mUserDataStore[entityKey], "Spawn() -- UserData objects do not match.");
 			
@@ -1738,19 +1742,15 @@ namespace HelloBoids
 			// add a targetingSkill requirement to this TacticalStation
 			Skill targetingSkill;
 			targetingSkill.SkillType = SKILLS.Targeting;
-			targetingSkill.Level = 2;     			// the level of this skill
+			targetingSkill.Value = new Stat(SKILLS.Targeting.ToString(), 2);
 			targetingSkill.Production = null;
 			//targetingSkill.Modifiers = null;
-			targetingSkill.BaseValue = 2;
-			targetingSkill.EffectiveValue = 0; // todo: this should be a Getter perhaps and not a public variable
+                 // todo: this should be a Getter perhaps and not a public variable
 			// add the modifier(s) to this skill.  Recall that modifiers behave just like any other type of PRODUCTION and must be registered as PRODUCTION 
 			// at the appropriate time (eg On USE of the Skill, or on EQUIP of an Item, etc.)
 			
-			// NOTE: This station will be CONSUMING TargetingSkilLModifer and NOT producing any.  The operator will be PRODUCING
+			// NOTE: This station will be CONSUMING TargetingSkillModifer and NOT producing anything except perhaps FATIGUE (todo)?  The operator will be PRODUCING
 			//targetingSkill.AddProduction(livingEntityID, PRODUCTS.TargetingSkillModifier, 1, true, -1);
-
-			// TODO: This MUST go to the TacticalStation, NOT HERE
-			// add the skill to the DROID as if it was being added to a CREW STATION which for HelloBoids.cs we are not modeling for now... but KGB and SciFiCommand does.
 			station.Skills.Add(targetingSkill.SkillType, targetingSkill);
 			
 			// each Station CONSUMES PRODUCT.ElectricalPower from our Batter (a Producer)
@@ -1934,17 +1934,20 @@ namespace HelloBoids
             // SKILLS
 			Skill targetingSkill;
 			targetingSkill.SkillType = SKILLS.Targeting;
-			targetingSkill.Level = 3;     			// the level of this skill
+			targetingSkill.Value = new Stat(SKILLS.Targeting.ToString(), 3);
 			targetingSkill.Production = null;
 			//targetingSkill.Modifiers = null;
-			targetingSkill.BaseValue = 1;
-			targetingSkill.EffectiveValue = 0;
+
 			
             // TODO: The TargetingSkillModifier seems to be correctly registerinig
             //       it's Modifier, but the SKILL added to the HumanOperator does not.
             //       It doesn't really do anything atm. Indeed we do not even call
             //       RegisterProduction() even though a SKILL is producing for instance
-            //       a bonus to AIM during HasHitsOccurrred()
+            //       a bonus to AIM during HasHitsOccurrred().  The question is, should
+            //       we try to treat functions/methods that use a SKILL as an implementation
+            //       of that SKILL being used instead?  This way we always know whenever a SKILL
+            //       is being used, it's represented by a function that will need access to any/all
+            //       modifiers.
 
 			// add the modifier(s) to this skill.  Recall that modifiers behave just like any other type of PRODUCTION and must be registered as PRODUCTION 
 			// at the appropriate time (eg On USE of the Skill, or on EQUIP of an Item, etc.)
@@ -2735,15 +2738,10 @@ namespace HelloBoids
             double seperatationDistanceSquare = separationDistance * separationDistance;
             double alignmentDistanceSquared = alignmentDistance * alignmentDistance;
             double cohesionDistanceSquared = cohesionDistance * cohesionDistance;
-		   
-            
+		               
             double largestDistanceSquared = largestDistance * largestDistance;
 			
-			
-			// TODO: do we need a BaseEntity Struct that  just contains the EntityArrayIndex, UserTypeID and Configuration?
-			
-			
-			int recordCount = (int)transformStructStore.Count;
+            int recordCount = (int)transformStructStore.Count;
 			
 			//Console.WriteLine("ProcessOpticalSensors() - TransformStore's Record count == " + recordCount.ToString());
 			//Console.WriteLine("ProcessOpticalSensors() - Largest Distance Squared == " + largestDistanceSquared.ToString());
@@ -2927,7 +2925,6 @@ namespace HelloBoids
 			// NOTE: store MUST be of the type Transform_Struct as the neighbor's tuples use .Item1 to hold that InternalTransformIndex and NOT the EntityArrayIndex
 			int recordCount = (int)store.Count;
 
-			
 			//Console.WriteLine ("Span and Store Size Agree == " + (store.Span.Length == store.Size).ToString());
 			
             //using (EntryClass.CodeProfiler.HookUp("AssignSpan"))
@@ -3540,7 +3537,12 @@ namespace HelloBoids
 				Boid current = (Boid)Boids[i];
 			
 				EntityNode tacticalStation = GetTacticalStations(i)[0]; 
-				List<SensorContact> contacts = tacticalStation.GetSensorContacts();
+
+                int tacticalStructIndex;
+                Memory<TacticalStation> tacticalStationStruct = (Memory<TacticalStation>)tacticalStation.GetUserStruct(typeof(TacticalStation), out tacticalStructIndex);
+
+
+				List<SensorContact> contacts = tacticalStationStruct.GetSensorContacts(); //  tacticalStation.GetSensorContacts();
 				if (contacts == null || contacts.Count == 0) return;
 								
 				//List<Target> targets = tacticalStation.GetTargets();
@@ -3609,7 +3611,9 @@ namespace HelloBoids
 						Memory<BaseObject>baseObj = (Memory<BaseObject>)Boids[currentContact.ContactEntityArrayIndex].GetUserStruct(typeof(BaseObject), out componentIndex);
 						t.HitPoints = baseObj.Span[0].HitPoints; 
 
-						tacticalStation.Add(t);
+
+						tacticalStationStruct.Add(t); // tacticalStation.Add(t);
+
 						//Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY PASSED. Target added.");
 						
 					}
@@ -3673,6 +3677,14 @@ namespace HelloBoids
 			bool result = false;
 			hits = null;
 			
+            // TODO: Is this function better regarded as the implementation of a SKILL?
+            //  //  The question is, should
+            //       we try to treat functions/methods that use a SKILL as an implementation
+            //       of that SKILL being used instead?  This way we always know whenever a SKILL
+            //       is being used, it's represented by a function that will need access to any/all
+            //       modifiers.
+
+
 			//Console.WriteLine("HitHasOccurred() - Begin.");
 			System.Diagnostics.Debug.Assert (attackingOperator.Configuration == (uint)HumanOperatorConfiguration, "HitHasOccurred() - AttackerOperator is of incorrect CONFIGURATION.");
 										 
@@ -3717,6 +3729,14 @@ namespace HelloBoids
 			//if (contacts == null || contacts.Count == 0) 
 			//{
 			//}
+
+            int tacticalStructIndex;
+            Memory<TacticalStation> tacticalStationStruct = (Memory<TacticalStation>)attackingTacticalStation.GetUserStruct(typeof(TacticalStation), out tacticalStructIndex);
+
+
+            //List<Target> temp = tacticalStationStruct.GetTargets();
+            // TODO: i think the below call to GetTargets() should be moved to
+            //        tacticalStationStruct.GetTargets()
 			List<Target> targets = attackingTacticalStation.GetTargets();
 			
 			hits = new List<HIT>();
@@ -3833,16 +3853,54 @@ namespace HelloBoids
                 Console.WriteLine ("HitHasOccurred() - Detection Probability Reduction == '" + reduction.ToString() + "'");
 
                 // - evasive maneuvers (COMPARE VELOCITY MAGNITUDE CHANGES OVER X SECONDS PERIOD OF TIME
+                // if the velocity magnitude changes by some minimum amount over X seconds and this is sustained over and over again, over Y seconds, each Y second of evasive action adds a bonus.
                 // each second of "evasive" after 1 full second, adds -5% chance 'to-hit' by the attacking ship. (MAX -15% chance)
-                //      - we can't store the velocity of every ship, every frame... or even every X second... 
+                //      - STATISTICS SEARCH? we can't store the velocity of every ship, every frame... or even every X second...   so we poll every X seconds and we store only N number of entries.
+                // 
 
-
-				// - Counter measures deployed within X time (time * fallOff aka call it 'attenuation') - STATISTICS SEARCH
-                //      ECM - eg. electronic jammers
+				// - Counter measures deployed within X time (time * fallOff aka call it 'attenuation') 
+                //      - STATISTICS SEARCH
+                //      - ECM - eg. electronic jammers
 
                 
+
+
+
+                // TODO: when the target is added to the TacticalStation, the TacticalStation
+                //       should set the acquisition_time_ within the mUserDataStore
+                // TODO: when the target is lost, the acquisition time should be marked as stale, but re-acqisition then by the TacticalStation should not flag it as NOT stale or else this function will never get the correct state.
+                // If a target is marked as STALE, we can try to predict it's current
+                // location based on previous telemetry (heading + velocity)
+                // 
+                // These functions should reside in the TacticalStation itself so
+                // the responsibility of setting and checking these keys is self contained
+                
+                tacticalStationStruct.GetAquisitionDuration(targets[i], gt);
+                tacticalStationStruct.GetEvasiveManeuverDuration(targets[i], gt);
+
+
 				// - total acquisition time (durationOfSensorAquisition) = last acquisition - initial aquisition (the greater this value, the bigger the bonus to detect again (easier to re-aquire)
 				//      STATISTICS search should give us the acquisition times
+                // mStats[tacticalStation.EntityIndex];
+                double currentTotalElapsedSeconds = gt.TotalElapsedSeconds;
+                double diff = 0;
+                
+                
+
+                bool acquisitionStale = "aquisition_stale_" + targets[i].EntityArrayIndex.ToString();
+                string acquisitionKey = "aquisition_time_" + targets[i].EntityArrayIndex.ToString();
+
+                bool isStale =  EntryClass.mUserDataStore[tacticalStation.EntityKey].GetBool(acquisitionStale);         
+                double foundTime = EntryClass.mUserDataStore[tacticalStation.EntityKey].GetDouble(aquisitionKey);
+
+                if (foundTime != currentTotalElapsedSeconds)
+                {
+                    diff = currentTotalElapsedSeconds - foundTime;
+                }
+
+                float TEMP_GOOD_LOCK_TIME_AMOUNT_IN_SECONDS = 2.5d;
+                float acquisitionTimeCoeff = diff / TEMP_GOOD_LOCK_TIME_AMOUNT_IN_SECONDS ;
+
 
 				// total tracking-sensor-lock-time  = lastLock - initialLock (aka durationOfSensorLock) // how much time has this TRACKING SENSOR been tracking this target already
 
@@ -3851,7 +3909,7 @@ namespace HelloBoids
                 // --------------------------------------------------------------
                 // - operator skill  
 				Skill targetingSkill = attackingOperator.Skills[SKILLS.Targeting];
-                float operatorSkill = targetingSkill.EffectiveValue / EntryClass.bSim.MAX_SKILL;
+                float operatorSkill = targetingSkill.Value.Current / EntryClass.bSim.MAX_SKILL;
                 // - operator Health
 				baseObj = (Memory<BaseObject>)attackingOperator.GetUserStruct(typeof(BaseObject), out baseObjIndex);
 				double operatorHealthCoeff = baseObj.Span[0].HitPoints.Base > 0 ? baseObj.Span[0].HitPoints.Current / baseObj.Span[0].HitPoints.Base : 0;
@@ -4043,9 +4101,6 @@ namespace HelloBoids
 				
 				try 
 				{
-					// todo: change parameter attacker to tacticalStation?
-					// todo: randomly choose between 
-					// battery, opticalsensors, wings, laser, overall droid, tacticalstation or operator
 					EntityNode stationOperator = Boids[operatorEntityArrayIndex];
 					EntityNode specificSubTarget = hits[currentHitIndex].Target;
 					EntityNode weaponEntity = Boids[weaponEntityArrayIndex];
@@ -4624,7 +4679,6 @@ namespace HelloBoids
 				
 				//Console.WriteLine("ProcessPowerConsumption() - Entity '" + Boids[currentProduction.ProducerEntityArrayIndex].EntityKey + "' Producing '" + ((PRODUCTS)productID).ToString() );
 			    
-				
 				int[] distributionList = production.Span[(int)i].Consumers;
 				if (production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.List && production.Span[(int)i].DistributionMode != PRODUCT_DISTRIBUTION_TYPE.SingleItem)
 				{
@@ -6566,6 +6620,9 @@ return (0,0);
 				}
 			
 			//Console.WriteLine("EntityNode.Add(SensorContact) - 333 SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
+
+            // TODO: add acquisition time to userdata for the Entity represented by this struct
+
 			if (found == -1) 
 				mSensorContacts.Add (c);
 			else 
@@ -8328,6 +8385,12 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
 		public Statistics(string key)
 		{
+            // I'm  not really using this at the moment... the idea for using this rather than UserDataStore
+            // was that Statistics would not necessarily be saved, but even this is probably not correct.
+            // UserDataStore is probably all we need... but for now...
+
+
+            // NOTE: currently the key passed in PREFIX (eg "stats_") + entityArrayIndex.ToString() 
 			mBlackboardData = EntryClass.mUserDataStore.CheckOut(key);
 			
 			// lets say a Ship is detected and we want to check if it has fired upon any friendly 
@@ -8387,7 +8450,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		}
 	}
 ////////////////////////////////////////////////////////////////////////////////////////////////
-#endregion   //Rules, Queries, Policies, Conditions
+#endregion   Rules, Queries, Policies, Conditions
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
 	
@@ -8630,7 +8693,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		// Beyond 16,777,216: The "gap" between representable numbers increases. 
 		// For example, \(2^{24} + 1\) (16,777,217) cannot be represented exactly and will be rounded to 16,777,216 or 16,777,218.
 		// Larger Values: As the numbers grow, the gaps get wider. Eventually, a float can only represent multiples of 4, then multiples of 8, and so on.
-			
 		public float Base;
 		public float Current;
 		public string Name;
@@ -8693,9 +8755,9 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 	public struct Skill
 	{
 		public SKILLS SkillType;
-		public int Level;     			// the level of this skill
-		public int BaseValue; 
-		public int EffectiveValue;
+		public Stat Value;     			// Value.BaseValue is the proficiency level of this skill
+                                        // value.EffectiveValue is BaseValue + all modifiers added to it
+
 		
 		// These are modifiers that this Skill struct naturally PRODUCES 
 		// (as in PRODUCTION and as in, modifiers that are built in to this specific Skill). 
@@ -9476,10 +9538,9 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 								{
 									if (operatorSkills[k].SkillType == this.RequiredSkills[j].SkillType)
 									{
-										if (operatorSkills[k].Level < this.RequiredSkills[j].Level)
+										if (operatorSkills[k].Value.Current < this.RequiredSkills[j].Value.Current)
 										{
-											
-											int level = this.RequiredSkills[j].Level;
+											float level = this.RequiredSkills[j].Value.Current;
 											string skillname = this.RequiredSkills[j].SkillType.ToString();
 
 											errorReason = $"Operator {name}, does not have the required skill level {level} for the skill {skillname}.";

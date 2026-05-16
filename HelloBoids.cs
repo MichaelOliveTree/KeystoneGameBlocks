@@ -3221,11 +3221,11 @@ namespace HelloBoids
 			
 			
 			//Console.WriteLine("Do_Tactical_Logic() - CreateContactListFromAdjacents()");
-			CreateContactListFromAdjacents(); // based on policies
+			CreateContactListFromAdjacents(gt); // based on policies
 			
 			
 			//Console.WriteLine("Do_Tactical_Logic() - DoTargetPrioritization()");
-			DoTargetPrioritization();
+			DoTargetPrioritization(gt);
 			
 			
 			// todo: if we had a list of all weapons for every ship to pass all at once
@@ -3357,7 +3357,7 @@ namespace HelloBoids
 		/// <summary>
 		/// This is mostly just creating 'SensorContact' from "neighbors" .... based on policies
 		/// </summary>
-		private void CreateContactListFromAdjacents()
+		private void CreateContactListFromAdjacents(GameTime gt)
 		{
 			if (mNeighbors.Count == 0) return;
 			//Console.WriteLine("CreateContactListFromAdjacents() - STARTING");
@@ -3507,7 +3507,7 @@ namespace HelloBoids
 								telemetry.Velocity = bb.Velocity;
 								telemetry.DistanceSquared = distanceSquared;
 								telemetry.Heading = 0;
-								telemetry.TimeAcquired = Utils.NowTicks(); // todo: this needs to eventually just be gt.Ticks <-- which must come from 'gametime fixedstep' and not 'real-time'
+								telemetry.TimeAcquired = gt.TotalElapsedSeconds;
 								telemetry.TimeLast = telemetry.TimeAcquired;
 
 								c.Add(telemetry);			
@@ -3523,7 +3523,7 @@ namespace HelloBoids
 				// properly merging these SensorContacts with existing ones so as to maintain
 				// proper SensorContact histories for all detected Entities.
 				if (contacts != null)
-					allTacticalStations.Span[(int)i].Add(contacts); 
+					allTacticalStations.Span[(int)i].Add(contacts, gt); 
 			});
 			
 			//Console.WriteLine("CreateContactListFromAdjacents() - COMPLETED.");
@@ -3532,7 +3532,7 @@ namespace HelloBoids
 		/// <summary>
 		/// Using the current set of "SensorContacts" received, prioritize a list of hostile Targets based on policies
 		/// </summary>
-		private void DoTargetPrioritization()
+		private void DoTargetPrioritization(GameTime gt)
 		{
 			//Console.WriteLine("DoTargetPrioritization()");
 			int count = Boids.Count;
@@ -3602,7 +3602,11 @@ namespace HelloBoids
 						t = tacticalStationStruct.Span[0].GetTarget(currentContact.ContactEntityArrayIndex);
 						if (t.Equals(default(Target)))
 						{
-
+                            SensorContact.ContactTelemetry[] tmps = currentContact.Telemetry;
+                            System.Diagnostics.Debug.Assert (tmps != null && tmps.Length >=1, "Contact should have at least one telemetry snapshot.");
+                            int last = tmps.Length - 1;
+                            int first = 0;
+                            t.TimeAcquired = currentContact.Telemetry[first].TimeAcquired; //  gt.TotalElapsedSeconds
 						}
 						else 
 						{
@@ -3621,7 +3625,7 @@ namespace HelloBoids
 						t.HitPoints = baseObj.Span[0].HitPoints; 
 
 
-						tacticalStationStruct.Span[0].Add(t); // tacticalStation.Add(t);
+						tacticalStationStruct.Span[0].Add(t, gt); // tacticalStation.Add(t);
 
 						//Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY PASSED. Target added.");
 						
@@ -9041,7 +9045,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		public int EntityArrayIndex;
 		public int[] WeaponsAssigned;
 		public int[] TargetedBy;      // other Ships/Vehciles/Entities, ground radars, factions, etc that are targeting this Target
-		public STATUS Status;
+		public double TimeAcquired;
+        public STATUS Status;
 		public CREWSTATUS CrewStatus;
 		public Stat HitPoints;         // max hitpoints of target... should a Sensor be able to know this exact number?  It's really just a game thing and maybe we should just use visual observations of condition of ship instead
 		public double DistanceSquared; 
@@ -9780,7 +9785,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			return mTargets;
 		}
 		
-		public void Add (Target t)
+		public void Add (Target t, GameTime gt)
 		{
 			if (mTargets == null) mTargets = new List<Target>();
 			
@@ -9793,65 +9798,60 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 					break;
 				}
 			
+
+
+
+            string acquisitionStaleKey = "aquisition_stale_" + t.EntityArrayIndex.ToString();
+            string acquisitionKey = "aquisition_time_" + t.EntityArrayIndex.ToString();
+
 			if (found == -1)
-				mTargets.Add(t);
-			else
             {
+				EntryClass.mUserDataStore[attackingTacticalStation.EntityKey].SetDouble(acquisitionKey, t.TimeAcquired);
+
+                mTargets.Add(t);
+            }
+            else
+            {
+                // use the existing TimeAcquired before updating it's entry in the Dictionary
+                t.TimeAcquired = mTargets[found].TimeAcquired;
 				mTargets[found] = t;
+
                 Console.WriteLine ("TacticalStationStruct.Add() - Updating an existing Target.");
                 // 
-                // TODO: when the target is added to the TacticalStation, the TacticalStation
-                //       should set the acquisition_time_ within the mUserDataStore
+                
                 // TODO: when the target is lost, the acquisition time should be marked as stale, but re-acqisition then by the TacticalStation should not flag it as NOT stale or else this function will never get the correct state.
                 // If a target is marked as STALE, we can try to predict it's current
                 // location based on previous telemetry (heading + velocity)
-                // 
-                // These functions should reside in the TacticalStation itself so
-                // the responsibility of setting and checking these keys is self contained
+
                 
-                double test = tacticalStationStruct.Span[0].GetAquisitionDuration(targets[i], gt);
-                double test2 = tacticalStationStruct.Span[0].GetEvasiveManeuverDuration(targets[i], gt);
-
-                /*
-				// - total acquisition time (durationOfSensorAquisition) = last acquisition - initial aquisition (the greater this value, the bigger the bonus to detect again (easier to re-aquire)
-				//      STATISTICS search should give us the acquisition times
-                // mStats[tacticalStation.EntityIndex];
-                double currentTotalElapsedSeconds = gt.TotalElapsedSeconds;
-                double diff = 0;
-                
-                
-                string acquisitionStaleKey = "aquisition_stale_" + targets[i].EntityArrayIndex.ToString();
-                string acquisitionKey = "aquisition_time_" + targets[i].EntityArrayIndex.ToString();
-
-                bool isStale =  EntryClass.mUserDataStore[attackingTacticalStation.EntityKey].GetBool(acquisitionStaleKey);         
-                double foundTime = EntryClass.mUserDataStore[attackingTacticalStation.EntityKey].GetDouble(acquisitionKey);
-
-                if (foundTime != currentTotalElapsedSeconds)
-                {
-                    diff = currentTotalElapsedSeconds - foundTime;
-                }
-
-                double TEMP_GOOD_LOCK_TIME_AMOUNT_IN_SECONDS = 2.5d;
-                float acquisitionTimeCoeff = (float)(diff / TEMP_GOOD_LOCK_TIME_AMOUNT_IN_SECONDS) ;
-                */
-
+               
 
 		    }
         }
 		
-		public void Add (Target[] t)
+		public void Add (Target[] t, GameTime gt)
 		{
 			if (t == null || t.Length == 0) return;
 			
 			for (int i = 0; i < t.Length; i++)
-				Add(t[i]);
+				Add(t[i], gt);
 		}
 		
 		public void ClearTargets()
 		{
 			if (mTargets != null)
-				mTargets.Clear();
-		}
+            {
+				for (int i = 0; i < mTargets.Count; i++)
+                {
+                    string acquisitionStaleKey = "aquisition_stale_" + t.EntityArrayIndex.ToString();
+                    string acquisitionKey = "aquisition_time_" + t.EntityArrayIndex.ToString();
+
+                    EntryClass.mUserDataStore[attackingTacticalStation.EntityKey].Remove(acquisitionKey);
+                    EntryClass.mUserDataStore[attackingTacticalStation.EntityKey].Remove(acquisitionStaleKey);
+                }
+                mTargets.Clear();
+		    }
+        }
 		
 		public Target GetTarget (int entityArrayIndex)
 		{
@@ -9870,7 +9870,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			return mSensorContacts;
 		}
 		
-		public void Add (SensorContact c)
+		public void Add (SensorContact c, GameTime gt)
 		{
 			
 			if (mSensorContacts == null) mSensorContacts = new List<SensorContact>();
@@ -9889,18 +9889,24 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
             // TODO: add acquisition time to userdata for the Entity represented by this struct
 
 			if (found == -1) 
-				mSensorContacts.Add (c);
-			else 
+            {
+				string acquisitionStaleKey = "aquisition_stale_" + c.EntityArrayIndex.ToString();
+                string acquisitionKey = "aquisition_time_" + c.EntityArrayIndex.ToString();
+
+                EntryClass.mUserDataStore[entityKey].SetDouble(acquisitionKey, c.TimeAcquired);
+
+            }
+            else 
 				mSensorContacts[found].Add(c.Telemetry);
 			
 			//Console.WriteLine("EntityNode.Add(SensorContact) - 444 SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
 		}
 		
-		public void Add (List<SensorContact> contacts)
+		public void Add (List<SensorContact> contacts, GameTime gt)
 		{
 			if (contacts == null) return;
 			for (int i = 0; i < contacts.Count; i++)
-				Add(contacts[i]);
+				Add(contacts[i], gt);
 		}
 
 		public void RemoveContact(SensorContact contact)
@@ -9913,9 +9919,13 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		{
 			if (mSensorContacts != null)
 				mSensorContacts.Clear();
-		}
 
-		public void Add (StationAction a)
+            // TODO: if we call either ClearTargets() or ClearContaacts() and remove acquisitionkeys and stalekeys
+            //        it could impact the other unintentioinally
+        }
+        
+
+		public void Add (StationAction a, GameTime gt)
 		{
 			if (Actions == null) Actions = new List<StationAction>();
 			Actions.Add(a);
@@ -9927,7 +9937,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			if (Actions.Count == 0)
 				Actions = null;
 		}
-
 
 
         public double GetAquisitionDuration(Target target, GameTime gt)

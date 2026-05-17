@@ -1344,6 +1344,7 @@ namespace HelloBoids
 			////////////////////////////////////////////////////////////////////////////////////////////////////
 			// BATTERY to power Eyes, Wings, Laser and TacticalStation
 			EntityNode battery = CreateBattery(arrayIndex + BATTERY_OFFSET);
+            battery.BoundingBox = new BoundingBox (pos, sizeWithVariance * 0.05d);// HACK
 
             exLine = "Spawn() - CreateOpticalSensors 6";
 			////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1354,7 +1355,7 @@ namespace HelloBoids
 
 			exLine = "Spawn() - CreateOpticalSensors 7";
 
-            Console.WriteLine(exLine);
+            //Console.WriteLine(exLine);
             
 
 		    if (this.Octree != null)
@@ -3319,7 +3320,7 @@ namespace HelloBoids
 							return;
 						}
 						
-                        //Console.WriteLine("Do_Tactical_Logic() -  Attempting to find targets for TacticalStationStruct referencing Entity Array Index == " + tacticalStationStruct.Span[0].EntityArrayIndex.ToString());
+                        Console.WriteLine("Do_Tactical_Logic() -  Attempting to find targets for TacticalStationStruct referencing Entity Array Index == " + tacticalStationStruct.Span[0].EntityArrayIndex.ToString());
 						List<Target> targets = tacticalStationStruct.Span[0].GetTargets();
 						if (targets == null || targets.Count == 0) return;
 					
@@ -3470,7 +3471,7 @@ namespace HelloBoids
 								else
 									c.SensorsIndices.Append(sensorArrayIndex); // sensorStructIndex);
 
-								//Console.WriteLine("CreateContactListFromAdjacents() - Appending SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
+								Console.WriteLine("CreateContactListFromAdjacents() - Appending SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
 							}
 							else // contact has not yet already been detected by another Sensor within this same ship during this loop through all sensors on this same ship
 							{
@@ -3499,21 +3500,23 @@ namespace HelloBoids
 								c.ContactStatus = Target.STATUS.Unknown;
 								c.FriendOrFoe = SensorContact.FoF.Unknown;
 								c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices, sensorArrayIndex); //sensorStructIndex);
-								
-								// telemetry
-								SensorContact.ContactTelemetry telemetry;
-								telemetry.Radius = (float)bb.BoundingBox.Radius;    // how might size be spoofed?
-								telemetry.Position = bb.Translation;
-								telemetry.Velocity = bb.Velocity;
-								telemetry.DistanceSquared = distanceSquared;
-								telemetry.Heading = 0;
-								telemetry.TimeAcquired = gt.TotalElapsedSeconds;
-								telemetry.TimeLast = telemetry.TimeAcquired;
 
-								c.Add(telemetry);			
-								contacts.Add(c);
-								//Console.WriteLine("CreateContactListFromAdjacents() - Added NEW SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
-							}
+                                contacts.Add(c);
+                                
+                                Console.WriteLine("CreateContactListFromAdjacents() - Added NEW SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
+                            }
+
+                            // telemetry must be added regardless of whether this is abn existing or new SensorContact
+                            SensorContact.ContactTelemetry telemetry;
+                            telemetry.Radius = (float)bb.BoundingBox.Radius;    // how might size be spoofed?
+                            telemetry.Position = bb.Translation;
+                            telemetry.Velocity = bb.Velocity;
+                            telemetry.DistanceSquared = distanceSquared;
+                            telemetry.Heading = 0;
+                            telemetry.TimeAcquired = gt.TotalElapsedSeconds;
+                            telemetry.TimeLast = telemetry.TimeAcquired;
+
+                            c.Add(telemetry);			
 						} // end sensor range check
 					} // end for SensorsCount
 				} // end for neihbors Count
@@ -9148,7 +9151,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
             // see line 8357 for struct Production
             // and line 1876 for where this struct is used for
             //    adding HumanOperator's TargetingSkillModifier 
-            Production p;
+            //Production p;
 
             Modifiers = Utils.ArrayAppend(Modifiers, modifier);
             EntryClass.bSim.RegisterSkillModifier(modifier);   
@@ -9787,6 +9790,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
 		public void Add (Target t, GameTime gt)
 		{
+            Console.WriteLine ("TacticalStationStruct.Add() - Entered.");
+
 			if (mTargets == null) mTargets = new List<Target>();
 			
 			// if the target already exists, replace it with current data?
@@ -9799,24 +9804,29 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 				}
 			
 
-
-
             string acquisitionStaleKey = "aquisition_stale_" + t.EntityArrayIndex.ToString();
             string acquisitionKey = "aquisition_time_" + t.EntityArrayIndex.ToString();
 
 			if (found == -1)
             {
-				EntryClass.mUserDataStore[attackingTacticalStation.EntityKey].SetDouble(acquisitionKey, t.TimeAcquired);
+                Console.WriteLine ("TacticalStationStruct.Add() - Adding a NEW Target.");
+                int stationIndex = this.EntityArrayIndex;
+                string stationKey = EntryClass.bSim.Boids[stationIndex].EntityKey;
+
+                EntityNode e = EntryClass.bSim.Boids[t.EntityArrayIndex];
+				EntryClass.mUserDataStore[stationKey].SetDouble(acquisitionKey, t.TimeAcquired);
 
                 mTargets.Add(t);
+                Console.WriteLine ("TacticalStationStruct.Add() - Completed.");
             }
             else
             {
+                Console.WriteLine ("TacticalStationStruct.Add() - Updating an existing Target.");
                 // use the existing TimeAcquired before updating it's entry in the Dictionary
                 t.TimeAcquired = mTargets[found].TimeAcquired;
 				mTargets[found] = t;
 
-                Console.WriteLine ("TacticalStationStruct.Add() - Updating an existing Target.");
+                
                 // 
                 
                 // TODO: when the target is lost, the acquisition time should be marked as stale, but re-acqisition then by the TacticalStation should not flag it as NOT stale or else this function will never get the correct state.
@@ -9841,13 +9851,20 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		{
 			if (mTargets != null)
             {
+                int stationIndex = this.EntityArrayIndex;
+                string stationKey = EntryClass.bSim.Boids[stationIndex].EntityKey;
+
 				for (int i = 0; i < mTargets.Count; i++)
                 {
-                    string acquisitionStaleKey = "aquisition_stale_" + t.EntityArrayIndex.ToString();
-                    string acquisitionKey = "aquisition_time_" + t.EntityArrayIndex.ToString();
+                    int entityArrayIndex = mTargets[i].EntityArrayIndex;
+                    EntityNode e = EntryClass.bSim.Boids[mTargets[i].EntityArrayIndex];
 
-                    EntryClass.mUserDataStore[attackingTacticalStation.EntityKey].Remove(acquisitionKey);
-                    EntryClass.mUserDataStore[attackingTacticalStation.EntityKey].Remove(acquisitionStaleKey);
+                    string acquisitionStaleKey = "aquisition_stale_" + entityArrayIndex.ToString();
+                    string acquisitionKey = "aquisition_time_" + entityArrayIndex.ToString();
+
+                  throw new NotImplementedException("UserDataStore() - ClearTargets() ");
+                  //  EntryClass.mUserDataStore[stationKey].Remove(acquisitionKey);
+                  //  EntryClass.mUserDataStore[stationKey].Remove(acquisitionStaleKey);
                 }
                 mTargets.Clear();
 		    }
@@ -9890,11 +9907,21 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 
 			if (found == -1) 
             {
-				string acquisitionStaleKey = "aquisition_stale_" + c.EntityArrayIndex.ToString();
-                string acquisitionKey = "aquisition_time_" + c.EntityArrayIndex.ToString();
+                 int stationIndex = this.EntityArrayIndex;
+                string stationKey = EntryClass.bSim.Boids[stationIndex].EntityKey;
 
-                EntryClass.mUserDataStore[entityKey].SetDouble(acquisitionKey, c.TimeAcquired);
 
+				string acquisitionStaleKey = "aquisition_stale_" + c.ContactEntityArrayIndex.ToString();
+                string acquisitionKey = "aquisition_time_" + c.ContactEntityArrayIndex.ToString();
+
+                if (c.Telemetry != null)
+                { 
+                    SensorContact.ContactTelemetry first = c.Telemetry[0];
+                    SensorContact.ContactTelemetry last = c.Telemetry[c.Telemetry.Length - 1];
+                
+                
+                    EntryClass.mUserDataStore[stationKey].SetDouble(acquisitionKey, first.TimeAcquired);
+                }
             }
             else 
 				mSensorContacts[found].Add(c.Telemetry);
@@ -13111,7 +13138,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 					return;
 				}
 
-				if (entityNode.BoundingBox.Radius <= 0) throw new Exception("OctreeOctant.Add() - Entity BoundingBox invalid.");
+				if (entityNode.BoundingBox.Radius <= 0) throw new Exception("OctreeOctant.Add() - Entity '" + entityNode.EntityKey + "' BoundingBox invalid.");
 				double entityRadius = entityNode.BoundingBox.Radius;
 
 				// note: we intentionally compute a radius without taking into account hypotenuse.

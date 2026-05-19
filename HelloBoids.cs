@@ -3140,7 +3140,7 @@ namespace HelloBoids
 			//Console.WriteLine("Do_Tactical_Logic() - BEGIN ");
 			//ThreadedRandom random = new ThreadedRandom(seed); // <- WARNING: This is not correct when we need to use it in a Parallel.For().  It must be instanced by EACH parallel.For() thread! See below...
 			
-			
+			if (mNeighbors.Count == 0) return;
 			
 			
 			// todo: we could pass in an array of store to our Processor functions... rather than just one.
@@ -3207,13 +3207,13 @@ namespace HelloBoids
              //    - storing data on interior Walls and Floors and Ceilings "damage"
 
 
-        	//Console.WriteLine("Do_Tactical_Logic() - DoDeviceReadyStatus()");
+        	Console.WriteLine("Do_Tactical_Logic() - DoDeviceReadyStatus()");
 			DoDeviceReadyStatus();
 						
 			
-			//Console.WriteLine("Do_Tactical_Logic() - DoStationCanActStatus()");
+			Console.WriteLine("Do_Tactical_Logic() - DoStationCanActStatus()");
 			DoStationCanActStatus();
-			//Console.WriteLine("Do_Tactical_Logic() - continuing Do_Droid_Logic()");
+			Console.WriteLine("Do_Tactical_Logic() - continuing Do_Droid_Logic()");
 			
 			
 			
@@ -3221,29 +3221,29 @@ namespace HelloBoids
 			
 			
 			
-			//Console.WriteLine("Do_Tactical_Logic() - CreateContactListFromAdjacents()");
+			Console.WriteLine("Do_Tactical_Logic() - CreateContactListFromAdjacents()");
 			CreateContactListFromAdjacents(gt); // based on policies
 			
 			
-			//Console.WriteLine("Do_Tactical_Logic() - DoTargetPrioritization()");
+			Console.WriteLine("Do_Tactical_Logic() - DoTargetPrioritization()");
 			DoTargetPrioritization(gt);
 			
 			
 			// todo: if we had a list of all weapons for every ship to pass all at once
 			//       as well as all targets for each ship to pass all at once, we could run this
 			//       processor in a single call from here...
-			//Console.WriteLine("Do_Tactical_Logic() - DoWeaponFitnessScores()");
+			Console.WriteLine("Do_Tactical_Logic() - DoWeaponFitnessScores()");
 			DoWeaponFitnessScores(null, null);
 			
 			
-			//Console.WriteLine("Do_Tactical_Logic() - DoWeaponsCanFire()");
+			Console.WriteLine("Do_Tactical_Logic() - DoWeaponsCanFire()");
 			DoWeaponsCanFire();
 			
 			//ComponentStore<LifeForm> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
 			//ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			//ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 						
-			//Console.WriteLine("Do_Tactical_Logic() - preparing for loop()");
+			Console.WriteLine("Do_Tactical_Logic() - preparing for loop()");
 			int recordCount = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, recordCount, i => 				
 			//for (int i = 0; i < Boids.Count; i++)
@@ -3320,10 +3320,13 @@ namespace HelloBoids
 							return;
 						}
 						
-                        Console.WriteLine("Do_Tactical_Logic() -  Attempting to find targets for TacticalStationStruct referencing Entity Array Index == " + tacticalStationStruct.Span[0].EntityArrayIndex.ToString());
+                        //Console.WriteLine("Do_Tactical_Logic() -  Attempting to find targets for TacticalStationStruct referencing Entity Array Index == " + tacticalStationStruct.Span[0].EntityArrayIndex.ToString());
 						List<Target> targets = tacticalStationStruct.Span[0].GetTargets();
-						if (targets == null || targets.Count == 0) return;
-					
+						if (targets == null || targets.Count == 0) 
+                        {
+                            Console.WriteLine("Do_Tactical_Logic() -  NO Targets In TacticalStation.");
+                            return;
+                        }
 						Console.WriteLine("Do_Tactical_Logic() -  " + targets.Count.ToString() + " Targets In TacticalStation.");
 						// NOTE: TacticalStation.CanHit() returns true if a hit WILL RESULT from the fired shot
 						//       even if the HIT is not the expected location on a Target or even on the correct Target!
@@ -3360,8 +3363,9 @@ namespace HelloBoids
 		/// </summary>
 		private void CreateContactListFromAdjacents(GameTime gt)
 		{
+            Console.WriteLine("CreateContactListFromAdjacents() - STARTING");
 			if (mNeighbors.Count == 0) return;
-			//Console.WriteLine("CreateContactListFromAdjacents() - STARTING");
+			Console.WriteLine("CreateContactListFromAdjacents() - Neighbors Count == " + mNeighbors.Count.ToString());
 			
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 			int recordCount = (int)allTacticalStations.Count;
@@ -3390,7 +3394,6 @@ namespace HelloBoids
 				EntityNode currentStation = Boids[currentStationArrayIndex]; // <-- if we can get the Sensors without having to get the current Boid... hmm...
 				List<SensorContact> contacts = new List<SensorContact>();
 				
-				System.Diagnostics.Debug.Assert(currentStation.EntityKey.Contains("tactical"), "CreateContactListFromAdjacents() - Entity is NOT a TacticalStation.");
 				
 				int currentBoidArrayIndex = currentStation.EntityArrayIndex - TACTICAL_STATION_OFFSET;
 				EntityNode attackingShip = Boids[currentBoidArrayIndex];
@@ -3428,7 +3431,7 @@ namespace HelloBoids
 				if (potentialTargets == null || potentialTargets.Count == 0)
 					return;		 
 				
-				//Console.WriteLine("CreateContactListFromAdjacents() - BEGIN iterate through potential contacts.");
+				Console.WriteLine("CreateContactListFromAdjacents() - BEGIN iterate through potential contacts.");
 				
 				// iterate through all the potential "contacts"
 				for (int j = 0; j < potentialTargets.Count; j++)
@@ -3439,7 +3442,7 @@ namespace HelloBoids
 					//int potentialContactsInternalTransformIndex = neighbors[(int)j].Item1; 
 					int potentialContactsEntityArrayIndex = potentialTargets[j].EntityArrayIndex; //allTransforms.Span[potentialContactsInternalTransformIndex].EntityArrayIndex;
 			  
-					//Console.WriteLine("CreateContactListFromAdjacents() - 2");
+					Console.WriteLine("CreateContactListFromAdjacents() - 2");
 					// Iterate through all the Sensors the current Droid is using to see which ones might
 					// detect this potential contact.  This is why a "SensorContact" may already exist
 					// in the List<SensorContact> 'contacts'  because multiple Sensors on _the_same_ship_
@@ -3457,8 +3460,9 @@ namespace HelloBoids
 						if (sensorRangeSquared >= distanceSquared)
 						{
 							SensorContact c;
-
-							// if another sensor on this same vehicle has detected this potential contact already, append it's Sensor index
+							Boid bb = null;
+    
+    						// if another sensor on this same vehicle has detected this potential contact already, append it's Sensor index
 							// to the list of SensorIndices for this contact so we know all sensors that detected it.
 							Predicate<SensorContact> contactExists = contact => contact.ContactEntityArrayIndex == potentialContactsEntityArrayIndex;
 							c = contacts.Find(contactExists);
@@ -3478,7 +3482,7 @@ namespace HelloBoids
 								c = new SensorContact();
 
 								//Console.WriteLine("CreateContactListFromAdjacents() - Creating NEW SensorContact of Droid at Array Index = '" + contactsEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
-								Boid bb = null;
+
 								try 
 								{
 									bb =  (Boid)this.Boids[potentialContactsEntityArrayIndex];
@@ -3537,22 +3541,25 @@ namespace HelloBoids
 		/// </summary>
 		private void DoTargetPrioritization(GameTime gt)
 		{
-			//Console.WriteLine("DoTargetPrioritization()");
+			//Console.WriteLine("DoTargetPrioritization() - ENTER");
 			int count = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 		
 			{
-				if (Boids[i] is Boid == false) return;
-				Boid current = (Boid)Boids[i];
-			
-				EntityNode tacticalStation = GetTacticalStations(i)[0]; 
+                EntityNode tacticalStation = Boids[i];
+   				if (tacticalStation.Configuration != (uint)TacticalStationConfiguration) return;
 
                 int tacticalStructIndex;
                 Memory<TacticalStation> tacticalStationStruct = (Memory<TacticalStation>)tacticalStation.GetUserStruct(typeof(TacticalStation), out tacticalStructIndex);
 
 
-				List<SensorContact> contacts = tacticalStationStruct.Span[0].GetSensorContacts(); //  tacticalStation.GetSensorContacts();
-				if (contacts == null || contacts.Count == 0) return;
-								
+				List<SensorContact> contacts = tacticalStationStruct.Span[0].GetSensorContacts(); 
+				if (contacts == null || contacts.Count == 0) 
+                {
+                    //Console.WriteLine("DoTargetPrioritization() -  NO 'SENSORCONTACTS' In TacticalStation.");
+                    return;
+                }
+                //Console.WriteLine("DoTargetPrioritization() -  " + contacts.Count.ToString() + " 'SENSORCONTACTS' In TacticalStation.");
+
                 // NOTE: We DO NOT want to Clear existing Targets from previous frames because
                 //       we do things like track the target acquisition duration as well as whether
                 //       a contact has gone stale. 
@@ -3563,81 +3570,117 @@ namespace HelloBoids
 								
 				for (int j = 0; j < contacts.Count; j++)
 				{
-					// entityKey will usually be the ID of the target Entity (aka Droid or Ship).  But not always.  Sometimes it may be our own ship.  It depends on the specific rule.			
-					string targetKey = "boid_" + contacts[j].ContactEntityArrayIndex.ToString();
-					string currentKey = "boid_" + i.ToString();
-					
-					Policy roePolicy = new Policy();
-					Query q = new Query(EntryClass.mUserDataStore);
+                    int lineNum = 0;
+                    try
+                    {
+                        // entityKey will usually be the ID of the target Entity (aka Droid or Ship).  But not always.  Sometimes it may be our own ship.  It depends on the specific rule.			
+                        string targetKey = "boid_" + contacts[j].ContactEntityArrayIndex.ToString();
+                        string currentKey = "boid_" + i.ToString();
+                        
+                        lineNum = 2;
 
-					Rule r = new Rule("ROE - Friendly Fire", "Earth Alliance Directive 209 states Captains must not fire on Friendly forces.");
+                        Policy roePolicy = new Policy();
+                        Query q = new Query(EntryClass.mUserDataStore);
 
-					// Condition 1 == in Spawn() we randomly assign each Boid to either 'Red' or 'Blue' factions.
-					string name = "Never fire on Same Faction";
-					string description = "Never fire on any Droid that is a member of our Faction.";
-					 
-					Condition.EVAL_TYPE eval = Condition.EVAL_TYPE.NOT_EQUALS;
-					string operandLeft = "faction";
-					string operandRight = "faction";  
-						
-					Condition condition = new Condition(name, description, currentKey, targetKey, eval, operandLeft, operandRight);
-											
-					r.Add(condition);
+                        Rule r = new Rule("ROE - Friendly Fire", "Earth Alliance Directive 209 states Captains must not fire on Friendly forces.");
 
-					// Condition 2 == This Entity is not currently fighting us or one of our Allies in the arena
-					eval = Condition.EVAL_TYPE.EQUALS;
-					operandRight = "false";
-					
-					object[] delegateArgs = new object[]{currentKey, targetKey};
-					condition = new Condition(name, description, targetKey, currentKey, eval, IsCombatant, operandRight, delegateArgs);
-					r.Add(condition);
-					q.Add(r);
-					roePolicy.Add(q);
-			
-					SensorContact currentContact = contacts[j];
-					
-					//Console.WriteLine("DoTargetPrioritization() - PRE- roePolicy.Execute()" );
-					if (roePolicy.Execute())
-					{
-						// Targets are those SensorContacts that friendly forces will potentially fire upon.
-						// Whereas SensorContacts is all contacts regardless of FoF status.
-						Target t = new Target();
-						t = tacticalStationStruct.Span[0].GetTarget(currentContact.ContactEntityArrayIndex);
-						if (t.Equals(default(Target)))
-						{
-                            SensorContact.ContactTelemetry[] tmps = currentContact.Telemetry;
-                            System.Diagnostics.Debug.Assert (tmps != null && tmps.Length >=1, "Contact should have at least one telemetry snapshot.");
-                            int last = tmps.Length - 1;
-                            int first = 0;
-                            t.TimeAcquired = currentContact.Telemetry[first].TimeAcquired; //  gt.TotalElapsedSeconds
-						}
-						else 
-						{
-							t.TargetedBy = Utils.ArrayAppend(t.TargetedBy, (int)i);       // other Ships/Vehciles/Entities, ground radars, factions, etc that are targeting this Target
-						}
-						t.EntityArrayIndex = currentContact.ContactEntityArrayIndex;
-						t.WeaponsAssigned = null;
-						t.Status = Target.STATUS.Active;
-						t.CrewStatus = Target.CREWSTATUS.Alive;
-						// used to determine % damage of Target.   Should a Sensor be able to know this exact number?  
-						// It's really just a game thing and maybe we should just use visual observations of condition of ship instead
-						int componentIndex;
-						
-						EntityNode b = Boids[currentContact.ContactEntityArrayIndex];
-						Memory<BaseObject>baseObj = (Memory<BaseObject>)Boids[currentContact.ContactEntityArrayIndex].GetUserStruct(typeof(BaseObject), out componentIndex);
-						t.HitPoints = baseObj.Span[0].HitPoints; 
+                        // Condition 1 == in Spawn() we randomly assign each Boid to either 'Red' or 'Blue' factions.
+                        string name = "Never fire on Same Faction";
+                        string description = "Never fire on any Droid that is a member of our Faction.";
+                        
+                        Condition.EVAL_TYPE eval = Condition.EVAL_TYPE.NOT_EQUALS;
+                        string operandLeft = "faction";
+                        string operandRight = "faction";  
+                            
+                        lineNum = 3;
+                        Condition condition = new Condition(name, description, currentKey, targetKey, eval, operandLeft, operandRight);
+                                                
+                        r.Add(condition);
+
+                        lineNum = 4;
+
+                        // Condition 2 == This Entity is not currently fighting us or one of our Allies in the arena
+                        eval = Condition.EVAL_TYPE.EQUALS;
+                        operandRight = "false";
+                        
+                        object[] delegateArgs = new object[]{currentKey, targetKey};
+                        condition = new Condition(name, description, targetKey, currentKey, eval, IsCombatant, operandRight, delegateArgs);
+                        r.Add(condition);
+                        q.Add(r);
+                        roePolicy.Add(q);
+                
+                        lineNum = 5;
+                        SensorContact currentContact = contacts[j];
+                        if (currentContact.Equals(default(SensorContact))) throw new ArgumentNullException("DoTargetPrioritization() - SensorContact is NULL");
 
 
-						tacticalStationStruct.Span[0].Add(t, gt); // tacticalStation.Add(t);
+                        Console.WriteLine("DoTargetPrioritization() - PRE- roePolicy.Execute()" );
+                        if (roePolicy.Execute())
+                        {
+                            lineNum = 6;
+                            // Targets are those SensorContacts that friendly forces will potentially fire upon.
+                            // Whereas SensorContacts is all contacts regardless of FoF status.
+                            Target t = new Target();
+                            t = tacticalStationStruct.Span[0].GetTarget(currentContact.ContactEntityArrayIndex);
 
-						//Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY PASSED. Target added.");
-						
-					}
-					else
-					{
-						Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY FAILED.");
-					}
-				}
+                            lineNum = 7;
+                            if (t.Equals(default(Target)))
+                            {
+                                lineNum = 8;
+                                SensorContact.ContactTelemetry[] tmps = currentContact.Telemetry;
+
+                                lineNum = 9;
+                                System.Diagnostics.Debug.Assert (tmps != null && tmps.Length >=1, "Contact should have at least one telemetry snapshot.");
+                                
+                                lineNum = 10;
+                                int last = tmps.Length - 1;
+                                int first = 0;
+
+
+                                t.TimeAcquired = currentContact.Telemetry[first].TimeAcquired; //  gt.TotalElapsedSeconds
+                                lineNum = 11;
+                            }
+                            else 
+                            {
+                                t.TargetedBy = Utils.ArrayAppend(t.TargetedBy, (int)i);       // other Ships/Vehciles/Entities, ground radars, factions, etc that are targeting this Target
+
+                                lineNum = 12;
+                            }
+                            t.EntityArrayIndex = currentContact.ContactEntityArrayIndex;
+                            t.WeaponsAssigned = null;
+                            t.Status = Target.STATUS.Active;
+                            t.CrewStatus = Target.CREWSTATUS.Alive;
+                            // used to determine % damage of Target.   Should a Sensor be able to know this exact number?  
+                            // It's really just a game thing and maybe we should just use visual observations of condition of ship instead
+                            int componentIndex;
+                            
+                            lineNum = 13;
+
+
+                            EntityNode b = Boids[currentContact.ContactEntityArrayIndex];
+                            Memory<BaseObject>baseObj = (Memory<BaseObject>)Boids[currentContact.ContactEntityArrayIndex].GetUserStruct(typeof(BaseObject), out componentIndex);
+                            t.HitPoints = baseObj.Span[0].HitPoints; 
+
+                            lineNum = 14;
+
+                            tacticalStationStruct.Span[0].Add(t, gt); // tacticalStation.Add(t);
+
+                            lineNum = 15;
+                            Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY PASSED. Target added.");
+                            
+                        }
+                        else
+                        {
+                            lineNum = 16;
+                            Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY FAILED.");
+                        }
+                    }
+                
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("DoTargetPrioritization() - LINE == " + lineNum.ToString() + " " + ex.Message);
+                    }
+                }
 			});
 			
 			
@@ -8055,7 +8098,7 @@ return (0,0);
 		{
 			if (mRules == null || mRules.Length == 0) return true;
 			
-			//Console.WriteLine("Executing rules");
+			Console.WriteLine("Rule.Execute() - Executing " + mRules.Length.ToString() + " rules");
 			for (int i = 0; i < mRules.Length; i++)
 				if (!mRules[i].Evaluate(mContext)) return false;
 			
@@ -8099,57 +8142,82 @@ return (0,0);
 		{
 			if (mConditions == null || mConditions.Length == 0) return true;
 			
-			//Console.WriteLine("Condition.Evaluate() - Conditions Count == " + mConditions.Length.ToString());
+			Console.WriteLine("Condition.Evaluate() - Conditions Count == " + mConditions.Length.ToString());
 			for (int i = 0; i < mConditions.Length; i++)
 			{
-				string left = null;
-				string right = null;
-				System.Diagnostics.Debug.Assert(mConditions[i] != null, "Condition.Evaluate() - Condition is NULL");
-				//Console.WriteLine("Condition.Evaluate() - Condition Has Delegate == " + mConditions[i].LeftOperandIsDelegate.ToString());
-				
-				if (mConditions[i].LeftOperandIsDelegate)
-				{
-					// the LEFT operand delegate to invoke.  The RIGHT operand is what we want to compare it against 
-					bool result = mConditions[i].OperandLeftDelegate(mConditions[i].DelegateArgs);
-					left = result.ToString().ToUpper();
-					right =  mConditions[i].OperandRight.ToUpper(); // NOTE: We do not need anything more than a "true" or "false" for the rightOperand.  We DO NOT NEED A DICTIONARY KEY BECAUSE WE COULD SOLVE FOR THAT WITHIN THE DELEGATE 
-					System.Diagnostics.Debug.Assert(right == "FALSE" || right == "TRUE", "Evaluate() - When using a Delegate, a CONDITION must always evaluate against TRUE or FALSE.");
-					//Console.WriteLine("Condition.Evaluate() - LEFT IS A DELEGATE --> LEFT == " + left + " RIGHT == " + right);
-				}
-				else
-				{	
-					// left is the KVP to look up.  right is what we want to compare it against 
-					System.Diagnostics.Debug.Assert (context != null, "Context is not null.");
-					left = context[mConditions[i].LeftEntityKey].GetString(mConditions[i].OperandLeft);
-					right = context[mConditions[i].RightEntityKey].GetString(mConditions[i].OperandRight);  
-					//Console.WriteLine("Condition.Evaluate() - LEFT ENTITY '" + mConditions[i].LeftEntityKey + "' KEY == " + left + " RIGHT ENTITY '" + mConditions[i].RightEntityKey + "' KEY == " + right);
-				}
-				
-				switch (mConditions[i].mEvalType)
-				{
-					case Condition.EVAL_TYPE.EQUALS:
-						//Console.WriteLine("Condition.Evaluate() - EQUALS TEST");
-						if (left != right) return false; // todo: ErrorReason = 
-						break;
+                int lineNum = 0;
 
-					case Condition.EVAL_TYPE.NOT_EQUALS:
-						//Console.WriteLine("Condition.Evaluate() - NOT EQUALS TEST");
-						if (left == right) return false; // todo: ErrorReason = 
-						break;
+                try
+                {
+                    string left = null;
+                    string right = null;
+                    System.Diagnostics.Debug.Assert(mConditions[i] != null, "Condition.Evaluate() - Condition is NULL");
+                    //Console.WriteLine("Condition.Evaluate() - Condition Has Delegate == " + mConditions[i].LeftOperandIsDelegate.ToString());
+                    
+                    lineNum = 1;
+                    if (mConditions[i].LeftOperandIsDelegate)
+                    {
+                        lineNum = 2;
+                        // the LEFT operand delegate to invoke.  The RIGHT operand is what we want to compare it against 
+                        bool result = mConditions[i].OperandLeftDelegate(mConditions[i].DelegateArgs);
 
-					case Condition.EVAL_TYPE.LESS_THAN:
-						if (MicroEx.Evaluate(left + " >= " + right)) return false; // todo: ErrorReason = 
-						break;
-						//return OperandLeft < OperandRight;
+                        lineNum = 3;
+                        left = result.ToString().ToUpper();
+                        right =  mConditions[i].OperandRight.ToUpper(); // NOTE: We do not need anything more than a "true" or "false" for the rightOperand.  We DO NOT NEED A DICTIONARY KEY BECAUSE WE COULD SOLVE FOR THAT WITHIN THE DELEGATE 
 
-					case Condition.EVAL_TYPE.GREATER_THAN:
-						if (MicroEx.Evaluate(left + " <= " + right)) return false; // todo: ErrorReason = 
-						break;
-						//return OperandLeft > OperandRight;
+                        lineNum = 4;
 
-					default:
-						throw new ArgumentOutOfRangeException("Condition.Evaluate() - Unexpected evalType '" + mConditions[i].mEvalType.ToString() + "'");
-				}
+                        System.Diagnostics.Debug.Assert(right == "FALSE" || right == "TRUE", "Evaluate() - When using a Delegate, a CONDITION must always evaluate against TRUE or FALSE.");
+                        //Console.WriteLine("Condition.Evaluate() - LEFT IS A DELEGATE --> LEFT == " + left + " RIGHT == " + right);
+                    }
+                    else
+                    {	
+                        lineNum = 5;
+                        // left is the KVP to look up.  right is what we want to compare it against 
+                        System.Diagnostics.Debug.Assert (context != null, "Context is not null.");
+                        lineNum = 6;
+                        left = context[mConditions[i].LeftEntityKey].GetString(mConditions[i].OperandLeft);
+
+                        lineNum = 7;
+                        right = context[mConditions[i].RightEntityKey].GetString(mConditions[i].OperandRight);
+
+                        lineNum = 8;  
+                        //Console.WriteLine("Condition.Evaluate() - LEFT ENTITY '" + mConditions[i].LeftEntityKey + "' KEY == " + left + " RIGHT ENTITY '" + mConditions[i].RightEntityKey + "' KEY == " + right);
+                    }
+                    
+                    lineNum = 9;
+                    switch (mConditions[i].mEvalType)
+                    {
+                        case Condition.EVAL_TYPE.EQUALS:
+                            //Console.WriteLine("Condition.Evaluate() - EQUALS TEST");
+                            if (left != right) return false; // todo: ErrorReason = 
+                            break;
+
+                        case Condition.EVAL_TYPE.NOT_EQUALS:
+                            //Console.WriteLine("Condition.Evaluate() - NOT EQUALS TEST");
+                            if (left == right) return false; // todo: ErrorReason = 
+                            break;
+
+                        case Condition.EVAL_TYPE.LESS_THAN:
+                            if (MicroEx.Evaluate(left + " >= " + right)) return false; // todo: ErrorReason = 
+                            break;
+                            //return OperandLeft < OperandRight;
+
+                        case Condition.EVAL_TYPE.GREATER_THAN:
+                            if (MicroEx.Evaluate(left + " <= " + right)) return false; // todo: ErrorReason = 
+                            break;
+                            //return OperandLeft > OperandRight;
+
+                        default:
+                            throw new ArgumentOutOfRangeException("Condition.Evaluate() - Unexpected evalType '" + mConditions[i].mEvalType.ToString() + "'");
+                    }
+
+                    lineNum = 10;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Condition.Evaluate - LineNum == " + lineNum.ToString() + " " + ex.Message);
+                }
 			}
 			return true;
 		}
@@ -9891,7 +9959,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		{
 			
 			if (mSensorContacts == null) mSensorContacts = new List<SensorContact>();
-			//Console.WriteLine("EntityNode.Add(SensorContact) - 222 SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
+			Console.WriteLine("TacticalStation.Add(SensorContact) - SensorContact Add ENTERED to TacticalStation struct' referencing Entity at array index" + EntityArrayIndex.ToString() + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
 
 			int found = -1;
 			for (int i = 0; i < mSensorContacts.Count; i++)
@@ -9901,12 +9969,15 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 					break;
 				}
 			
-			//Console.WriteLine("EntityNode.Add(SensorContact) - 333 SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
+			Console.WriteLine("TacticalStation.Add(SensorContact) - SensorContact FOUND == " + (found != -1).ToString() + "' to TacticalStation struct' referencing Entity at array index" + EntityArrayIndex + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
 
             // TODO: add acquisition time to userdata for the Entity represented by this struct
 
 			if (found == -1) 
             {
+                mSensorContacts.Add(c);
+                Console.WriteLine ("TacticalStation.Add() - New Contact Added STARTED.");
+                
                  int stationIndex = this.EntityArrayIndex;
                 string stationKey = EntryClass.bSim.Boids[stationIndex].EntityKey;
 
@@ -9914,19 +9985,25 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 				string acquisitionStaleKey = "aquisition_stale_" + c.ContactEntityArrayIndex.ToString();
                 string acquisitionKey = "aquisition_time_" + c.ContactEntityArrayIndex.ToString();
 
-                if (c.Telemetry != null)
+                if (c.Telemetry != null && c.Telemetry.Length > 0)
                 { 
                     SensorContact.ContactTelemetry first = c.Telemetry[0];
                     SensorContact.ContactTelemetry last = c.Telemetry[c.Telemetry.Length - 1];
                 
                 
                     EntryClass.mUserDataStore[stationKey].SetDouble(acquisitionKey, first.TimeAcquired);
+
+                    Console.WriteLine ("TacticalStation.Add() - Telemetry updated.");
                 }
+
+                Console.WriteLine ("TacticalStation.Add() - New Contact Added COMPLETED.");
             }
             else 
+            {
 				mSensorContacts[found].Add(c.Telemetry);
 			
-			//Console.WriteLine("EntityNode.Add(SensorContact) - 444 SensorContact added to Entity '" + mID + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
+		        Console.WriteLine("TacticalStation.Add(SensorContact) - SensorContact added to TacticalStation struct' referencing Entity at array index" + EntityArrayIndex + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
+            }
 		}
 		
 		public void Add (List<SensorContact> contacts, GameTime gt)

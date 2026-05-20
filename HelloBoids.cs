@@ -3131,7 +3131,15 @@ namespace HelloBoids
 #endif
         		
 
-		
+		// Staggered Updates
+        // - Managing System Update Order in Unity ECS - Unity DOTS Tutorial [ECS Ver. 0.17]
+        //      https://www.youtube.com/watch?v=oX0NElpfXgg
+
+        // Moonside Games - Archetypal ECS Considered Harmful?
+        // https://moonside.games/posts/archetypal-ecs-considered-harmful/
+        //
+
+
 		/// <summary>
 		/// Seed might typically be Seeds.Local_Droid_Tactical_Logic + mCurrentFrame;
 		/// </summary>
@@ -3949,32 +3957,17 @@ namespace HelloBoids
                 // These functions should reside in the TacticalStation itself so
                 // the responsibility of setting and checking these keys is self contained
                 
-                double test = tacticalStationStruct.Span[0].GetAquisitionDuration(targets[i], gt);
-                double test2 = tacticalStationStruct.Span[0].GetEvasiveManeuverDuration(targets[i], gt);
+                double acquisitionDuration = tacticalStationStruct.Span[0].GetAquisitionDuration(targets[i], gt);
+                double evasiveDuration = tacticalStationStruct.Span[0].GetEvasiveManeuverDuration(targets[i], gt);
 
-                /*
-				// - total acquisition time (durationOfSensorAquisition) = last acquisition - initial aquisition (the greater this value, the bigger the bonus to detect again (easier to re-aquire)
-				//      STATISTICS search should give us the acquisition times
-                // mStats[tacticalStation.EntityIndex];
-                double currentTotalElapsedSeconds = gt.TotalElapsedSeconds;
-                double diff = 0;
-                
-                
-                string acquisitionStaleKey = "aquisition_stale_" + targets[i].EntityArrayIndex.ToString();
-                string acquisitionKey = "aquisition_time_" + targets[i].EntityArrayIndex.ToString();
+                Console.WriteLine ("HitHasOccurred() - Acquisition Duration == " + acquisitionDuration.ToString());
+                Console.WriteLine ("HitHasOccurred() - Evasive Duration == " + evasiveDuration.ToString());
 
-                bool isStale =  EntryClass.mUserDataStore[attackingTacticalStation.EntityKey].GetBool(acquisitionStaleKey);         
-                double foundTime = EntryClass.mUserDataStore[attackingTacticalStation.EntityKey].GetDouble(acquisitionKey);
-
-                if (foundTime != currentTotalElapsedSeconds)
-                {
-                    diff = currentTotalElapsedSeconds - foundTime;
-                }
-
+				
                 double TEMP_GOOD_LOCK_TIME_AMOUNT_IN_SECONDS = 2.5d;
-                float acquisitionTimeCoeff = (float)(diff / TEMP_GOOD_LOCK_TIME_AMOUNT_IN_SECONDS) ;
-                */
 
+                float acquisitionTimeCoeff = (float)(acquisitionDuration / TEMP_GOOD_LOCK_TIME_AMOUNT_IN_SECONDS) ;
+            
 
 				// total tracking-sensor-lock-time  = lastLock - initialLock (aka durationOfSensorLock) // how much time has this TRACKING SENSOR been tracking this target already
 
@@ -4008,8 +4001,7 @@ namespace HelloBoids
 
            
                  
- 
-                                   
+                
 
 
 				// TODO:  find the actual target that was hit... we may be aiming for an assembly or component and may hit something different, such as a different Component or Operator or even a different Starship or Droid or NOTHING
@@ -4026,6 +4018,7 @@ namespace HelloBoids
 				EntityNode tacticalStation = Boids[targets[i].EntityArrayIndex + TACTICAL_STATION_OFFSET];
                 System.Diagnostics.Debug.Assert(attackingTacticalStation == tacticalStation, "HitHasOccurred() - TacticalStations do not match.");
                 
+                // BASE Objects indices for the various potential targets on a single Ship/Droid
                 int tacticalStationIndex = tacticalStation.GetUserStructIndex(typeof(BaseObject));
 				EntityNode opticalSensor = Boids[targets[i].EntityArrayIndex + OPTICAL_SENSOR_OFFSET];
                 int opticalSensorIndex = opticalSensor.GetUserStructIndex(typeof(BaseObject));
@@ -4257,9 +4250,7 @@ namespace HelloBoids
 		/// </summary>
         private object[] CalculateDamage(EntityNode attackerOperator, EntityNode target, double distanceSquared, Memory<BaseObject> baseObjForWeapon, Memory<Component> componentStructForWeaponEntity, Memory<Weapon> weaponStruct, GameTime gt, Random rand, out bool criticalMalfunctionHasOccurred)
         {
-			
-			
-			
+					
 			/*
 			Production laserDamage;
 			laserDamage.Amount = 5;
@@ -4292,15 +4283,13 @@ namespace HelloBoids
 			laserEntityArrayIndex = laserEntityArrayIndex + LASER_OFFSET; // now add the laserOffset to it to get the laser Entity Array index
 			
 			
-			
 			EntityNode laser = Boids[laserEntityArrayIndex];
 			int laserIndex = -1;
 			int powerConsumerIndex = -1;
 			
 			Memory<PowerConsumer> powerConsumer = (Memory<PowerConsumer>)laser.GetUserStruct(typeof(PowerConsumer), out powerConsumerIndex);
 			Memory<Laser_Struct> laserStruct = (Memory<Laser_Struct>)laser.GetUserStruct(typeof(Laser_Struct), out laserIndex);
-			
-			
+						
 			double output = laserStruct.Span[0].BeamOutput;
 			
 			double reqt = powerConsumer.Span[0].PowerRequirement;
@@ -9927,6 +9916,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 
                 EntityNode e = EntryClass.bSim.Boids[t.EntityArrayIndex];
 				EntryClass.mUserDataStore[stationKey].SetDouble(acquisitionKey, t.TimeAcquired);
+                EntryClass.mUserDataStore[stationKey].SetBool(acquisitionStaleKey, false);
 
                 mTargets.Add(t);
                 Console.WriteLine ("TacticalStationStruct.Add() - Completed.");
@@ -10034,8 +10024,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
                     SensorContact.ContactTelemetry first = c.Telemetry[0];
                     SensorContact.ContactTelemetry last = c.Telemetry[c.Telemetry.Length - 1];
                 
-                
-                    EntryClass.mUserDataStore[stationKey].SetDouble(acquisitionKey, first.TimeAcquired);
+                    double timeAcq = gt.TotalElapsedSeconds; // first.TimeAcquired;
+                    EntryClass.mUserDataStore[stationKey].SetDouble(acquisitionKey, timeAcq);
 
                     Console.WriteLine ("TacticalStation.Add() - Telemetry updated.");
                 }
@@ -10089,9 +10079,31 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 
         public double GetAquisitionDuration(Target target, GameTime gt)
         {
-            double result = 0;
+            double diff = 0;
 
-            return result;
+            // - total acquisition time (durationOfSensorAquisition) = last acquisition - initial aquisition (the greater this value, the bigger the bonus to detect again (easier to re-aquire)
+            //      STATISTICS search should give us the acquisition times
+            // mStats[tacticalStation.EntityIndex];
+            double currentTotalElapsedSeconds = gt.TotalElapsedSeconds;
+            
+            string acquisitionStaleKey = "aquisition_stale_" + target.EntityArrayIndex.ToString();
+            string acquisitionKey = "aquisition_time_" + target.EntityArrayIndex.ToString();
+
+            int stationIndex = this.EntityArrayIndex;
+            string stationKey = EntryClass.bSim.Boids[stationIndex].EntityKey;
+
+
+            bool isStale =  EntryClass.mUserDataStore[stationKey].GetBool(acquisitionStaleKey);    
+
+            double foundTime = EntryClass.mUserDataStore[stationKey].GetDouble(acquisitionKey);
+
+            if (foundTime != currentTotalElapsedSeconds)
+            {
+                diff = currentTotalElapsedSeconds - foundTime;
+            }
+
+
+            return diff;
         }
         
         public double GetEvasiveManeuverDuration(Target target, GameTime gt)

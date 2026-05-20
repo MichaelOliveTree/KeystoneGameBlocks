@@ -3207,13 +3207,13 @@ namespace HelloBoids
              //    - storing data on interior Walls and Floors and Ceilings "damage"
 
 
-        	Console.WriteLine("Do_Tactical_Logic() - DoDeviceReadyStatus()");
+        	//Console.WriteLine("Do_Tactical_Logic() - DoDeviceReadyStatus()");
 			DoDeviceReadyStatus();
 						
 			
-			Console.WriteLine("Do_Tactical_Logic() - DoStationCanActStatus()");
+			//Console.WriteLine("Do_Tactical_Logic() - DoStationCanActStatus()");
 			DoStationCanActStatus();
-			Console.WriteLine("Do_Tactical_Logic() - continuing Do_Droid_Logic()");
+			//Console.WriteLine("Do_Tactical_Logic() - continuing Do_Droid_Logic()");
 			
 			
 			
@@ -3221,22 +3221,22 @@ namespace HelloBoids
 			
 			
 			
-			Console.WriteLine("Do_Tactical_Logic() - CreateContactListFromAdjacents()");
+			//Console.WriteLine("Do_Tactical_Logic() - CreateContactListFromAdjacents()");
 			CreateContactListFromAdjacents(gt); // based on policies
 			
 			
-			Console.WriteLine("Do_Tactical_Logic() - DoTargetPrioritization()");
+			//Console.WriteLine("Do_Tactical_Logic() - DoTargetPrioritization()");
 			DoTargetPrioritization(gt);
 			
 			
 			// todo: if we had a list of all weapons for every ship to pass all at once
 			//       as well as all targets for each ship to pass all at once, we could run this
 			//       processor in a single call from here...
-			Console.WriteLine("Do_Tactical_Logic() - DoWeaponFitnessScores()");
+			//Console.WriteLine("Do_Tactical_Logic() - DoWeaponFitnessScores()");
 			DoWeaponFitnessScores(null, null);
 			
 			
-			Console.WriteLine("Do_Tactical_Logic() - DoWeaponsCanFire()");
+			//Console.WriteLine("Do_Tactical_Logic() - DoWeaponsCanFire()");
 			DoWeaponsCanFire();
 			
 			//ComponentStore<LifeForm> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
@@ -3324,7 +3324,7 @@ namespace HelloBoids
 						List<Target> targets = tacticalStationStruct.Span[0].GetTargets();
 						if (targets == null || targets.Count == 0) 
                         {
-                            Console.WriteLine("Do_Tactical_Logic() -  NO Targets In TacticalStation.");
+                            //Console.WriteLine("Do_Tactical_Logic() -  NO Targets In TacticalStation.");
                             return;
                         }
 						Console.WriteLine("Do_Tactical_Logic() -  " + targets.Count.ToString() + " Targets In TacticalStation.");
@@ -3352,7 +3352,7 @@ namespace HelloBoids
 				}
 			});
 			
-            Console.WriteLine ("Do_Tactical_Logic() - Method Completed.");
+           // Console.WriteLine ("Do_Tactical_Logic() - Method Completed.");
 			// see Keystone.Game01.Messages.   public class AttackResults since
 			// we need results going over the network
 		}
@@ -3363,9 +3363,9 @@ namespace HelloBoids
 		/// </summary>
 		private void CreateContactListFromAdjacents(GameTime gt)
 		{
-            Console.WriteLine("CreateContactListFromAdjacents() - STARTING");
+            //Console.WriteLine("CreateContactListFromAdjacents() - STARTING");
 			if (mNeighbors.Count == 0) return;
-			Console.WriteLine("CreateContactListFromAdjacents() - Neighbors Count == " + mNeighbors.Count.ToString());
+			//Console.WriteLine("CreateContactListFromAdjacents() - Neighbors Count == " + mNeighbors.Count.ToString());
 			
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 			int recordCount = (int)allTacticalStations.Count;
@@ -3505,12 +3505,12 @@ namespace HelloBoids
 								c.FriendOrFoe = SensorContact.FoF.Unknown;
 								c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices, sensorArrayIndex); //sensorStructIndex);
 
-                                contacts.Add(c);
+                                
                                 
                                 Console.WriteLine("CreateContactListFromAdjacents() - Added NEW SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
                             }
 
-                            // telemetry must be added regardless of whether this is abn existing or new SensorContact
+                            // telemetry must be added regardless of whether this is an existing or new SensorContact
                             SensorContact.ContactTelemetry telemetry;
                             telemetry.Radius = (float)bb.BoundingBox.Radius;    // how might size be spoofed?
                             telemetry.Position = bb.Translation;
@@ -3520,7 +3520,12 @@ namespace HelloBoids
                             telemetry.TimeAcquired = gt.TotalElapsedSeconds;
                             telemetry.TimeLast = telemetry.TimeAcquired;
 
-                            c.Add(telemetry);			
+                            
+                            c.Add(telemetry);	
+                            // NOTE: call to contacts.Add() here will update an existing SensorContact or Append a new SensorContact that didn't previously exist.
+                            contacts.Add(c);
+
+
 						} // end sensor range check
 					} // end for SensorsCount
 				} // end for neihbors Count
@@ -3575,8 +3580,15 @@ namespace HelloBoids
                     {
                         // entityKey will usually be the ID of the target Entity (aka Droid or Ship).  But not always.  Sometimes it may be our own ship.  It depends on the specific rule.			
                         string targetKey = "boid_" + contacts[j].ContactEntityArrayIndex.ToString();
-                        string currentKey = "boid_" + i.ToString();
+
+                        int currentBoidIndex = i - TACTICAL_STATION_OFFSET;
+                    
+                        string currentKey = "boid_" + currentBoidIndex.ToString();
                         
+                        targetKey = EntryClass.bSim.Boids[contacts[j].ContactEntityArrayIndex].EntityKey;
+
+                        currentKey = EntryClass.bSim.Boids[currentBoidIndex].EntityKey;
+
                         lineNum = 2;
 
                         Policy roePolicy = new Policy();
@@ -3604,7 +3616,7 @@ namespace HelloBoids
                         operandRight = "false";
                         
                         object[] delegateArgs = new object[]{currentKey, targetKey};
-                        condition = new Condition(name, description, targetKey, currentKey, eval, IsCombatant, operandRight, delegateArgs);
+                        condition = new Condition(name, description, currentKey, targetKey, eval, IsCombatant, operandRight, delegateArgs);
                         r.Add(condition);
                         q.Add(r);
                         roePolicy.Add(q);
@@ -3614,9 +3626,11 @@ namespace HelloBoids
                         if (currentContact.Equals(default(SensorContact))) throw new ArgumentNullException("DoTargetPrioritization() - SensorContact is NULL");
 
 
-                        Console.WriteLine("DoTargetPrioritization() - PRE- roePolicy.Execute()" );
+                        //Console.WriteLine("DoTargetPrioritization() - PRE- roePolicy.Execute()" );
                         if (roePolicy.Execute())
                         {
+                            Console.WriteLine("DoTargetPrioritization() - roePolicy SUCCEEDED." );
+
                             lineNum = 6;
                             // Targets are those SensorContacts that friendly forces will potentially fire upon.
                             // Whereas SensorContacts is all contacts regardless of FoF status.
@@ -3629,14 +3643,20 @@ namespace HelloBoids
                                 lineNum = 8;
                                 SensorContact.ContactTelemetry[] tmps = currentContact.Telemetry;
 
+                                //if (currentContact.Telemetry == null)
+                                //{
+                                    // TODO: WARNING: The codingshuttle.com c# compiler does NOT trigger any System.Diagnostic.Debug.Assert() so those are useless for now... (since dotnetfiddle.net is no longer working for us)
+                                //    currentContact.Telemetry = new SensorContact.ContactTelemetry[1];
+
+                                //}
                                 lineNum = 9;
-                                System.Diagnostics.Debug.Assert (tmps != null && tmps.Length >=1, "Contact should have at least one telemetry snapshot.");
+                                System.Diagnostics.Debug.Assert (tmps != null && tmps.Length >=1, "DoTargetPrioritization() - Contact should have at least one telemetry snapshot.");
                                 
                                 lineNum = 10;
-                                int last = tmps.Length - 1;
+                                //int last = tmps.Length - 1;
                                 int first = 0;
 
-
+                                lineNum = 777;
                                 t.TimeAcquired = currentContact.Telemetry[first].TimeAcquired; //  gt.TotalElapsedSeconds
                                 lineNum = 11;
                             }
@@ -3678,7 +3698,9 @@ namespace HelloBoids
                 
                     catch (Exception ex)
                     {
-                        Console.WriteLine("DoTargetPrioritization() - LINE == " + lineNum.ToString() + " " + ex.Message);
+                        Console.WriteLine("DoTargetPrioritization() - ERROR: LINE == " + lineNum.ToString() + " " + ex.Message);
+                        Console.WriteLine("DoTargetPrioritization() - ERROR: LINE == " + lineNum.ToString() + " " + ex.Message);
+                        Console.WriteLine("DoTargetPrioritization() - ERROR: LINE == " + lineNum.ToString() + " " + ex.Message);
                     }
                 }
 			});
@@ -8159,6 +8181,8 @@ return (0,0);
                     {
                         lineNum = 2;
                         // the LEFT operand delegate to invoke.  The RIGHT operand is what we want to compare it against 
+                        System.Diagnostics.Debug.Assert(mConditions[i].OperandLeftDelegate != null, "Condition.Evaluate() - Delegate is NULL");
+
                         bool result = mConditions[i].OperandLeftDelegate(mConditions[i].DelegateArgs);
 
                         lineNum = 3;
@@ -8167,56 +8191,76 @@ return (0,0);
 
                         lineNum = 4;
 
-                        System.Diagnostics.Debug.Assert(right == "FALSE" || right == "TRUE", "Evaluate() - When using a Delegate, a CONDITION must always evaluate against TRUE or FALSE.");
+                        System.Diagnostics.Debug.Assert(right == "FALSE" || right == "TRUE", "Condition.Evaluate() - When using a Delegate, a CONDITION must always evaluate against TRUE or FALSE.");
                         //Console.WriteLine("Condition.Evaluate() - LEFT IS A DELEGATE --> LEFT == " + left + " RIGHT == " + right);
                     }
                     else
                     {	
                         lineNum = 5;
                         // left is the KVP to look up.  right is what we want to compare it against 
-                        System.Diagnostics.Debug.Assert (context != null, "Context is not null.");
+                        System.Diagnostics.Debug.Assert (context != null, "Condition.Evaluate() - Context must not be NULL.");
                         lineNum = 6;
-                        left = context[mConditions[i].LeftEntityKey].GetString(mConditions[i].OperandLeft);
-
+                        string lkey = mConditions[i].LeftEntityKey;
+                        string rkey = mConditions[i].RightEntityKey;
                         lineNum = 7;
-                        right = context[mConditions[i].RightEntityKey].GetString(mConditions[i].OperandRight);
+                        System.Diagnostics.Debug.Assert (!string.IsNullOrEmpty(lkey), "Condition.Evaluate() - ERROR: Key is null or empty!");
 
-                        lineNum = 8;  
+                        Console.WriteLine("Condition.Evaluate() - lkey == " + lkey + " rkey == " + rkey + " lOperand == " + mConditions[i].OperandLeft + " rOperand == " + mConditions[i].OperandRight);
+
+
+                        lineNum = 8;
+                        left = context[lkey].GetString(mConditions[i].OperandLeft);
+
+                        right = context[rkey].GetString(mConditions[i].OperandRight);
+
+                        lineNum = 9;  
                         //Console.WriteLine("Condition.Evaluate() - LEFT ENTITY '" + mConditions[i].LeftEntityKey + "' KEY == " + left + " RIGHT ENTITY '" + mConditions[i].RightEntityKey + "' KEY == " + right);
                     }
                     
-                    lineNum = 9;
+                    lineNum = 10;
                     switch (mConditions[i].mEvalType)
                     {
                         case Condition.EVAL_TYPE.EQUALS:
-                            //Console.WriteLine("Condition.Evaluate() - EQUALS TEST");
+                            lineNum = 11;
+                            Console.WriteLine("Condition.Evaluate() - EQUALS TEST - left == " + left + " right == " + right);
                             if (left != right) return false; // todo: ErrorReason = 
                             break;
 
                         case Condition.EVAL_TYPE.NOT_EQUALS:
-                            //Console.WriteLine("Condition.Evaluate() - NOT EQUALS TEST");
+                            lineNum = 12;
+                            Console.WriteLine("Condition.Evaluate() - NOT EQUALS TEST - left == " + left + " right == " + right);
+
                             if (left == right) return false; // todo: ErrorReason = 
                             break;
 
                         case Condition.EVAL_TYPE.LESS_THAN:
+                            lineNum = 13;
                             if (MicroEx.Evaluate(left + " >= " + right)) return false; // todo: ErrorReason = 
                             break;
                             //return OperandLeft < OperandRight;
 
                         case Condition.EVAL_TYPE.GREATER_THAN:
+                            lineNum = 14;
                             if (MicroEx.Evaluate(left + " <= " + right)) return false; // todo: ErrorReason = 
                             break;
                             //return OperandLeft > OperandRight;
 
                         default:
+                            lineNum = 15;
                             throw new ArgumentOutOfRangeException("Condition.Evaluate() - Unexpected evalType '" + mConditions[i].mEvalType.ToString() + "'");
                     }
 
-                    lineNum = 10;
+                    lineNum = 11;
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("Condition.Evaluate - LineNum == " + lineNum.ToString() + " " + ex.Message);
+                    Console.WriteLine("Condition.Evaluate() - ERROR: - LineNum == " + lineNum.ToString() + " " + ex.Message);
+                    Console.WriteLine("Condition.Evaluate() - ERROR: - LineNum == " + lineNum.ToString() + " " + ex.Message);
+                    Console.WriteLine("Condition.Evaluate() - ERROR: - LineNum == " + lineNum.ToString() + " " + ex.Message);
+                    Console.WriteLine("Condition.Evaluate() - ERROR: - LineNum == " + lineNum.ToString() + " " + ex.Message);
+                    Console.WriteLine("Condition.Evaluate() - ERROR: - LineNum == " + lineNum.ToString() + " " + ex.Message);
+                    Console.WriteLine("Condition.Evaluate() - ERROR: - LineNum == " + lineNum.ToString() + " " + ex.Message);
+
                 }
 			}
 			return true;
@@ -8257,11 +8301,11 @@ return (0,0);
 		{
 			Name = name;
 			Description = description;
-			OperandLeft = operandLeft;
-			OperandRight = operandRight;
+			OperandLeft = operandLeft;  
+			OperandRight = operandRight; 
 			mEvalType = eval;
-			LeftEntityKey = leftEntityKey; // our UserDataStore holds a Dictionary<string, UserData> with the string 'key' being the EntityID the UserData belongs too. 
-			RightEntityKey = rightEntityKey;
+			LeftEntityKey = leftEntityKey; // currentKey, our UserDataStore holds a Dictionary<string, UserData> with the string 'key' being the EntityID the UserData belongs too. 
+			RightEntityKey = rightEntityKey; // targetKey
 			LeftOperandIsDelegate = false;
 		}
 		

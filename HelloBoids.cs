@@ -921,6 +921,17 @@ namespace HelloBoids
 			Statistics = new List<Statistics>(new Statistics[numElements]);
 			
 
+
+            // each droid can only scan for new SensorContacts and Targets every 2 seconds
+            // mIntervalTimers.Register(entityKey, "droid_sensor_scan", 2.00d);
+
+            // bool spawnReady = mIntervalTimers.IsReady(entityKey, "droid_sensor_scan");
+
+            // mIntervalTimers.Reset(entityKey, "droid_sensor_scan");
+
+
+
+            
 			// Spawn the Boids using Parallel.For() and optional memory fragmenting
 			System.Threading.Tasks.Parallel.For(0, numBoids, i=>
             //for (int i = 0; i < numBoids; i++)
@@ -1408,7 +1419,53 @@ namespace HelloBoids
 			// values
 			string exLine =  "CreateOpticalSensor 1";
 			string entityKey = "sensor_" + arrayIndex.ToString(); // prefix with "sensor_" to not duplicate with "boid_".  It turns out this is technically not necessary because every arrayIndex is always unique... duh!
-			EntityNode opticalSensor = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); // OpticalSensor is the Droid's 'eyes'
+			
+            
+            
+
+            
+
+            // each droid can only scan for new SensorContacts and Targets every 2 seconds
+            // mIntervalTimers.Register(entityKey, "droid_sensor_scan", 2.00d);
+
+            // bool spawnReady = mIntervalTimers.IsReady(entityKey, "droid_sensor_scan");
+
+            // mIntervalTimers.Reset(entityKey, "droid_sensor_scan");
+
+            /*
+            Framerate Dependency: Because the update is staggered, make sure you scale any time-based logic (like movement or timers) by the actual time passed since the entity last updated, rather than assuming a fixed delta time.
+            
+            Prioritize Updates: Consider grouping entities by distance. Off-screen or distant entities can be updated using a larger modulo (e.g., every \(10\) frames), while critical entities close to the player can be updated every frame.
+            
+            Keep State Visuals Smooth: Modulo updates are perfect for heavy AI logic or pathfinding. However, make sure visual elements (like position interpolation or animations) are updated every frame in your render loop so the game looks smooth.
+
+            
+            // Choose how many groups you want to divide your entities into.
+            // More groups = lower CPU spike per frame, but longer time between individual updates.
+            const int TOTAL_GROUPS = 10; 
+
+            void UpdateGameEntities(vector<Entity> entities, int currentFrame) 
+            {
+                for (int i = 0; i id % TOTAL_GROUPS; i++)
+                {
+                    // Stagger the update
+                    if ((currentFrame + updateGroup) % TOTAL_GROUPS == 0) 
+                    {
+                        entities[i]->Update();
+                    }
+                }
+            }
+            */
+
+            // https://forums.factorio.com/viewtopic.php?t=53405
+            // staggered updates - factorio forums advice.txt
+
+            
+            
+            
+            
+            
+            EntityNode opticalSensor = new EntityNode(entityKey, arrayIndex, 0, 0, 0, 0, 0); // OpticalSensor is the Droid's 'eyes'
 			opticalSensor.Configuration = (uint)OpticalSensorConfiguration;
 			
 			//CONFIGURATION OpticalSensorConfiguration = CONFIGURATION.Transform | CONFIGURATION.Component | CONFIGURATION.PowerUsing | CONFIGURATION.Sensor;
@@ -3702,8 +3759,9 @@ namespace HelloBoids
                         }
                         else
                         {
+                            string errorReason = roePolicy.ErrorReason;
                             lineNum = 16;
-                            Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY FAILED.");
+                            Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY FAILED. " + errorReason);
                         }
                     }
                 
@@ -8053,7 +8111,7 @@ return (0,0);
 		// we want to build this query up as a type of Policy for When can a vessel be fired upon?
 		
 		private List<Query> mQueries;
-		private string mErrorReason;
+		public string ErrorReason;
 		
 		
 		public Policy()
@@ -8077,8 +8135,12 @@ return (0,0);
 			for (int i = 0; i < mQueries.Count; i++)
 			{
 				UserDataStore context = mQueries[i].Context;
-				if (!mQueries[i].Execute()) return false;
-			}
+				if (!mQueries[i].Execute()) 
+                {
+                    ErrorReason = mQueries[i].ErrorReason;
+                    return false;
+                }
+            }
 			
 			return true;
 		}
@@ -8089,7 +8151,8 @@ return (0,0);
 	{
 		private UserDataStore mContext;
 		private Rule[] mRules;
-		
+		public string ErrorReason;
+
 		// see line 2535 for useage 
 		public Query(UserDataStore uds)
 		{
@@ -8114,8 +8177,11 @@ return (0,0);
 			
 			Console.WriteLine("Rule.Execute() - Executing " + mRules.Length.ToString() + " rules");
 			for (int i = 0; i < mRules.Length; i++)
-				if (!mRules[i].Evaluate(mContext)) return false;
-			
+				if (!mRules[i].Evaluate(mContext))
+                {
+                    ErrorReason = mRules[i].ErrorReason;
+                    return false;
+                }
 			return true;
 		}
 	}
@@ -8156,7 +8222,7 @@ return (0,0);
 		{
 			if (mConditions == null || mConditions.Length == 0) return true;
 			
-			Console.WriteLine("Condition.Evaluate() - Conditions Count == " + mConditions.Length.ToString());
+			//Console.WriteLine("Condition.Evaluate() - Conditions Count == " + mConditions.Length.ToString());
 			for (int i = 0; i < mConditions.Length; i++)
 			{
                 int lineNum = 0;
@@ -8165,7 +8231,12 @@ return (0,0);
                 {
                     string left = null;
                     string right = null;
-                    System.Diagnostics.Debug.Assert(mConditions[i] != null, "Condition.Evaluate() - Condition is NULL");
+                    if (mConditions[i] == null)
+                    {
+                        ErrorReason = "Condition.Evaluate() - Condition " + i.ToString() + " is NULL";
+                        return false;
+                    }
+
                     //Console.WriteLine("Condition.Evaluate() - Condition Has Delegate == " + mConditions[i].LeftOperandIsDelegate.ToString());
                     
                     lineNum = 1;
@@ -8173,8 +8244,12 @@ return (0,0);
                     {
                         lineNum = 2;
                         // the LEFT operand delegate to invoke.  The RIGHT operand is what we want to compare it against 
-                        System.Diagnostics.Debug.Assert(mConditions[i].OperandLeftDelegate != null, "Condition.Evaluate() - Delegate is NULL");
-
+                        if (mConditions[i].OperandLeftDelegate == null)
+                        {
+                            ErrorReason = "Condition.Evaluate() - ERROR: Delegate for Condition " + i.ToString() + " is NULL";
+                            return false;
+                        }
+                        
                         bool result = mConditions[i].OperandLeftDelegate(mConditions[i].DelegateArgs);
 
                         lineNum = 3;
@@ -8191,13 +8266,26 @@ return (0,0);
                         lineNum = 5;
                         // left is the KVP to look up.  right is what we want to compare it against 
                         System.Diagnostics.Debug.Assert (context != null, "Condition.Evaluate() - Context must not be NULL.");
+                        if (context == null)
+                        {
+                            ErrorReason = "Condition.Evaluate() - ERROR: Context must not be NULL.";
+                            return false;
+                        }
+                        
+
                         lineNum = 6;
                         string lkey = mConditions[i].LeftEntityKey;
                         string rkey = mConditions[i].RightEntityKey;
                         lineNum = 7;
-                        System.Diagnostics.Debug.Assert (!string.IsNullOrEmpty(lkey), "Condition.Evaluate() - ERROR: Key is null or empty!");
+                        System.Diagnostics.Debug.Assert (!string.IsNullOrEmpty(lkey) && !string.IsNullOrEmpty(rkey), "Condition.Evaluate() - ERROR: Key is null or empty!");
 
-                        Console.WriteLine("Condition.Evaluate() - lkey == " + lkey + " rkey == " + rkey + " lOperand == " + mConditions[i].OperandLeft + " rOperand == " + mConditions[i].OperandRight);
+                        if (string.IsNullOrEmpty(lkey) || string.IsNullOrEmpty(rkey))
+                        {
+                            ErrorReason = "Condition.Evaluate() - ERROR: Left or Right Key is EMPTY.";
+                            return false;
+                        }
+
+                        //Console.WriteLine("Condition.Evaluate() - lkey == " + lkey + " rkey == " + rkey + " lOperand == " + mConditions[i].OperandLeft + " rOperand == " + mConditions[i].OperandRight);
 
 
                         lineNum = 8;
@@ -8214,13 +8302,13 @@ return (0,0);
                     {
                         case Condition.EVAL_TYPE.EQUALS:
                             lineNum = 11;
-                            Console.WriteLine("Condition.Evaluate() - EQUALS TEST - left == " + left + " right == " + right);
+                            //Console.WriteLine("Condition.Evaluate() - EQUALS TEST - left == " + left + " right == " + right);
                             if (left != right) return false; // todo: ErrorReason = 
                             break;
 
                         case Condition.EVAL_TYPE.NOT_EQUALS:
                             lineNum = 12;
-                            Console.WriteLine("Condition.Evaluate() - NOT EQUALS TEST - left == " + left + " right == " + right);
+                            //Console.WriteLine("Condition.Evaluate() - NOT EQUALS TEST - left == " + left + " right == " + right);
 
                             if (left == right) return false; // todo: ErrorReason = 
                             break;

@@ -1,0 +1,238 @@
+Distributing Workload of Mod to Multiple Ticks
+Post by Impatient » Sun Oct 15, 2017 6:06 am
+
+Calling Mod Functionality just every N-th Tick
+A mod does heavy calculations. It just doesn't need to do them every tick. Every minute would suffice entirely. Putting a modulo test at the beginning of the mod function as requirement for the calculations in the mod function to be done, would be the way to go then, to relief the game engine, right?
+
+Like so:
+ Pseudocode A
+Code: Select all
+
+function ModMain(args){
+    if(GameLibrary.Time.Tick % 3600 == 0){
+        //do calculations, because a full minute went by
+    }
+    else{
+        //don't do anything
+    }
+}
+I would like to hear your feedback, if this is THE efficient way to do it.
+Distributing Workload of Mod to Multiple Ticks
+For the following I assume, the above solution is the way to go.
+
+But it is ugly, if the mod leaves the game to run smooth for the most time, and lags it for 5 seconds every full minute. So the mod has to distribute the work to every tick within a ... calculation cycle (CC) (lets call it that instead of a minute) evenly.
+
+How would i approach this challenge, knowing, that the mod has to iterate through a long list of data, and do the same, short calculation for every item in the list. In other words, knowing, that the weight of the calculations stems from the amount of data to be processed, not from the complexity of the calculations.
+Would I just divide the data into (ticks/CC) split parts and process one every tick? I guess, yes. But as I see it, there would be some problems.
+
+Problem 1: Data can increase or decrease during the Calculation Cycle
+Every tick the game engine itself can alter the data to be processed by the mod. Not only the values within the data items, but also add or remove items to or from the list.
+
+Luckily, to process every item in the list precisely one time during one CC is not a strict necessity for the mod. If an item is not processed because it was added after a new CC begun or removed before the current CC ended, it is no deal. Is this called fuzzyness? The algorithm of the mod being somewhat fuzzy suffices entirely.
+
+Problem 2: Knowing the Amount of Data and splitting it.
+I understood, a lot of data in factorio is managed via linked lists because all of the data has to be processed every tick anyways. Is my understanding correct?
+
+Then, for the list of all the entities on the map and/or for the list of all the entities on the map placed by the players:
+1. what is a way for the mod to find out how many there are and
+2. how could the mod split the list into more or less even parts?
+
+The linked lists in factorio do not have an index, correct? No linked list has, correct?
+
+Thanks for your feedback and your ideas.
+Last edited by Impatient on Sun Oct 15, 2017 5:20 pm, edited 1 time in total.
+Top
+User avatar
+DaveMcW
+Smart Inserter
+Smart Inserter
+Posts: 3753
+Joined: Tue May 13, 2014 11:06 am
+Contact: Contact DaveMcW
+Re: Distributing Workload of Mod to Multiple Ticks
+Post by DaveMcW » Sun Oct 15, 2017 8:50 am
+
+1. Yes, modulo in on_tick is the way to go for rarely used functions.
+2. Yes, processing pieces of data every tick is better than one very slow function every minute.
+3. No, the Lua API does not use linked lists. This is one reason API functions are so slow.
+
+If you are trying to scan every entity on the map, you might want to do one chunk per tick.
+
+But do you really need to scan every entity? What data are you trying to obtain?
+Top
+User avatar
+Klonan
+Factorio Staff
+Factorio Staff
+Posts: 5457
+Joined: Sun Jan 11, 2015 2:09 pm
+Contact: Contact Klonan
+Re: Distributing Workload of Mod to Multiple Ticks
+Post by Klonan » Sun Oct 15, 2017 10:07 am
+
+The easiest way is as follows:
+Code: Select all
+
+function update()
+  local tick = game.tick % 64
+  for k, entity in pairs (my_table_of_entities) do
+    if k % 64 == tick
+      do_stuff(entity)
+    end
+  end
+end
+This will spread the update of the entities cleanly over 64 ticks, and account for any additions and removals from the list
+It will work for lists several thousand entries long, but eventually the time to modulo and check each entry in the list becomes significant
+Links: log-file, Applicaton directory, desync-report, update issues.
+Top
+User avatar
+withers
+Fast Inserter
+Fast Inserter
+Posts: 125
+Joined: Fri Apr 08, 2016 4:54 pm
+Contact: Contact withers
+Re: Distributing Workload of Mod to Multiple Ticks
+Post by withers » Sun Oct 15, 2017 1:17 pm
+
+Klonan wrote:
+The easiest way is as follows:
+Code: Select all
+
+function update()
+  local tick = game.tick % 64
+  for k, entity in pairs (my_table_of_entities) do
+    if k % 64 == tick
+      do_stuff(entity)
+    end
+  end
+end
+This will spread the update of the entities cleanly over 64 ticks, and account for any additions and removals from the list
+It will work for lists several thousand entries long, but eventually the time to modulo and check each entry in the list becomes significant
+Better optimized, no? ;)
+Code: Select all
+
+function update()
+  local tick = game.tick % 64
+  while my_table_of_entities[tick] do
+    do_stuff(my_table_of_entities[tick])
+    tick = tick + 64
+  end
+end
+Top
+User avatar
+Optera
+Smart Inserter
+Smart Inserter
+Posts: 2920
+Joined: Sat Jun 11, 2016 6:41 am
+Contact: Contact Optera
+Re: Distributing Workload of Mod to Multiple Ticks
+Post by Optera » Sun Oct 15, 2017 3:58 pm
+
+Klonan wrote:
+The easiest way is as follows:
+Code: Select all
+
+function update()
+  local tick = game.tick % 64
+  for k, entity in pairs (my_table_of_entities) do
+    if k % 64 == tick
+      do_stuff(entity)
+    end
+  end
+end
+This will spread the update of the entities cleanly over 64 ticks, and account for any additions and removals from the list
+It will work for lists several thousand entries long, but eventually the time to modulo and check each entry in the list becomes significant
+Instead of iterating over every entity and checking if their id matches the modulo result, use stepping with stride to iterate only over a subset of entities.
+This variant was measured ~40% faster for simply instructions over a large (100+) array of entities.
+Code: Select all
+
+function OnTick(event)
+  local offset = game.tick % update_interval
+  for i=#my_table_of_entities - offset, 1, -1 * update_interval do
+    do_stuff(my_table_of_entities[i])
+  end
+end
+Basically a slight variant of withers optimization. I prefer having control over the index in case entities need to be removed during on_tick.
+My Mods: mods.factorio.com
+Top
+sillyfly
+Smart Inserter
+Smart Inserter
+Posts: 1103
+Joined: Sun May 04, 2014 11:29 am
+Contact: Contact sillyfly
+Re: Distributing Workload of Mod to Multiple Ticks
+Post by sillyfly » Sun Oct 15, 2017 5:26 pm
+
+There is some merit to choosing a prime number as your modulus. Suppose your mod runs every m ticks, and some other mod which had the same idea runs every n ticks. How often will those two calculations occur simultaneously? The answer is the least common multiple of m and n, or lcm(m,n).
+As an example, if m=64 and n=24, then lcm(m,n)=lcm(64,24)=192 (64*3=192=24*8).
+
+Now, if m and n are co-prime then lcm(m,n) = m*n, which is the maximum one can hope for (as m*n is by definition a multiple of both m and n). Since you can't know in advance what number another mod creator will choose, your best bet is to choose a prime number, as it will only not be co-prime with multiples of itself.
+
+Returning to our previous example, if the mods were to use 23 and 61, now they will only both perform the calculation every 23*61=1401 ticks, even though each one will perform calculations slightly more often, thus limiting to a minimum ticks with doubly-heavy calculations.
+
+TL;DR - it is better to choose a prime number for the modulus to avoid multiple mods doing calculations at the same time.
+
+Reference: https://en.wikipedia.org/wiki/Least_common_multiple
+Top
+User avatar
+eradicator
+Smart Inserter
+Smart Inserter
+Posts: 5211
+Joined: Tue Jul 12, 2016 9:03 am
+Contact: Contact eradicator
+Re: Distributing Workload of Mod to Multiple Ticks
+Post by eradicator » Mon Oct 16, 2017 8:09 am
+
+@Optera: Hi. Good job spreading my code :P. You should update your copy/paste example to include some minor detail changes:
+Code: Select all
+
+local update_interval = 61 --interval should be defined outside the function
+function OnTick(event)
+  local offset = event.tick % update_interval --event.tick is ever so slightly faster than game.tick
+  for i=#my_table_of_entities - offset, 1, -1 * update_interval do
+    do_stuff(my_table_of_entities[i])
+  end
+end
+@Impatient:
+This is basically the "fuzzy" method you described. Keep in mind that this will only work on numerically indexed tables and you can only use table.remove() or equivalent to remove entries to ensure the indexes are continuous. Removing inside the loop is fine, but bear in mind that removing entries from the middle of a table is somewhat slow. Adding entries will "mess up" the current cycle and some items will not be processed. Processing of all entries is only guaranteed if the list length didn't change during the cycle. So if you have a list that changes very often you'd need to think of something. A possible solution would be mark entries for deletition (e.g set to false instead of table.remove()) during the cycle instead of deleting them to keep the index order intact and then at the end of a cycle remove all entries marked. Adding new items should also be done only once per cycle. If you have a large number of entries AND frequent removal you could make your own removing function that just moves the last entry of the list into the empty spot, this is much faster but is only feasible if you don't care about the order in which the items are processed.
+Actually what are you trying to do? Would be much easier to help than if we have to guess :P
+
+@sillyfly: Totally agree. Additionally i like to use a random number as the comparision object, i.e.
+Code: Select all
+
+ if event.tick % 61 == 13
+but i don't have any theoretical background to prove the effectiveness of that.
+Author of: Belt Planner, Hand Crank Generator, Screenshot Maker, /sudo and more.
+Mod support languages: 日本語, Deutsch, English
+My code in the post above is dedicated to the public domain under CC0.
+Top
+User avatar
+darkfrei
+Smart Inserter
+Smart Inserter
+Posts: 2905
+Joined: Thu Nov 20, 2014 11:11 pm
+Contact: Contact darkfrei
+Re: Distributing Workload of Mod to Multiple Ticks
+Post by darkfrei » Tue Jun 18, 2019 7:17 am
+
+I really like how the BurnerLeech works.
+It makes only one calculation per tick, but it can be changed to few calculations per tick.
+Code: Select all
+
+function on_tick ()
+  local parts = global.parts or {} -- adding them on entity creating or whatever
+  if #parts = 0 then return end -- nothing to do
+  local index = global.index or 1
+  if index > #parts then index = 1 end -- cycle limit, starting again
+  local not_valid = do_your_stuff (parts[index]) -- your function, return true if it must be deleted
+  if not_valid then 
+    table.remove (parts, index)
+  else
+    global.index = index + 1
+  end
+end

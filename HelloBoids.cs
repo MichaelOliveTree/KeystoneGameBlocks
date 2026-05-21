@@ -4,9 +4,11 @@
 //
 //(contact email: Hypnotron.v1.0@gmail.com or TP_WalksWithGod@proton.me)
 //
-//This work may NOT be licensed, sold, redistributed without consent from Michael Preston Joseph. (contact email: Hypnotron.v1.0@gmail.com or TP_WalksWithGod@proton.me).
+//This work may NOT be licensed, sold, redistributed without consent from Michael Preston Joseph. 
+// (contact email: Hypnotron.v1.0@gmail.com or TP_WalksWithGod@proton.me).
 //
-//Please report any infringnment of my works to Hypnotron.v1.0@mail.com  or TP_WalksWithGod@proton.me
+//Please report any infringnment of my works to Michael Preston Joseph. 
+// (contact email: Hypnotron.v1.0@mail.com  or TP_WalksWithGod@proton.me)
 //////////////////////////////////////////////////////////////////////////////////////
 #define DEBUG
 #define CACHE_VERTICES

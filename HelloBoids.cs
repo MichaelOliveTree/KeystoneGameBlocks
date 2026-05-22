@@ -588,7 +588,12 @@ namespace HelloBoids
 
                 //HACK - make the elapsedSeconds always equal to fixed-step
                 elapsedSeconds = mStep;
+                //Console.WriteLine ("MAIN() - " + elapsedSeconds.ToString() + " elapsed seconds.");
+
 				TimeSpan ts = TimeSpan.FromSeconds(elapsedSeconds);
+
+                //Console.WriteLine ("MAIN() - " + ts.TotalSeconds.ToString() + " elapsed seconds.");
+
 				gt.Update(ts);
 
                 // Update and Render operations
@@ -3469,7 +3474,7 @@ namespace HelloBoids
 				//       we could skip any TacticalStation that is not designated as PRIMARY TacticalStation
 				
 				EntityNode currentStation = Boids[currentStationArrayIndex]; // <-- if we can get the Sensors without having to get the current Boid... hmm...
-				List<SensorContact> contacts = new List<SensorContact>();
+				List<SensorContact> contactsList = new List<SensorContact>();
 				
 				
 				int currentBoidArrayIndex = currentStation.EntityArrayIndex - TACTICAL_STATION_OFFSET;
@@ -3522,8 +3527,8 @@ namespace HelloBoids
 					Console.WriteLine("CreateContactListFromAdjacents() - 2");
 					// Iterate through all the Sensors the current Droid is using to see which ones might
 					// detect this potential contact.  This is why a "SensorContact" may already exist
-					// in the List<SensorContact> 'contacts'  because multiple Sensors on _the_same_ship_
-					// might detect this adjacent 'contact.'
+					// in the List<SensorContact> 'contactsList'  because multiple Sensors on _the_same_ship_
+					// might detect this adjacent 'currentContact.'
 					for (int k = 0; k < sensorEntities.Length; k++)
 					{
 						int sensorStructIndex = -1;
@@ -3536,27 +3541,27 @@ namespace HelloBoids
 						
 						if (sensorRangeSquared >= distanceSquared)
 						{
-							SensorContact c;
+							SensorContact currentContact;
 							Boid bb = null;
     
     						// if another sensor on this same vehicle has detected this potential contact already, append it's Sensor index
 							// to the list of SensorIndices for this contact so we know all sensors that detected it.
 							Predicate<SensorContact> contactExists = contact => contact.ContactEntityArrayIndex == potentialContactsEntityArrayIndex;
-							c = contacts.Find(contactExists);
+							currentContact = contactsList.Find(contactExists);
 
-							if (!c.Equals(default(SensorContact)))
+							if (!currentContact.Equals(default(SensorContact)))
 							{
-								//Console.WriteLine("CreateContactListFromAdjacents() - sensor contact name == " + c.Name);
-								if (c.SensorsIndices == null) 
-									c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices,  sensorArrayIndex); // sensorStructIndex);
+								//Console.WriteLine("CreateContactListFromAdjacents() - current SensorContact name == " + currentContact.Name);
+								if (currentContact.SensorsIndices == null) 
+									currentContact.SensorsIndices = Utils.ArrayAppend<int>(currentContact.SensorsIndices,  sensorArrayIndex); // sensorStructIndex);
 								else
-									c.SensorsIndices.Append(sensorArrayIndex); // sensorStructIndex);
+									currentContact.SensorsIndices.Append(sensorArrayIndex); // sensorStructIndex);
 
-								Console.WriteLine("CreateContactListFromAdjacents() - Appending SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
+								Console.WriteLine("CreateContactListFromAdjacents() - Appending SensorContact of Droid at Array Index = '" + currentContact.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
 							}
 							else // contact has not yet already been detected by another Sensor within this same ship during this loop through all sensors on this same ship
 							{
-								c = new SensorContact();
+								currentContact = new SensorContact();
 
 								//Console.WriteLine("CreateContactListFromAdjacents() - Creating NEW SensorContact of Droid at Array Index = '" + contactsEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
 
@@ -3566,25 +3571,25 @@ namespace HelloBoids
 								}
 								catch (Exception ex)
 								{
-									Console.WriteLine("DoContactListSorting() - ERROR: Boid contact at Array Index == " + c.ContactEntityArrayIndex.ToString() + " not found. " + ex.Message);
+									Console.WriteLine("DoContactListSorting() - ERROR: Boid contact at Array Index == " + currentContact.ContactEntityArrayIndex.ToString() + " not found. " + ex.Message);
 								}
 
 								//int sensorContactInternalTransformIndex = bb.GetUserStructIndex(typeof(Transform.Transform_Struct));
 								// contact details are needed to find the correct SensorContact to potentially merge with an existing SensorContact for this detected Entity
 								// NOTE: HelloBoids should only have one element within its SensorsIndices
 								//       because each Droid only has one Sensor ('Optical Sensor' == eyes)
-								c.ContactEntityArrayIndex = potentialContactsEntityArrayIndex; // index within the Boid[] array of the detected Droid
-								c.Index = (int)i;
-								c.Name =  "boid_" + potentialContactsEntityArrayIndex.ToString(); // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
-								c.RegistryNumber = c.Name;
-								c.Type = SensorContact.TYPE.Drone;
-								c.ContactStatus = Target.STATUS.Unknown;
-								c.FriendOrFoe = SensorContact.FoF.Unknown;
-								c.SensorsIndices = Utils.ArrayAppend<int>(c.SensorsIndices, sensorArrayIndex); //sensorStructIndex);
+								currentContact.ContactEntityArrayIndex = potentialContactsEntityArrayIndex; // index within the Boid[] array of the detected Droid
+								currentContact.Index = (int)i;
+								currentContact.Name =  "boid_" + potentialContactsEntityArrayIndex.ToString(); // verified name of ship eg. UEN Pegasus "Galactica Class Battlestar"
+								currentContact.RegistryNumber = currentContact.Name;
+								currentContact.Type = SensorContact.TYPE.Drone;
+								currentContact.ContactStatus = Target.STATUS.Unknown;
+								currentContact.FriendOrFoe = SensorContact.FoF.Unknown;
+								currentContact.SensorsIndices = Utils.ArrayAppend<int>(currentContact.SensorsIndices, sensorArrayIndex); //sensorStructIndex);
 
                                 
                                 
-                                Console.WriteLine("CreateContactListFromAdjacents() - Added NEW SensorContact of Droid at Array Index = '" + c.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
+                                Console.WriteLine("CreateContactListFromAdjacents() - Added NEW SensorContact of Droid at Array Index = '" + currentContact.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
                             }
 
                             // telemetry must be added regardless of whether this is an existing or new SensorContact
@@ -3605,9 +3610,9 @@ namespace HelloBoids
                             
 
                             
-                            c.Add(telemetry);	
-                            // NOTE: call to contacts.Add() here will update an existing SensorContact or Append a new SensorContact that didn't previously exist.
-                            contacts.Add(c);
+                            currentContact.Add(telemetry);	
+                            // NOTE: call to contactsList.Add() here will update an existing SensorContact or Append a new SensorContact that didn't previously exist.
+                            contactsList.Add(currentContact);
 
 
 						} // end sensor range check
@@ -3618,8 +3623,8 @@ namespace HelloBoids
 				// add all of the SensorContacts to the current TacticalStation, and it will be responsible for
 				// properly merging these SensorContacts with existing ones so as to maintain
 				// proper SensorContact histories for all detected Entities.
-				if (contacts != null)
-					allTacticalStations.Span[(int)i].Add(contacts, gt); 
+				if (contactsList != null)
+					allTacticalStations.Span[(int)i].Add(contactsList, gt); 
 			});
 			
 			//Console.WriteLine("CreateContactListFromAdjacents() - COMPLETED.");
@@ -3713,8 +3718,6 @@ namespace HelloBoids
                         //Console.WriteLine("DoTargetPrioritization() - PRE- roePolicy.Execute()" );
                         if (roePolicy.Execute())
                         {
-                            Console.WriteLine("DoTargetPrioritization() - roePolicy SUCCEEDED." );
-
                             lineNum = 6;
                             // Targets are those SensorContacts that friendly forces will potentially fire upon.
                             // Whereas SensorContacts is all contacts regardless of FoF status.
@@ -3773,7 +3776,7 @@ namespace HelloBoids
                         {
                             string errorReason = roePolicy.ErrorReason;
                             lineNum = 16;
-                            Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY FAILED. " + errorReason);
+                            //Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY FAILED. " + errorReason);
                         }
                     }
                 
@@ -8315,25 +8318,41 @@ return (0,0);
                         case Condition.EVAL_TYPE.EQUALS:
                             lineNum = 11;
                             //Console.WriteLine("Condition.Evaluate() - EQUALS TEST - left == " + left + " right == " + right);
-                            if (left != right) return false; // todo: ErrorReason = 
+                            if (left != right) 
+                            {
+                                ErrorReason = "Evaluation FAILED. 'left' " + left + " does NOT equals 'right' " + right;
+                                return false;
+                            }
                             break;
 
                         case Condition.EVAL_TYPE.NOT_EQUALS:
                             lineNum = 12;
                             //Console.WriteLine("Condition.Evaluate() - NOT EQUALS TEST - left == " + left + " right == " + right);
 
-                            if (left == right) return false; // todo: ErrorReason = 
+                            if (left == right) 
+                            { 
+                                ErrorReason = "Evaluation FAILED. 'left' " + left + " MUST NOT equal 'right' " + right;
+                                return false;
+                            }
                             break;
 
                         case Condition.EVAL_TYPE.LESS_THAN:
                             lineNum = 13;
-                            if (MicroEx.Evaluate(left + " >= " + right)) return false; // todo: ErrorReason = 
+                            if (MicroEx.Evaluate(left + " >= " + right)) 
+                            { 
+                                ErrorReason = "Evaluation FAILED. 'left' " + left + " MUST BE less than 'right' " + right;
+                                return false;
+                            } 
                             break;
                             //return OperandLeft < OperandRight;
 
                         case Condition.EVAL_TYPE.GREATER_THAN:
                             lineNum = 14;
-                            if (MicroEx.Evaluate(left + " <= " + right)) return false; // todo: ErrorReason = 
+                            if (MicroEx.Evaluate(left + " <= " + right)) 
+                            { 
+                                ErrorReason = "Evaluation FAILED. 'left' " + left + " MUST BE greater than 'right' " + right;
+                                return false;
+                            } 
                             break;
                             //return OperandLeft > OperandRight;
 
@@ -10031,7 +10050,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		
 		public void Add (Target t, GameTime gt)
 		{
-            Console.WriteLine ("TacticalStationStruct.Add() - Entered.");
+            //Console.WriteLine ("TacticalStationStruct.Add() - Entered.");
 
 			if (mTargets == null) mTargets = new List<Target>();
 			
@@ -10043,22 +10062,25 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 
 			if (found == -1)
             {
-                Console.WriteLine ("TacticalStationStruct.Add() - Adding a NEW Target.");
-                int stationIndex = this.EntityArrayIndex;
-                string stationKey = EntryClass.bSim.Boids[stationIndex].EntityKey;
+                // NOTE: i dont think the mUserDataStore is needed because
+                //       the 'TimeAcquired' can be taken from 
+                //       mSensorContacts[t.SensorContactIndex].TimeAcquired();
+                //
+                //Console.WriteLine ("TacticalStationStruct.Add() - Adding a NEW Target.");
+                //int stationIndex = this.EntityArrayIndex;
+                //string stationKey = EntryClass.bSim.Boids[stationIndex].EntityKey;
 
-                EntityNode e = EntryClass.bSim.Boids[t.EntityArrayIndex];
-				EntryClass.mUserDataStore[stationKey].SetDouble(acquisitionKey, mSensorContacts[t.SensorContactIndex].TimeAcquired());
-                EntryClass.mUserDataStore[stationKey].SetBool(acquisitionStaleKey, false);
+                //EntityNode e = EntryClass.bSim.Boids[t.EntityArrayIndex];
+				//EntryClass.mUserDataStore[stationKey].SetDouble(acquisitionKey, mSensorContacts[t.SensorContactIndex].TimeAcquired());
+                //EntryClass.mUserDataStore[stationKey].SetBool(acquisitionStaleKey, false);
 
                 mTargets.Add(t);
-                Console.WriteLine ("TacticalStationStruct.Add() - Completed.");
+                Console.WriteLine ("TacticalStationStruct.Add() - Add of new 'Target' Completed.");
             }
             else
             {
-                Console.WriteLine ("TacticalStationStruct.Add() - Updating an existing Target.");
 				mTargets[found] = t;
-
+                Console.WriteLine ("TacticalStationStruct.Add() - Updating an existing Target completed.");
                 
                 // 
                 
@@ -10165,20 +10187,11 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 
 		public void Add (SensorContact c, GameTime gt)
 		{
-			
 			if (mSensorContacts == null) mSensorContacts = new List<SensorContact>();
-			Console.WriteLine("TacticalStation.Add(SensorContact) - SensorContact Add ENTERED to TacticalStation struct' referencing Entity at array index" + EntityArrayIndex.ToString() + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
-
-			int found = -1;
-			
-			
-			Console.WriteLine("TacticalStation.Add(SensorContact) - SensorContact FOUND == " + (found != -1).ToString() + "' to TacticalStation struct' referencing Entity at array index" + EntityArrayIndex + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
-
-            // TODO: add acquisition time to userdata for the Entity represented by this struct
-
+			int found = FindSensorContact(c.Name);
 			if (found == -1) 
             {
-                Console.WriteLine ("TacticalStation.Add() - New Contact Added STARTED.");
+                //Console.WriteLine ("TacticalStation.Add() - New Contact Added STARTED.");
                 
                  int stationIndex = this.EntityArrayIndex;
                 string stationKey = EntryClass.bSim.Boids[stationIndex].EntityKey;
@@ -10199,7 +10212,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
                 }
 
                 mSensorContacts.Add(c);
-
                 Console.WriteLine ("TacticalStation.Add() - New Contact Added COMPLETED.");
             }
             else 
@@ -10208,7 +10220,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
                 // one for this detected Entity already exists
 				mSensorContacts[found].Add(c.Telemetry);
 			
-		        Console.WriteLine("TacticalStation.Add(SensorContact) - SensorContact added to TacticalStation struct' referencing Entity at array index" + EntityArrayIndex + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
+		        Console.WriteLine("TacticalStation.Add(SensorContact) - FOUND EXISTING SensorContact.  SensorContact added to 'TacticalStation' struct referencing Entity at array index" + EntityArrayIndex + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
             }
 		}
 		
@@ -21134,7 +21146,7 @@ public abstract class PlanedFrustum
                 //double elapsedSeconds = (double)CoreClient._CoreClient.Engine.AccurateTimeElapsed();
                 //elapsedSeconds /= 1000d;
                 //return elapsedSeconds;
-              return mElapsedSeconds.Seconds; 
+              return mElapsedSeconds.TotalSeconds; 
 			}
         }
         
@@ -21150,7 +21162,7 @@ public abstract class PlanedFrustum
         {
         	get 
 			{ 	
-				return mTotalElapsedSeconds.Seconds;
+				return mTotalElapsedSeconds.TotalSeconds;
 			}
         }
         
@@ -21164,16 +21176,23 @@ public abstract class PlanedFrustum
 
 		public void Update (TimeSpan ts)
 		{
+            // check if PAUSED
 			if (_timeScaling == 0.0f) return; 
         	
-            mElapsedSeconds.Add(ts);
-							
-			mTotalElapsedSeconds += mElapsedSeconds;
+            //Console.WriteLine ("GameTime.Update() - Adding " + ts.TotalSeconds.ToString() + " seconds.");
+
+            mElapsedSeconds = ts;		
+			mTotalElapsedSeconds = mTotalElapsedSeconds + mElapsedSeconds;
+
+            //Console.WriteLine ("GameTime.Update() - Total Elapsed Seconds ==  " + mTotalElapsedSeconds.TotalSeconds.ToString() + " seconds.");
+
+
 			TimeSpan totalTime = mTotalElapsedSeconds + mStartOffset;
-								
-            mElapsedGameTimeSeconds = mElapsedSeconds.Seconds * _timeScaling;
+
+            // todo: below might be incorrect... need mTotalElapsedSeconds not mElapsedSeconds, yes?				
+            mElapsedGameTimeSeconds = mElapsedSeconds.TotalSeconds * _timeScaling;
 		
-            IntervalTimers.Update(ts.Seconds);
+            IntervalTimers.Update(ts.TotalSeconds);
 		}
 		
 		

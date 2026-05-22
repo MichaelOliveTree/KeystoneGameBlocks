@@ -1213,13 +1213,10 @@ namespace HelloBoids
 
             Vector3d pos = new Vector3d(posX, posY, posZ);
             
-
-
 			string entityKey = "boid_" + arrayIndex.ToString(); // prefix with "boid_" to not duplicate with "sensor_"
 			
             Boid b = null;
-            // todo: generate Droids with some variance for age
-            
+    
 			try
 			{
 				b = new Boid(entityKey, arrayIndex, posX, posY, posZ, vX, vY);
@@ -1231,9 +1228,6 @@ namespace HelloBoids
 				b.BlackBoardData.SetString("faction", factionColor);
 
                 // //EntryClass.mUserDataStore[entityKey].SetString("faction", factionColor);
-
-
-
 				//EntryClass.mUserDataStore[entityKey].SetString("faction", factionColor);
 				System.Diagnostics.Debug.Assert(b.BlackBoardData == EntryClass.mUserDataStore[entityKey], "Spawn() -- UserData objects do not match.");
 			
@@ -1281,7 +1275,6 @@ namespace HelloBoids
     
                 					
 			    // ARMOR
-    			// memBaseObj.Span[0].Armor = new Armor(b.BoundingBox);
                 int DR = 50;
                 CONSTRUCTION_MATERIAL material = CONSTRUCTION_MATERIAL.IRON;
                 float quality = 0.5f;
@@ -1301,8 +1294,11 @@ namespace HelloBoids
     			ComponentStore<LifeForm> storeLivingEntity = EntryClass.mCStoreCol.CheckOut<LifeForm>(EntryClass.NUM_ENTRIES); // Repository.StoresCollection.CheckOut<Component>(EntryClass.NUM_ENTRIES);
                 int livingEntityID = -1;
                 Memory<LifeForm> memLivingEnt = storeLivingEntity.CheckOut(out livingEntityID);
-    			b.AddUserStruct(typeof(LifeForm), memLivingEnt, livingEntityID);			
-    			storeLivingEntity.Span[livingEntityID].Age = 1;
+    			b.AddUserStruct(typeof(LifeForm), memLivingEnt, livingEntityID);
+
+                double MAX_AGE = 5.0d;
+                double age = Utils.RandomWithVariance(rand, MAX_AGE, 0.5d); 			
+    			storeLivingEntity.Span[livingEntityID].Age = (float)age;
     		}
 			catch (Exception ex)
 			{
@@ -1457,18 +1453,44 @@ namespace HelloBoids
             Keep State Visuals Smooth: Modulo updates are perfect for heavy AI logic or pathfinding. However, make sure visual elements (like position interpolation or animations) are updated every frame in your render loop so the game looks smooth.
 
             
+            // NOTE: If instead of a single entities list we store the entities
+            // into different groups or 'buckets', then we only update the Entities
+            // in the bucket(s) that are set to active, then we should have minimal
+            // overdraw.
+            // 
             // Choose how many groups you want to divide your entities into.
             // More groups = lower CPU spike per frame, but longer time between individual updates.
             const int TOTAL_GROUPS = 10; 
 
-            void UpdateGameEntities(vector<Entity> entities, int currentFrame) 
+
+            void UpdateGameEntities(List<EntityNode> entities, int currentFrame) 
             {
-                for (int i = 0; i id % TOTAL_GROUPS; i++)
+                // Process only a subset of data on a given tick/frame
+                int currentBucket = currentFrame % TOTAL_GROUPS; 
+
+                for (i = 0; i < entities.length; i++) 
                 {
-                    // Stagger the update
-                    if ((currentFrame + updateGroup) % TOTAL_GROUPS == 0) 
+                    // Only update if the Entity falls into the current time slice
+                    if (i % TOTAL_GROUPS == currentBucket) 
                     {
-                        entities[i]->Update();
+                        processUpdate(entities[i]);
+                    }
+                }
+            }
+
+            void UpdateGameEntitiesGroups(List<List<EntityNode>> groups, int currentFrame) 
+            {
+                // Process only a subset of data on a given tick/frame
+                TOTAL_GROUPS = groups.Length;
+                int currentBucket = currentFrame % TOTAL_GROUPS; 
+
+                for (i = 0; i < groups.length; i++) 
+                {
+                    // Only update the Entities within a 'group' if it falls into the current time slice
+                    if (i % TOTAL_GROUPS == currentBucket) 
+                    {
+                        for (int j = 0; j < groups[i].Length; j++)
+                            processUpdate(groups[i][j]);
                     }
                 }
             }
@@ -1477,6 +1499,12 @@ namespace HelloBoids
             // https://forums.factorio.com/viewtopic.php?t=53405
             // staggered updates - factorio forums advice.txt
 
+            // Staggered Updates
+            // - Managing System Update Order in Unity ECS - Unity DOTS Tutorial [ECS Ver. 0.17]
+            //      https://www.youtube.com/watch?v=oX0NElpfXgg
+
+            // Moonside Games - Archetypal ECS Considered Harmful?
+            // https://moonside.games/posts/archetypal-ecs-considered-harmful/
 
             
             
@@ -3205,13 +3233,7 @@ namespace HelloBoids
 #endif
         		
 
-		// Staggered Updates
-        // - Managing System Update Order in Unity ECS - Unity DOTS Tutorial [ECS Ver. 0.17]
-        //      https://www.youtube.com/watch?v=oX0NElpfXgg
-
-        // Moonside Games - Archetypal ECS Considered Harmful?
-        // https://moonside.games/posts/archetypal-ecs-considered-harmful/
-        
+     
 
 
 		/// <summary>
@@ -3381,8 +3403,12 @@ namespace HelloBoids
 				
 				 // TODO: Establish CANFIRE PER WEAPON - following only uses the 1 weapon we know exists on each Droid.
 				bool canFire = weaponStruct.Span[0].CanFire(out errorReason);
-				
-				//Console.WriteLine("Do_Tactical_Logic() - Weapon CanFire() == " + canFire.ToString());		
+				bool canAct = tacticalStationStruct.Span[0].CanAct(out errorReason);
+
+
+				Console.WriteLine("Do_Tactical_Logic() - Weapon Can Fire == " + canFire.ToString());		
+                Console.WriteLine("Do_Tactical_Logic() - Station Can Act == " + canAct.ToString() + " " + errorReason);		
+
 				if (canFire)
            	 	{  
 					string weaponKey = weapons[0].EntityKey;

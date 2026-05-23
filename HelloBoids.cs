@@ -1843,8 +1843,6 @@ namespace HelloBoids
 			storeTacticalStation.Span[checkOutIndex].EntityArrayIndex = arrayIndex; // we use EntityArrayIndex and not SpanIndex because we want to use it to find the Boid element in the EntryClass.bSim.Boids[index] List
 			storeTacticalStation.Span[checkOutIndex].HistoryCount = 1;
 			storeTacticalStation.Span[checkOutIndex].CooldownBetweenActions = 3.0f;
-			storeTacticalStation.Span[checkOutIndex].MaxActions = 2;
-			storeTacticalStation.Span[checkOutIndex].NumActions = 0;
 			storeTacticalStation.Span[checkOutIndex].Actions = null;
 			storeTacticalStation.Span[checkOutIndex].ContactsHistory = null;
 
@@ -3916,14 +3914,9 @@ namespace HelloBoids
 			//    but it will be speculative.   
 			//  - bonus for damage
 			//  and remember, it's the tactical station that keeps track of all the weapons available and the targets (including friendlies)
-			//List<SensorContact> contacts = attackingTacticalStation.GetSensorContacts();
-			//if (contacts == null || contacts.Count == 0) 
-			//{
-			//}
-
+		
             int tacticalStructIndex;
             Memory<TacticalStation> tacticalStationStruct = (Memory<TacticalStation>)attackingTacticalStation.GetUserStruct(typeof(TacticalStation), out tacticalStructIndex);
-
 
 			List<Target> targets = tacticalStationStruct.Span[0].GetTargets();
 			
@@ -4042,7 +4035,7 @@ namespace HelloBoids
                 // if the velocity magnitude changes by some minimum amount over X seconds and this is sustained over and over again, over Y seconds, each Y second of evasive action adds a bonus.
                 // each second of "evasive" after 1 full second, adds -5% chance 'to-hit' by the attacking ship. (MAX -15% chance)
                 //      - STATISTICS SEARCH? we can't store the velocity of every ship, every frame... or even every X second...   so we poll every X seconds and we store only N number of entries.
-                // 
+                
 
 				// - Counter measures deployed within X time (time * fallOff aka call it 'attenuation') 
                 //      - STATISTICS SEARCH
@@ -4194,7 +4187,7 @@ namespace HelloBoids
 				{
 					for (int j = 0; j < selectedTargets.Count; j++)
 					{
-						//Memory<TacticalStation> tacticalStation = (Memory<TacticalStation>)attackingTacticalStation.GetUserStruct(typeof(TacticalStation), out tacticalStationIndex); 
+						// Memory<TacticalStation> tacticalStation = (Memory<TacticalStation>)attackingTacticalStation.GetUserStruct(typeof(TacticalStation), out tacticalStationIndex); 
 
 						Vector3d start = attackingShip.Translation;   // todo: if hierarchical and if this is the Weapon and not the Droid, it should be .DerivedTranslation
 						Vector3d targetLoc = selectedTargets[j].Translation; // TODO: if hierarchical, this should be .DerivedTranslation
@@ -10062,17 +10055,58 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		public float CooldownBetweenActions;  //todo: maybe this is CurrentAction.Duration where "CanAct" = (NumActions < Actions.Count - 1 && elapsed >= CurrentAction.Duration)  the minimum amount of time since the previous action before the next action can take place e.g 4.5 seconds and represents the time it takes to carry out that previous Action and to be ready to carry out the next
 		                                       // or it might be the Math.Max(thisAction, prevAction) since a previious action might take less time to complete so we will be able to act when it completes first.
 		public int HistoryCount; 
-		public int NumActions;
-		public int MaxActions;        // based on operator's max ability to handle so many simultaneously, tacticalstation TL, tacticalStation damage, and ability to perform that many actions in the first place (eg having enough weapons to use )
 
 		public System.Collections.Generic.Queue<List<SensorContact>> ContactsHistory;
 		private List<Target> mTargets;
         private List<SensorContact> mSensorContacts;
         
-		public List<Target> GetTargets()
+        
+		public void Add (SensorContact c, GameTime gt)
 		{
-			return mTargets;
+			if (mSensorContacts == null) mSensorContacts = new List<SensorContact>();
+			int found = FindSensorContact(c.Name);
+			if (found == -1) 
+            {
+                //Console.WriteLine ("TacticalStation.Add() - New Contact Added STARTED.");
+                
+                 int stationIndex = this.EntityArrayIndex;
+                string stationKey = EntryClass.bSim.Boids[stationIndex].EntityKey;
+
+
+				string acquisitionStaleKey = "aquisition_stale_" + c.ContactEntityArrayIndex.ToString();
+                string acquisitionKey = "aquisition_time_" + c.ContactEntityArrayIndex.ToString();
+
+                if (c.Telemetry != null && c.Telemetry.Length > 0)
+                { 
+                    SensorContact.ContactTelemetry first = c.Telemetry[0];
+                    SensorContact.ContactTelemetry last = c.Telemetry[c.Telemetry.Length - 1];
+                
+                    double timeAcq = gt.TotalElapsedSeconds; // first.TimeAcquired;
+                    EntryClass.mUserDataStore[stationKey].SetDouble(acquisitionKey, timeAcq);
+
+                    Console.WriteLine ("TacticalStation.Add() - Telemetry updated.");
+                }
+
+                mSensorContacts.Add(c);
+                Console.WriteLine ("TacticalStation.Add() - New Contact Added COMPLETED.");
+            }
+            else 
+            {
+                // just add the telemetry and DO NOT add the 'c' sensorContact because
+                // one for this detected Entity already exists
+				mSensorContacts[found].Add(c.Telemetry);
+			
+		        Console.WriteLine("TacticalStation.Add(SensorContact) - FOUND EXISTING SensorContact.  SensorContact added to 'TacticalStation' struct referencing Entity at array index" + EntityArrayIndex + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
+            }
 		}
+		
+		public void Add (List<SensorContact> contacts, GameTime gt)
+		{
+			if (contacts == null) return;
+			for (int i = 0; i < contacts.Count; i++)
+				Add(contacts[i], gt);
+		}
+
 		
 		public void Add (Target t, GameTime gt)
 		{
@@ -10120,6 +10154,55 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		    }
         }
 		
+        
+		public List<SensorContact> GetSensorContacts()
+		{
+			return mSensorContacts;
+		}
+		
+        public SensorContact FindSensorContact (int entityArrayIndex)
+        {
+            int found = -1;
+
+            for (int i = 0; i < mSensorContacts.Count; i++)
+				if (mSensorContacts[i].ContactEntityArrayIndex == entityArrayIndex)
+				{
+					found = i;
+					break;
+				}
+
+            return mSensorContacts[found];
+        }
+
+        public int FindSensorContact (string name)
+        {
+            int found = -1;
+
+            for (int i = 0; i < mSensorContacts.Count; i++)
+				if (mSensorContacts[i].Name == name)
+				{
+					found = i;
+					break;
+				}
+
+            return found;
+        }
+
+		public void RemoveContact(SensorContact contact)
+		{
+            if (mSensorContacts != null)
+			    mSensorContacts.Remove(contact);
+		}
+
+		public void ClearContacts()
+		{
+			if (mSensorContacts != null)
+				mSensorContacts.Clear();
+
+            // TODO: if we call either ClearTargets() or ClearContaacts() and remove acquisitionkeys and stalekeys
+            //        it could impact the other unintentioinally
+        }
+
 		public void Add (Target[] t, GameTime gt)
 		{
 			if (t == null || t.Length == 0) return;
@@ -10151,10 +10234,18 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		    }
         }
 		
+        public List<Target> GetTargets()
+		{
+			return mTargets;
+		}
+
 		public Target GetTarget (int entityArrayIndex)
 		{
 			if (mTargets == null || mTargets.Count == 0) return default(Target);
 			
+
+            // return mTargets.Find();
+
 			for (int i = 0; i < mTargets.Count; i++)
 				if (mTargets[i].EntityArrayIndex == entityArrayIndex)
 					return mTargets[i];
@@ -10162,12 +10253,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			return default(Target);
 		}
 		        
-		
-		public List<SensorContact> GetSensorContacts()
-		{
-			return mSensorContacts;
-		}
-		
+
         public int FindTarget (int entityArrayIndex)
         {
             int found = -1;
@@ -10183,94 +10269,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
             //return mTargets[found];
         }
 
-        public SensorContact FindSensorContact (int entityArrayIndex)
-        {
-            int found = -1;
-
-            for (int i = 0; i < mSensorContacts.Count; i++)
-				if (mSensorContacts[i].ContactEntityArrayIndex == entityArrayIndex)
-				{
-					found = i;
-					break;
-				}
-
-            return mSensorContacts[found];
-        }
-
-        public int FindSensorContact (string name)
-        {
-            int found = -1;
-
-            for (int i = 0; i < mSensorContacts.Count; i++)
-				if (mSensorContacts[i].Name == name)
-				{
-					found = i;
-					break;
-				}
-
-            return found;
-        }
-
-		public void Add (SensorContact c, GameTime gt)
-		{
-			if (mSensorContacts == null) mSensorContacts = new List<SensorContact>();
-			int found = FindSensorContact(c.Name);
-			if (found == -1) 
-            {
-                //Console.WriteLine ("TacticalStation.Add() - New Contact Added STARTED.");
-                
-                 int stationIndex = this.EntityArrayIndex;
-                string stationKey = EntryClass.bSim.Boids[stationIndex].EntityKey;
-
-
-				string acquisitionStaleKey = "aquisition_stale_" + c.ContactEntityArrayIndex.ToString();
-                string acquisitionKey = "aquisition_time_" + c.ContactEntityArrayIndex.ToString();
-
-                if (c.Telemetry != null && c.Telemetry.Length > 0)
-                { 
-                    SensorContact.ContactTelemetry first = c.Telemetry[0];
-                    SensorContact.ContactTelemetry last = c.Telemetry[c.Telemetry.Length - 1];
-                
-                    double timeAcq = gt.TotalElapsedSeconds; // first.TimeAcquired;
-                    EntryClass.mUserDataStore[stationKey].SetDouble(acquisitionKey, timeAcq);
-
-                    Console.WriteLine ("TacticalStation.Add() - Telemetry updated.");
-                }
-
-                mSensorContacts.Add(c);
-                Console.WriteLine ("TacticalStation.Add() - New Contact Added COMPLETED.");
-            }
-            else 
-            {
-                // just add the telemetry and DO NOT add the 'c' sensorContact because
-                // one for this detected Entity already exists
-				mSensorContacts[found].Add(c.Telemetry);
-			
-		        Console.WriteLine("TacticalStation.Add(SensorContact) - FOUND EXISTING SensorContact.  SensorContact added to 'TacticalStation' struct referencing Entity at array index" + EntityArrayIndex + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
-            }
-		}
-		
-		public void Add (List<SensorContact> contacts, GameTime gt)
-		{
-			if (contacts == null) return;
-			for (int i = 0; i < contacts.Count; i++)
-				Add(contacts[i], gt);
-		}
-
-		public void RemoveContact(SensorContact contact)
-		{
-            if (mSensorContacts != null)
-			    mSensorContacts.Remove(contact);
-		}
-
-		public void ClearContacts()
-		{
-			if (mSensorContacts != null)
-				mSensorContacts.Clear();
-
-            // TODO: if we call either ClearTargets() or ClearContaacts() and remove acquisitionkeys and stalekeys
-            //        it could impact the other unintentioinally
-        }
         
 
 		public void Add (StationAction a, GameTime gt)
@@ -10346,7 +10344,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		/// </remarks>
 		public bool CanAct(out string errorReason)
 		{
-			EntityNode station = EntryClass.bSim.Boids[this.EntityArrayIndex]; // an actual Boid but for now, we think of it as dedicated Station Component Entity
+			EntityNode station = EntryClass.bSim.Boids[this.EntityArrayIndex]; 
 			errorReason = null;
 			bool result = true;
 
@@ -10360,8 +10358,10 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			if (!baseObj.IsEmpty)
 			{
 				string name = baseObj.Span[0].FullName;
-				int max = MaxActions;
-				int diff = NumActions;
+
+                int max = GetMaxActionCount();
+				int diff = Actions != null ? max - Actions.Count : 0;
+
 				if (diff <= 0)
 				{
 					errorReason = $"Station {name}, is already performing the maximum {max} number of simultaneous actions allowed based on the Level of this Station, it's current condition and the skill and condition of it's currrent Operator.";
@@ -10395,9 +10395,9 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 
 		public int GetMaxActionCount()
 		{
-			int result = 0;
+            int result = 0;
+			int currentNum = Actions != null ? Actions.Count : 0;
 
-			result = Actions.Count;
 
 			// station powered? (assuming it requires power to function)
 			// station TL
@@ -10419,7 +10419,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		// for this specific sensor
 		public int GetMaxTargets()
 		{
-			int result = 0;
+			int result = 5;
 
 			return result;
 		}

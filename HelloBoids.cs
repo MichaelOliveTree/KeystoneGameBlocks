@@ -1947,10 +1947,7 @@ namespace HelloBoids
 			string buildScriptRelativePath = "\\scripts_build\\battery_builder.css";
 			Builder build = new Builder(buildScriptRelativePath);
 			build.Calculate(battery);
-	
-			
-			
-			
+						
 			// each Battery can Produce a PRODUCTS.ElectricalPower
 			Production p;
 			p.ProducerEntityArrayIndex = battery.EntityArrayIndex;
@@ -4587,10 +4584,14 @@ namespace HelloBoids
 			});			
 		}
 		
+        // 
+        // see struct TacticalStation line 10347
+        // 
 		private void DoStationCanActStatus()
 		{
-			ComponentStore<LifeForm> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
-			ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
+			//ComponentStore<LifeForm> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
+			//ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
+
 			ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 			
 			int recordCount = (int)allTacticalStations.Count;
@@ -10037,11 +10038,22 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 
 	public struct TacticalStation
 	{
+        // todo: are these for ALL types of stations or just Tactical?
+        //       Eventually we want to be able to store all of these actions as
+        //       histories in an offline datastore... as log entries for all 
+        //       crew actions at every station.
 		public class StationAction
 		{
+            public uint RecordID;   // unique ID for EVERY StationAction across ALL Stations of all kinds (eg Tactical, Helm, Engineering, Security, etc) across ALL ships simulation-wide.
+
 			public double TimeStarted;     // time this action started
 			public double Duration;         // time to complete this action
-			public int ActionID;         // eg Fire at Target, Lay Mines, Deploy Counter-measures
+            public double TimeCompleted;
+            public int Status;           // enum
+            public int Resolution;       // can include partial completions (read below about an operator dying during the course of an action)
+            public int AssignedTo;       // operatorID (if an operator has died during their attempt to complete this action, the action must be resolved as INCOMPLETE and a new ActionID must be issued to a new member if one wishes to resume the partially complete action)
+			public int ActionID;         // eg Scan for Targets, Prioritize Targets, Fire at Target, Lay Mines, Deploy Counter-measures, Planetary-Geo Scan for various things like Archaelogy and searching for ruins/artifacts, searching for bio-signs of a particular individual(s) on planet or INSIDE THE SHIP, conduct a diagnostic of a particular ship system, etc.
+
 		}
 
 		public int EntityArrayIndex;
@@ -10057,9 +10069,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		public int HistoryCount; 
 
 		public System.Collections.Generic.Queue<List<SensorContact>> ContactsHistory;
-		private List<Target> mTargets;
         private List<SensorContact> mSensorContacts;
-        
+        private List<Target> mTargets;
         
 		public void Add (SensorContact c, GameTime gt)
 		{
@@ -10271,11 +10282,32 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 
         
 
+        // TODO: if these are added here, then surely they need to be advanced
+        // during Tick()?  I think one of the reasons we want to have these StationAction
+        // is to be able to log them and to be able to store them to disk and recall them
+        // whenever we like.
 		public void Add (StationAction a, GameTime gt)
 		{
 			if (Actions == null) Actions = new List<StationAction>();
 			Actions.Add(a);
+
+            //todo: add a cooldown
+            string stationKey = EntryClass.bSim.Boids[this.EntityArrayIndex].EntityKey;
+
+            // NOTE: we do need to include the RecordID because even though each StationKey is unique for all stations in the entire simulation, there could be multiple ActionIDs of the same type in any one particular station and we need to be
+            // able to diffrentiate between them.
+            string timerName = GetActionTimerIntervalName(a);
+            BoidSimulation.mIntervalTimers.Register(stationKey, timerName);
+
+
+
 		}
+        
+
+        private string GetActionTimerIntervalName(Action a)
+        {
+            return "StationAction_" + a.ActionID.ToString() + "_" + a.RecordID.ToString();
+        }
 		
 		public void Remove (StationAction a)
 		{
@@ -10340,7 +10372,9 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		/// 1 - moving a turret to aim at a specific target and fire when ready
 		/// 2 - prioritizing targets
 		/// 3 - assigning targets to weapons
-		/// 4 - monitoring guided missiles to ensure they are on course, otherwise they may need to be given a destruct order to avoid hazards to friendly ships (including your own)
+		/// 4 - monitoring guided missiles to ensure they are on course, otherwise they may need to be given a destruct order to avoid hazards to friendly ships (including your own)k
+        /// 5 - issuing command to reload silos from automated rotary missile magazines
+        /// 6 - 
 		/// </remarks>
 		public bool CanAct(out string errorReason)
 		{
@@ -10368,6 +10402,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 					return false;
 				}
 				
+
+                string timerIntervalName = GetActionTimerIntervalName(Actions[0]);
 				// check the cooldowns (if a slot is available, then doesn't this mean the cooldown has expired?  
 				// once a cooldown expires, the action is removed from the list of current actions correct?
 				

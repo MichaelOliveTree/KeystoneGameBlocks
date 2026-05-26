@@ -10035,7 +10035,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 	
 		
 	
-
+    // bigchiefcreative.com
+    // 
 	public struct TacticalStation
 	{
         // todo: are these for ALL types of stations or just Tactical?
@@ -10281,7 +10282,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         }
 
         
-
         // TODO: if these are added here, then surely they need to be advanced
         // during Tick()?  I think one of the reasons we want to have these StationAction
         // is to be able to log them and to be able to store them to disk and recall them
@@ -10297,14 +10297,11 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
             // NOTE: we do need to include the RecordID because even though each StationKey is unique for all stations in the entire simulation, there could be multiple ActionIDs of the same type in any one particular station and we need to be
             // able to diffrentiate between them.
             string timerName = GetActionTimerIntervalName(a);
-            BoidSimulation.mIntervalTimers.Register(stationKey, timerName);
-
-
-
+            float duration = 2f;
+            BoidSimulation.mIntervalTimers.Register(stationKey, timerName, duration);
 		}
         
-
-        private string GetActionTimerIntervalName(Action a)
+        private string GetActionTimerIntervalName(TacticalStation.StationAction a)
         {
             return "StationAction_" + a.ActionID.ToString() + "_" + a.RecordID.ToString();
         }
@@ -10315,7 +10312,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			if (Actions.Count == 0)
 				Actions = null;
 		}
-
 
         public double GetAquisitionDuration(Target target, GameTime gt)
         {
@@ -10349,7 +10345,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
                 diff = currentTotalElapsedSeconds - foundTime;
             }
 
-
             return diff;
             */
         }
@@ -10360,7 +10355,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 
             return result;
         }
-
 
 		// todo: Actions that have completed need to be removed from a list?
 		///<summary>

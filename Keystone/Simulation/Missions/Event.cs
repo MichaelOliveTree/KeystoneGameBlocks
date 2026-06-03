@@ -3,7 +3,8 @@
 
 namespace Keystone.Simulation.Missions
 {
-    // Mission Event
+    // Mission
+    // Event
 
     /// <summary>
     /// Mission Events that occur after an objective is reached.  This can be 
@@ -11,7 +12,7 @@ namespace Keystone.Simulation.Missions
     /// a particular mission event.  Events can also trigger dialogue between
     /// crew, enemy ships, friendly ships, etc.
     /// </summary>
-    public class Event
+    public class MissionEvent
     {
     }
 }

@@ -129,6 +129,17 @@ namespace Keystone.Simulation.Missions
             // fill the objective points
 
 
+                // Mission
+                //    Objectives
+
+                // Orders are broad , tasks represent the breakdown of high level orders into low level tasks.
+                // 
+                // Orders (eg: Board that ship)
+                //     Tasks (eg. assemble # marines onto shuttle, deploy shuttle, attach to appropriate location on target, breech hull, neutralize resistance, etc...)
+                //
+
+                // are we POLLING for completion of tasks/objectives or using callbacks or something else?
+
             return true;
         }
 
@@ -273,7 +284,6 @@ namespace Keystone.Simulation.Missions
 
         // add a default mission that is freeform with no objectives or objectivepoints with option to select how many opponents or even never ending waves of opponents
         // add a random mission generator that can generate mission data and load it for random experiences
-
 
         // a mission script isn't (CAN'T BE!) tied to any one particular Entity. Entity.IDs must be variable and passed into the script
 

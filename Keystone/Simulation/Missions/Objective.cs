@@ -35,6 +35,8 @@ namespace Keystone.Simulation.Missions
             RTB
                 
         }
+
+        
         //   eg: scan planet for X (eg drop ship ladning site)
         //       - board drop ship
         //       - launch drop ship
@@ -55,7 +57,10 @@ namespace Keystone.Simulation.Missions
         //              - ObjectiveTypes.Search&Destroy
         //              - ObjectiveTypes.Find (eg artifact)
         //              - ObjectiveTypes.Analyze
-        //              - 
+        //              - ObjectiveTypes.HoldPosition
+        //              - ObjectiveTypes.Liberate (worlds, areas, zones of control)
+        //              - ObjectiveTypes.Capture (zones of control, grid-points/map-points)
+        //              - ObjectiveTypes.Rescue (people)
         //              - ObjectiveTypes.Transport item quantity where
 
         private Entities.Entity mSubject;

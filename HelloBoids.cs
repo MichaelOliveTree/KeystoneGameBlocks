@@ -786,14 +786,15 @@ namespace HelloBoids
 		
         				
 
+        
+        public OctreeOctant Octree { get; }
+        
+        public static IntervalTimers mIntervalTimers;
+
         public Seeds Seeds { get; set; }
 		
         public List<EntityNode> Boids { get; set; }
-					// NOTE: The statistics do not exist within each Droid and so we can keep them
-			//       when a Droid is Destroyed and then Respawned and the Statistics can continue
-			//       to accumulate with the newly spawned replacement for that Droid assuming its using
-			//       the same ID/Profile which is how I envision a screensaver type auto-play game would work.
-		public List<Statistics> Statistics {get; set;}				 
+			 
 		
 
         // Note: the larger the various distance values below,
@@ -814,9 +815,15 @@ namespace HelloBoids
 		private float MAX_LEVEL = 10.0f;
 		private float MAX_SKILL = 100.0f;
 
+		public static SimulationEventManager mSimEventManager;
+		
+        					// NOTE: The statistics do not exist within each Droid and so we can keep them
+			//       when a Droid is Destroyed and then Respawned and the Statistics can continue
+			//       to accumulate with the newly spawned replacement for that Droid assuming its using
+			//       the same ID/Profile which is how I envision a screensaver type auto-play game would work.
+		public List<Statistics> Statistics {get; set;}
 
-        public OctreeOctant Octree { get; }
-        public static IntervalTimers mIntervalTimers;
+
 
 
 		private const CONFIGURATION HumanOperatorConfiguration = CONFIGURATION.Transform | CONFIGURATION.RigidBody |  CONFIGURATION.LifeForm | CONFIGURATION.Sentient | CONFIGURATION.Intelligent | CONFIGURATION.SelfPropelled;
@@ -840,8 +847,8 @@ namespace HelloBoids
 		public const int BATTERY_OFFSET = 5;
 		public const int HUMAN_OPERATOR_OFFSET = 6;
 		
-		public static SimulationEventManager mSimEventManager;
-		
+	
+
 		private object mLock = new object();
 			
 		private static System.Threading.SemaphoreSlim mSort = new System.Threading.SemaphoreSlim(1);
@@ -2744,6 +2751,8 @@ namespace HelloBoids
         }
 #endif
     
+        
+
 			
 		
 		// https://github.com/MonoGame/MonoGame/blob/db9e544dfb3f1c1e8bfc2ea08fec31c1c17a9033/MonoGame.Framework/Game.cs#L539
@@ -3247,22 +3256,7 @@ namespace HelloBoids
 			// OR, our various processors can just grab the Stores that are needed.  There's no need really to 
 			// grab the stores outside of the processor functions only to just pass them there...  
 	
- 			
-			 // Sensor scan 
-			 //  - spatial searches using Search Radius to find adjacents/neibhors
-			             
-             //  Sensor Scans
-			 //    - atmospheric composition
-			 //    - geological - minerals
-			 //    - archaeological (ground penetrating radars and such)
-			 //
-			 //    - biological life analysis
-			 //    - specific racial signatures 
-			 //    - specific person signatures (much slower if the search area is not very limited)
-			 //    - specific atoms, molecules
-			 //    - specific energy signatures
-			 //    
-			 
+ 		
              //    - AreaOfInterest 
 			
 			// https://forum.paradoxplaza.com/forum/threads/the-truth-is-out-there-an-aurora-4x-c-forum-game-version-1-13.1492866/page-11
@@ -3306,6 +3300,23 @@ namespace HelloBoids
              //    - storing data on interior Walls and Floors and Ceilings "damage"
 
 
+
+
+
+            // Executing tactical simulation orders generally follows this process:
+            // 1. Assess the SituationGather 
+            //     Intel: Scan the simulation interface to identify enemy or crisis locations.
+            //     Resource Check: Determine the readiness of your fleet, crew, or units (e.g., weapon readiness, fuel, and health).
+            // 2. Formulate the Tactical PlanDetermine the Objective: Decide whether the goal is offensive engagement, defensive maneuvering, or an extraction/rescue operation.
+            //     Assign Roles: If applicable, designate specific sub-commands (e.g., assigning weapons control, navigation, or sonar to AI or other crew members).
+            // 3. Issue the OrdersInput Commands: Translate your tactical plan into the simulation's digital interface. This usually involves plotting coordinates, selecting formations (e.g., tactical V), and setting engagement rules.
+            //     Execute/Simulate: Initiate the combat or action phase of the simulation.
+            // 4. Monitor and AdjustReal-time Tracking: Observe unit behavior, resource depletion, and combat outcomes.
+            //     Adjustments: Adapt your orders based on how the simulation's AI or opposing forces react.If you can specify the name of the game or tactical simulation you are playing, I can provide you with the exact user interface commands, hotkeys, or strategic guides for that specific program.
+
+
+
+
         	//Console.WriteLine("Do_Tactical_Logic() - DoDeviceReadyStatus()");
 			DoDeviceReadyStatus();
 						
@@ -3322,22 +3333,18 @@ namespace HelloBoids
 			
 			//Console.WriteLine("Do_Tactical_Logic() - CreateContactListFromAdjacents()");
 			CreateContactListFromAdjacents(gt); // based on policies
-			
-			
 			//Console.WriteLine("Do_Tactical_Logic() - DoTargetPrioritization()");
 			DoTargetPrioritization(gt);
-			
-			
 			// todo: if we had a list of all weapons for every ship to pass all at once
 			//       as well as all targets for each ship to pass all at once, we could run this
 			//       processor in a single call from here...
 			//Console.WriteLine("Do_Tactical_Logic() - DoWeaponFitnessScores()");
-			DoWeaponFitnessScores(null, null);
-			
-			
+			DoWeaponFitnessScores(null, null);		
 			//Console.WriteLine("Do_Tactical_Logic() - DoWeaponsCanFire()");
 			DoWeaponsCanFire();
 			
+
+
 			//ComponentStore<LifeForm> allLivingEntities = EntryClass.mCStoreCol.CheckOut<LifeForm>(0);
 			//ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			//ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
@@ -3378,16 +3385,54 @@ namespace HelloBoids
 				//       The client EXE will have access to those types and the UI elements using them and can update
 				//       those relevant UI elements as necessary
 				
-				
+                // our crew station + operator can only work so fast... we call CanAct() to see if the
+                // cooldown between any previous Action has completed.
+				bool canAct = tacticalStationStruct.Span[0].CanAct(out errorReason);
+
+
+                Console.WriteLine("Do_Tactical_Logic() - Station Can Act == " + canAct.ToString() + " " + errorReason);		
+
+                if (!canAct) return;
+
+            `   // Keystone.Simulation.Mission
+                // Keystone.Simulation.Objective
+
+				// Mission
+                //    Objectives
+
+                // Orders are broad , tasks represent the breakdown of high level orders into low level tasks.
+                // 
+                // Orders (eg: Board that ship)
+                //     Tasks (eg. assemble # marines onto shuttle, deploy shuttle, attach to appropriate location on target, breech hull, neutralize resistance, etc...)
+                //
+                // 
                 //  - are we in a state of COMBAT?
 				//		- direct orders?
+
+                // TODO: this comment doesnt belong here, but for now remember
+			    // HELM station would be influenced by Orders, Mission and Posture for example
+			    // if ordered to defend another ship, helm would try to maneuver such that this ship
+			    // is physically located between the ship-to-defend and a threat
+
+                // TODO: hERE we need to decide what to do asfar as StationAction goes
+                // now that we know we "CanAct"  we need to start by examining current orders, policies, existing actions, etc
+
+				
+                //LOG THE StationActions to an Orders logger
+                //    StationActions resemble RAID bug database entries
+
+
+
 				//      - any Contacts in list marked as FOF.Foe + FOF.Hostile as opposed to just FOF.Foe (note: stale contacts are still treated as available in case of need to persue)
 				//      	- FOF.Withdrawing may be ignored for example if ROE says we don't persue in this circumstance including disabled ships and unarmed ships like freighters
 				
 				
 				// TODO: Here i Think we should be retrieving the Contacts and Targets from the tacticalStation
 				//       and the Target list should already be prioritized.
-				
+
+
+
+
 				
 				EntityNode[] weapons = GetWeapons(attackerEntityArrayIndex);	
 				int weaponArrayIndex = weapons[0].EntityArrayIndex; // todo: hack -  we know all droids have one weapon but this will fail otherwise
@@ -3398,11 +3443,8 @@ namespace HelloBoids
 				
 				 // TODO: Establish CANFIRE PER WEAPON - following only uses the 1 weapon we know exists on each Droid.
 				bool canFire = weaponStruct.Span[0].CanFire(out errorReason);
-				bool canAct = tacticalStationStruct.Span[0].CanAct(out errorReason);
-
 
 				Console.WriteLine("Do_Tactical_Logic() - Weapon Can Fire == " + canFire.ToString());		
-                Console.WriteLine("Do_Tactical_Logic() - Station Can Act == " + canAct.ToString() + " " + errorReason);		
 
 				if (canFire)
            	 	{  
@@ -3656,6 +3698,19 @@ namespace HelloBoids
 		/// </summary>
 		private void DoTargetPrioritization(GameTime gt)
 		{
+            			
+			// a carrier with very few fighters remaining might be a low tactical threat
+			// but high strategic threat... 
+			// if a carrier is a primary mission objective that should increase its priority when scoring
+			
+			// a ship that is a primary target, but is not fleeing, can perhaps be scored lower since there will be time
+			// to target it later if there are more dangerous threats to deal with first.
+			// if a primary target is attempting to escape, the ETA that it will reach an escape trajectory should be used
+			// to wieght it's prioritization score
+			
+
+
+
 			//Console.WriteLine("DoTargetPrioritization() - ENTER");
 			int count = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, count, i => 		
@@ -3810,16 +3865,11 @@ namespace HelloBoids
                 }
 			});
 			
+
 			
-			// a carrier with very few fighters remaining might be a low tactical threat
-			// but high strategic threat... 
-			// if a carrier is a primary mission objective that should increase its priority when scoring
 			
-			// a ship that is a primary target, but is not fleeing, can perhaps be scored lower since there will be time
-			// to target it later if there are more dangerous threats to deal with first.
-			// if a primary target is attempting to escape, the ETA that it will reach an escape trajectory should be used
-			// to wieght it's prioritization score
-			
+
+
 			// NPC non-jobs 
 			// - read
 			// - study for promotion
@@ -4612,12 +4662,7 @@ namespace HelloBoids
 		/// </summary>
 		private void DoEnableDisableSensors()
 		{
-			// TODO: this comment doesnt belong here, but for now remember
-			// HELM station would be influenced by Orders, Mission and Posture for example
-			// if ordered to defend another ship, helm would try to maneuver such that this ship
-			// is physically located between the ship-to-defend and a threat
-			
-			
+
 		}
 		
 		/// <summary>
@@ -5349,14 +5394,7 @@ namespace HelloBoids
 		}
 		
 		
-		public enum ACTIONS : int
-		{
-			None = 0,
-			FiringAt,
-			TargetHit,
-			DeployMine,
-			DeployProbe
-		}
+
 		
 		public interface ISimulationEventManager
 		{
@@ -9057,15 +9095,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		GreatUnderPressure
 	}
 
-	public enum ActionType : int
-	{
-		Target,
-		FireAt,
-		Ram,
-		DeployCounterMeasure,
-		DeployMine,
-		DeployProbe
-	}
 
 	public class UnitedEarthCode
 	{
@@ -9102,17 +9131,17 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 	}
 
 		
-		public enum PropertyOperation : byte
-		{
-			Replace = 0,
-			Add,        // typically for adding an array element
-			Remove,     // typically for removing an array element
-			Union,      // merge two arrays with no duplicates
-			Increment,  // for numeric propertyspec values to add the propertySpec value to the existing value within the Entity
-			Decrement,
-			Additive_Multiply,
-			Additive_Divide
-		}
+    public enum PropertyOperation : byte
+    {
+        Replace = 0,
+        Add,        // typically for adding an array element
+        Remove,     // typically for removing an array element
+        Union,      // merge two arrays with no duplicates
+        Increment,  // for numeric propertyspec values to add the propertySpec value to the existing value within the Entity
+        Decrement,
+        Additive_Multiply,
+        Additive_Divide
+    }
 
 
 	/// <summary>
@@ -10034,29 +10063,103 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
     }
 	
 		
-	
-    // bigchiefcreative.com
-    // 
+	/// Actions available to Stations such as TacticalStation
+	public enum ActionType : int
+	{
+        // Tactical
+		Target,
+		FireAt,
+		Ram,
+		DeployCounterMeasure,
+		DeployMine,
+		DeployProbe,
+        ScanForTargets, // Mines, Missiles, Asteroids, Debris, Ships, etc
+        PrioritizeTargets,
+
+        // Science
+        Planetary_Scan_Geo_Caves,
+        Planetary_Scan_Geo_Minerals,
+        Planetary_Scan_Life,   // racial signatures, specific person signatures (much slower to perform if search area is not very limited)
+        Planetary_Scan_Archaelogical,
+        Planetary_Scan_Atmospheric_Composition,
+        Planetary_Scan_Specific_Atoms_Or_Molecules,
+        Planetary_Scan_Energy_Signatures,
+
+        // Engineering
+
+        // Security
+        
+        // Medical
+
+        
+        // Diagnostics
+        Diagnostic_Weapons_Systems,
+        Diagnostic_Sensors
+
+
+        // see Keystone\Simulation\Objective.cs
+        //   eg: scan planet for X (eg drop ship ladning site)
+        //       - board drop ship
+        //       - launch drop ship
+        //       - protect drop ship
+        //       - drop ship landed
+        //       - drop ship deboarded
+        //       - drop ship RTB initiated
+        //       - drop ship recovered
+
+        //              - ObjectiveTypes.Destroy targetID
+        //              - ObjectiveTypes.DestroyN #num FactionID
+        //              - ObjectiveTypes.Disable targetID
+        //              - Objectivetypes.Board targetID (troop count? what if board and rescue, or board and take-over, or board and investigate, etc). What if we actually want specific npc's to board such as a materlergy scientist?
+        //              - ObjectiveTypes.Defend targetID, duration
+        //              - ObjectiveTypes.Escort
+        //              - ObjectiveTypes.Patrol 
+        //              - ObjectiveTypes.Recon boundingbox or targetID or path?
+        //              - ObjectiveTypes.Search&Destroy
+        //              - ObjectiveTypes.Find (eg artifact)
+        //              - ObjectiveTypes.Analyze
+        //              - ObjectiveTypes.HoldPosition
+        //              - ObjectiveTypes.Liberate (worlds, areas, zones of control)
+        //              - ObjectiveTypes.Capture (zones of control, grid-points/map-points)
+        //              - ObjectiveTypes.Rescue (people)
+        //              - ObjectiveTypes.Transport item quantity where
+	}
+
+
 	public struct TacticalStation
 	{
         // todo: are these for ALL types of stations or just Tactical?
         //       Eventually we want to be able to store all of these actions as
         //       histories in an offline datastore... as log entries for all 
         //       crew actions at every station.
+        //
+        // 
+        // 
+        // Avoid the temptation to add new fields to the bug database. Every month or so, somebody will come up with a great idea for a new field to put in the database. You get all kinds of clever ideas, for example, keeping track of the file where the bug was found; keeping track of what % of the time the bug is reproducible; keeping track of how many times the bug occurred; keeping track of which exact versions of which DLLs were installed on the machine where the bug happened. It’s very important not to give in to these ideas. If you do, your new bug entry screen will end up with a thousand fields that you need to supply, and nobody will want to input bug reports any more. For the bug database to work, everybody needs to use it, and if entering bugs “formally” is too much work, people will go around the bug database.
+        //      - SRC https://www.joelonsoftware.com/2000/11/08/painless-bug-tracking/
+        //
 		public class StationAction
 		{
             public uint RecordID;   // unique ID for EVERY StationAction across ALL Stations of all kinds (eg Tactical, Helm, Engineering, Security, etc) across ALL ships simulation-wide.
+            public ActionType ActionID; 
 
+            public int Area;
+            public int AssignedBy;  // operatorID  
+            public int AssignedTo;  // crewmemberID (if a crew member has died during their attempt to complete this action, the action must be resolved as INCOMPLETE and a new ActionID must be issued to a new member if one wishes to resume the partially complete action)
+			
+            public int Priority;
+
+            public double TimeAssigned;
 			public double TimeStarted;     // time this action started
 			public double Duration;         // time to complete this action
             public double TimeCompleted;
-            public int Status;           // enum
-            public int Resolution;       // can include partial completions (read below about an operator dying during the course of an action)
-            public int AssignedTo;       // operatorID (if an operator has died during their attempt to complete this action, the action must be resolved as INCOMPLETE and a new ActionID must be issued to a new member if one wishes to resume the partially complete action)
-			public int ActionID;         // eg Scan for Targets, Prioritize Targets, Fire at Target, Lay Mines, Deploy Counter-measures, Planetary-Geo Scan for various things like Archaelogy and searching for ruins/artifacts, searching for bio-signs of a particular individual(s) on planet or INSIDE THE SHIP, conduct a diagnostic of a particular ship system, etc.
+            public int Status;           // enum Open, Assigned, InProgress, Closed, Postponed (Operator must be the one to assign Status)
+            public int Resolution;       //  can include partial completions (read below about an operator dying during the course of an action.) The crew member who  is assigned this Action can set the Resolution which will result in it returning to the Operator of the TacticalStation for review and likely Closing.
 
+  
 		}
 
+        private const uint CAN_ACT = 1; // when a StationAction is added, a cooldown must be completed before another Action can be added to this Station.
 		public int EntityArrayIndex;
 		public CONFIGURATION Configuration;
 		//public int UserTypeID;
@@ -10065,7 +10168,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 
 		// Queue is First In First Out
 		public System.Collections.Generic.List<StationAction> Actions;
-		public float CooldownBetweenActions;  //todo: maybe this is CurrentAction.Duration where "CanAct" = (NumActions < Actions.Count - 1 && elapsed >= CurrentAction.Duration)  the minimum amount of time since the previous action before the next action can take place e.g 4.5 seconds and represents the time it takes to carry out that previous Action and to be ready to carry out the next
+		public float CooldownBetweenActions;  //todo: i think all we have to do is when adding an Action, use it's Duration and wait for the callback to complete after registeirng the TimerInterval.  We don't need this CooldownBetweenActions variabl;e at all  -> The Following OLDER TODO IS obsolete? -> todo: maybe this is CurrentAction.Duration where "CanAct" = (NumActions < Actions.Count - 1 && elapsed >= CurrentAction.Duration)  the minimum amount of time since the previous action before the next action can take place e.g 4.5 seconds and represents the time it takes to carry out that previous Action and to be ready to carry out the next
 		                                       // or it might be the Math.Max(thisAction, prevAction) since a previious action might take less time to complete so we will be able to act when it completes first.
 		public int HistoryCount; 
 
@@ -10073,6 +10176,21 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         private List<SensorContact> mSensorContacts;
         private List<Target> mTargets;
         
+        public uint mUserStructFlags;
+
+
+		public void SetUserStructFlag(uint flag, bool value)
+		{
+			mUserStructFlags |= flag;
+		}
+		
+		public bool	GetUserStructFlag(uint flag)
+		{
+			return (flag & mUserStructFlags) != 0;	
+		}
+				
+
+
 		public void Add (SensorContact c, GameTime gt)
 		{
 			if (mSensorContacts == null) mSensorContacts = new List<SensorContact>();
@@ -10081,9 +10199,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
             {
                 //Console.WriteLine ("TacticalStation.Add() - New Contact Added STARTED.");
                 
-                 int stationIndex = this.EntityArrayIndex;
+                int stationIndex = this.EntityArrayIndex;
                 string stationKey = EntryClass.bSim.Boids[stationIndex].EntityKey;
-
 
 				string acquisitionStaleKey = "aquisition_stale_" + c.ContactEntityArrayIndex.ToString();
                 string acquisitionKey = "aquisition_time_" + c.ContactEntityArrayIndex.ToString();
@@ -10211,7 +10328,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			if (mSensorContacts != null)
 				mSensorContacts.Clear();
 
-            // TODO: if we call either ClearTargets() or ClearContaacts() and remove acquisitionkeys and stalekeys
+            // TODO: if we call either ClearTargets() or ClearContacts() and remove acquisitionkeys and stalekeys
             //        it could impact the other unintentioinally
         }
 
@@ -10280,8 +10397,8 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
             return found;
             //return mTargets[found];
         }
-
         
+
         // TODO: if these are added here, then surely they need to be advanced
         // during Tick()?  I think one of the reasons we want to have these StationAction
         // is to be able to log them and to be able to store them to disk and recall them
@@ -10296,65 +10413,64 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 
             // NOTE: we do need to include the RecordID because even though each StationKey is unique for all stations in the entire simulation, there could be multiple ActionIDs of the same type in any one particular station and we need to be
             // able to diffrentiate between them.
-            string timerName = GetActionTimerIntervalName(a);
             float duration = 2f;
-            BoidSimulation.mIntervalTimers.Register(stationKey, timerName, duration);
+            StationAction_TimerRegister(a, duration);
+            SetUserStructFlag(CAN_ACT, false);
 		}
-        
-        private string GetActionTimerIntervalName(TacticalStation.StationAction a)
+
+        private void StationAction_TimerRegister(TacticalStation.StationAction a, float duration)
         {
-            return "StationAction_" + a.ActionID.ToString() + "_" + a.RecordID.ToString();
+            string name = GetActionTimerIntervalName(a);
+            string stationKey = EntryClass.bSim.Boids[this.EntityArrayIndex].EntityKey;
+
+            BoidSimulation.mIntervalTimers.Register(stationKey, 
+                                                name, 
+                                                duration, 
+                                                true,
+                                                false,
+                                                0,
+                                                StationAction_TimerIntervalCompleted);
+
         }
-		
+
+        public void StationAction_TimerIntervalCompleted(string stationID, string intervalName)
+        {
+            string[] s = intervalName.Split('_'); // s0 == "StationAction" s1 == "ActionID" s2 = RecordID
+
+            ActionType actionID = Enum.Parse<ActionType>(s[1]);
+            int recordID = int.Parse(s[2]);
+
+            StationAction a = FindAction(actionID);           
+            SetUserStructFlag(CAN_ACT, true);
+
+            Remove(a);
+        }
+
+        private StationAction FindAction (ActionType actionID)
+        {
+            if (Actions == null) return null;
+
+            for (int i = 0; i < Actions.Count; i++)
+                if (Actions[i].ActionID == actionID)
+                    return Actions[i];
+
+            return null;
+        }
+                		
 		public void Remove (StationAction a)
 		{
+            if (Actions == null) throw new ArgumentOutOfRangeException("TacticalStation.Remove() - StationAction not found. Actions == NULL!");
+
 			Actions.Remove(a);
 			if (Actions.Count == 0)
 				Actions = null;
 		}
 
-        public double GetAquisitionDuration(Target target, GameTime gt)
+        private string GetActionTimerIntervalName(TacticalStation.StationAction a)
         {
-            double diff = 0;
-
-            // - total acquisition time (durationOfSensorAquisition) = last acquisition - initial aquisition (the greater this value, the bigger the bonus to detect again (easier to re-aquire)
-            //      STATISTICS search should give us the acquisition times
-            // mStats[tacticalStation.EntityIndex];
-            double currentTotalElapsedSeconds = gt.TotalElapsedSeconds;
-            
-            return currentTotalElapsedSeconds - mSensorContacts[target.SensorContactIndex].TimeAcquired();
-
-            /*
-            string acquisitionStaleKey = "aquisition_stale_" + target.EntityArrayIndex.ToString();
-            string acquisitionKey = "aquisition_time_" + target.EntityArrayIndex.ToString();
-
-            int stationIndex = this.EntityArrayIndex;
-            string stationKey = EntryClass.bSim.Boids[stationIndex].EntityKey;
-
-
-            bool isStale =  EntryClass.mUserDataStore[stationKey].GetBool(acquisitionStaleKey);    
-
-            double foundTime = EntryClass.mUserDataStore[stationKey].GetDouble(acquisitionKey);
-
-
-            SensorContact c = mSensorContacts[target.SensorContactIndex];
-            foundTime = c.TimeAcquired();
-
-            if (foundTime != currentTotalElapsedSeconds)
-            {
-                diff = currentTotalElapsedSeconds - foundTime;
-            }
-
-            return diff;
-            */
+            return "StationAction_" + a.ActionID.ToString() + "_" + a.RecordID.ToString();
         }
-        
-        public double GetEvasiveManeuverDuration(Target target, GameTime gt)
-        {
-            double result = 0;
 
-            return result;
-        }
 
 		// todo: Actions that have completed need to be removed from a list?
 		///<summary>
@@ -10397,28 +10513,6 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 				}
 				
 
-                string timerIntervalName = GetActionTimerIntervalName(Actions[0]);
-				// check the cooldowns (if a slot is available, then doesn't this mean the cooldown has expired?  
-				// once a cooldown expires, the action is removed from the list of current actions correct?
-				
-				List<int>toRemove = new List<int>();
-				int pos = 0;
-				foreach (var item in Actions)
-				{
-					double elapsed = Utils.GetAge(item.TimeStarted);
-					bool hasElapsed = elapsed > item.Duration;
-					if (hasElapsed)
-					{
-						toRemove.Add(pos);
-					}
-					pos++;
-					
-				}
-
-				if (toRemove.Count > 0)
-					for (int i = 0; i < toRemove.Count; i++)
-						Actions.RemoveAt(toRemove[i]);
-				
 			}
 			return result;
 		}
@@ -10453,6 +10547,55 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 
 			return result;
 		}
+
+        
+        /// <summary>
+        /// SensorContact's duration of acquisition by a Sensor component.
+        /// </summary>
+        public double GetAquisitionDuration(Target target, GameTime gt)
+        {
+            double diff = 0;
+
+            // - total acquisition time (durationOfSensorAquisition) = last acquisition - initial aquisition (the greater this value, the bigger the bonus to detect again (easier to re-aquire)
+            //      STATISTICS search should give us the acquisition times
+            // mStats[tacticalStation.EntityIndex];
+            double currentTotalElapsedSeconds = gt.TotalElapsedSeconds;
+            
+            return currentTotalElapsedSeconds - mSensorContacts[target.SensorContactIndex].TimeAcquired();
+
+            /*
+            string acquisitionStaleKey = "aquisition_stale_" + target.EntityArrayIndex.ToString();
+            string acquisitionKey = "aquisition_time_" + target.EntityArrayIndex.ToString();
+
+            int stationIndex = this.EntityArrayIndex;
+            string stationKey = EntryClass.bSim.Boids[stationIndex].EntityKey;
+
+
+            bool isStale =  EntryClass.mUserDataStore[stationKey].GetBool(acquisitionStaleKey);    
+
+            double foundTime = EntryClass.mUserDataStore[stationKey].GetDouble(acquisitionKey);
+
+
+            SensorContact c = mSensorContacts[target.SensorContactIndex];
+            foundTime = c.TimeAcquired();
+
+            if (foundTime != currentTotalElapsedSeconds)
+            {
+                diff = currentTotalElapsedSeconds - foundTime;
+            }
+
+
+            return diff;
+            */
+        }
+        
+        public double GetEvasiveManeuverDuration(Target target, GameTime gt)
+        {
+            double result = 0;
+
+            return result;
+        }
+
 	}
 		
 	
@@ -21262,7 +21405,7 @@ public abstract class PlanedFrustum
 
     public class IntervalTimers
     {			
-        public delegate string IntervalCompleted(string nodeID, string name);
+        public delegate void IntervalCompleted(string nodeID, string name);
         //private List<TimePeriod> mTimePeriods;
         private Dictionary<string, TimePeriod> mKeyedTimePeriods;
 		private System.Collections.Concurrent.ConcurrentDictionary<string, TimePeriod> mIntervals;
@@ -21326,13 +21469,15 @@ public abstract class PlanedFrustum
 
 		
 
-        public void Register(string nodeID, string name, double durationInSeconds, bool activateImmediately = true, bool repeating = false, int repeatCount = 0)
+        public void Register(string nodeID, string name, double durationInSeconds, bool activateImmediately = true, bool repeating = false, int repeatCount = 0, IntervalCompleted completedCallback = null)
         {
             TimePeriod tp = new TimePeriod();
 
             tp.OwnerID = nodeID;
             tp.Name = name;
             tp.Duration = durationInSeconds;
+            if (durationInSeconds % EntryClass.mStep != 0)
+                Console.WriteLine("IntervalTimers.Register() - '" + name + "' is not a multiple of " + EntryClass.mStep.ToString() + ". It is a good idea for the duration interval to be a multiple of the FIXED STEP SIZE.");
             tp.Elapsed = 0d;
             tp.Repeating = repeating;
             tp.RepeatCount = repeatCount;
@@ -21340,7 +21485,7 @@ public abstract class PlanedFrustum
 
             tp.IsPaused = false;
             tp.DeActivateAfterCompleted = false;
-            tp.IntervalCompletedCB = null;
+            tp.IntervalCompletedCB = completedCallback;
 
             tp.IsActive = activateImmediately;
 

@@ -251,7 +251,53 @@ using System.IO;
 			// https://panoptesv.com/RPGs/Equipment/Weapons/BeamWeapons.php?HR=0
 			// https://gamedev.stackexchange.com/questions/148961/how-to-design-a-damage-formula-in-an-rpg-which-keeps-weapons-with-different-atta
 			
+		
+
+ 		
+             //    - AreaOfInterest 
 			
+			// https://forum.paradoxplaza.com/forum/threads/the-truth-is-out-there-an-aurora-4x-c-forum-game-version-1-13.1492866/page-11
+			
+             // Crew/NPC movement (steering)
+             //   linear acceleration / decelaration
+			 // Ship movement - Gravitation / N-Body
+             // Ship movement - Newtonian Physics
+             // Ship movement - Steering
+			 // Ship movement - Lerping to a destination over a specific time period
+             //   SEE https://github.com/vazgriz/PID_Controller
+			 //     - MIT License
+			 //     - specifically has a sample for controlling a Turret
+			 //     - https://github.com/vazgriz/PID_Controller/blob/master/Assets/Scripts/Turret.cs
+			 //     - Also see stage\\projects\\waypointfollower.txt
+			
+			 // Turret aiming - PID controllers
+             // laser / particle cannons - movement
+             // missiles - PID controllers again
+
+             // particle Systems
+             // motion fields
+             // 
+
+			 // Collisions - could benefit from sharing Adjacents / Neighbors from Sensor Scans or vice-versa
+             // collisions (BoundingBox.Min, BoundingBox.Max, and Sphere.Center and Sphere.Radius need to be in a Memory<T> struct)
+             //
+			
+             // Animations (LODs used to prevent animations when too far away?)
+             //   - interpolation Animations
+             //   - spritesheets, atlas texture animations
+             // 
+             
+			 // 
+			 // 
+             //    - storing data on interior Walls for fast iteration of mouse picking
+             //    walls and floors and ceilings.  <-- This is mostly for when our view is such that
+             //    we cannot first determine the closest edge and use that to find any wall on that edge
+             //    For instance, imagine a camera that is more like a FPS view or a bullet or laser hits a Walls
+
+             //    - storing data on interior Walls and Floors and Ceilings "damage"
+
+
+
 
 // FIXES Feb.8.2026
 //   - started adding code for Laser fire damage effects processing 
@@ -263,6 +309,102 @@ using System.IO;
 // TODO: THE SAMPLE FROM GITHUB https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
 // and simply uses System.Drawing to draw the boids.  I will want to just use a simple 3d pyramid type boid .obj instead.
 // https://github.com/swharden/Csharp-Data-Visualization/blob/main/website/content/simulations/boids/index.md
+
+
+
+    
+// // todo: Parallel.For() libnoise.net ?? 
+
+
+
+// State
+//      Factions Relationships (at War, Peace, War - CeaseFire, None)
+//      Regions Controlled By
+// 
+//
+    // Policies
+    //      Treaties
+    //      Laws
+    //      Captain's Personal Views
+    //
+    //
+    // Mission
+    //     Objectives (tend to describe What, Where, When but not How, Who or Why... How and Who are for the executives of the ship, Why is for Generals and Politicians)
+    //           Orders(capture enemy ship)
+    //              Conditions
+    //                  Stealth Configuration
+    //                  Communications Restrictions
+    //                  Engine burn restrictions
+    //                  Weapon Use Restrictions (eg. stealth missiles only)
+    //
+    //                Tasks (disable ship, dock with ship, board target ship, breach hull, neutralize opfor, take bridge, secure prisonsers)
+    //                Tasks (find and recover artifact, or fuel, or whatever)
+    //                     Actions
+    //           ThreatCondition = Red, Yellow, Green
+    //           
+
+    // Executing tactical simulation orders generally follows this process:
+    // 1. Assess the SituationGather 
+    //     Intel: Scan the simulation interface to identify enemy or crisis locations.
+    //     Resource Check: Determine the readiness of your fleet, crew, or units (e.g., weapon readiness, fuel, and health).
+    // 2. Formulate the Tactical PlanDetermine the Objective: Decide whether the goal is offensive engagement, defensive maneuvering, or an extraction/rescue operation.
+    //     Assign Roles: If applicable, designate specific sub-commands (e.g., assigning weapons control, navigation, or sonar to AI or other crew members).
+    // 3. Issue the OrdersInput Commands: Translate your tactical plan into the simulation's digital interface. This usually involves plotting coordinates, selecting formations (e.g., tactical V), and setting engagement rules.
+    //     Execute/Simulate: Initiate the combat or action phase of the simulation.
+    // 4. Monitor and AdjustReal-time Tracking: Observe unit behavior, resource depletion, and combat outcomes.
+    //     Adjustments: Adapt your orders based on how the simulation's AI or opposing forces react.If you can specify the name of the game or tactical simulation you are playing, I can provide you with the exact user interface commands, hotkeys, or strategic guides for that specific program.
+
+
+// As ship's captain, the player receives a Mission with Objectives in it.  The Player then must delegate responsibility to his Officers for carrying out the tasks needed to fulfill these mission objectives.
+
+// Thus, the Station operators, will receive Orders from the Player, and in turn, they will create a list of Tasks to complete those Orders.
+
+
+// 
+// 
+// if (!canAct) return;
+//
+// if (currentStation.Orders > 0)
+// {
+//        Tasks[] t = FullFillOrders(currentStation.Orders, currentStation.Actions);
+//        for (int i = 0; i < t.Length; i++)
+//           Execute(t);
+//           NOTE: Orders that are completed (all tasks that comprised it are completed) must be flagged as COMPLETED
+//                 by the Operator
+// }
+// else
+// {
+//     // self directed tasks
+//     //   - diagnostics
+//     //   - readyness drills
+//     //   - schedule modifications - eg. extra days off for some crewmembers
+//     //   
+// }
+
+
+// SAMPLE MISSION #1
+//      
+//     Receive 100 Passengers (see attached Passenger Manifest #EK2022) from Earth Station Kappa.
+//     Ferry Passengers safely to Mars Colony Beta.
+//     
+//     SITUATION REPORT:
+//           Rebel forces from Mars Colony Alpha may be in the area comprised of converted Mining Ships and Freighters with retrofitted missiles and lasers.
+//     
+
+// Captain to Tactical -> "Continuous Long Range Scans en Route to Mars", "Report Enemy and Unknown contacts only", "Review History of Rebel Tactics in the Mars System and Report any Recommendations", "Run diagnostics on weapons system to ensure we're at 100% readyness", "Run diagnostics on sensors to ensure 100% readyness", advise on egress to Mars LowOrbit. Advise on egress to Mars Colony Beta egress by shuttle.  Support shuttle to surface.
+
+//  Upon arriving at Mars geosychronous distance, hostiles are detected.  Tactical must report these to the Captain (Player).
+// Tactical should also determine if the Captain is overwhelmed and perhaps take initiative and raise shields, prepare weapons, set condition Red, etc.
+// 
+
+
+
+// So tactical operator must enqueue "StationAction."  These should be queued perhaps within buckets by the Area->SubArea that they belong too (as in RAID bug database.)  This way if a particular bucket for Sensor scans using the main radar, will never have multiple scans running at once because that bucket will have a queue with the second request blocked until the first one finishes."
+// REcall how queued actions for an RTS like Total War occur... there are different queues for each Structure type and each Structure might be able to build more than one unit at a time, but nonetheless, you can enqueue as many as you like.
+// We could have seperate queues set for each Component such as a SensorScan queued by a sensor in a bucket with it's entityID as the bucket key.
+
+
+
 
 
 
@@ -2750,8 +2892,8 @@ namespace HelloBoids
             return results;
         }
 #endif
-    
-        
+
+
 
 			
 		
@@ -3256,66 +3398,6 @@ namespace HelloBoids
 			// OR, our various processors can just grab the Stores that are needed.  There's no need really to 
 			// grab the stores outside of the processor functions only to just pass them there...  
 	
- 		
-             //    - AreaOfInterest 
-			
-			// https://forum.paradoxplaza.com/forum/threads/the-truth-is-out-there-an-aurora-4x-c-forum-game-version-1-13.1492866/page-11
-			
-             // Crew/NPC movement (steering)
-             //   linear acceleration / decelaration
-			 // Ship movement - Gravitation / N-Body
-             // Ship movement - Newtonian Physics
-             // Ship movement - Steering
-			 // Ship movement - Lerping to a destination over a specific time period
-             //   SEE https://github.com/vazgriz/PID_Controller
-			 //     - MIT License
-			 //     - specifically has a sample for controlling a Turret
-			 //     - https://github.com/vazgriz/PID_Controller/blob/master/Assets/Scripts/Turret.cs
-			 //     - Also see stage\\projects\\waypointfollower.txt
-			
-			 // Turret aiming - PID controllers
-             // laser / particle cannons - movement
-             // missiles - PID controllers again
-
-             // particle Systems
-             // motion fields
-             // 
-
-			 // Collisions - could benefit from sharing Adjacents / Neighbors from Sensor Scans or vice-versa
-             // collisions (BoundingBox.Min, BoundingBox.Max, and Sphere.Center and Sphere.Radius need to be in a Memory<T> struct)
-             //
-			
-             // Animations (LODs used to prevent animations when too far away?)
-             //   - interpolation Animations
-             //   - spritesheets, atlas texture animations
-             // 
-             
-			 // 
-			 // 
-             //    - storing data on interior Walls for fast iteration of mouse picking
-             //    walls and floors and ceilings.  <-- This is mostly for when our view is such that
-             //    we cannot first determine the closest edge and use that to find any wall on that edge
-             //    For instance, imagine a camera that is more like a FPS view or a bullet or laser hits a Walls
-
-             //    - storing data on interior Walls and Floors and Ceilings "damage"
-
-
-
-
-
-            // Executing tactical simulation orders generally follows this process:
-            // 1. Assess the SituationGather 
-            //     Intel: Scan the simulation interface to identify enemy or crisis locations.
-            //     Resource Check: Determine the readiness of your fleet, crew, or units (e.g., weapon readiness, fuel, and health).
-            // 2. Formulate the Tactical PlanDetermine the Objective: Decide whether the goal is offensive engagement, defensive maneuvering, or an extraction/rescue operation.
-            //     Assign Roles: If applicable, designate specific sub-commands (e.g., assigning weapons control, navigation, or sonar to AI or other crew members).
-            // 3. Issue the OrdersInput Commands: Translate your tactical plan into the simulation's digital interface. This usually involves plotting coordinates, selecting formations (e.g., tactical V), and setting engagement rules.
-            //     Execute/Simulate: Initiate the combat or action phase of the simulation.
-            // 4. Monitor and AdjustReal-time Tracking: Observe unit behavior, resource depletion, and combat outcomes.
-            //     Adjustments: Adapt your orders based on how the simulation's AI or opposing forces react.If you can specify the name of the game or tactical simulation you are playing, I can provide you with the exact user interface commands, hotkeys, or strategic guides for that specific program.
-
-
-
 
         	//Console.WriteLine("Do_Tactical_Logic() - DoDeviceReadyStatus()");
 			DoDeviceReadyStatus();

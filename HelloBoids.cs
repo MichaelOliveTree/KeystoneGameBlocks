@@ -446,6 +446,22 @@ using System.IO;
 
 
 
+// see Entity.cs  private void PublicPropertyChangedEventRaise(string propertyName)
+// 
+        // NOTE: June.4.2026 - Here our Event system does not use a "EventManager" and instead each
+        //       subscriber, subscribes directly to the Entity that is raising the Event.
+        //       Downsides to this approach:
+        // //    1) if we want to process all events in bulk
+        //       after all events have been raised, it's easier to have a single EventManager that queues 
+        //       them all, rather than each Entity having to queue their own...
+        //       2) Our MisionObjectives need to subscribe to every Entity and to potentially each events it wants to
+        //        "listen" for on that Entity, instead of just subscribing once for each event type, for all Entities.
+        // https://gamedev.net/forums/topic/190536-scheduling-game-events/
+        // https://gamedev.net/forums/topic/593340-how-to-design-an-event-driven-architecture-for-a-game/
+// https://github.com/Steamodded/smods/wiki/Guide-%E2%80%90-Event-Manager
+// https://gamedev.net/tutorials/programming/general-and-gameplay-programming/managing-decoupling-part-2-polling-callbacks-and-events-r3044
+
+
 
 
 

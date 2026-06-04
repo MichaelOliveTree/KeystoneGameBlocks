@@ -316,6 +316,8 @@ using System.IO;
 // // todo: Parallel.For() libnoise.net ?? 
 
 
+// Keystone.Simulation.Mission
+// Keystone.Simulation.Objective
 
 // State
 //      Factions Relationships (at War, Peace, War - CeaseFire, None)
@@ -330,18 +332,71 @@ using System.IO;
     //
     // Mission
     //     Objectives (tend to describe What, Where, When but not How, Who or Why... How and Who are for the executives of the ship, Why is for Generals and Politicians)
-    //           Orders(capture enemy ship)
+    //           Orders(capture enemy ship, broad , tasks represent the breakdown of high level orders into low level tasks.)
     //              Conditions
     //                  Stealth Configuration
     //                  Communications Restrictions
     //                  Engine burn restrictions
     //                  Weapon Use Restrictions (eg. stealth missiles only)
     //
-    //                Tasks (disable ship, dock with ship, board target ship, breach hull, neutralize opfor, take bridge, secure prisonsers)
+    //                Tasks (disable ship, assemble # marines onto shuttle, deploy shuttle,dock with ship, board target ship, breach hull, neutralize opfor/resistance, take bridge, secure prisonsers)
     //                Tasks (find and recover artifact, or fuel, or whatever)
     //                     Actions
     //           ThreatCondition = Red, Yellow, Green
     //           
+
+    //  - are we in a state of COMBAT?
+    //		- direct orders?
+
+    // TODO: this comment doesnt belong here, but for now remember
+    // HELM station would be influenced by Orders, Mission and Posture for example
+    // if ordered to defend another ship, helm would try to maneuver such that this ship
+    // is physically located between the ship-to-defend and a threat
+
+    
+// BEGIN TRANSMISSION ---------------------------------------------------
+// SAMPLE MISSION #1  - "A Shakedown Cruise"
+//      
+//     Receive 100 Passengers (see attached Passenger Manifest #EK2022) from Earth Station Kappa.
+//     Ferry Passengers safely to Mars Colony Beta.
+//     
+//     SITUATION REPORT:
+//           Rebel forces from Mars Colony Alpha may be in the area comprised of converted Mining Ships and Freighters with retrofitted missiles and lasers.
+//     
+// 
+//     RECOMMENDED ACTIONS:
+//          Captain to Tactical -> "Continuous Long Range Scans en Route to Mars", "Report Enemy and Unknown contacts only", "Review History of Rebel Tactics in the Mars System and Report any Recommendations", "Run diagnostics on weapons system to ensure we're at 100% readyness", "Run diagnostics on sensors to ensure 100% readyness", advise on egress to Mars LowOrbit. Advise on egress to Mars Colony Beta egress by shuttle.  Support shuttle to surface.
+
+//  Upon arriving at Mars geosychronous distance, hostiles are detected.  Tactical must report these to the Captain (Player).
+// Tactical should also determine if the Captain is overwhelmed and perhaps take initiative and raise shields, prepare weapons, set condition Red, etc.
+// 
+// END TRANSMISSION -----------------------------------------------------
+
+
+// BEGIN TRANSMISSION ---------------------------------------------------
+// SAMPLE MISSION #2 - "Rebellion at Titan"
+//
+//    Eliminate hostile threats in orbit around Titan.
+//    Support the loyalists in defeating the rebels that are fighting to take control over Titan Colony Sigma.  
+//    - Rumors have it that the Rebels have built a secret output where reserve forces ar e being deployed from.  Ensure ALL threats on and around Titan are identified and neutralized.  We don't need this hornet's nest stirring up again.
+//    - Use of Diplomacy is at your discretion.
+//    - Deploy Marines to assist in ground fighting at your discretion.
+//    - Assist in any emergency repairs to Colony Sigma.
+//
+//    SITUATION REPORT:
+//    A coup in progress on Saturn's largest moon Titan at Titan Colony Sigma.  The coup is being supported by the war-freighter "Blalock" in Low-Orbit providing directed-fire-support, COMS jamming, Reconaissance\Intel, and other support to the Rebel forces.  
+
+// The loyalists at Titan Colony Sigma estimate they can only hold out for 12 hours.  At maximum speed, the Echo-Star can get their in 10 hours.  God speed Captain.
+
+//     RECOMMENDED ACTIONS:
+//          Captain to Tactical -> "Continuous Long Range Scans en Route to Titan", "Report Enemy and Unknown contacts only", "Review History of Rebel Tactics in the Saturn and Titan System and Report any Recommendations", "Run diagnostics on weapons system to ensure we're at 100% readyness", "Run diagnostics on sensors to ensure 100% readyness", advise on egress to Titan LowOrbit. Advise on egress to Titan Colony Beta Sigma egress by shuttle with Marines.  Support shuttle to surface.... 
+//        Destroy\Disable\Capture the Blalock and hand it over to the Titan Colony loyalists security forces.
+
+//  Upon arriving at Titan geosychronous distance, hostiles are detected.  Tactical must report these to the Captain (Player).
+// Tactical should also determine if the Captain is overwhelmed and perhaps take initiative and raise shields, prepare weapons, set condition Red, etc.
+// 
+// END TRANSMISSION -----------------------------------------------------
+
 
     // Executing tactical simulation orders generally follows this process:
     // 1. Assess the SituationGather 
@@ -355,22 +410,21 @@ using System.IO;
     //     Adjustments: Adapt your orders based on how the simulation's AI or opposing forces react.If you can specify the name of the game or tactical simulation you are playing, I can provide you with the exact user interface commands, hotkeys, or strategic guides for that specific program.
 
 
+
 // As ship's captain, the player receives a Mission with Objectives in it.  The Player then must delegate responsibility to his Officers for carrying out the tasks needed to fulfill these mission objectives.
 
-// Thus, the Station operators, will receive Orders from the Player, and in turn, they will create a list of Tasks to complete those Orders.
+// Thus, the Station operators, will receive Orders from the Player, and in turn, they will create a list of Tasks(StationAction) to complete those Orders.
 
 
-// 
+
 // 
 // if (!canAct) return;
 //
 // if (currentStation.Orders > 0)
 // {
-//        Tasks[] t = FullFillOrders(currentStation.Orders, currentStation.Actions);
+//        Tasks[] t = FullFillOrders(currentStation.Orders);
 //        for (int i = 0; i < t.Length; i++)
 //           Execute(t);
-//           NOTE: Orders that are completed (all tasks that comprised it are completed) must be flagged as COMPLETED
-//                 by the Operator
 // }
 // else
 // {
@@ -382,21 +436,8 @@ using System.IO;
 // }
 
 
-// SAMPLE MISSION #1
-//      
-//     Receive 100 Passengers (see attached Passenger Manifest #EK2022) from Earth Station Kappa.
-//     Ferry Passengers safely to Mars Colony Beta.
-//     
-//     SITUATION REPORT:
-//           Rebel forces from Mars Colony Alpha may be in the area comprised of converted Mining Ships and Freighters with retrofitted missiles and lasers.
-//     
 
-// Captain to Tactical -> "Continuous Long Range Scans en Route to Mars", "Report Enemy and Unknown contacts only", "Review History of Rebel Tactics in the Mars System and Report any Recommendations", "Run diagnostics on weapons system to ensure we're at 100% readyness", "Run diagnostics on sensors to ensure 100% readyness", advise on egress to Mars LowOrbit. Advise on egress to Mars Colony Beta egress by shuttle.  Support shuttle to surface.
-
-//  Upon arriving at Mars geosychronous distance, hostiles are detected.  Tactical must report these to the Captain (Player).
-// Tactical should also determine if the Captain is overwhelmed and perhaps take initiative and raise shields, prepare weapons, set condition Red, etc.
-// 
-
+// Tasks -> StationAction's 
 
 
 // So tactical operator must enqueue "StationAction."  These should be queued perhaps within buckets by the Area->SubArea that they belong too (as in RAID bug database.)  This way if a particular bucket for Sensor scans using the main radar, will never have multiple scans running at once because that bucket will have a queue with the second request blocked until the first one finishes."
@@ -3476,30 +3517,10 @@ namespace HelloBoids
 
                 if (!canAct) return;
 
-            `   // Keystone.Simulation.Mission
-                // Keystone.Simulation.Objective
-
-				// Mission
-                //    Objectives
-
-                // Orders are broad , tasks represent the breakdown of high level orders into low level tasks.
-                // 
-                // Orders (eg: Board that ship)
-                //     Tasks (eg. assemble # marines onto shuttle, deploy shuttle, attach to appropriate location on target, breech hull, neutralize resistance, etc...)
-                //
-                // 
-                //  - are we in a state of COMBAT?
-				//		- direct orders?
-
-                // TODO: this comment doesnt belong here, but for now remember
-			    // HELM station would be influenced by Orders, Mission and Posture for example
-			    // if ordered to defend another ship, helm would try to maneuver such that this ship
-			    // is physically located between the ship-to-defend and a threat
-
-                // TODO: hERE we need to decide what to do asfar as StationAction goes
+                // TODO: hERE we need to decide what to do as far as StationAction goes
                 // now that we know we "CanAct"  we need to start by examining current orders, policies, existing actions, etc
 
-				
+
                 //LOG THE StationActions to an Orders logger
                 //    StationActions resemble RAID bug database entries
 

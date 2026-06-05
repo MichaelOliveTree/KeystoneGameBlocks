@@ -312,6 +312,12 @@ using System.IO;
 
 
 
+// todo: for my BehaviorTree, add a "Address" property that we can read to print out the current node's Path through the tree so we know exactly the path we've taken down the tree at the current breakpoint when checking the .Address property.
+
+// Order.Rescind()
+// Order.Supercede(otherOrder)
+
+
     
 // // todo: Parallel.For() libnoise.net ?? 
 
@@ -389,7 +395,7 @@ using System.IO;
 // The loyalists at Titan Colony Sigma estimate they can only hold out for 12 hours.  At maximum speed, the Echo-Star can get their in 10 hours.  God speed Captain.
 
 //     RECOMMENDED ACTIONS:
-//          Captain to Tactical -> "Continuous Long Range Scans en Route to Titan", "Report Enemy and Unknown contacts only", "Review History of Rebel Tactics in the Saturn and Titan System and Report any Recommendations", "Run diagnostics on weapons system to ensure we're at 100% readyness", "Run diagnostics on sensors to ensure 100% readyness", advise on egress to Titan LowOrbit. Advise on egress to Titan Colony Beta Sigma egress by shuttle with Marines.  Support shuttle to surface.... 
+//          Captain to Tactical -> "Continuous Long Range Scans en Route to Titan", "Report Enemy and Unknown contacts only", "Review History of Rebel Tactics in the Saturn and Titan System and Report any Recommendations", "Run diagnostics on weapons system to ensure we're at 100% readyness", "Run diagnostics on sensors to ensure 100% readyness", advise on egress to Titan LowOrbit (eg recommend we enter orbit from the east at high latitude to avoid suspected SAM sites over Rebel controlled colonies Alpha and Beta). Advise on egress to Titan Colony Beta Sigma egress by shuttle with Marines.  Support shuttle to surface....  Be ready for any surprises..." (some of these are "STANDING ORDERS")
 //        Destroy\Disable\Capture the Blalock and hand it over to the Titan Colony loyalists security forces.
 
 //  Upon arriving at Titan geosychronous distance, hostiles are detected.  Tactical must report these to the Captain (Player).
@@ -416,11 +422,12 @@ using System.IO;
 // Thus, the Station operators, will receive Orders from the Player, and in turn, they will create a list of Tasks(StationAction) to complete those Orders.
 
 
+// task.OrderID // the order this task is supporting
 
 // 
 // if (!canAct) return;
 //
-// if (currentStation.Orders > 0)
+// if (currentStation.Orders > 0 && !currentStation.ordersCompleted())
 // {
 //        Tasks[] t = FullFillOrders(currentStation.Orders);
 //        for (int i = 0; i < t.Length; i++)
@@ -432,8 +439,36 @@ using System.IO;
 //     //   - diagnostics
 //     //   - readyness drills
 //     //   - schedule modifications - eg. extra days off for some crewmembers
+//      // - calibrate weapons - requires targets to be deployed or asteroid field nearby
+//      //
 //     //   
 // }
+
+
+
+
+// todo: DROP IN REPLACEMENT FOR KeyScript.Event -> Keystone.Events.EventManager
+//    MissionManager subscribes to EventManager
+//			- can subscribe to an Event of a specific name for ALL ENtities or for just ONE\OR MORE specific Entity
+
+
+// CreateTasks(Orders)
+// bool task.RequiredForMissionCompletion = false; // perform continuos radar scans
+// tasks.Prerequisites <-- like Rules\Conditions.  Tasks can have prerequisites
+// 	eg. location/range, time, some event to occur, some other entity to arrive nearby or leave
+//      a prerequisite for some tasks might be that not hostiles are in the area, unless override with
+//      (DangerClose) directive to perform say a Docking with shuttle even though there are Enemy ships that
+//      can easily target the vulnerable docking shuttle/transport.
+//
+//  Tasks may have a required Sequence
+//  Check for impossible dependancies/requirements
+	// eg. ship to board has been destroyed or fled and thus all tasks related to assembling marines and deploying shuttle and breeching hull etc are IRRELEVANT/VOID
+//
+
+// OnMissionObjectivesChanged()
+// OnOrdersChanged()
+// OnTasksChanged()
+
 
 
 
@@ -445,7 +480,7 @@ using System.IO;
 // We could have seperate queues set for each Component such as a SensorScan queued by a sensor in a bucket with it's entityID as the bucket key.
 
 
-
+ 
 // see Entity.cs  private void PublicPropertyChangedEventRaise(string propertyName)
 // 
         // NOTE: June.4.2026 - Here our Event system does not use a "EventManager" and instead each
@@ -456,15 +491,26 @@ using System.IO;
         //       them all, rather than each Entity having to queue their own...
         //       2) Our MisionObjectives need to subscribe to every Entity and to potentially each events it wants to
         //        "listen" for on that Entity, instead of just subscribing once for each event type, for all Entities.
+		//       3) doesnt have to constantly subscribe everytime an Entity is added to scene.
+
         // https://gamedev.net/forums/topic/190536-scheduling-game-events/
         // https://gamedev.net/forums/topic/593340-how-to-design-an-event-driven-architecture-for-a-game/
 // https://github.com/Steamodded/smods/wiki/Guide-%E2%80%90-Event-Manager
 // https://gamedev.net/tutorials/programming/general-and-gameplay-programming/managing-decoupling-part-2-polling-callbacks-and-events-r3044
 
 
-
-
-
+// class EventManager.cs
+// {
+//      // surrendered
+//      // hit
+//      // destroyed
+//      // boarded
+//      // hit/damaged
+//      // left region
+//      // entered region
+//      // 
+// 
+// }
 
 // NOTE: The primary purpose of this is to demonstrate the use of Memory<T>
 // via ComponentStore.cs (ComponentStore.ReadOnlySpan and ComponentStore.WriteOnlySpan)

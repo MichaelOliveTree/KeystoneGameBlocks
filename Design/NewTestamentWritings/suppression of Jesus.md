@@ -3,8 +3,8 @@ The Suppression of Jesus' Teachings By the Romans and Pharisees (On The Four Gos
 
 NOTICE: Please download and SAVE this video, copyright notice and transcript. Permission is given to share complete and unedited copies of this video, and complete and unedited copies of this transcript provided this copyright notice and my name and email are included.  Thank you.   
 
-A Transcript of this video can be found here:
-https://www.github.com/KeystoneGameBlocks/design/NewTestamentWritings/suppression of Jesus.txt
+A Transcript of this video can be found [here](https://github.com/MichaelOliveTree/KeystoneGameBlocks/blob/main/Design/NewTestamentWritings/suppression%20of%20Jesus.md):
+(https://github.com/MichaelOliveTree/KeystoneGameBlocks/blob/main/Design/NewTestamentWritings/suppression%20of%20Jesus.md)
 -------------------------------------------------------
 
 1)  The Gospels are a collection of ancient manuscripts and as such, historical context is REQUIRED before one can fully understand the parables (and the teachings of Jesus that the parables hold).

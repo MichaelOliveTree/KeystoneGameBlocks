@@ -11,6 +11,8 @@ namespace KeyEdit.Workspaces
 {
 	// TODO: Add an "Address" property similar to OctreeOctant that will return the hierarchical location of the current node.
 
+	// TODO: Add profiler blocks to test How long each BehaviorTree run takes per frame.
+
 	
 	/// <summary>
 	/// </summary>

@@ -7,6 +7,7 @@ using Keystone.Resource;
 using Keystone.Types;
 using Keystone.Utilities;
 
+
 namespace KeyEdit.Workspaces
 {
 	// TODO: Add an "Address" property similar to OctreeOctant that will return the hierarchical location of the current node.

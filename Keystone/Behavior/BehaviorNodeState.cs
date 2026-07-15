@@ -200,6 +200,88 @@ namespace Keystone.Behavior
 
         */
 
+
+        /*
+        using Node = std::function<Status()>;
+
+        // --- Control Flow ---
+
+        Node Sequence(std::vector<Node> children) {
+            return [children]() {
+                for (const auto& child : children) {
+                    Status status = child();
+                    if (status == Status::RUNNING || status == Status::FAILURE) {
+                        return status;
+                    }
+                }
+                return Status.SUCCESS;
+            };
+        }
+
+        Node Selector(std::vector<Node> children) {
+            return [children]() {
+                for (const auto& child : children) {
+                    Status status = child();
+                    if (status == Status::RUNNING || status == Status::SUCCESS) {
+                        return status;
+                    }
+                }
+                return Status.FAILURE;
+            };
+        }
+
+        // --- Leaf Actions ---
+
+        struct Agent {
+            int battery;
+            int ammo;
+        };
+
+        Node CheckBattery(Agent& agent) {
+            return [&agent]() {
+                return (agent.battery > 20) ? Status::SUCCESS : Status::FAILURE;
+            };
+        }
+
+        Node AttackEnemy(Agent& agent) {
+            return [&agent]() {
+                if (agent.ammo > 0) {
+                    agent.ammo--;
+                    std::cout << "Attacking enemy! Pew pew.\n";
+                    return Status.SUCCESS;
+                }
+                return Status.FAILURE;
+            };
+        }
+
+        Node Flee() {
+            return []() {
+                std::cout << "Fleeing to safety...\n";
+                return Status.SUCCESS;
+            };
+        }
+
+        // --- Execution ---
+
+        int main() {
+            Agent my_agent { .battery = 15, .ammo = 5 };
+
+            // Build the behavior tree closure
+            Node behavior_tree = Selector({
+                Sequence({
+                    CheckBattery(my_agent),
+                    AttackEnemy(my_agent)
+                }),
+                Flee()
+            });
+
+            // Tick the tree
+            behavior_tree();
+
+            return 0;
+        }
+        */
+
     internal class BehaviorNodeState
     {
         // TODO: remove codeplex BehaviorTree from keystone solution... i dont use it afterall.

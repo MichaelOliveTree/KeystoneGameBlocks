@@ -196,8 +196,18 @@ namespace Keystone.Behavior
                     int result = nativePtr(10, 20);
                 }
             }
-            Use code with caution.Delegate vs. Function Pointer ComparisonFeatureDelegates (Func, Action, delegate)Function Pointers (delegate*)Memory AllocationAllocates an object on the managed heapZero allocations (lives on the stack/registers)GC PressureTriggers Garbage Collection over timeNo GC tracking or pressureIL OpcodeUses callvirt (slower virtual call)Uses calli (fast raw address hop)Instance MethodsSupported naturally (myObj.Method)Restricted (strictly designed for static methods)Safety TypeSafe managed codeUnsafe (can cause memory crashes if misused)Important Rules & LimitationsNo Instance Methods Directly: Function pointers cannot cleanly point to non-static instance methods because they do not implicitly capture the object's this context.No Closures: They cannot be used with lambdas that capture external variables.Use for Hot Paths: Only substitute delegates for function pointers in tight loops, math engines, parsing algorithms, or low-level wrappers where invocation overhead is measurable.
-
+            
+            Use code with caution.Delegate vs. Function Pointer ComparisonFeatureDelegates (Func, Action, delegate)
+            Function Pointers (delegate*)Memory AllocationAllocates an object on the managed heapZero allocations 
+            (lives on the stack/registers)GC PressureTriggers Garbage Collection over timeNo GC tracking or pressure
+            IL Opcode
+            Uses callvirt (slower virtual call)Uses calli (fast raw address hop)Instance Methods
+            Supported naturally (myObj.Method)Restricted (strictly designed for static methods)Safety 
+            TypeSafe managed codeUnsafe (can cause memory crashes if misused)Important Rules & LimitationsNo 
+            Instance Methods Directly: Function pointers cannot cleanly point to non-static instance methods because 
+            they do not implicitly capture the object's this context.No Closures: They cannot be used with lambdas that 
+            capture external variables.Use for Hot Paths: Only substitute delegates for function pointers in tight loops, 
+            math engines, parsing algorithms, or low-level wrappers where invocation overhead is measurable.
         */
 
 

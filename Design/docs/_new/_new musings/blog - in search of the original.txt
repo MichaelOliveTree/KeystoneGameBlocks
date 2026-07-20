@@ -1,0 +1,201 @@
+
+In Search of the Original
+July 24, 2025
+
+You Don’t Have to Look Very Far
+Hey You! Need an idea for a game? There are those who would say if you’re a new game developer, you should pick a “genre” that interests you and that fits your development skill level, define your audience and then make a game that caters to that audience. It sounds like good advice but that type of advice has lots of problems.
+
+It tends to lead to highly derivative games that don’t stand out from the crowd.
+You can end up chasing the never ending graphical state-of-the-art for that genre because psychologically you wind up defining your game’s quality by how it compares in terms of aesthetics to top games in the “genre.”
+You’re not likely to get much suggestions in the way of novel mechanics to build your game around.
+You constrain your own imagination and creativity by thinking in terms of genres. From a design perspective, genres are not real. Genres are for marketers, critics and players. I don’t believe we should think in terms of genres if what we are really interested in is adopting certain design “conventions.” But we should still always be at least mildly critical of conventions because innovation requires it. While you are dutifully following every established convention for a particular “genre” somebody else is about to release a competing game that will redefine what it means to be state-of-the-art.
+I believe one approach to making original games, is to make decisions about the desired interactive goals and/or what their game’s messaging should be. The chosen interactive goals and messaging will inform the writing of the story, the design of new mechanics, the aesthetics, and the controls. For this to work optimally, I think the language used to describe the messaging needs to be very precise.
+
+If one considers that the story, aesthetics, and yes, mechanics, can all exist to serve the messaging (and this should be the mindset of the writers and asset creators when they are designing), it will more likely result in games that have successful and impactful messaging. In short, these games will tend to be very memorable.
+
+Mechanics serve the messaging? If there is significant messaging, then yes they should. If you want to invent new mechanics, one way to do this is to consider what can be added to specifically enhance or realize the unique qualities of your game. If you are not trying to be original in your messaging in any significant way, it will be very difficult to invent new mechanics.
+
+Design by Messaging - Using messaging, to inform the design of story, aesthetics and mechanics.
+Narrative and Messaging are the same thing in my view, but the word “narrative” so often gets confused with “story” by educators, students, designers and players. The word “messaging” in contrast is much clearer. In my opinion, we really need to STOP using the word “narrative” in our design documents and discussions in favor of “messaging.”
+
+Education vs Propaganda
+The content of a message can be used for education or propaganda. The language and delivery of the message can be one of freedom or of blind acceptance or force.
+
+To educate is a positive and means to impart knowledge and ideas (https://en.wikipedia.org/wiki/Idea) such as faiths, beliefs, science, theories, philosophies, etc:
+
+Berkeley’s Taxonomy of Ideas: Perceptions, Thoughts and Volitions
+https://blog.kennypearce.net/archives/historical_thinkers/george_berkeley/berkeleys_taxonomy_of_ideas.html
+Abstract Ideas and Concrete Ideas
+https://en.m.wikipedia.org/wiki/Abstract_and_concrete
+..in a way that also allows the audience the freedom to accept, reject, modify or reinterpret the messages. Propaganda on the other hand attempts to indoctrinate; often to force acceptance of messages via manipulation and one that may not necessarily be held by those imparting the messages, and may be knowingly untrue, inaccurate, misleading or incomplete from the perspective of those imparting the message. Thus, education and propaganda are separated by the integrity of the deliverer and the degree of freedom granted to the audience.
+
+Message Examples
+It’s a dangerous world
+There are strange new worlds and civilizations
+The NPC baddies might not be as “evil” as you were lead to believe. (already suggests a mystery or element of a larger one)
+The cake is a lie.
+Everytime you think you’ve got it all figured out, there is yet another layer to this onion of a mystery.
+The ultimate antagonist is not who the player thinks it is or is lead to believe.
+You are the last best hope for humanity (suggests altruism, patriotism , heroism, self sacrifice, courage, etc. This can be made more complex if combined with messaging about who the player is…)
+
+player is an unlikely hero
+player is not a “tough guy” but discovered that there is more than one type of strength.
+player has overcome much adversity, but has maintained his optimism.
+player had a mysterious childhood (perhaps suggests flashback elements – eg the player is actually an alien who was raised by human parents)
+The world is full of NPCs that can’t be trusted.
+The player is not cynical and naturally very trusting. (suggests that although the player is not gullible, he allows NPCs into his sphere even though he knows they will likely disappoint him)
+We will continue our look at messaging  below where we see how it can inform other aspects of a game's design. (TODO: yes, I have more work to do here, but I think if you are patient, read the non silly pars of this entire thread, you may see where Design by Messaging is going)
+
+Elements of a Game: A Crash Course
+A video game encompasses several key aspects that contribute to its overall experience, including game-play, messaging, aesthetics, and technology. Game-play refers to the mechanics and rules of interaction, while messaging ties the game to real world concepts and ideas and if applicable can inform the creation of the story and context. Aesthetics encompass the visual and audio design, and technology involves the underlying systems that support the game.
+
+Detailed Breakdown:
+
+1. Game-play: the assembly of interactivity, mechanics and technology.
+
+Interactivity: The level of interactivity will be influenced by the goals the designer has in mind for their players. The following are types of goals that a designer may want their player to have. (A game can have more than 1 of these, but production & execution becomes increasingly more difficult and time consuming).
+
+Personally, I think rather than thinking in terms of “genres” we should get back to the idea of what types of modes, interactivity and systems we want to give our players and from there we can decide on what type of camera and control system will be best. Thinking in terms of “genres” is needlessly limiting and frankly, detrimental to the growth of the industry. I think we should leave talk of “genres” to the marketers, critics and players. As creators, we should always be wary of adopting labels that were created from the outside.
+
+Real Life Systems Simulation – (e.g. Physics (including Collisions, Rag-dolls, Fluids, Aviation, Newtonian Space Flight, Driving\Racing), Trucking, Boating, Mechanized War, Naval/Submarine warfare, etc). Deciding upon and balancing levels of realism\abstraction and fidelity are the main considerations here.
+Multiplayer (e.g. MMO, MOBA, RTS, FPS) – Interacting with other human players.
+Artificial Intelligence
+Not basic algorithms like Pathing, but rather…
+Mordor Nemesis System
+Left 4 Dead style “buddy system”
+Creativity, Building & Crafting – Compared to the game “Infiniminer” from which it was based, “Minecraft” focused on creativity and survival. Games that offer the player high levels of creativity require high levels of interactivity within the game space.
+Competition – I’ve seen it argued that “Infiniminer’s” focus on competition rather than creativity limited it’s appeal.
+Exploration
+Quests
+Survival
+Puzzle Solving
+Mechanics: These are the fundamental rules and actions players can perform within the game, like movement, combat, or puzzle-solving.
+
+Objectives and Goals: Games provide clear targets for players to achieve, giving direction and purpose.
+Progression and Rewards: How players advance through the game, gaining new abilities, items, or status.
+UI & Feedback Mechanisms: How the game communicates with the player about their actions and the game state (e.g., health bars, score updates, notifications & alerts).
+Helpful Links on Game Mechanics
+https://stephentrinh.medium.com/the-4-elements-of-game-mechanics-fce3166123c2
+https://en.m.wikipedia.org/wiki/Game_mechanics
+https://monkeyslunch.com/resources/big-list-of-game-mechanics/
+https://gamedesignskills.com/game-design/video-game-mechanics/
+https://katnamag.itch.io/game-mechanic-database
+https://tvtropes.org/pmwiki/pmwiki.php/Main/GameTropes
+2. Messaging:
+
+Meta-Communication & Meta-Messaging
+
+https://en.wikipedia.org/wiki/Meta-communication
+https://en.m.wikipedia.org/wiki/Subtext
+Story: A game does not need a story, but they usually do still have some basic messaging. A good story is one that effectively weaves together and delivers messages. Elements that comprise a story can be viewed as tools and devices for effectively delivering messages. When thinking in this way, it becomes clear that story can be engineered to serve this purpose.
+
+Good prose and dialogue are difficult, but that takes a lot of practice and reading of others’ works. But with a mindset of engineering a story around the messaging, you should still be able to write a quality story you can be proud of.
+
+Again, the story along with it’s plot, setting, characters, dialogue, literary devices, narration and presentation (useful for a tutorial or in-game assistants or advisors), arguments/persuasion, and prose is a vehicle for the messaging. Often, but not always, the primary message gets built slowly throughout the story and is fully realized in the resolution or climax of the story thus fully realizing the the point or purpose of the story.
+
+I think this is worth re-emphasizing ; outside of improving memory, problem solving, logical reasoning, reflexes and hand eye coordination and such, game-play by itself does not have this specific kind of “point” or “purpose.” Let’s refer to games with little to no messaging as “achievement oriented ” games.
+
+point (noun)
+
+1a:
+
+(1): an individual detail
+
+(2): a distinguishing detail
+
+1b: the most important essential in a discussion or matter
+
+2: an end or object to be achieved: purpose.
+
+I want to be very clear so as not to offend anyone; I’m distinguishing between games that focus on achievements like “winning” matches, or “mastering” mechanics, besting your “speed-run” time, or attaining a “high score” versus messaging-centric games designed to have the player reach a desired understanding. To be clear, “understanding(s)” and “revelation(s), attained through the process of receiving and understanding the messaging embedded by the designer/author is what can leave the player with a deep sense of “satisfaction, clarity, excitement and accomplishment (source: Google AI)” upon playing and completing the game.
+
+There’s a time and place for mindless fun, time-sink games that are “achievement” oriented, or “pass-times” I suppose, but nowadays, I’m personally only interested in spending my time with games that have something to say. Why? I want to hopefully learn new ideas or practical knowledge and wisdom that can be useful to me outside of gaming. Games with little to no messaging, don’t usually strive to impart such things. It’s my personal opinion that achievement-centric games at best have an opportunity-cost to playing them and at worst have messages so simplistic and one dimensional as to be borderline propaganda.
+
+Story Elements 
+
+Hook ← todo: for now, see this informative thread on this very site using Half-Lifes opening as an example.
+History & Cultural Knowledge: Messaging designed to teach history, geography, geopolitics of a particular time and region, anthropology, ancient or foreign languages and cultures, etc. War-games are good examples of games that can teach history (including cultural anthropology) and geography; a favorite of mine is “Rome Total War” by Creative Assembly.
+Although it is not necessary to tell a story to teach history, I believe teaching teaching history is far more effective when doing so. Before written languages, human beings shared history, mythology, legends, and folktales, and the messages (e.g. wisdom, lessons, cultural knowledge, values, collective memory, etc) contained there-in through oral traditions of story telling because stories are easier to remember than dry facts.
+Lore is fictional history and cultural knowledge.
+Setting and World-building: The environment and context in which the story unfolds. Games are special in that the player can interact with these worlds and potentially change the world directly via mechanics, or indirectly through their progression and choices.
+e.g. Prehistoric (Dinosaurs, Dawn of Man)
+e.g. Modern day.
+e.g. Historical / Period Piece.
+e.g. High Fantasy – Lord of the Rings
+e.g. Low Fantasy – Conan the Barbarian
+e.g. Science Fiction – Hyperion, 3-Body Problem, Star Trek, Battlestar Galactica
+e.g. Science Fantasy \ Space Opera – Star Wars, Macross
+e.g. Time \ Inter-dimensional traveling through any of the above.
+Factions & Characters: The factions and/or individuals within the game world, including their personalities, relationships, and roles. As an aside on the use of “archetypes,” for your character, be careful that they are not unrealistic, one-dimensional, cliche, or boring creations.  Think about the messages each character is meant to represent, support , enhance,  etc.
+Themes – Themes are recurring or persistent messages.
+Game Space (World) – The weaving together (engineering) of any story will be influenced by how the player advances through the game space.
+Streaming Open World
+Sandbox – “Sandbox gaming is a type of video game that allows the player to have a high degree of freedom to explore and interact with the game world in a nonlinear fashion. Sandbox games often have open-world environments that the player can interact with at will, rather than following a predetermined path or set of objectives.” (source: https://nordvpn.com/cybersecurity/glossary/sandbox-gaming/)
+Zones
+Maps (Campaigns, Chapters, Episodes, Levels, Etc)
+Narration \ Presentation \ Guidance: How well the player is taught the various game-play concepts and directed through the game at large. This can include the use of an “advisor” or “instructor” for a tutorial.
+Aesthetics:
+
+Like story, art direction, sound design, UI design, serve the messaging and asset creators should should have a deep and detailed understanding of the messaging that the designer is trying to convey.
+
+Visual Design: The art style\direction for any GUI, HUD, 2D/3D graphics and textures, and the overall visual presentation of the game.
+Audio Design: The music\soundtracks, ambiance, sound effects, and voice acting that enhance the game’s atmosphere and immersion.
+3. Technology:
+
+Engine and Programming: The underlying software and code that powers the game including scene management, spatial partitioning, save/load/resume, data streaming & paging.
+World/Level/Map and Partitioning technology.
+Modding Tools
+Fluidity: How well the game controls.
+Modding & Extensibility
+Controls: The way players interact with the game using input devices including the use of Virtual Reality and Augmented Reality glasses. Controls are tightly linked with mechanics. They can seem a bit “chicken and the egg.” Some mechanics are designed with the controls in mind and some controls are derived consider from the mechanics.
+4. Polish:
+
+Balance and Difficulty: Ensuring that the game is challenging but fair, with difficulty scaling appropriately.
+Performance: How smoothly the game runs on different hardware.
+Execution: How well put together the game-play concepts are
+“Gamergate”
+Do we all remember “Gamergate?” (not to be confused with GamersGate the Sweden-based online video game store.) Quoting Wikipedia: ” Gamergate or GamerGate (GG) was a loosely organized misogynistic online harassment campaign motivated by a right-wing backlash against feminism, diversity, and progressivism in video game culture.  It was conducted using the hashtag “#Gamergate” primarily in 2014 and 2015.  Gamergate targeted women in the video game industry, most notably feminist media critic Anita Sarkeesian and video game developers Zoë Quinn and Brianna Wu.”
+
+Gamergate is not over. Please, do not be lulled into complacency and believe that it is. It will never end. Just like aspects of slavery and Jim Crow hasn’t ended. The “price of freedom is eternal vigilance.” Unfortunately, too many people regard that immensely insightful quote as a mere slogan.
+
+GamerGate is not just about anti-wokeness, it’s about homogeneity of thought which can lead to some very ugly, very destructive and IMO evil societal outcomes.
+
+There is another subtle implication of promoting homogeneity of thought. I believe it oppresses individuality and personal expression and therefore the quantity of truly original output of an entire society.
+
+I hope people remember that an original product derived from YOUR individual truths, experiences, ideas and imagination, cannot easily be competed with and out-spent by the big players within “the Industry.” The big players are not so socially/culturally conservative and lacking in ideas that they couldn’t create games that appeal to smaller marketing demographics, they just don’t want to because they claim it’s not economically feasible. As I alluded to earlier, this is something that can easily result in harm. If the argument for example, is that it’s not economically feasible to make a AAA game that follows a black leader in Birmingham, Alabama during the Civil Rights Movement in the USA because it’s assumed it won’t have mass appeal, then this suggests that there is some element of systemic racism within “the Industry” even if it is unconscious and unintentional.
+
+Another Indie Revolution is Coming
+The following are just some related thoughts with no place to call home:
+
+The next Indie Revolution won’t be led by developers. It will be led by auteurs and artists of all kinds, including writers… like GOOD writers. This is long overdue and I believe the progress towards this reality got *derailed by Unreal Engine and Unity.
+
+As we approach the Borg-ification of society, there will be a push by some future heroes to put their MESSAGES out there using video games because the market is just so much larger than every other form of media. The potential to reach so many is not only huge, but it’s still attainable by small independent teams and individuals and the gatekeepers are currently not yet able to stop them(caution: there are folks out there who believe in, and are pushing for, the idea that a “license” be required to write and release software!”) In my view, they desperately want a way to install a gatekeeper since on-demand game streaming services like OnLive (Google Stadia) and others have failed to gain traction.
+
+How is it after all these years you still can’t simply install something like Unity and Unreal, configure them for your project and it’s technical goals, and then generate or load a fully functional and bug free template of your game that just works?
+
+___Games as Art
+
+I believe true art is personal for the artist and has integrity (honesty from the point of view of the artist). Indeed, the only responsibility an artist has to it’s audience is a commitment to the integrity of the work. This is why commercial art is often not regarded as true art. Commercial art’s reason for existing is to sell a product.
+
+I’d like to see game design become a more formal and precise discipline particularly when it comes to defining it’s terminology. I would also like to see more formal articulations of various designers’ design processes and methods. This essay is my modest attempt at doing some of that work vis-a-vis design by messaging. I know many view iterative design as super important and I agree, but that is not where the bulk of a game’s design takes place.
+
+____ Democratizing All Media
+
+Games distribution storefronts like Steam should expand to every sort of digital IP there is. Sure their would need to be separate styles and layouts of pages for video versus games or music, radio, podcasts, poetry, comedy, novels or comic books/comic strips, 2D art or 3D art and services, etc. A one stop “Steam News, Media & Education” store for all forms of digital IP can help democratize the creation and distribution of paid indie media, news and educational programs.
+
+With AI generated “commercial-art”, production costs for all media will begin to steadily decrease. Steam leveraged the triumphant and huge success of Half-Life and Counter-Strike to launch Steam. Maybe, Steam should offer a PayPal like option where creators can add a “Purchase via Steam” button for each of their works that will bring them to the product page on “Steam News, Media & Education” storefront.
+
+Because there can be a lot of cross-pollination between creators of different types of media, this could help ALL media in this new media ecosystem. A rising tide lifts all boats. I personally would hope they should they evolve in this way, they don’t become like Amazon and try to become a be-all / end-all storefront. Stick to the mission of democratizing ALL MEDIA.
+
+Only You, Are You.
+Perhaps the following will help inspire and motivate you to find, value and utilize YOUR voice…
+
+You are truly unique in the universe and don’t ever forget that fact. There was never anyone exactly like you before you arrived and there will never be anyone exactly like you after you leave. You should not need to ask others for ideas. Look inward. Let your unique perspectives, qualities and experiences guide you.
+
+What if I told you that there are works that God created that only you will be able to make manifest? How do I know this? If you believe in God and if you believe that God has created everything both seen and unseen in the Universe, then it logically follows that man doesn’t actually create or invent anything, but only manifests and discovers things respectively. Thus, since we are each unique, this means that God has already created “works” expressly for each of us, and if we never manifest “our” works before we move on, then those works will never be manifested because they were created specifically for each of us. How cool is that? What works could be out there just waiting for you to manifest?
+
+So if for example, you get hooked on drugs and veer off the path God has chosen for you, and then you move-on in an untimely fashion, all those works God intended for you to create will be lost to mankind (or the aliens archaeologists who discover the remnants of our failed civilization) for eternity. I’m working on a more detailed post about this idea titled “Regaining Your Zest For Life” on my blog. The post is currently marked as “private” so check back soon. If you like this post, you may like that one since its formulation actually predates this one.
+
+Self expression + your individuality must not be suppressed and especially not by yourself. As an indie, I think you should be wary of those who would steer you into suppressing your own individuality and creativity. In my view, YOUR individuality is your biggest advantage, so please don’t forsake it. Indies should rarely try to compete with big studios and publishers with their never-ending sequels or, homogenized (see GamerGate), mainstream, games that have far bigger budgets than you will likely have.
+
+I hope you liked this post and found it useful. 

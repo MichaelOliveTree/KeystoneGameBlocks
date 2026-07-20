@@ -1,0 +1,59 @@
+june 21, 2025
+
+originality factor (OF)
+   - an attempt to quantify a game's uniqueness.
+  do games with a higher OF do better than gmes that are comparatively more derivative?  what does history teach us? Let's apply this metric retroactively to past games and see...
+
+- mechanics - what is the rate of new mechanics invention within the industry?  If you want to invent new mechanics, one way to do this is to consider what can be added to specificly enhance or realize the unique qualities of your game. If you are not trying to be original (story and / themes) in any significant way, it will be very difficult to invent new mechanics.  I submit that there is a correlation between OF and new mechanics and/or novel combinations of mechanics.
+.
+https://stephentrinh.medium.com/the-4-elements-of-game-mechanics-fce3166123c2
+
+__________
+side note: "Minecraft focussed more on creativity and survival rather than infiniminers focus on competition." <<- from a YouTube short.
+
+this is an interesting way of looking at it, but i think the more fantasy vibe is also important... infiniminer sterile sci-fi look is a big turn off.
+
+
+_________
+
+these two are the easiest in some respects 
+- themes
+- aesthetics
+- level/ map design and philosophy thereof
+
+- controls
+
+- You.  You are truly unique in the universe and don't ever forget that fact.  There was never anyone exactly like you before you arrived and there will never be anyone exactly like you after you leave.   You don't need to ask others for ideas, look inward. Let your unique qualities and experiences guide you 
+
+
+There are those who would say you should pick a genre that interests you and fits your development skill level, define your audience and then make a game that caters to that audience.  It sounds like good advice but that type of advice has lots of problems.
+1) 
+
+self expression + your individuality must not be suppressed. as an indie be wary of those who would steer you into supressing your own individuality and creativity (in effect getting you to forsake your biggest advantage) and instead get you to essentially compete with their mainstream games that have far bigger budgets than you 
+
+new "markets" are made, they don't already "exist" per se.  Thus, games with high OF can be said to have made a new market.
+
+games with high OF don't necessarily mean greater programming difficulty
+
+- engine quicksand 
+    an inie revolution is coming... but it won't be lead by developers.  it will be lead by autuers and artists of all kinds. This is long overdue and the progression towards this reality got derailed by Unity and Unreal.  How is it after all these years you still can't install either of those engines, configure the engine for your project and it's genre, and then generate or load a fully functional and bug free template of your game that just works?  Collision detection and response, shadows, physics, networking/multiplayer, gui, etc.
+
+
+
+
+
+
+- gamergate - not just about conservatism or anti-wokeness, it's about homogeneity of thought... it's about getting people to not be original because originality can't be out-spent. We live in super dangerous times.  There are forces out there that want to strip us of our uniqueness. I liken them to the Taliban but far worse  
+
+The dirty little secret about the major players in the games industry is that they don't want indie developers to make games that are deeply personal, games that express non mainstream (especially non conservative)views, games that criticize the industry itself, 
+
+games as art,.
+
+- hacks dominate.  what is a hack?
+https://en.m.wikipedia.org/wiki/Hack_writer#:~:text=Hack%20writer%20is%20a%20pejorative,quantity%20taking%20precedence%20over%20quality.
+
+"Hack writer is a pejorative term for a writer who is paid to write low-quality, rushed articles or books "to order", often with a short deadline. In fiction writing, a hack writer is paid to quickly write sensational, pulp fiction such as "true crime" novels or "bodice ripping" paperbacks. In journalism, a hack writer is deemed to operate as a "mercenary" or "pen for hire", expressing their client's political opinions in pamphlets or newspaper articles. Hack writers are usually paid by the number of words in their book or article; as a result, hack writing has a reputation for quantity taking precedence over quality."
+
+I would point out that the above description from Wikipedia says "paid to write low-quality..." almost as if to suggest that such writers could produce high-quality works, but don't because they aren't getting paid enough to do so.  That's definitely not the case in the games industry where I believe it's more a question of ability or lack thereof.
+
+

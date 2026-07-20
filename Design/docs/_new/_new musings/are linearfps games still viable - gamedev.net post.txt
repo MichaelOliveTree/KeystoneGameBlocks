@@ -1,0 +1,37 @@
+Hypnotr0n
+January 02, 2026 02:25 PM
+ 0
+
+______
+tomcloudy said:
+
+Do you think linear  FPS games are still viable today?
+If so, what do you think they need to succeed in a modern context?
+Of course they are still viable and I think there are just two keys… a novel story with novel mechanics.
+
+_______
+
+If I might suggest, please read about my proposal for “Design By Messaging” as a process for designing  games… particularly story based  games.
+
+https://www.gamedev.net/forums/topic/718935-designing-around-messaging-a-process/
+
+The key point to remember is that designing around “messaging” (aka: one or more narratives) WILL INFORM the design of the STORY as well as NEW MECHANICS, the CHARACTERS, the AESTHETICS, etc.
+
+So the answer to your question: Are "linear  FPS games are still viable today?" the answer is OF COURSE and a PROCESS FOR DOING THIS SUCCESSFULLY is to design the  game around “messaging” as this will yield TWO CRITICAL THINGS:
+
+1: A NOVEL STORY that serves the messaging
+
+2: NOVEL MECHANICS are much easier to invent when you are designing/thinking in terms of “messaging.”
+
+Example  Game Idea with an Example novel mechanic:
+
+-→ The main message is one involving “agency/control.”. Is the Player in control of their own life? If not who is?   Player is a former renowned archaeologist and Biblical historian (currently down on his luck, but trying to regain control of his life (foreshadowing.. tee-hee)…) who is hired by someone with deep pockets to search for some artifact that may or may not be… in… Ethiopia…  Finding out exactly where in the World “it/they” is/are, is part of your commission.  You've signed an NDA and are to report your finding only to your employer, but your travels have you uncovering uncomfortable truths.  Your benefactor has also given you certain mind control technologies (uh…where did he get this technology from? No matter, you need this job and are willing to not ask too many questions in this regard…) to help you in your search since you'll be interviewing people (people who remember your discoveries and will be willing to give YOU access but virtually no one else, hence why you were chosen) who wont be forthcoming.  Beware, some who receive you, see you representing colonialism and theft, but they are curious as to what you could be looking for…. And, Maybe your employer had a mind control device installed in YOU and you cannot remember it? ←-
+
+SO… we've got some clues for novel mechanics… mind control tech (who,what minds can you read/control and how do you deploy this tech), artifacts you may find that may “do” things, a 6th sense you develop to discover that your mind is being read by someone... occult knowledge you may uncover that may allow you to do who knows what… if you are a true believer that is.  
+
+What do you do when you find out the truth you are uncovering needs to be shared with the entire world but your benefactor will stop at nothing to prevent this from happening… and then the entire game focus shifts in a similar way to how Half Life shifted from player fighting Aliens to player fighting Spec-Ops Commandos?
+
+Best of luck.
+Michael OliveTree
+Hypnotron
+WalksWithGod

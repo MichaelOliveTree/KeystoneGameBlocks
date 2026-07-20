@@ -1,0 +1,13 @@
+Michael Joseph 
+26 years old
+graduated from Penn State University in 1995
+Software Test Engineer in the Microsoft Games Group for the past 3 years (in a nuttshell, i get paid to play games all day)
+	- Baseball 2000 (we ship it this Wednessday)
+	- MS Soccer 1.0 (crap game)
+	- MS NBA Full Court Press (really crap game)
+	- Golf 3.0 (ok even though it was dated when we shipped it)
+	- Golf '98 (crap game. It was programmed in VB5 which is interesting though)
+
+I've worked as a contract employee in the same group at MS for 3 years.  Ive learned quite a bit about the PC Games industry during my time there and i will be quitting that position officially on April 14th to work on this project full time.
+
+I program in VB5/6.   I've been programming in my spare time for about 3 years and i consider my skills to be modest.  I do not consider myself a guru and im sure my code can stand to be optimized however i consider my code to be quite robust.  I can read C/C++ to a certain degree.... enough to port small code samples anyway.  If i were ever to switch languages, it'd go with JAVA despite its speed and compatibility issues associated with cross platform development with it.

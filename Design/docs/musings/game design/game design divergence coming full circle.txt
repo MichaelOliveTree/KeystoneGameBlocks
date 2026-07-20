@@ -1,0 +1,7 @@
+Sept 19, 2007.  11:55pm 
+-Hypnotron
+I believe somewhere in the mid 90's there was divergence or a branching of the game design tree where the vast majority of developers went from designing 
+splitting effort between world physical complexity and interactivity, and visuals to being very lopsided towards the visuals at the expense of the world simulation.  I think finally we're starting to come back to that but alot of game engines still must handle these things in a retrofitted way because they still dont want to sacrifice visuals and sacrificing visuals is what it would take to achieve the rich interactivity users want in an elegant engine.  
+
+Thats sort of the direction i want to go... i want to go back up the tree and still applying whats been learned but doing so in the abandoned branch from the middle 90's where 
+

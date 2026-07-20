@@ -1,0 +1,39 @@
+march.5.2023
+
+escaping the cultural ghetto
+
+ https://www.youtube.com/watch?v=d1pOahq4TCk
+ 
+ https://www.youtube.com/watch?v=diZQCY4Ird0
+ 
+ 
+great videos to consider when designing stories in games that matter.
+
+currently, there is very little philosophy explored in mainstream gaming.
+
+At best, mainstream games are just escapist fantasy and at worst, fascit propaganda.
+
+Unfortunately, its not just games.  Film and TV are becoming debased as well.  
+
+Media producers have a huge responsibility towards integrity, but most shirk that responsibility.  
+
+They have products that can be used to educate, but they instead just use it for mindless, nihilistic, entertainment because it is easier to make profitable.  There needs to be a balance.
+
+It's actually quite stark when you think of it.  Most games are "us" vs "them", and outside of that there's nothing there... just rules and mechanics.
+
+There are games which are sort of like puzzles, like Tetris where the only narrative is in the music itself.  So the question is, is games as a medium really appropriate for deep narratives?  Well... to each his own I guess.  The challenge is keeping users engaged.  Most of the time, the narrative that shows up in the form of periodic windows full of text and dialogue, are annoying and just get in the way of progression within the game.
+
+MUDs are text based and engaging. Zork is text based and engaging.  But it's more like "lore" and "world building" not story.  EotL however, did a great job of letting the player progress at their own pace.  Generally, players weren't forced to fight monsters that were more powerful than them.  Furthermore, the player could always return to somewhere safe to heal up and chat with other players.  Furthermore, they could examine new elements that they stored in their inventory at a time and place of their own choosing.  But again, it's worth noting that there wasn't a main story to follow, it was strictly exploration in a "world" (world building is so important here) and being able to interact via multiplayer, other characters.  You could join guilds and such.
+
+Another cool aspect of MUDs is that proficient players could traverse the world extremely quickly by memory and just entering in the keystrokes rapidly.  Traversing the world can initially be a slow methodical pace, but proficient users could quickly traverse it. Some mage types can even open a portal that will return them to the Heart of the City.  This unfortunately is tricky to do in graphical open-world/sandbox simulations and games.  
+
+I think the key for visual simulations and games, the narrative first has to be presented in the visuals (characters and environment) and audio.  Portal did a great job of mostly not getting in the player's way with loads of text, by just using a voiceover of the GladOS AI.  Optimally, the visuals of the world or levels should be treated like a character. Portal went further and made the audio a character.
+
+Another useful design is to make it so the "text" can be picked up by the player and stored in an inventory and read back at the user's choosing thus eliminating the need to stop the "flow" of the gameplay and give the user the ability to read at their leisure.
+
+One of the reasons the window of text occurs is because the user enters the simulation/game and initially, every scene and character in the game is foreign.  Most games do a poor job of gradually introducing the player to new characters, monsters, scene elements, mechanics, etc.  Portal again did this brilliantly.  The tutorial seemlessly flowed into the rest of the game.
+
+
+For games like Grand Theft Auto, the game uses real world cultural knowledge on the players' part to avoid having to introduce game elements.  Everyone knows what a car is and sadly, what gangs, mafia, carjacking is and robbery and violent crime.  But in fantasy/magical realm types of games, everything is new and strange ... even the fauna and which plants can be used to craft potions.  
+  
+

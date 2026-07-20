@@ -1,0 +1,42 @@
+A(10,10) 
+B(50,10)
+theta = 120
+Y = 99
+
+W = A-B
+W = 10 - 50, 10 - 10
+W = (-40,0)
+
+W dot Z = |W| * |Z| * cos (theta)
+W dot W = |W| * 99 * cos(120)
+
+
+'|W| is the length of AB
+|W| = sqrt(W.x * W.x) + (W.y * W.y)
+|W| = sqrt(1600 + 0)
+|W| = 40
+
+'Z is our vector from C to B
+Z = C-B
+Z = (Z.x - 50) , (Z.y - 10)
+Z = (Z.x - 50) , (Z.y - 10)
+
+
+'We need to solve for vector the unknow Z.x
+W dot Z = |Z| * |W| * cos(theta)
+(W.x * Z.x) + (W.y * Z.y) = |Z| * |W| * cos(theta)
+-40 * (Zx-50) + 0 * (Z.y - 10) = 99 * 40 * cos(120)
+-Z.x+50 = 99 * cos(12)
+Z.x - 50 = -99 * -.5
+Z.x = 99.5
+
+
+|Z| = Y = 99
+99 = sqrt (((Z.x - 50)^2 + (Z.y - 10))^2))
+99 = sqrt((99.5 - 50)^2 + (Z.y - 10)^2)
+9801 = 2450.25 + (Z.y - 10)^2
+(Z.y - 10) ^2 = 7350.75
+Z.y -10 = 85.7365149746594260296085939045407
+Z.y = 95.7365149746594260296085939045407 
+or
+Z.y = 75.7365149746594260296085939045407

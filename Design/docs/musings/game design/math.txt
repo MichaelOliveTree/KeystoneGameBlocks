@@ -1,0 +1,122 @@
+<landen> hi
+<Pizaz> ok, please pardon my lameness at math. But i could use help with the following.  If i have line from point A(10,10)  and point B(2,3)  and another line that goes from B(2,3) to C(?,50)  how can i solve for ?  such that lines AB and lines BC are at Z degrees apart?
+<landen> Do you know dot products?
+<Pizaz> umm...  ive got a vb routine that can get dot products
+<Pizaz> so yeah
+<landen> call the missing component of C, u.
+<landen> call E = A-B  E is a new vector.
+<landen> F = C-B = (x-2,47)
+<landen> E dot F = |E|*|F| cos(angle)
+<landen> E dot F = 10x -20 + 470
+<landen> |F| = ((x-2)^2 + 47^2)^.5
+<landen> pizaz if you square both sides you get a quadratic equation for x.
+<landen> Pizaz if you draw a graph you will see that there are two solutions.
+<Pizaz> right.  and i need both answers.  Im actually making a trinary star system
+<landen> You can look down at the triangle or up at it.
+
+Lets say i have two points A and B with values (for the sake of this example) (10,10) and (50,50) respectively.  I want to find the vectors that intersect Point B at  an X degree angle to line AB.  Once i have the vectors, i need to find a point on either vector that is Y distance away from point B.  Can anyone help?
+                     
+                     
+
+                     C(?,?) 
+                   Y/   
+             120 ( /               
+A(10,10)----------- B(50,50)
+             120 ( \
+                    \
+                     \
+                    Z \                    
+                       D(?,?)
+I need a formula to solve for points C and D which are Y and Z distance respectively away from point B and whos vectors intersect line AB at point B at an angle of 120 degrees.  You can input any value u want for distance Y and Z.  I just need to be able to solve for points C and D given any value for Y and Z. (this is not intended to flood)
+
+<Pizaz_> Lets say i have two points A and B with values (for the sake of this example) (10,10) and (50,50) respectively.  I want to find the vectors that intersect Point B at  an X degree angle to line AB.  Once i have the vectors, i need to find a point on either vector that is Y distance away from point B. 
+<Pizaz_> you can make angle X = 120
+<crb> first lets get a vector call it y from point A to point B
+<crb> ok, so lets start by finding y which we define as the vector from a to b
+<crb> if you draw a coordinate system and place any to points called a and b, and then draw a vector from a to b
+<crb> then you have a triangle
+<crb> formed by the 3 lines, the origin to a, the origin to b and the line a to b
+<crb> vectors add according to the triangle rule
+<crb> the vecor oa plus the vector ab equals the vector ob
+<crb> by oa I mean draw a vector from point 0 (the origin) to point a
+<crb> ok we can read the vector oa from it's coordinates
+<crb> and we know the vector ob from it's coordinates
+<crb> vector oa is (10, 10) and vector ob is (50, 50) 
+<crb> also vectors add component wise
+<crb> so if I tell you that oa + ab = ob then you can also write this as 2 equations
+<crb> 10 + the x component of ab = 50
+<crb> and 10 + the y component of ab = 50
+<crb> so the vector ab is .... (40 40)
+<Pizaz_> ok.  so vector AB = B.x - A.x, B.y - A.y
+<crb> yup you got that
+<crb> now do you know what a dot product is?
+<Pizaz_> A dot B =  A.x * B.x +  A.y * B.y
+<crb> right but it also means |a| * |b| * cos (theta) where |a| mean the lenght of a and theta is the angle between a and b
+<crb> when I said a and b in |a| * |b| I didn't mean the a and b point above I meant 2 arbitrary vectors called a and b
+<crb> so we have a vector y which goes from a to b
+<crb> a vector inside vertical bars mean length which is a plain old number
+<crb> so the |a| * |b| is not a dot b (think wrong type since dot takes vectors but |a| returns a scalar)
+<crb> if I had writen a * b where a and b were vectors that would be do product of a and b
+<crb> so we found a vector y which goes from a to b
+<crb> and we want to find a vector say z such that z/|z| dot y/|y| = cos theta
+<crb> do you understand what I mean by that?
+<crb> y/|y| is a vector of length 1 in direction of y which we said is the vector from a to b
+<crb> theta is the angle between z and y
+<crb> since y is the vector from a to b if we find z we have a vector that will make a intersection with ab of theta degrees
+<crb> so in component form y dot z is Y.x * Z.x + Y.y * Z.x
+<crb> so I need to solve for 2 unknowns Z.x and Z.y and I have one equation so far
+<crb> Y.x * Z.x + Y.y * Z.y = |Y| * |Z| cos theta
+<Pizaz_> is that |Y| * |Z| * cos(theta) ?
+<crb> yes
+<crb> so now we need a second equation that constrains Z.x and Z.y and we can find the components of Z
+<crb> ok there are an infinite number of Vectors Z (they are all of the same direction but have different lengths)
+<crb> so let pick a convient one ... let pick the one whose length is 1 since that will make our life easy
+<crb> the length of a vector (say z) is given by sqrt (Z.x * Z.x + Z.y * Z.y)
+<crb> this you might note is sqrt(Z dot Z)
+<crb> so now we have 2 equations
+<crb> Y.x * Z.x + Y.y * Z.y = |Y||Z| * cos (theta)
+<crb> and sqrt (Z.x * Z.x + Z.y * Z.y) = 1 which is |z| = 1
+<crb> 2 equations in 2 unkowns, solve them simultantously
+<crb> yes we know |y| cos theta since you told me were points a and b were and these determine Y uniquely and you told me what angle theta you want for intersection
+<crb> that first were should be where
+<Pizaz_> yeah, Y = 40,40
+<crb> right
+<Pizaz_> theta = 120
+<Pizaz_> Z=1
+<crb> right
+<crb> right
+<Pizaz_> cos 120 = -.5
+<crb> nope, sorry my mistake you are right cos (120) is -0.5
+<crb> so can you solve the simultaneous equations?
+<crb> take the first equation Y.x * Z.x + Y.y * Z.y = cos theta and solve for Z.x
+<crb> you should get Z.x = (cos theta - Y.y * Z.y) / Y.x right?
+<crb> ok now plug that relation for Z.x into the (Z.x)^2 + (Z.y)^2 = 1
+<Pizaz_> ((cos theta - Y.y * Z.y) / Y.x)^2 + (Z.y)^2 = 1
+<crb> now do the binomial expantion of the first squared term
+<Pizaz_> do u mean go back and get Z.y the same way we got Z.x and then plug that in?
+<crb> no
+<Pizaz_> Z.y = (cos theta - Y.x * Z.x) / Y.y
+<crb> yes Z.y is as you wrote it 
+<crb> we found Z.x = (cos theta - Y.y * Z.y) / Y.x
+<crb> we get Z.x ^2 = (1/ Y.x)^2 ((Cos theta)^2 - 2 * Y.y * Z.y * cos theta - Y.y^2 * Z.y^2) right?
+<crb> now put that in Z.x ^2 + Z.y^2 = 1
+<crb> and you have a single equation in one unknow (Z.y)
+<crb> if you group the terms you can rewrite it as K1 Z.y ^2 + K2 Z.y + k3 = 1
+<crb> where K1 K2 K3 are functions of things we know (Y.x, Y.y, and cos theta)
+<crb> ok so if you group them you can write this as a quadratic equation ...
+<crb> K1 Z.y ^2 + K2 Z.y + (k3 -1) = 0
+<crb> do you know how to solve for Z.y now?
+<crb> Z.y = (-k2 +/- sqrt (K2 ^2 - 4 * K1 * (k3-1)))/(2*K1)
+<crb> it's the formula you learned way back when x = (-b +/- Sqrt(b^2 -4ac))/(2a)
+<crb> that Ax^2 + Bx + c = 0
+<crb> has solutions x = (-b +/- Sqrt(b^2-4ac))/(2a)
+<crb> in our case we have not x but Z.y
+<crb> ok well you do the grouping and get a second order equation in Z.y then you use the quadratic euqation to get a solution for Z.y
+<crb> knowing Z.y you can plug that number into Y.x * Z.x + Y.y * Z.y = cos theta to find Z.x
+<crb> now we have Z.y and Z.x so we have a vector of length 1 that make an angle of theta degrees with our vector y wich went from point a to b
+<crb> vectors don't intersect points they have directions and magnitudes but they doint have positions
+<crb> since z is magnitude(or length) one you can multiply Z by a length and get a vector in the direction you want with the size you need
+<crb> the point you wanted will have the same coordinates as vactor z * (length you want) + vector ob
+<crb> above where you solved the quadratic equation for Z.y you actually get 2 values (one for the + 
+<crb> I think one correspondes to going theta clock wise and one to counter clockwise, but I ain't sure 
+

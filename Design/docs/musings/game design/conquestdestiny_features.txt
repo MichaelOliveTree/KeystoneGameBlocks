@@ -1,0 +1,101 @@
+Conquest and Destiny is a real-time strategy simulation of galactic proportions. You are placed in a galaxy with possible thousands of other players who simultaneously compete against each other in a raw contest of power, wits, and knowledge. The galaxy will be running 24 hours a day, every day of the week. You simply login when you wish to play, or assemble your orders offline, then login to send your desires to all your forces at once. Each galaxy can theoretically hold up to 900,000 players, running races at the same time. Players wishing to enter and rule in the Milky Way can receive their very own, never before used, already populated, homeworld. >From there, the rest is up to you! 
+Some of the physical features of this galaxy are:
+
+-41,000 by 41,000 by 8,100 Light-year cube of galactic space. 
+-21 Million Individual Planets, each with 150 different pieces of information. 
+-19 Million Moons, each capable of being individually inhabited and developed. 
+-Star Density Patterns that simulate our Spiral Galaxy, the Milky Way. 
+-150 Different Star Types. 
+-250 Different Planet Types. 
+-Black Holes, Nebulae, Quantum Singularities, Super Novae, Wormholes, Pulsars, and much more. 
+Conquest and Destiny will have the biggest tech tree of any game with 18 General Skills and over 35 Research Sciences including items and abilities like:
+Cloaking Shields 
+System Defense Centers 
+Planetary Ion Cannons 
+Organic Vessels 
+Disease Creation 
+Rimworlds 
+Dyson Spheres 
+Super Planets 
+Planet Moving 
+Stargates 
+Laser Mine Fields 
+Psionic Agents 
+Terraforming 
+Boarding Raids 
+Induced Super Novas 
+Wormhole Creation 
+Conquest and Destiny also has other features that add to a total game experience. Some of them are:
+Agents - you can recruit individuals of exceptional abilities and make them your planetary governors, battle commanders, assassins, engineers, or scientists. They gain experience and abilities over time. 
+GUN - Galactic United Nations. This is where all the player races gather and discuss galactic law, elect leaders, and various other political functions. 
+Stock Market - This is where transactions take place between players. When you want to buy or sell stock or commodities. It is done here. 
+Companies - Any player can start their own company, develop their own vessel designs, research improvements in planetary installations, all to sell to other players. A properly run company can be a very profitable enterprise. 
+Loan Funds- Become a galactic Loan Shark. Set up credits to be lent to other races....at a fee of course! :) 
+
+
+General questions:
+What is Conquest and Destiny? 
+Conquest and Destiny started as a open-ended PBeM (Play by E-mail) game. It ran for about 3 years, then shut down due to real life time management concerns ... Over the years of creating and managing the original C&D, it underwent a significant evolution as massive player input helped a lot of the concepts develop. Now here we are with the real-time Internet version, that has also evolved significantly from the PBeM version. 
+Daniel Canham 
+Conquest and Destiny is a real-time strategy game. Every action will take place in a continuous persistent galaxy. Players wishing to enter Andromeda can start with their customized race on their own home world or start as a lieutenant of an already existing race. You could become a great conqueror or a trader, one of the leader of the Galactic United Nations (GUN) or even a stockbroker. 
+Where am I able to play the game? 
+The game is now at the pre-alpha test phase. Alpha testing should start at the end of February. Sign on! 
+Top
+To become an alpha tester: 
+What is this all about? 
+Alpha testing starts (hopefully) at the end of February 2000. Until then you are invited to participate at the discussions on the news-server, which will be directly involved into the development of the game, so you could be some kind of a co-writer :) Now go on and subscribe! 
+How do I access the news-server? 
+For anonymous login go to: 
+http://space-conquest.tzo.com/exchange/logon.asp 
+For real participation: 
+Move to www.tucows.com or your favorite download page and search for "newsreader" install it and enter "space-conquest.tzo.com" as news-server. 
+If you use Outlook: 
+You will find settings for Newsreader under Extras>Kontos>Add>News... there add "space-conquest.tzo.com" as news-server. 
+What's the "designer test app"? 
+There is an test application which tests balance issues. Get that and other things at this link. 
+What kind of suggestion should I make? 
+Everything! While it won't necessarily be added in the first version, it may get put into a later version. 
+Top
+Getting started: 
+How big is the galaxy? 
+The galaxy is huge! Here are some stats:
+41000x41000x8100 light-years 
+9 Million Stars with over 150 different types 
+21 Million Planets with 200 different planetary descriptions 
+and nebulae and singularities and wormholes... 
+How does the coordinate system work? 
+An example star coordinate would be ABCDE-123. That means that the star is in quadrant A, subquadrant B, sector C, subsector D, domain E, and is star 123. Within the star system planet and moon positions are indicated by numbers separated by dashes. An example planet coordinate would be ABCDE-123-5, this would indicate planet 5 in orbit around the indicated star. An example moon coordinate would be ABCDE-123-5-2, this says that it is moon 2 in orbit around the indicated planet. This may sound confusing, but it is pretty easy once you start visualizing it. Most selection will be handled by point and click through the game anyway, so there will be little need to depend on this system, but I'll will be necessary to have a basic understanding of it. 
+Are there different races? 
+When you start a new race you are able to define their physicals, communication manner, government, looking and much more. So every race has its unique stats, which divide even more with those many different research paths. 
+What is the goal? 
+You could target to get to be a huge and important empire. But you could also try to get a trader, selling ships and goods to everyone. Even to research every technology in the tech tree could become a goal of many real life years! There is a stock market, so you could try to become a big broker, or the CEO from a company. Finally you could even get voted into the Galactic United Nations (GUN). 
+How does research work? 
+There are uncounted researches divided into 32 research targets. It will take about 5 real live years to develop them all! You could also put your research points into general skills, thus making your race better in some areas. To research something you have to pay credits, but every race has also a "research" ability, which may speed things up ... or slow them down. 
+How does the battle take place? 
+Battle AI will handle the round based battle within a very flexible battle script generated by the player. There will be tactics selection and other parameters controlled by the script. After much debate, this is the only way we can figure to do it that will be fair to the off-line player who gets jumped on at 4am. 
+Top
+More detailed info: 
+What ships will I use? 
+Every player will design his/her own Vessels, using a Vessel designer. There is everything from interceptors to giant death-stars, from scout to immobile defense centers. 
+
+I heard about the GUN... 
+Any race can become a voting member of the Galactic United Nations. They only have to pay dues to the GUN. There are three elected player directors who initiate gun directives and move GUN forces around as they wish. If they get out of control, members can start a confidence vote for new elections. The three directors have the following seats:
+Executive director: Controls money to other directors and the release of forces. 
+Resource director: Can distribute funds, send spies, research disease cures, build, etc. 
+Security director: He is responsible for moving forces around and attacking things. 
+
+What's a consortium? 
+Consortiums are formalized alliances groups. They are like guilds or clans in other games. There will also be several levels of alliance outside of consortiums from trade pact to full military defense pacts. 
+
+What are companies for? 
+Companies trade vessel designs, and improved planetary facilities. They can build those for less than a race can and maybe do things that they can't. 
+
+What are agents? 
+All your Vessels and Planets are considered to have individuals nominally in charge. As players perform actions with these items, these individuals will gain experience. When that experience reaches a certain level they become recruitable as agents. They can then be assigned to jobs like Spy, Engineer, Assassin, Governor, Scientist, Warrior, etc. Depending on their duties, and what happens to them (battles, etc.) they will gain experience and levels, and become better at what they do. So the more Task Forces and Planets that you have, the faster you will acquire agents for use throughout your empire. 
+
+Is it possible to be just a broker? 
+There is a market in the game where company stock and commodities are traded. The stock portion of the market is just that. Companies or other races who own stock or wish to get stock can either place a buy/sell order on the market or fill one that already exists. The commodities market is a place where you can sell or buy the basic items in the galaxy. Those would be Metal, Crystal, Fissionables, Trade Goods, Food, Neutronium, and Darkmatter. They would work the same way that stock would, you either buy the item directly if there is some available for sale or place a buy order at the price you are willing to buy it. Finally there will be a Used Ship market where you can get rid of your old vessels or buy others races vessels. 
+I would rather be a Trader then a Conqueror, is that possible too? 
+Sure, you could only rely on Trade and the Stock market. The best way to do that is to be CEO from a Company. The whole game provides enough diversity that there are several paths for players to become a successful empire.
+May I also play off-line?
+You can accumulate a bunch of commands while off-line then login, dump those commands, and receive whatever is waiting for you on the server, then log off again. Or you could be logged in over a long period of time and receive information as it happens. There will also be a pager and email alert system that can notify you off-line that something is happening to your game assets.

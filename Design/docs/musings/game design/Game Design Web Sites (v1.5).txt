@@ -1,0 +1,503 @@
+Path: news1.sttln1.wa.home.com!newsr1.rdc1.sfba.home.com!newshub1.rdc1.sfba.home.com!a-newshub1.rdc1.sfba.home.com!newshub2.rdc1.sfba.home.com!news.home.com!newsfeed.gamma.ru!Gamma.RU!howland.erols.net!torn!news.ccs.queensu.ca!dalamb
+From: john.champaign@acm.org (John Champaign)
+Newsgroups: rec.games.design,comp.games.development.design,comp.games.development.programming.misc
+Subject: Game Design Web Sites (v1.5)
+Supersedes: <dessites_996485103@qucis.QueensU.CA>
+Followup-To: comp.games.development.design
+Date: 29 Aug 2001 09:25:04 GMT
+Organization: Computing and Information Science, Queen's University at Kingston, Ontario,  K7L 3N6, Canada
+Lines: 485
+Distribution: world
+Expires: 12 Oct 2001 09:25:04 GMT
+Message-ID: <dessites_999077104@qucis.QueensU.CA>
+Reply-To: john.champaign@acm.org (John Champaign)
+NNTP-Posting-Host: highnoon.cs.queensu.ca
+Keywords: FAQ, game design
+Originator: dalamb@qucis.queensu.ca
+Xref: newshub1.rdc1.sfba.home.com rec.games.design:30016526 comp.games.development.design:30023169 comp.games.development.programming.misc:30028290
+
+Archive-name: games/design/sites
+Posting-Frequency: monthly
+URL: http://www.cs.queensu.ca/~dalamb/Games/design/gameDesignSites.html
+Last-Modified: 2000/10/27 13:17:35
+
+  Table of Contents
+  
+  * Table of Contents
+  * Design
+  * Technical
+  * Code Mines
+  * Graphics/Artwork
+  * Miscellaneous
+    
+  Design
+  
+The complete Wargames Handbook at
+       http://www.hyw.com/Books/WargamesHandbook/Contents.htm
+       This one came up last term when I was doing a project on the
+       history of computer games and book marked it as something that
+       might be useful for the thesis. The author seems to be a
+       die-hard historical gamer who's been sucked into the computer
+       world. It's a great site from a design perspective (i.e. what
+       makes a game play well). It's very thorough and goes from an
+       assumption of the reader knowing nothing up to some worthwhile
+       ideas. It doesn't even try to touch on technical issues.
+       
+MARK GALLEAR'S GAME DESIGN PAGE at
+       http://www.geocities.com/TimesSquare/Arena/8461/index.html
+       Describes itself well as:
+       
+  This guide attempts to give insights into what makes a great
+  computer game. It is not about programming games but concerns
+  itself with design issues. It includes sections on the development
+  of different game genres. This looks at how seminal games in each
+  genre have added to it or taken it in a new direction. Design
+  issues such as using real-time or turn-based systems are examined
+  in depth. Examples include a comparison of Steel Panthers and
+  Command & Conquer. Even if you are just interested in playing
+  games, you will hopefully find it interesting and give you some
+  idea of what to look for in a great game.
+  
+Adventure Game Toolkit (AGT) (by David Malmberg and Mark J. Welch)
+       (Generic Adventure Game System, GAGS) at
+       http://www.markwelch.com/agt.htm
+       I came across this product many years ago in casual browsing,
+       then found it again recently while doing research. Their
+       package assists with the creation of text-based, adventure
+       games with limited graphic and sound support. If my project
+       eventually takes on the dimensions I hope and it is something I
+       can pass on for others to salvage ideas and code from, their
+       model might be a valuable example of one approach to doing
+       this.
+       
+Game Architecture Design at
+       http://people.ne.mediaone.net/melkior/gameprog/gadroot.htm
+       Steve Crocker thinks as I do about imposing the value of a
+       framework and designing well thought out, easily re-used or
+       updated code. Contains two excellent documents one on
+       architecture and another on design. All code, mainly examples,
+       is in C++. Also has a good collection of links to game design
+       sites (so my collection of links to game design sites has a
+       link to his collection -- this is getting out of control! If I
+       can get him to link to mine we can view into infinity ;-). Page
+       seems to be part of his homepage as a whole and you can look at
+       his poetry, prose and recordings if you're so inclined (I
+       wasn't)
+       
+Converting Boardgames for the Computer at
+       http://www.gamesdomain.com/gdr.cgi?depart/dec98/bgmp.html
+       An article taken from Games Domain Review that focuses on the
+       conversion of board games to computer from a VERY high level.
+       
+The Game AI Page: Building Artificial Intelligence into Games at
+       http://www.gameai.com/
+       A brilliant site put together by someone who is really
+       fascinated by AI and the many ways it can be applied to games.
+       Gives a rundown on the AI strategies currently in use by
+       commercial games, some of the theories that could be adapted to
+       games and small freeware/shareware games that demonstrate AI
+       concepts well (like genetic algorithms). Has a very earthy,
+       personal tone to it that may or may not be your cup of tea
+       (about the same as mine, so if my comments are annoying you,
+       you might not love his site).
+       
+Project Armageddon - Next Generation RTS ... for free! at
+       http://projecta.simplenet.com/
+       A real-time strategy game (ala Starcraft) that has been in
+       development since 1996. Has a very pleasing web page and seems
+       to promise quite a game, but very little is currently
+       available. I thought this might be another example of how to
+       put together a web-based product with many different members.
+       The fact that their past members list is three times the size
+       of their current members and the fact that the game has been in
+       production for 4 years makes me lean towards thinking this
+       might not be the best way to do it. If I might be so
+       presumptuous as to suggest that they are trying to follow a
+       cathedral approach with a medium/team that desperately wants a
+       bazaar (see The Cathedral and the Bazaar for the original
+       paper and additional documentation).
+       
+RPGMaker.net at http://www.rpgmaker.net/
+       Formerly RPG Warehouse (or they assimilarted it or something).
+       Big collection of downloads, tutorials and design suggestions
+       for making your own RPGs. Also has tile sets which I'm
+       especially interested in.
+       
+Pure Delusion Web Site at
+       http://www.puredelusion.clubnet-uk.com/index.html
+       A new site beginning development. The 18 year old who started
+       it seems to be recording what he's learned, so it would be a
+       great starting points for newbies.
+       
+Designing Games: rec.games.design FAQ at
+       http://www.cs.queensu.ca/~dalamb/Games/design/design.html
+       Maintained by my supervisor (breath on nails, polish on shirt)
+       who took it over from Travis Casey.
+       
+GameCoding UK at
+       http://homepage.ntlworld.com/paul.gerfen/new_page_2.htm
+       "The purpose of this site is to gather together everything you
+       will need on one site to write top selling games. I hope this
+       site will meet the needs of tomorrows programmers, whether your
+       a complete beginner or an advanced coder, there's something for
+       everyone. " Pretty ambitious purpose, I don't think he quite
+       pulls it off, but that's just my 2 cents. Really neat menus
+       (for what it's worth).
+       
+       
+  Technical
+  
+42 - The Answer to you programming questions at
+       http://www.steinke.net/42/index.html
+       Self-described as ``a collection of tutorials and articles on
+       various aspects of game development. Most of this site covers
+       2d algorithms, especially tile based techniques.'' Also
+       provides information about enemy AI, game design, graphic
+       effects, fast sprites as well as some of the authors own
+       programs (at least two of which are distributed with source
+       code). The nine articles provided seem to be a good
+       introduction to how games can be programmed using tiles, with
+       one giving an overview as how this is implemented in classic
+       NES game Zelda. A section on design tips give good, solid
+       common-sense advice on how to avoid designing ``features'' sure
+       to irritate long-time gamers. Because of the tight focus of the
+       articles and tutorials, you might not find what you're looking
+       for (if tiles aren't your bag baby). This is probably the whole
+       point and I'm missing it. ;-)
+       
+The "Influence Mapping" Thread (Summary) from comp.ai.games at
+       http://www.gameai.com/influ.thread.html
+       A collection of messages posted to comp.ai.games that seems to
+       be a very reasonable approach to evaluating which force
+       ``controls'' what area of the battlefield and from this allow
+       the ai to make some tactical decisions. It is of particular
+       interest to me, as it seems like something that would be easily
+       implemented on my tile-based battlefield and might make the ai
+       a bit more playable. Like any collection of message from a
+       newsgroup, the quality of post varies, but from a first skim
+       this looks to have a high signal-to-noise ratio.
+       
+Welcome to Gamedev.net, Game Dictionary, and Demo News at
+       http://www.gamedev.net/
+       A potpourri of game design goodies, this is a frequently
+       referred to site in the game design newsgroups that delivers
+       with more solid technical articles and forums than I have seen
+       elsewhere. Describes its own content as ``theory, design, art,
+       music, physics, graphics, OpenGL, news, Source Code, AI, Sound,
+       Assembly, Discussion Forums, and more!'' Nice design with a
+       slightly chaotic feel to it.
+       
+generation5.org at http://www.generation5.org
+       Claims to be at ``the forefront of Artificial Intelligence''.
+       Seems to have some essays on general AI principles that I hope
+       will be useful when I get seriously into developing the AI
+       component of the game. Interview section looks like it might be
+       interesting to browse through. Site is difficult to navigate as
+       a whole.
+       
+The Ishpeckian Network at http://come.to/ishpeck/
+       Has a programming section with collections of resources for
+       general game programming, Basic, C/C++, Java and code.
+       
+Josh's Programming Page - Links at
+       http://members.tripod.com/~sakajmh/links.htm
+       Collection of links for programming tutorials in C++ and game
+       design/programming.
+       
+Amit's Game Programming Information at
+       http://www-cs-students.stanford.edu/~amitp/gameprog.html
+       Great site for ideas on implementing issues that come up often
+       in games (e.g. shortest path).
+       
+An optimal pathfinder for vehicles in real-world digital terrain maps
+       at
+       http://www.student.nada.kth.se/~f93-maj/pathfinder/index.ht
+       ml
+       A paper on finding the shortest path.
+       
+A* Demonstraton at http://www.ccg.leeds.ac.uk/james/aStar/
+       Information and demo for the A* path finding algorithm.
+       
+Allegro - a game programming library at
+       http://www.talula.demon.co.uk/allegro/
+       Allegro is a library of functions for use in computer games,
+       written for the djgpp compiler in a mixture of C and assembly
+       language
+       
+Java Games Developement Center at
+       http://www.electricfunstuff.com/jgdc/
+       This was a hard one to categorize. There's definitely some
+       design meat on this site, but their vision seems to be first
+       and foremost providing code, tutorials and more technical
+       assistance, with design following from that. Regardless, if
+       you're into java game development, this is the centre for you
+       (ergo the name!).
+       
+java programming source code and tutorial resource at Gamelan.com at
+       http://www.gamelan.com/
+       ``Gamelan's primary mission is to serve as a central registry
+       and directory of Java resources,'' says the site also claiming
+       ``Most serious Java developers visit our site every day to keep
+       up with breaking developments and new techniques.'' I've
+       definitely seen it referred to in the newsgroups, but I'm not
+       100% convinced that they are the centre of the caffeinated
+       universe they claim to be -- Maybe I'm just cynical though.
+       
+Cplusplus.8m.com - C++ and OpenGL programming at
+       http://cplusplus.8m.com/
+       Seems useful if you're programming in C/C++ and need tutorials
+       or code mining. Quite a bit of advertising which is a turn-off
+       (All-Advantage strikes again!). The rush of pop ups actually
+       crashed my browser last time I visited.
+       
+VB Tutorial Main Page at http://markbutler.8m.com/vb-tutorial.htm
+       Takes a programmer with minimal Visual Basic knowledge and
+       walks them through the creation of a tile based RPG ala Zelda,
+       Might & Magic or Ultima.
+       
+Games Programming at http://www.cbel.com/Games_Programming/
+       A whole bunch of links for people who want information hard and
+       fast. Seems to have a 3D-shooter bias.
+       
+Reliable software at http://www.relisoft.com
+       Technical collection (C/C++ tutorials, etc) with bias towards
+       games and open-source.
+       
+       
+  Media
+  
+FEED: Dialog on the Frontiers of Game Design at
+       http://www.feedmag.com/vgs/q2t1.html
+       Came to my attention on a web page where the author had linked
+       to it because he had been interviewed. It has a wide variety of
+       articles on all sorts of issues that are current for game
+       designers. It's an interesting read that gives you a bit of
+       insight into the industry. Obviously it isn't going to help you
+       develop a better game.
+       
+Gamasutra - The Art & Science of Making Games at
+       http://www.gamasutra.com/
+       After seeing frequent references to this site in many of the
+       newsgroups I was quite anxious to finally get to see this
+       Mecca. It's a site very focused on all professionals working in
+       the gaming industry and combines news, articles, job searches,
+       making connections, message forums, contests and surveys. Very
+       slick and professional layout with some areas off-limit until
+       you become a member (free). Seems more focused on broader
+       topics, so if theirs something specific you need to know, you
+       might be better off looking elsewhere, but if you want to while
+       away some time reading, this is the place to come.
+       
+developium at http://www.developium.com/
+       A smaller version of Gamasutra or GameDev.net this promises to
+       eventually link together designers, provide articles, forums,
+       news and a thriving community. Still in the early stages of
+       growth.
+       
+Games-JOBS.com - games recruitment jobs in USA, UK, Europe. at
+       http://www.games-jobs.com/
+       Pretty self-descriptive title. Maybe this doesn't belong under
+       media though --
+       
+GIG -- Get In the Game! at http://www.gignews.com/
+       Another gaming industry site with job sites, article by and for
+       gaming professionals and lots of fun info.
+       
+Makegames.com: launch your career in computer game development at
+       http://www.makegames.com/
+       This wasn't advertised in a post, but I grabbed it from Diana
+       (the woman behind the whole show I think)'s signature. The site
+       looks -- kind of -- well, ugly. But I never judge a website by
+       its graphics -- nope, not me -- never -- ever. Regardless, this
+       is the first site I've seen 100% devoted to careers in gaming,
+       so worth looking at just for that. Diana is also wickedly
+       funny.
+       
+Game Developer's Newsletter at http://www.thegdn.homestead.com/
+       Their mission statement is ``The Game Developer's Newsletter is
+       produced for you, the developer: to inspire, to encourage, to
+       share in the knowledge and passion of creating computer
+       games.'' It brings a tear to my eye. Its links are
+       unimplemented, maybe the back issues have more info. Seems to
+       have good conference info.
+       
+flipCode - Game Development News & Resources at
+       http://www.flipcode.com/
+       Name says it all; this is another site with ``
+       gaming/multimedia news and information site with an emphasis on
+       development''. ``Also has daily news links to the latest
+       happenings in the industry, interviews, tutorials, documents,
+       (and) features''.
+       
+Perlin Noise at
+       http://freespace.virgin.net/hugo.elias/models/m_perlin.htm
+       Useful for randomly generating maps. The basic idea is using
+       combinations of frequencies to get random distributions.
+       Interesting.
+       
+       
+  Code Mines
+  
+GDT: Game Development Thingy - Online Game Development Projects at
+       http://gdt.virtualave.net/
+       This is a site that links together people who want to work on
+       programming a computer game. Part of their philosophy is that
+       its open source game development for anyone, so it looks like a
+       good location to find code or possibly distribute my code later
+       on. Has pop up banners that are quite annoying.
+       
+Linux Games - Even Penguins Like To Have Fun at
+       http://www.linuxgames.com/
+       I assume that if they're programmed for Linux at least SOME
+       will have bought into the open source concept.
+       
+Grant's Home Page at http://skyscraper.fortunecity.com/apple/230/
+       Has Gomokuse (your guess is as good as mine, and I played it!),
+       Checkers and Othello executables (dos/win) along with source
+       code. Grant Castillou presents them as an introduction to board
+       game programming. These games are the limit to his site. His
+       request to be sent ``a few bucks'' leaves a bit of a sour
+       taste.
+       
+ANTIMETA at http://www.antimeta.com/
+       Collection of projects Marc Lepage is working on. Minions is a
+       RTS he is playing with. Also has YAGE, which is a dead project,
+       envisioned to be an engine for Java turn based wargames. This
+       promises to have some worthwhile code.
+       
+Link's house O games at
+       http://www.interlog.com/~mikemaz/games/home.html
+       Contains a collection of applet games. I actually couldn't get
+       them to load, but maybe I was just having a bad day.
+       
+BURKS 4 Online at http://burks.brighton.ac.uk/
+       Claims to be a useful resource for computer science students
+       with tutorial and reference material along with hundreds of
+       megs of software (including some source code). Can also be
+       ordered on CD instead of downloading.
+       
+Game Creation Resources at http://www.ambrosine.com/resource.html
+       A bunch of software packages to help non-programmers create
+       games. Some source code if you look hard.
+       
+Open Directory - Computers: Programming: Games at
+       http://dmoz.org/Computers/Programming/Games/
+       A yahoo-esque collection of links. Apparently human editors
+       look over each site. Geez, who'd do nothing but post a
+       collection of links!?!?! <wink>
+       
+Game Developer Magazine at http://www.gdmag.com/
+       The website for a paper (non-e) magazine. Contains a source
+       code section. I met the editor-in-chief (and got his business
+       card to prove it!) at LinuxWorld, which was one of the high
+       points along with peaking shyly at the Loki team from behind
+       the exhibitors' booths.
+       
+Roguelike News - Main at
+       http://www.skoardy.demon.co.uk/rlnews/index.html
+       Site with dungeon generation algorithms for Rogue, Nethack, and
+       games of that ilk.
+       
+CodeBrain.com - Free Java at http://www.codebrain.com/index.html
+       Focus of the site seems to be to suck you into viewing their
+       banners, but has a wide variety of code from which you might be
+       able to dig up some goodies.
+       
+CodeUniverse.com - Source Code Archive at
+       http://www.codeuniverse.com/
+       This is code pure and simple; if you're looking for foreplay
+       first you'll have to look elsewhere. The first thing that
+       greets you on opening it up is a list of code posted with the
+       language specified in front. You can comment on code you grab,
+       submit your own code or look just at specific languages.
+       
+Freeciv - Open source project at http://www.freeciv.org/
+       Some people say that the best way to become a master programer
+       is to read quality code. I've heard positive reviews of both
+       the code and design followed by this mature product. If you're
+       interested in doing a management sim this would be an excellent
+       springboard. GPL licensed.
+       
+Nethack - Open source project at http://www.nethack.org/
+       Another mature product for people who treat code like a good
+       novel. Might be worth looking through. I got somewhat negative
+       vibes from the community working on it, they seemed a bit
+       bitter about something, but maybe that's just me being
+       sensitive. GPL licensed.
+       
+       
+  Graphics/Artwork
+  
+Character Pack #1 - Visual Basic Explorer at
+http://www.vbexplorer.com/charpack1.asp
+A collection of portraits and tiles by artist Hermann Hillmann that
+you are free to incorporate into any non-commercial game. I'd love to
+use the tiles in my game.
+
+Free Textures at http://www.bladestextures.com/free_textures.htm
+Another collection of tiles and patterns. Also has tutorials on
+modifying images which could be handy for re-sizing, changing colours,
+etc.
+
+http://sua.virtualave.net/ at http://sua.virtualave.net/
+Shareware United Association. Apparently has a good collection of
+sprites you can download. Don't know if there are any pixies available
+though --
+
+Blade's Textures and Tiles at http://www.bladestextures.com/
+You can buy collections of textures and tiles on CD from this guy.
+Some demos available for free on his site.
+
+
+  Miscellaneous
+  
+KuesterLaw Technology Law Resource - Patent Copyright Trademark at
+       http://www.kuesterlaw.com/index.html
+       Gives the basics of intellectual property so you can make sure
+       the creators of your ``inspiration'' don't sue you.
+       
+GamesBasic.Com - The (free!) art of games creation..High Speed!! at
+       http://www.gamesbasic.com/
+       A gaming-specific programming language that uses modular basic.
+       
+3D Rad at http://www.3drad.com/index.htm
+       The Rapid 3D Application Development System - Interactive 3d
+       worlds and 3d games creator.
+       
+Dark Basic Software at http://www.darkbasic.com/home.html
+       This is another gaming-specific programming language. This one
+       seemed to generate a fair bit of attention in the newsgroups.
+       
+COMMAND DECISION MODELING: at
+       http://www-leav.army.mil/nsc/warsim/reason/assess/section2/
+       section2.htm
+       From the military, this is a very serious thorough outline of
+       some heavy-duty wargame AI techniques. Very dense. You have
+       been warned.
+       
+Automatic World Builder at
+       http://www.best.com/~jendave/builder/world/index.html
+       I wasn't able to access this page (he's on some server that
+       limits him to 500 hits a day or something -- don't ask me -- )
+       but it was described in a newsgroup posting that this lets you
+       run a simulation similar to a game of civilization that
+       produces a world with history, cultures and traditions. Seems
+       like an interesting concept and I'd like to check it out (maybe
+       I'll try at midnight ;-).
+       
+Xtreme Games LLC Web Site at http://www.xgames3d.com/
+       Helps amateur game designers sell their product for a 50/50
+       split. Neat site layout and also has some technical resources
+       and industry news (not the focus of the site though).
+       
+  _________________________________________________________________
+
+Please feel free to e-mail me if you find any dead links or have
+suggested additions.
+
+Please feel welcome to visit the game I'm currently working on at
+http://qlink.queensu.ca/~4jc24/cisc499.
+
+-- 
+"Yo' ideas need to be thinked befo' they are say'd" - Ian Lamb, age 3.5
+http://www.cs.queensu.ca/~dalamb/

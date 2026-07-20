@@ -1,0 +1,94 @@
+    August.11.2010  
+	
+	from this thread 
+	http://www.gamedev.net/community/forums/topic.asp?topic_id=579332
+	
+	I think the key to Duke 4 is continuing the trend of rule breaking as I detail in the thread.
+	-----------------------------------------------------------------------
+	Quote:
+    Original post by onfu
+    Sorta begs the question of what any potential current dev team is actually going to aim for with DNF.
+
+    Do you put a new coat of paint on oldschool Duke and keep its classic (dated) feel? Do you make a modern FPS with so little in common with the feel of its early counterparts that it might as well be a new IP, but then relying purely on character to bring the fans?
+
+    I wonder if anyone even knows what the potential audience for DNF wants or hopes for... and I wonder if the potential DNF audience itself even knows what it wants.
+
+
+
+
+I have to agree that this is a huge question and I think it's an interesting one to mull over. It probably starts with thinking about what exactly it was about Duke 3D that we loved and would expect in a sequel and what parts could we sacrifice and still feel as if we were playing a Duke game?
+
+If you look at Blizzard, they didn't change very much about Starcraft II. Were they scared of changing the formula especially considering all the professional gaming built around it? But not to digress...
+
+1) Duke was a more light-hearted satirical game-play experience compared to the serious, gothic, brooding, demon infested Doom 2 and other competitors during the mid 90's.
+- Duke was always wise cracking.
+- Cops dressed as overgrown pigs on two legs.
+- Duke was an 80's action hero\wrestler stereotype which I think just translates into being a "man's man." Give me some beer, women with nice tits, some guns to play with and shit to blow up, and I'm cool.
+- Bizarre and rather crazy weapons for it's day (shrink ray + stomp, freeze ray + kick, pipe bomb with remote trigger) which fits in with the theme of light-hearted and satirical game-play. Half Life again reminded us that a game could have more than gatling guns and shotguns.
+
+2) Many maps were well lit and a change of pace from the horror style darkness in games before it... something i think Half Life duplicated to it's benefit.
+
+3) Pushed the envelope in terms of content and themes. Before Hot Coffee mod there was public outrage all over the media over the killing of topless strippers in a children's game called Duke Nukem 3D.
+- Duke was misogynistic.
+- Duke was a rebel.
+- Duke was a bit of a lunatic really, perhaps even a sadistic one.
+- Duke was a bit of a contradiction which added some complexity to what at first glance seemed like a cardboard stereotype of a tough guy.
+- Duke was an anti-hero.
+
+4)Duke took place in the real world which served as an anchor to keep all the rest of the absurdity in check. Sure things were campy and surreal, but in just the perfect way. You fought on the city streets, in movie theaters, in bathrooms, on the roofs of buildings... but never in some anonymous jungle or dark dungeon or any other personality deprived setting.
+
+5)Mod-ability. Build engine map editor made modding pretty accessible.
+
+So I think the core theme of Duke is simply [bold]"breaking the rules."[/bold] Duke 4 needs to simply break the rules of what currently is the norm for First Person Shooters. How does Duke 4 do that in this day and age? I can't say. There are all kinds of shooters out today and more are coming out tomorrow. How do you break the rules if your game isn't even going to get released for another 3 years?
+
+I think if you look at Serious Sam 2 you see a game that tried to copy Duke in some respects but in copying it (and Doom) they didn't really break any rules.
+
+[Edited by - Hypnotron on August 11, 2010 9:14:14 PM]
+
+ User Rating: 1011   |  Rate This User  	Send Private MessageView Profile 	Report this Post to a Moderator | Link
+
+	Reply Quoting This MessageEdit Message PlayfulPuppy    Member since: 10/23/2004  From: Australia
+ Posted - 8/11/2010 10:39:58 PM
+
+    Quote:
+    Original post by Hypnotron
+    4)Duke took place in the real world which served as an anchor to keep all the rest of the absurdity in check. Sure things were campy and surreal, but in just the perfect way. You fought on the city streets, in movie theaters, in bathrooms, on the roofs of buildings... but never in some anonymous jungle or dark dungeon or any other personality deprived setting.
+
+
+
+Y'see, this is what I loved (And still love) about the original Duke. I still don't understand why there are so few (Non-sandbox) games that take place in a modern, urban setting.
+
+(Although looking at the leaked DNF footage it's mostly sewers and warehouses. Oh dears).
+
+ User Rating: 1210   |  Rate This User  	Send Private MessageView Profile 	Report this Post to a Moderator | Link
+
+	Reply Quoting This MessageEdit Message Trapper Zoid  GDNet+  Member since: 5/20/2005  From: Melbourne, Australia
+ Posted - 8/11/2010 11:28:06 PM
+Heh, this reminds me of all the gamer arguments back in the 90s as to which was better - Duke Nukem 3D or Quake? And teenaged me arguing that they were both sucky games in completely different ways.
+
+For me, there wasn't anything wrong with the gameplay itself of Duke Nukem 3D. It had a range of interesting varied environments and interesting weapons leading to fun shooty gameplay for the time. It was the antithesis of Quake's boring-as-all-hell brown snoozefest environments and blandtastic weapons and enemies.
+
+The problem was Duke himself. I know this is a personal opinion, but to me he's the single most unappealing game protagonist I've ever had the misfortune of playing as. I found his misogynistic brand of "humour" to be so unfunny it completely spoilt the rest of the game for me. And that was back when teenager me was playing the game for the first time in the 90s; I doubt the IP has aged well over a decade and a half.
+
+I'm guessing the unfunny humour was a 3D Realms thing given they also made Shadow Warrior which was even worse, but it's a Catch 22 situation. There's no point making a Duke Nukem game if they don't include the Duke 3D "humour", but that will make it a game I don't want to play. (Of course, if they go back to the original Duke Nukem sidescroller I might be interested...)
+
+
+ User Rating: 1796   |  Rate This User  	Send Private MessageView ProfileView JournalView GD Showcase Entries 	Report this Post to a Moderator | Link
+
+	Reply Quoting This MessageEdit Message Hypnotron    Member since: 10/10/2006  From: Seattle, WA, United States
+ Posted - 8/12/2010 12:18:28 AM
+Trapper Zoid,
+
+I think you're correct that a formulaic rehash would suck and a lot of the themes and style of Duke would not go over well in 2010. But I don't think Duke needs a lot of that.
+
+If I'm right, I think the key to a successful Duke is to keep him as a rebel and for the game to break rules of story telling, action, themes, etc. That is a big challenge in a world of "the Simpson's Already Did It!"
+
+Duke is Duke because he broke the rules as a character and as a game. So Duke 4 has to continue breaking the rules... not trying to re-bake the same cake in a new oven.
+
+Imagine the game opens and Duke is chillin' at home with his ebony wife and 6 adopted kids. One or more of the kids is handicapped. Damn Duke, you've changed! Didn't know you had it in you... but then again, you always were a rebel...
+
+And maybe Duke's learned some new tricks... Duke doing kung-fu or karate? I'm suddenly having images of a white "Black Dynamite." http://www.imdb.com/title/tt1190536/
+
+Anyway, I would love to own the Duke IP (heh, duh i suppose). Seriously, it's still full of potential.
+
+[Edited by - Hypnotron on August 11, 2010 11:18:18 PM]

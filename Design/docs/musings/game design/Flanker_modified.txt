@@ -1,0 +1,494 @@
+
+const MAX_MISSION_WAYPOINTS	= 32;
+
+const MAX_PASSWORD_LENGTH	= 8;
+
+const RANDOM_BIT			= 0x40;
+
+const SU27_FUEL_CAPACITY	= 0x24b8;
+
+const OBJECT_ID_LENGTH		= 2;
+
+const SIM_EVENT_HEADER_ID	= 0x000e;
+
+const EVENT_RECORD_LEN		= 16;
+
+// type of sortie flown by flight
+const SORTIE_NOTHING				= 0x0001;	// Nothing
+const SORTIE_ESCORT					= 0X0002;	// Escort
+const SORTIE_CAP					= 0x0004;	// Combat Air Patrol
+const SORTIE_INTERCEPT				= 0x0008;	// Intercept
+const SORTIE_GAI					= 0x0010;	// Ground to Air Intercept
+const SORTIE_CAS					= 0x0020;	// Close Air Support
+const SORTIE_FIGHTER_SWEEP			= 0x0040;	// Fighter Sweep
+const SORTIE_GROUND_ATTACK			= 0x0080;	// Ground Attack
+const SORTIE_RADAR_SUPPRESSION		= 0x0100;	// Radar Suppression
+const SORTIE_PINPOINT_STRIKE		= 0x0200;	// Pinpoint Strike
+const SORTIE_ANTISHIP_STRIKE		= 0x0400;	// Anti-Ship Strike
+const SORTIE_AWACS					= 0x0800;	// AWACS
+const SORTIE_RUNWAY_ATTACK			= 0x1000;	// Runway Attack
+const SORTIE_OBSERVATION			= 0x2000;	// Observation
+const SORTIE_AIR_ATTACK				= (SORTIE_ESCORT|SORTIE_CAP|SORTIE_INTERCEPT|
+												SORTIE_GAI|SORTIE_FIGHTER_SWEEP);
+
+// number of planes in flight
+const FLIGHT_LEADER_ONLY		= 0;
+const FLIGHT_LEADER_1_WINGMAN	= 1;
+const FLIGHT_LEADER_2_WINGMEN	= 2;
+const FLIGHT_LEADER_3_WINGMEN	= 3;
+
+const FLIGHT_LEADER	= 0;
+const WINGMAN_1		= 1;
+const WINGMAN_2		= 2;
+const WINGMAN_3		= 3;
+const MAX_WING_SIZE	= 4;
+
+// shape index used by ground objects
+const SH_F15					= 0x0012;
+const SH_F16					= 0x0013;
+const SH_S2S19_ARTILLERY_UNIT	= 0x0015;
+const SH_OSA_MISSILE_BOAT  		= 0x0022;
+const SH_MOL_TORPEDO_BOAT		= 0x0023;
+const SH_KUB_RADAR				= 0x0028;
+const SH_KUB_LAUNCHER			= 0x0029;
+const SH_MIG23					= 0x002c;
+const SH_MIG29					= 0x002d;
+const SH_OSA_AK					= 0x0036;
+const SH_R73					= 0x003f;
+const SH_ZSU23_SHILKA			= 0x0042;
+const SH_SU27					= 0x0044;
+const SH_SUBMARINE				= 0x0045;
+const SH_T72_TANK				= 0x0046;
+const SH_TU95					= 0x0048;
+const SH_BULLET					= 0x0057;
+const SH_1R13_EWR_STATION		= 0x005e;
+const SH_55ZH6_EWR_STATION		= 0x005f;
+const SH_DUG_IN_UNIT			= 0x0061;
+const SH_RADAR_UNIT1			= 0x0062;
+const SH_IL76					= 0x0064;
+const SH_A50					= 0x0065;
+const SH_GROZNY_CRUISER			= 0x0067;
+const SH_MIG27					= 0x007d;
+const SH_SU25					= 0x0080;
+const SH_URAL_TRACTOR_UNIT		= 0x009a;
+const SH_ZIL_FUEL_TANKER		= 0x009e;
+const SH_ZIL_GAS_TANKER			= 0x00a0;
+const SH_R77	        		= 0x00ab;
+const SH_TOR					= 0x00ac;
+const SH_MOSKVA_CRUISER			= 0x00af;
+const SH_TUNGUSKA				= 0x00b1;
+const SH_TARANTUL2_MISSILE_BOAT	= 0x00bc;
+const SH_RADAR_UNIT2			= 0x00c3;
+const SH_BAIKAL_CONTROL_POST	= 0x00c6;
+const SH_S300_LAUNCHER			= 0x00c7;
+const SH_S300_TRACK_RADAR		= 0x00c9;
+const SH_BUK_COMMAND_POST		= 0x00d6;
+const SH_BUK_RADAR				= 0x00d7;
+const SH_BUK_LOADER_LAUNCHER	= 0x00d8;
+const SH_BUK_SAM				= 0x00d9;
+const SH_STRELA_10M3			= 0x00da;
+const SH_TU142					= 0x00dd;
+const SH_HOBY_TANKER_SHIP		= 0x00e1;
+const SH_SU24					= 0x00e2;
+const SH_TU22_M3				= 0x00e4;
+const SH_SLAVA_CRUISER			= 0x00f1;
+const SH_UDALOY_CRUISER			= 0x00f2;
+const SH_NATA_MINE_SWEEPER		= 0x00f3;
+const SH_PETYA_PATROL_SHIP		= 0x00f4;
+const SH_BRDM_VEHICLE			= 0x00f5;
+const SH_SUA152_ARTILLERY_UNIT	= 0x00f6;
+const SH_BMP2_VEHICLE			= 0x00f7;
+const SH_BMD_VEHICLE			= 0x00f8;
+const SH_S2S9_ARTILLERY_UNIT	= 0x00f9;
+const SH_TARANTUL4_MISSILE_BOAT	= 0x00fa;
+const SH_76N6E_RADAR_UNIT		= 0x00fe;
+const SH_GRISHA_CRUISER			= 0x0108;
+const SH_POLNOCHNY_LAND_SHIP	= 0x010e;
+const SH_IGLA					= 0x0110;
+const SH_S300_SEARCH_RADAR		= 0x0142;
+const SH_MAX_SHAPE_INDEX		= 0x0143;
+
+// event ID for statistics file
+const AIR_OBJ_EVENT		= 0x0001;
+const GROUND_OBJ_EVENT	= 0x0002;
+const DYNAMIC_OBJ_EVENT	= 0x0004;
+const HIT_EVENT			= 0x0008;
+const HIT_DESTROY_EVENT	= 0x0010;
+const KILL_EVENT		= 0x0020;
+const APPEAR_EVENT		= 0x0040;
+const REMOVE_EVENT		= 0x0080;
+const EXPLOSION_EVENT	= 0x0100;
+const PRI_TARGET_EVENT	= 0x0200;
+const SEC_TARGET_EVENT	= 0x0400;
+
+// failure object IDs
+const RADAR_FAILURE			= 0x0001;
+const EOS_FAILURE			= 0x0004;
+const MLWS_FAILURE			= 0x0008;
+const HYDRAULICS_FAILURE	= 0x0010;
+const AUTOPILOT_FAILURE		= 0x0020;
+const LEFT_ENGINE_FAILURE	= 0x0040;
+const RIGHT_ENGINE_FAILURE	= 0x0080;
+const PILOT_HEAD_FAILURE	= 0x0100;
+const HELMET_FAILURE		= 0x0400;
+const ACS_FAILURE			= 0x0800;
+const ECM_FAILURE			= 0x1000;
+const HUD_FAILURE			= 0x2000;
+const MFD_FAILURE			= 0x4000;
+
+typedef unsigned char	UCHAR;
+typedef unsigned short	USHORT;
+typedef unsigned int	UINT;
+typedef unsigned long	ULONG;
+
+// country enumeration
+typedef enum country_id {
+	C_UNKNOWN,
+	C_RUSSIA,
+	C_UKRAINE,
+	C_USA,
+	C_TURKEY,
+} COUNTRY_ID;
+
+// weapon enumeration
+typedef enum weapon_id {
+	W_INVALID_ID,
+	W_GunA,
+	W_R60,
+	W_R73,
+	W_R27r,
+	W_R27t,
+	W_R27rl,
+	W_R27tl,
+	W_R33,
+	W_R77,
+	W_X29,
+	W_X31,
+	W_X31A,
+	W_X25,
+	W_X35,
+	W_B1500K,
+	W_B1500,
+	W_B250,
+	W_B250HD,
+	W_B500,
+	W_B500K,
+	W_C8,
+	W_C13,
+	W_C24,
+	W_C25,
+	W_AIM120,					// AMRAAM RH AIR2AIR Missile
+	W_X15,
+	W_X55,
+	W_X25p,
+	W_R23r,
+	W_R23t,
+	W_B500F,
+	W_B250BF,
+	W_B500B,
+	W_B500C,
+	W_B25F,
+	W_B25B,
+	W_FUEL800,
+	W_FUEL1500,
+	W_FUEL3000,
+	W_ECM_SORBCIA,
+	W_ECM_REP,
+	W_X59,
+	W_X65,
+	W_AIM9,						// Sidewinder IR AIR2AIR Missile
+	W_GunM,
+	W_GunB,
+	W_GunC,
+	W_GunD,
+	W_X15M,
+	W_FUEL800_MIG23,
+	MAX_WEAPON_ID
+} WEAPON_ID;
+
+// mission type enumeration
+typedef enum mission_classification {
+	MC_NOT_PROTECTED,			// This mission is not classified
+	MC_TRAINING,				// Training Mission
+	MC_PILOT,					// Pilot Mission
+	MC_SQUAD_LEADER,			// Squadron Leader Mission
+	MC_GENERAL					// General Mission
+} MISSIONCLASSIFICATION;
+
+// waypoint ID enumeration
+typedef enum waypoint_id {
+	WP_TURNING_POINT,			// Turning Point
+	WP_TAKE_OFF,				// Take Off
+	WP_LANDING,					// Landing
+	WP_BOMBING,					// Bombing
+	WP_MISSILE_TO_GROUND,		// Launch air to surface for ground target
+	WP_MISSILE_TO_SHIP,			// Launch air to surface for sea target
+	WP_FIRE_ROCKETS,			// Fire Rockets
+	WP_BEGIN_LOOP,				// Begin Waypoint Loop
+	WP_END_LOOP,				// End Waypoint Loop
+	WP_WINGMAN_ON,				// Tight Formation
+	WP_WINGMAN_OFF,				// Loose Formation
+	WP_TERRAIN_FOLLOW_OFF,		// Disable terrain follow mode, use fixed alt
+	WP_TERRAIN_FOLLOW_ON,		// Enable terrain follow mode
+	WP_WINGMAN,					// Unknown
+	WP_MISSILE_TO_RADAR,		// Launch air to surface for Anti-Radar target
+	WP_DESTRUCTION				// Unknown
+} WAYPOINT_ID;
+
+// simulation object enumeration
+typedef enum sim_object_id {
+	SO_END_OF_MISSION,			// Mark the end of the mission file
+	SO_FLIGHT,					// identifies a flight
+	SO_GROUND_OBJECT,			// identifies a ground target
+	SO_MAP_AIR_BASE,			// Unknown
+	SO_MAP_POINT_MARKER,		// Unknown
+	SO_MAP_GROUND_OBJECT,		// Unknown
+	SO_MAP_MARKER,				// Unknown
+	SO_MISSION_AIR_BASE,		// Unknown
+	SO_FAILURE,					// identifies a failure
+	SO_BRIEFING,				// identifies a briefing
+	SO_METEOROLOGICAL_SETTINGS,	// identifies a meteorilogical report
+	SO_MAP_RESOURCE,			// Unknown
+	SO_TARGET_MARKER			// identifies a target to be attacked or defended
+} SIM_OBJECT_ID;
+
+// skill level enumeration
+typedef enum skill_level {
+	SL_AVERAGE,					// Average
+	SL_GOOD,   					// Good
+	SL_HIGH,					// High
+	SL_EXCELLENT,				// Excellent
+	SL_ME,		 				// Object controlled by user
+	SL_REMOTE	 				// Object controlled by remote user
+} SKILL_LEVEL;
+
+
+// target marker type enumeration
+typedef enum target_marker_id {
+	TMT_ATTACK,					// Attack this target
+	TMT_DEFEND					// Defend this target
+} TARGET_MARKER_ID;
+
+// active ground object behavior index
+typedef enum behavior_id {
+	B_KUB_LAUNCHER,
+	B_OSA_AK,
+	B_ZSU_23_SHILKA,
+	B_TOR,
+	B_KUB_RADAR,
+	B_GROZNY_CRUISER,
+	B_MOSKVA_CRUISER,
+	B_OSA_MISSILE_BOAT,
+	B_MOL_TORPEDO_BOAT,
+	B_TUNGUSKA,
+	B_S300_LAUNCHER,
+	B_TURANTUL2_MISSILE_BOAT,
+	B_S300_TRACK_RADAR,
+	B_BUK_SAM,
+	B_BUK_LOADER_LAUNCHER,
+	B_STRELA_10M3,
+	B_HOBY_TANKER,
+	B_BUK_RADAR,
+	B_S300_SEARCH_RADAR,
+	B_NATA_MINE_SWEEPER,
+	B_PETYA_PATROL_SHIP,
+	B_TURANTUL4_MISSILE_BOAT,
+	B_GRISHA_CRUISER,
+	B_UDALOY_CRUISER,
+	B_SLAVA_CRUISER,
+	B_1R13_EWR_STATION,
+	B_55ZH6_EWR_STATION,
+	B_POLNOCHNY_LAND_SHIP,
+	B_IGLA,
+	B_MAX_ACTIVE_OBJECT,
+	B_STATIC = 0xff
+} BEHAVIOR_ID;
+
+// aircraft enumeration
+typedef enum aircraft_id {
+	A_SU27,						// Sukhoi SU-27 Flanker
+	A_MIG29,					// Mikoyan Gurovich Mig-29 Fulcrum
+	A_F16,						// General Dynamics F-16 Falcon
+	A_F15,						// McDonnel Douglass F-15 Eagle
+	A_TU95,						// Tupolev TU-95 Bear
+	A_SU25,						// Sukhoi SU-25 Frog Foot
+	A_MIG23,					// Mikoyan Gurovich Mig-23 Flogger-B
+	A_MIG27,					// Mikoyan Gurovich Mig-27 Flogger-D
+	A_A50,						// AW-50 AWACS (IL-76 Mainstay)
+	A_IL76,						// IL-76 Mainstay
+	A_TU142,					// Tupolev TU-142 Bear (navalized variant)
+	A_SU24,						// Sukhoi SU-24 Fencer
+	A_TU22M3					// Tupolev TU-22M3 Backfire
+} AIRCRAFT_ID;
+
+// mission survavability
+typedef enum survivability_id {
+	S_REALISTIC,
+	S_NORM,
+	S_GOOD,
+	S_HIGH
+} SURVIVABILITY_ID;
+
+// event string ID for statistics file
+typedef enum event_string_id {
+	AIR_OBJ_EVENT_STRING,
+	GROUND_OBJ_EVENT_STRING,
+	DYNAMIC_OBJ_EVENT_STRING,
+	HIT_EVENT_STRING,
+	HIT_DESTROY_EVENT_STRING,
+	KILL_EVENT_STRING,
+	APPEAR_EVENT_STRING,
+	REMOVE_EVENT_STRING,
+	EXPLOSION_EVENT_STRING,
+	PRI_TARGET_EVENT_STRING,
+	SEC_TARGET_EVENT_STRING
+} EVENT_STRING_ID;
+
+// 3D position in simulation world
+typedef struct position {
+	long	x;
+	long	y;
+	long	z;
+} SIMPOS, *PSIMPOS;
+
+// mission file header
+typedef struct mission_header {
+	USHORT	FileCRC;
+	long	StartTime;
+	long	StartRandomTime;
+	UCHAR	MySide;
+	UCHAR	MissionClass;
+	UCHAR	MinSkill;
+	UCHAR	MaxSkill;
+	UCHAR	HardLandings;
+	UCHAR	MyPlanePresent;
+	SIMPOS	SavedZoom;
+	USHORT	PasswordLength;
+	char	Password[MAX_PASSWORD_LENGTH];
+	UCHAR	Survivability;		
+} MISSIONHEADER, *PMISSIONHEADER;
+
+// hard point or pylon for weapons loadout
+typedef struct hardpoint {
+	USHORT	nCount;
+	USHORT	eType;
+} HARDPOINT, *PHARDPOINT, PYLON, *PPYLON;
+
+// waypoint description
+typedef struct waypoint {
+	SIMPOS	Position;
+	USHORT	nVelocity;
+	USHORT	eAction;
+	USHORT	nCount;
+} WAYPOINT, *PWAYPOINT;
+
+// ground object description
+typedef struct ground_object {
+	USHORT	State;					// Apply RANDOM_BIT here
+	UCHAR	eCountry;
+	UCHAR	eBehavior;
+	SIMPOS	Position;
+	short	nHeading;
+	UCHAR	eSkill;
+	USHORT	eShape;
+} GROUNDOBJECT, *PGROUNDOBJECT;
+
+// flight description
+typedef struct flight {
+	UCHAR	Flag;					// Apply RANDOM_BIT here
+	UCHAR	Number;
+	UCHAR	eCountry;
+	UCHAR	eAircraft;
+	UCHAR	nWingSize;
+	UCHAR	fSortie;
+	UCHAR	nWayPoints;
+	UCHAR	nHardPoints;
+	UCHAR	eSkill[MAX_WING_SIZE];
+	long	nFuel;
+	long	nStartTime;
+} FLIGHT, *PFLIGHT;	
+
+// statistics file header
+typedef struct sim_event_header {
+	USHORT	nEventHeaderID;
+	ULONG	nEventLength;
+} SIMEVENTHDR, *PSIMEVENTHDR;
+
+// simulation event (from statistics file)
+typedef struct sim_event {
+	long	nTime;
+	USHORT	eType;
+	USHORT	eCountry;
+	USHORT	eClass;
+	USHORT	eShape;
+	USHORT	nObjectID;
+	USHORT	nParentObjectID;
+} SIMEVENT, *PSIMEVENT;
+
+// meteorology report (for changing default weather)
+typedef struct met_report {
+	ULONG	nAmbientTemp;					// ambient temperature @ sea-level
+	ULONG	nAirPressure;					// air pressuer @ sea-level       
+	ULONG	nWindSpeedH;					// wind speed                     
+	ULONG	nWindAngleH;					// wind angle                     
+	ULONG	nWindSpeedE;					// wind speed                     
+	ULONG	nWindAngleE;					// wind angle                     
+	ULONG	nTurbInMountains;				// turbulence in mountains        
+	ULONG	nTurbAt2k;						// turbulence @ 2k                
+	ULONG	nTurbAt8k;						// turbulence @ 8k                
+	ULONG	nDynamicTurbAt0;				// dynamic turbulence @ landing?
+	ULONG	nCloudBase;						// clouds minimum altitude (base)
+	ULONG	nCloudCeiling;					// clouds maximum altitude	(ceiling)
+	ULONG	nVisibility;					// mist visibility in meters      
+} METREPORT, *PMETREPORT;
+
+// systems failure description
+typedef struct sys_failure {
+	USHORT	eType;
+	long	nExactTimeOfFailure;
+	long	nTimeBetweenFailure;
+} SYSFAILURE, *PSYSFAILURE;
+
+// target marker
+typedef struct target_marker {
+	UCHAR	fAttackDefend;
+	SIMPOS	Position;
+} TARGETMARKER, *PTARGETMARKER;
+
+typedef struct mis_obj_index_elem {
+	SIM_OBJECT_ID	eSimObject;
+	int				nOffset;
+	int				nLength;
+} INDEXELEMENT, *PINDEXELEMENT;
+
+// macros
+
+#define GETBIT(x,y)	((x) & (y))
+#define SETBIT(x,y)	((x) |= (y))
+#define CLRBIT(x,y)	((x) &= ~(y))
+
+
+public:
+	USHORT		m_State;					// Apply RANDOM_BIT here
+	UCHAR		m_eCountry;
+	UCHAR		m_eBehavior;
+	CPosition	m_Position;
+	short		m_nHeading;
+	UCHAR		m_eSkill;
+	USHORT		m_eShape;
+	static char *m_szShape[];
+
+public:
+	UCHAR		m_Flag;						// Apply RANDOM_BIT here
+	UCHAR		m_Number;
+	UCHAR		m_eCountry;
+	UCHAR		m_eAircraft;
+	UCHAR		m_nWingSize;
+	UCHAR		m_fSortie;
+	UCHAR		m_nWayPoints;
+	UCHAR		m_nHardPoints;
+	UCHAR		m_eSkill[MAX_WING_SIZE];
+	long		m_nFuel;
+	CSimTime	m_StartTime;
+	static char *m_szWeapon[];
+

@@ -1,0 +1,17 @@
+Feb.27.2014 - F2P players dont play they get played
+
+http://www.gamasutra.com/blogs/AndreasAhlborn/20140227/211819/Can_F2P_never_be_Fairplay.php
+
+In F2P the players don't play, they get played.
+
+What are the goals of F2P? We know that two key early goals are to overcome discoverability problems and achieve lowest possible barrier to entry in a competitive market.
+
+So the fair F2P game creator says "I want to get players across that initial threshold of finding, downloading and playing the game. From there, it is my responsibility to create a great game that customers will want to buy the full version of."
+
+This is really a DEMO model where the demo and full version interoperate in a multiplayer environment such that players can upgrade from demo to full with a single one time purchase and with no requirement of restarting the game and losing any progress. The transition is seamless and the monetization model is completely transparent.
+
+For the rest of the F2P developers, alongside overcoming discoverability and achieving low barrier, "free" is a lure to an immediate player manipulation system.
+
+Bees2Flower vs Flies2Trap
+
+When F2P first started to pop up, I thought the networked demo model (even if networking just applied to distribution and DRM and not actual multiplayer) would take over and so I predicted that all games would become F2P in order to compete. But I had no idea what others had in mind for F2P and I had no idea that F2P would usher in a wave of the most unethical monetization schemes and game mechanics the games industry has ever seen. 

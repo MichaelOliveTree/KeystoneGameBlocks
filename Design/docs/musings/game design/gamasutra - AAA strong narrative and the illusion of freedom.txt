@@ -1,0 +1,28 @@
+
+Feb.24.2014  - AAA strong narrative and 
+
+http://www.gamasutra.com/blogs/AndreasWalther/20140221/211377/Trauma_and_Catharsis_in_Videogames__Part_I_of_III_Acts_of_Killing.php
+
+
+The problems with ludonarrative dissonance in strong armed narrative games is fundamentally tied to two things.
+1) the problem of game content creation, management, deployment and the technological problem of having an AI that can use all of this content appropriately.
+2) Because these games essentially care more about the story, experience and the flow they want to manufacture, player freedom atrophies until they're left with just the "fun" mechanics such as killing and blowing things up and the occasional gratuitous T&A.
+
+The entire game design process for these games revolves around story and content. The result is beautiful worlds that start to turn ugly if you spend too much time thinking about how much non-interactive facade it all is. And the elaborate facade _must_exist_  because strong narrative requires the player be corralled. It's an inherent weakness of these types of games and will exist for the foreseeable future.
+
+That process actually represents a stark change from how most games were built pre 1995 or even how most indies build games today where most of the focus is on mechanics, systems simulation, function over form... and not story.
+
+So Clint Hocking is totally right but I think the problem is even deeper and more fundamental than he expressed. AAA is producing some of the most visually amazing & lazy uninspired crap you'll ever see. Their enslavement to fun and flow has moved the game design process into Dr. Frankestein's laboratory where they output big and impressive creations that have nothing much going on behind the eyes. 
+
+The question I would like answered is why do some writers and game designers think they can "solve" all of the fundamental problems associated with strong narrative games? It's worth pointing out that even the venerable "Portal" didn't solve them... they incorporated them.  As it happens limited player freedom was integral to the story and the obvious choices for the player always fit with the limited available choices.  The novel aspect of being able to walk through walls provided only the illusion of great freedom and interactivity.
+
+
+The new Thief game is upon us and I would have loved it had the producers decided to allow the player to imagine Garrett's motivations for themselves and then hook that into the game world's interactivity to provide meaning as you say, in the form of options for how to spend that money. Donate it to the orphanage? Buy books for a troubled school? Use it to gobble up legitimate businesses? Buy politicians, judges and cops? Spend it on booze, gambling and women?
+
+How the player chooses to have Garrett interact with the world would shape the world, shape the characters own language and tone, shape how badly law enforcement is trying to catch this mystery criminal, etc, etc. Suddenly the game becomes one that can be replayed over and over again. As it is, the new Thief appears very hollow and as such offers no compelling replay value. I mean, how is that not disposable game design?
+
+Indies are tackling the non interactive facade problems somewhat and are able to make some interesting advances by abandoning the pursuit of visual fidelity/realism from the onset.
+
+Minecraft with it's block by block game world is almost symbolic of the type of fundamental course correction taking place in some corners of the indie scene where every "thing" in the world has purpose and is not just part of a giant facade.
+
+Sorry. Enough rambling :) 

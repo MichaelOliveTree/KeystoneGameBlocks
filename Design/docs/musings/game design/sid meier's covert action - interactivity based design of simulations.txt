@@ -1,0 +1,24 @@
+nov.19.2014 - Sid Meier's Covert Action <-- interactivity based design of simulations (interface based)
+
+http://www.rockpapershotgun.com/2014/11/18/covert-action-review/
+
+when you look at an early game like Sid Meier's Covert Action you see a design that 
+
+1) sets out to simulate a fantasy job like "spy"
+2) defines the types of missions you can do
+3) creates an interface for those missions
+	- bare minimum abstract design to create the sense and provide relevant information
+4) ties them all together in an overarching agent & task based simulation of the world 
+
+
+Other games that follows this principle are Krellan Commander, XCOM (with it's GeoView, BaseViews, MissionViews), Zelda (with the different views it has of overworld, dungeons, shops), Dwarf Fortress, etc.
+
+In a sense, every part of the interface is both game-y, as well as complimenting/supporting/fullfilling the overall games design goals.
+
+When Sid Meier's said "make just one game" he was referring to this... that the many sub-games exist to support the main game.  They don't exist to be their own seperate games.  That is a great example of how Spore went wrong.
+
+
+
+Games that go too far in this regard are games like Rules of Engagement.  
+
+

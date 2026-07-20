@@ -1,0 +1,47 @@
+Oct.10.2018
+
+
+Very simple rules on how to be ethical is to be
+1) open (transparency)
+2) honest (don't tell lies)
+3) truthful ( actively making known all the full truth of a matter).
+
+Following these simple and objective rules, you inform users of your software whether you plan on (or are reserving the potentiality of) exploiting them now and/or in the future. So for example, you can write exploitative software that mines users' data and then sell that data to the highest bidder, just so long as you inform your users about it. Informing them has to be open, honest and truthful. This knowledge empowers users.
+
+
+<Hypnotron> awww... i posted as AC on /. and nobody modded my post up
+<Hypnotron> been a couple of hours and its still at 0 
+<Hypnotron> :(
+<mith_1> That is what you get for posting as AC
+<mith_1> Or maybe what you wrote is no good.
+<Hypnotron> :(
+<Hypnotron> it was just a short post about ethics being taught in STEM courses
+<Hypnotron> one person wrote "Who's ethics do we teach?" 
+<Hypnotron> and i just proposed very simple and objective rules
+<Hypnotron> 1) Honesty
+<Hypnotron> 2) Openness
+<Hypnotron> 3) Truthfulness
+<Hypnotron> this allows you to create software that is going to data mine your users, so long as you are open, up front, and honest about it
+<Hypnotron> my rules empower the user.
+<Hypnotron> but of course, companies like Facebook don't want to do that
+<Hypnotron> they want to hide their exploitation 
+<Hypnotron> but im saying it's not inherently evil if you make sure the users know completely, that all kinds of data is being collected, stored, shared, sold, and being used for targeted ads, by employers for screening purposes, etc, etc
+<Hypnotron> but im sure it would be a very ugly looking disclosure
+<Hypnotron> people would be like "i don't think so! that's too much" if they knew the full extent
+<Hypnotron> so you get the unethical behavior instead... the lies and coverups
+<Hypnotron> STEM if you don't know in Oz, stands for Science, Technolgy, Engineering, Math
+<Hypnotron> anyways
+<Hypnotron> my rules don't apply to everything in life
+<Hypnotron> works of art for instance have a different standard.  Integrity
+<Hypnotron> for a work to have integrity, the creator has to believe in the message of the work (they must practice what they preach)
+<Hypnotron> but otherwise they are permitted to manipulate and lie to the audience so long as doing so serves the work
+<Hypnotron> if they don't believe in whatever messages they are preaching, then it's not art.  It's propaganda or commercialism.
+<Hypnotron> depending on who's doing it and for what purpose
+<Hypnotron> as far as STEM ethics goes
+<Hypnotron> it places the burden of educating the user on the creators
+<Hypnotron> but you can create anything you want
+<Hypnotron> someone did find my post and asked about the guidance system software of a weapon
+<Hypnotron> don't know.  If you're writing guidance system software, the specs were probably provided to you by the purchaser
+<Hypnotron> "this is what we want built.  this is how we expect it to perform. here's some money to get it done."
+<Hypnotron> so the relationship is a bit different.  However, if they were just selling the guidance software online to anybody, then Honesty, Openness and Truthfulness should apply
+<Hypnotron> the fact the weapon will kill people is a different question to wrangle with

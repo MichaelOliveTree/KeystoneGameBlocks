@@ -1,0 +1,33 @@
+
+
+Nobody talks about boycotting... not even Mike Malloy.
+
+Nobody talks about how unprincipled we are... how its not about dem's vs republicans or libs vs cons, it's about how collectively we are unprincipled and therefore cant even be counted on doing the right thing eventually.  We will simply accept the wrong thing without fighting it.  We're not talking about accepting a philosophy, but an actual form of oppression
+
+
+A good pitch if you were a Young Turk or an Ed Shultz and had a dedicated audience would be to start preaching faith in each other... maybe we dont have faith in the ultra right wingers, but we do have faith in each other and we are affirming our principles and convictions, that we arent apathetic and if so damn us all to hell.
+
+
+On Waywardness or waylessness
+-----------------
+WHat is the American Way? What is the way of Jesus?  What is the way of the samurai (re: ghost dog)  
+What is a person without any "way"?
+
+If a way is not defined, how can it be chosen.  If it cannot be chosen, how can it be followed?  If it cannot be followed but the people think they do, are they really lost?
+
+Is our American Constitution and Laws enough to define a way?  The root of hypocrisy
+
+
+
+http://blogs.msdn.com/b/chuckw/archive/2010/12/09/directx-and-net.aspx
+
+At this point, Managed DirectX 1.1 is really beginning to show it's age.
+
+    * Since the last version of D3DX9 supported by Managed DirectX 1.1 is April 2006, it makes use of a very outdated version of the HLSL compiler.
+    * The Managed DirectX 1.1 assemblies are 32-bit only, so you cannot use them from an x64 native .NET application (/platform:anycpu on a Windows x64 system). You must build with /platform:x86 and stay within the limits of the 2 GB memory space of 32-bit applications.
+    * The assemblies only support the legacy DirectX API set, with no support for Direct3D9Ex, Direct3D 10.x, Direct3D 11, Direct2D, DirectWrite, DXGI, D3DX10, D3DX11, XAUDIO2, XACT, XINPUT, etc.
+    * Since Managed DirectX 2.0 was never released in production form, the Managed DirectX 1.1 assemblies still reflect .NET 1.1 design principles and does not support or make use of .NET 2.0 constructs.
+    * Managed DirectX 1.1 while compatible with .NET 2.0 (and the .NET 3.0 and .NET 3.5 extensions of the 2.0 runtime), is not compatible with .NET 4.0
+
+
+      

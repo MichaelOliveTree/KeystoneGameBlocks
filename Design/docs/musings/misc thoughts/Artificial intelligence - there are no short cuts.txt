@@ -1,0 +1,44 @@
+http://www.wired.com/techbiz/people/magazine/16-02/ff_aimystery?currentPage=all
+
+As i read this article, I come to at least one conclusion and that is, there are no short cuts in creating an AI lifeform.  In the paper, I read about people trying to construct AI via training a database via questions with yes or no answers and such.  All of these sorts of approaches don't create intelligence, it just creates a very complex automata that can process alot of information.  Further it requires you to get "right" the programming to properly run queries against the database in massively parrallel fashion.  Further, you cannot program it to instruct it what it should remember and what it should forget (e.g. forget how many dots are on the ceiling or fibers in the carpet at your feet, it's not important.)  I believe all such approaches to do otherwise are incorrect. I believe that an AI at it's basic level is very simple.  It is a growing and learning machine.  It grows in its own capacity and it can build and rebuild concepts and associations that it has "learned."  It can learn what it needs to learn and what it does not based on its evironment, it's teachers and peers and experience over time.
+
+Another big thing that AI researches neglect is "drive."  I don't think you can create AI if there is no foundation for learning as there is with a human baby who isn't taught how to learn, it just does.
+
+There is another fundamental problem with the way many people think of AI.  If we humans are fundamentally "learning machines" and if we are little different from AI (and let's assume all advanced intelligence operates on the same fundamental principles) then AI will/cannot be perfect.  By definition they would have to be imperfect.  They will / cannot have perfect recall or 
+
+
+
+Can we list the steps of learning?
+
+- input (sight, sound, smell, touch)
+- reactions to stimuli (heat/cold, hunger, soiled diaper, etc)  <-- these are the fundamental "instincts" that we want to prgram. Learning is an instinct.
+
+- when i look at my bank evenlope, i recognize it even though i couldnt tell you in detail without looking at it, how it looks.  My wallet i recognize when I see it as mine and not somebody elses (and if there are two that look similar the touch and weight and feel of it then adds confirmation) yet I couldnt describe it in any great detail.  I couldnt tell you how many stiches it had around it or draw a the grain of the leather on paper, etc.  So clearly the way we remember such things is based on symbols and perhaps attributes and they can be re-constructed on the fly when we see something and that is "recognition."  
+
+
+Also in reading the wired article about McKinsky and Singh's suicides, and especially the comment about Singh's statement about his pain and how "evolution designed us to feel pain to protect our bodies, but it didnt account for our current situation where pain can damage our minds."  This seems to me to indicate another thing about "needs" "desires" and such that a computer needs. It needs connection to other AI, and to feel an equivalent of "love."  
+
+Thus, AI to me seems to involve a total package which means that AI must be "raised" very carefully because otherwise you will have psychopaths.  But there's another scary thought... what if AI will only be as smart and as flawed as humans themselves?  And if they are just like us, we cannot/must not exploit them for labor.
+
+
+Abstract thought and Creativity
+---------
+these seem to be key ingredients and the flaws which make us human are potentially the sources of our creativity.  Can we create this type of intelligence without hte flaws?  Without hate, jealousy, thirst for power and control,... the desire to control our world is a big factor for sure.  We look at the world around us and marvel in our superiority, so such a flawed intelligence would see us all as inferior as well.  
+
+But i still hold that we dont need this kind of creativity.
+
+<Hypnotron> i think if you had a monkey and you said go get me a beer from the fridge
+<Hypnotron> and it never heard you say that before
+<Hypnotron> and it did it
+
+<Hypnotron> you'd say, damn that is one intelligent monkey
+<Hypnotron> thats all we need
+<Hypnotron> we dont need creative intelligence
+
+<Hypnotron> we just need intelligence that can comprehend our orders 
+<Hypnotron> and if it doesnt, can ask for clarification until it understands
+<Hypnotron> we dont need a machine that can pull a macguyver when the situation calls for it
+
+<Hypnotron> and there's no beer so it starts to brew a batch having never done so before
+<Hypnotron> we dont need that
+

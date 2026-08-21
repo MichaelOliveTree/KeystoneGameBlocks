@@ -534,7 +534,7 @@ namespace HelloBoids
         public static double DEPTH = 800d;
 		
 		public static uint NUM_ENTRIES = 768;
-        public static uint NUM_ITERATIONS = 400;
+        public static uint NUM_ITERATIONS = 350;
         public static double MAX_RUNTIME_SECONDS = 5.5;
 		
 
@@ -1047,7 +1047,7 @@ namespace HelloBoids
         // to find a good balance between performance and
         // simulation/behavior quality
 		//public static double MAX_SEARCH_DISTANCE = 35d;
-		public static double SEPERATION_DISTANCE = 25.0d;
+		public static double SEPERATION_DISTANCE = 90.0d;
 		public static double ALIGNMENT_DISTANCE = 15.5d;
 		public static double COHESION_DISTANCE = 12.5d;
 		
@@ -3534,7 +3534,7 @@ namespace HelloBoids
 			//ComponentStore<Component> allComponents  = EntryClass.mCStoreCol.CheckOut<Component>(0);
 			//ComponentStore<TacticalStation> allTacticalStations  = EntryClass.mCStoreCol.CheckOut<TacticalStation>(0);
 						
-			Console.WriteLine("Do_Tactical_Logic() - preparing for loop()");
+			//Console.WriteLine("Do_Tactical_Logic() - preparing for loop()");
 			int recordCount = Boids.Count;
             System.Threading.Tasks.Parallel.For(0, recordCount, i => 				
 			//for (int i = 0; i < Boids.Count; i++)
@@ -3562,10 +3562,7 @@ namespace HelloBoids
 				int tacticalIndex;
 				Memory<TacticalStation> tacticalStationStruct = (Memory<TacticalStation>) tacticalStationEnts[0].GetUserStruct(typeof(TacticalStation), out tacticalIndex);
 
-				string errorReason = null;
-				if (tacticalStationStruct.Span[0].CanAct(out errorReason)) return;
-				//Console.WriteLine("Do_Tactical_Logic() - Station CanAct() == TRUE");		
-				
+				string errorReason = null;				
 				// NOTE: The EXE will render Sensor Contact info as necessary.
 				//       The client EXE will have access to those types and the UI elements using them and can update
 				//       those relevant UI elements as necessary
@@ -3573,9 +3570,7 @@ namespace HelloBoids
                 // our crew station + operator can only work so fast... we call CanAct() to see if the
                 // cooldown between any previous Action has completed.
 				bool canAct = tacticalStationStruct.Span[0].CanAct(out errorReason);
-
-
-                Console.WriteLine("Do_Tactical_Logic() - Station Can Act == " + canAct.ToString() + " " + errorReason);		
+                //Console.WriteLine("Do_Tactical_Logic() - Station Can Act == " + canAct.ToString() + " " + errorReason);		
 
                 if (!canAct) return;
 
@@ -3609,7 +3604,7 @@ namespace HelloBoids
 				 // TODO: Establish CANFIRE PER WEAPON - following only uses the 1 weapon we know exists on each Droid.
 				bool canFire = weaponStruct.Span[0].CanFire(out errorReason);
 
-				Console.WriteLine("Do_Tactical_Logic() - Weapon Can Fire == " + canFire.ToString());		
+				//Console.WriteLine("Do_Tactical_Logic() - Weapon Can Fire == " + canFire.ToString());		
 
 				if (canFire)
            	 	{  
@@ -3637,7 +3632,7 @@ namespace HelloBoids
                             //Console.WriteLine("Do_Tactical_Logic() -  NO Targets In TacticalStation.");
                             return;
                         }
-						Console.WriteLine("Do_Tactical_Logic() -  " + targets.Count.ToString() + " Targets In TacticalStation.");
+						//Console.WriteLine("Do_Tactical_Logic() -  " + targets.Count.ToString() + " Targets In TacticalStation.");
 						// NOTE: TacticalStation.CanHit() returns true if a hit WILL RESULT from the fired shot
 						//       even if the HIT is not the expected location on a Target or even on the correct Target!
 						//       Otherwise it is a total MISS.  We log the hit/miss EVENT either way... typically as a 
@@ -3651,7 +3646,7 @@ namespace HelloBoids
 							return;
 						}	
 						
-						Console.WriteLine("Do_Tactical_Logic() -  " + hits.Count.ToString() + " HITs have occurred.");
+						//Console.WriteLine("Do_Tactical_Logic() -  " + hits.Count.ToString() + " HITs have occurred.");
 						ProcessHits(hits, operatorEntityArrayIndex, stationEntityArrayIndex, attackerEntityArrayIndex, weaponArrayIndex, gt, random);
 					}
 					catch (Exception ex)
@@ -3741,7 +3736,7 @@ namespace HelloBoids
 				if (potentialTargets == null || potentialTargets.Count == 0)
 					return;		 
 				
-				Console.WriteLine("CreateContactListFromAdjacents() - BEGIN iterate through potential contacts.");
+				//Console.WriteLine("CreateContactListFromAdjacents() - BEGIN iterate through potential contacts.");
 				
 				// iterate through all the potential "contacts"
 				for (int j = 0; j < potentialTargets.Count; j++)
@@ -3752,7 +3747,7 @@ namespace HelloBoids
 					//int potentialContactsInternalTransformIndex = neighbors[(int)j].Item1; 
 					int potentialContactsEntityArrayIndex = potentialTargets[j].EntityArrayIndex; //allTransforms.Span[potentialContactsInternalTransformIndex].EntityArrayIndex;
 			  
-					Console.WriteLine("CreateContactListFromAdjacents() - 2");
+					//Console.WriteLine("CreateContactListFromAdjacents() - 2");
 					// Iterate through all the Sensors the current Droid is using to see which ones might
 					// detect this potential contact.  This is why a "SensorContact" may already exist
 					// in the List<SensorContact> 'contactsList'  because multiple Sensors on _the_same_ship_
@@ -3785,7 +3780,7 @@ namespace HelloBoids
 								else
 									currentContact.SensorsIndices.Append(sensorArrayIndex); // sensorStructIndex);
 
-								Console.WriteLine("CreateContactListFromAdjacents() - Appending SensorContact of Droid at Array Index = '" + currentContact.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
+								//Console.WriteLine("CreateContactListFromAdjacents() - Appending SensorContact of Droid at Array Index = '" + currentContact.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
 							}
 							else // contact has not yet already been detected by another Sensor within this same ship during this loop through all sensors on this same ship
 							{
@@ -3817,7 +3812,7 @@ namespace HelloBoids
 
                                 
                                 
-                                Console.WriteLine("CreateContactListFromAdjacents() - Added NEW SensorContact of Droid at Array Index = '" + currentContact.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
+                               // Console.WriteLine("CreateContactListFromAdjacents() - Added NEW SensorContact of Droid at Array Index = '" + currentContact.ContactEntityArrayIndex.ToString() + "' detected by the Sensor at Array Index = '" + sensorArrayIndex.ToString() + "'");
                             }
 
                             // telemetry must be added regardless of whether this is an existing or new SensorContact
@@ -3834,7 +3829,7 @@ namespace HelloBoids
                             // to be the same as that of the first Telemtry[0] subscript
                             // if available.
                             telemetry.TimeAcquired = gt.TotalElapsedSeconds;
-                            Console.WriteLine ("CreateContactListFromAdjacents() - TimeAcquired == " + gt.TotalElapsedSeconds.ToString());
+                           // Console.WriteLine ("CreateContactListFromAdjacents() - TimeAcquired == " + gt.TotalElapsedSeconds.ToString());
                             
 
                             
@@ -4010,7 +4005,7 @@ namespace HelloBoids
                             tacticalStationStruct.Span[0].Add(t, gt); // tacticalStation.Add(t);
 
                             lineNum = 15;
-                            Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY PASSED. Target added.");
+                           // Console.WriteLine("DoTargetPrioritization() - Rules of Engagement POLICY PASSED. Target added.");
                             
                         }
                         else
@@ -4023,8 +4018,6 @@ namespace HelloBoids
                 
                     catch (Exception ex)
                     {
-                        Console.WriteLine("DoTargetPrioritization() - ERROR: LINE == " + lineNum.ToString() + " " + ex.Message);
-                        Console.WriteLine("DoTargetPrioritization() - ERROR: LINE == " + lineNum.ToString() + " " + ex.Message);
                         Console.WriteLine("DoTargetPrioritization() - ERROR: LINE == " + lineNum.ToString() + " " + ex.Message);
                     }
                 }
@@ -4241,7 +4234,7 @@ namespace HelloBoids
                             }
                     }
                 
-                Console.WriteLine ("HitHasOccurred() - Detection Probability Reduction == '" + reduction.ToString() + "'");
+        //        Console.WriteLine ("HitHasOccurred() - Detection Probability Reduction == '" + reduction.ToString() + "'");
 
                 // - evasive maneuvers (COMPARE VELOCITY MAGNITUDE CHANGES OVER X SECONDS PERIOD OF TIME
                 // if the velocity magnitude changes by some minimum amount over X seconds and this is sustained over and over again, over Y seconds, each Y second of evasive action adds a bonus.
@@ -4267,8 +4260,8 @@ namespace HelloBoids
                 double acquisitionDuration = tacticalStationStruct.Span[0].GetAquisitionDuration(targets[i], gt);
                 double evasiveDuration = tacticalStationStruct.Span[0].GetEvasiveManeuverDuration(targets[i], gt);
 
-                Console.WriteLine ("HitHasOccurred() - Acquisition Duration == " + acquisitionDuration.ToString());
-                Console.WriteLine ("HitHasOccurred() - Evasive Duration == " + evasiveDuration.ToString());
+          //      Console.WriteLine ("HitHasOccurred() - Acquisition Duration == " + acquisitionDuration.ToString());
+          //      Console.WriteLine ("HitHasOccurred() - Evasive Duration == " + evasiveDuration.ToString());
 
 				
                 double TEMP_GOOD_LOCK_TIME_AMOUNT_IN_SECONDS = 2.5d;
@@ -4344,7 +4337,7 @@ namespace HelloBoids
                                     allBaseObjs.Span[laserIndex].Volume + 
                                     allBaseObjs.Span[batteryIndex].Volume + 
                                     allBaseObjs.Span[humanOperatorIndex].Volume;
-                Console.WriteLine ("HitHasOccurred() - TotalVolume == '" + totalVolume.ToString() + "'");
+        //        Console.WriteLine ("HitHasOccurred() - TotalVolume == '" + totalVolume.ToString() + "'");
                 System.Diagnostics.Debug.Assert (totalVolume > 0, "HitHasOccured() - 'totalVolume' must not be 0.");
 
 
@@ -4356,21 +4349,21 @@ namespace HelloBoids
 				// Battery
 				// Operator
 				weights[0] = allBaseObjs.Span[hullIndex].Volume / totalVolume;
-                Console.WriteLine ("Weight0 == " + weights[0].ToString());
+     //           Console.WriteLine ("Weight0 == " + weights[0].ToString());
 
 				weights[WINGS_OFFSET] = allBaseObjs.Span[wingsIndex].Volume / totalVolume;
-                Console.WriteLine ("Weight1 == " + weights[1].ToString());
+     //           Console.WriteLine ("Weight1 == " + weights[1].ToString());
 
                 weights[TACTICAL_STATION_OFFSET] = allBaseObjs.Span[tacticalStationIndex].Volume / totalVolume;
-                Console.WriteLine ("Weight2== " + weights[2].ToString());
+     //           Console.WriteLine ("Weight2== " + weights[2].ToString());
                 weights[OPTICAL_SENSOR_OFFSET] = allBaseObjs.Span[opticalSensorIndex].Volume / totalVolume;
-                Console.WriteLine ("Weight3 == " + weights[3].ToString());
+     //           Console.WriteLine ("Weight3 == " + weights[3].ToString());
                 weights[LASER_OFFSET] = allBaseObjs.Span[laserIndex].Volume / totalVolume;
-                Console.WriteLine ("Weight4 == " + weights[4].ToString());
+     //           Console.WriteLine ("Weight4 == " + weights[4].ToString());
                 weights[BATTERY_OFFSET] = allBaseObjs.Span[batteryIndex].Volume / totalVolume;
-                Console.WriteLine ("Weight5 == " + weights[5].ToString());
+     //           Console.WriteLine ("Weight5 == " + weights[5].ToString());
                 weights[HUMAN_OPERATOR_OFFSET] = allBaseObjs.Span[humanOperatorIndex].Volume / totalVolume;
-				Console.WriteLine ("Weight6 == " + weights[6].ToString());
+	//			Console.WriteLine ("Weight6 == " + weights[6].ToString());
 
                 // Iterate through the weights in reverse order (since our weights
                 // are in order of largest to smallest) to find which index the random point belongs to.
@@ -4386,7 +4379,7 @@ namespace HelloBoids
                     rValue -= weights[j];
                 }
 
-				Console.WriteLine("HitHasOccurred() - Hit at subassembly or opponent index '" + selectedIndex.ToString() + "'");
+	//			Console.WriteLine("HitHasOccurred() - Hit at subassembly or opponent index '" + selectedIndex.ToString() + "'");
 				
 				// the selectedTargets are all the Entities (including sub-Entities within a Ship like sensors, computers, power generators, life support systems, bunks, etc)
 				// that have been "hit" by the weapon being used by the attackingShip
@@ -4445,6 +4438,7 @@ namespace HelloBoids
 				EntryClass.mUserDataStore[attacker.EntityKey].IncrementInteger("shotsfired");
 				//Console.WriteLine("ProcessHits() - Attacker Droid @ Array Index '" + currentArrayIndex.ToString() + "' firing shot # " + EntryClass.mUserDataStore[attacker.EntityKey].IncrementInteger("shotsfired").ToString() + " on Droid @ Array Index '" + currentTarget.EntityArrayIndex.ToString() + "'");
 
+	/*
 				// TODO: QUEUE ANIMATION TO FIRE THIS WEAPON 
 				// Publish a CombatEventRecord containing the 'FireAt' Attempt
 				int actionID = (int)ACTIONS.FiringAt;
@@ -4468,6 +4462,7 @@ namespace HelloBoids
 				r.Damage = null;
 
 				mSimEventManager.PublishEvent(attacker, actionID, r);
+		*/
 
 				// NOTE: here we assume the Fire() occurs immediately using a lightspeed laser and the damage is instantaneous 
 				//       and does not need any travel time to reach the currentTarget
@@ -4527,7 +4522,7 @@ namespace HelloBoids
 							throw new Exception("ProcessHits() - Unexpected Damge type. " + damages[j].GetType().Name);
 					}
 
-					
+			/*
 					// Console.WriteLine ("ProcessHits() - Publishing HIT RESULTS - 1");	
 					// Publish a CombatEventRecord containing the Hit Results
 					actionID = (int)ACTIONS.TargetHit;
@@ -4547,6 +4542,7 @@ namespace HelloBoids
 					r.Damage = damageAmounts;
 
 					mSimEventManager.PublishEvent(attacker, actionID, r);
+			*/
 				}
 			}
 		}
@@ -4664,7 +4660,7 @@ namespace HelloBoids
 			double finalDamageAmount = Math.Max(0, damageAmountWithVariance - defense); 
 									
 			// NOTE: Damage amount generated. 
-			Console.WriteLine ("CalculateDamage() - Result == " + finalDamageAmount.ToString() + " (Target Average Defense == " + defense.ToString() + " Weapon Attack Value == " + damageAmountWithVariance.ToString() + " Critical Hit == " + isCriticalHit.ToString() + ")");
+	//		Console.WriteLine ("CalculateDamage() - Result == " + finalDamageAmount.ToString() + " (Target Average Defense == " + defense.ToString() + " Weapon Attack Value == " + damageAmountWithVariance.ToString() + " Critical Hit == " + isCriticalHit.ToString() + ")");
 			double time = gt.TotalElapsedSeconds;
 						
 			// ------------------------------------------
@@ -5712,7 +5708,7 @@ namespace HelloBoids
 						//LifeForm lf = (LifeForm)memSpan[records[i].EntityIndex];
 						Stat prev = baseObject.Span[0].HitPoints;
 						baseObject.Span[0].HitPoints.Current -= records[i].Amount;
-						Console.WriteLine ("HealthSystem.Apply() -  Entity '" + EntryClass.bSim.Boids[records[i].TargetEntityArrayIndex].EntityKey + " Hitpoints: '" + baseObject.Span[0].HitPoints.ToString() + "' Previously was: '" + prev.ToString() + "'");
+						//Console.WriteLine ("HealthSystem.Apply() -  Entity '" + EntryClass.bSim.Boids[records[i].TargetEntityArrayIndex].EntityKey + " Hitpoints: '" + baseObject.Span[0].HitPoints.ToString() + "' Previously was: '" + prev.ToString() + "'");
 						
 					}
 				}
@@ -5775,7 +5771,7 @@ namespace HelloBoids
 						
 						int amount = d.Amount;
 						mDamageResults.Add (new HealthSystem.DamageResult() {TargetEntityArrayIndex = d.TargetEntityArrayIndex, Amount = amount});
-						Console.WriteLine ("DamageSystem.Add() - Damage of '" + amount.ToString() + "'  being applied to '" + EntryClass.bSim.Boids[d.TargetEntityArrayIndex].EntityKey);
+						//Console.WriteLine ("DamageSystem.Add() - Damage of '" + amount.ToString() + "'  being applied to '" + EntryClass.bSim.Boids[d.TargetEntityArrayIndex].EntityKey);
 					}
 					
 					// use the same <LifeForm>store as the one passed in, for applying health changes to the Droid
@@ -5851,7 +5847,7 @@ namespace HelloBoids
 						
 						int amount = d.Amount;
 						mDamageResults.Add (new HealthSystem.DamageResult() {TargetEntityArrayIndex = d.TargetEntityArrayIndex, Amount = amount});
-						Console.WriteLine ("DamageOverTimeSystem.Add() - Damage of '" + amount.ToString() + "'  being applied to '" + EntryClass.bSim.Boids[d.TargetEntityArrayIndex].EntityKey);
+						//Console.WriteLine ("DamageOverTimeSystem.Add() - Damage of '" + amount.ToString() + "'  being applied to '" + EntryClass.bSim.Boids[d.TargetEntityArrayIndex].EntityKey);
 					}
 					
 					// use the same <LifeForm> store as the one passed in, for applying health changes to the Droid
@@ -8413,7 +8409,7 @@ return (0,0);
 		{
 			if (mRules == null || mRules.Length == 0) return true;
 			
-			Console.WriteLine("Rule.Execute() - Executing " + mRules.Length.ToString() + " rules");
+			//Console.WriteLine("Rule.Execute() - Executing " + mRules.Length.ToString() + " rules");
 			for (int i = 0; i < mRules.Length; i++)
 				if (!mRules[i].Evaluate(mContext))
                 {
@@ -8589,12 +8585,6 @@ return (0,0);
                 catch (Exception ex)
                 {
                     Console.WriteLine("Condition.Evaluate() - ERROR: - LineNum == " + lineNum.ToString() + " " + ex.Message);
-                    Console.WriteLine("Condition.Evaluate() - ERROR: - LineNum == " + lineNum.ToString() + " " + ex.Message);
-                    Console.WriteLine("Condition.Evaluate() - ERROR: - LineNum == " + lineNum.ToString() + " " + ex.Message);
-                    Console.WriteLine("Condition.Evaluate() - ERROR: - LineNum == " + lineNum.ToString() + " " + ex.Message);
-                    Console.WriteLine("Condition.Evaluate() - ERROR: - LineNum == " + lineNum.ToString() + " " + ex.Message);
-                    Console.WriteLine("Condition.Evaluate() - ERROR: - LineNum == " + lineNum.ToString() + " " + ex.Message);
-
                 }
 			}
 			return true;
@@ -10358,7 +10348,16 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 
 		public void Add (SensorContact c, GameTime gt)
 		{
-			if (mSensorContacts == null) mSensorContacts = new List<SensorContact>();
+			if (mSensorContacts == null) 
+			{
+				mSensorContacts = new List<SensorContact>();
+				int stationIndex = this.EntityArrayIndex;
+				int componentIndex;
+				Memory<TacticalStation> tact = (Memory<TacticalStation>)EntryClass.bSim.Boids[stationIndex].GetUserStruct(typeof(TacticalStation), out componentIndex);
+				Span<TacticalStation> sp = tact.Span;
+				sp[0] = this;
+			}
+
 			int found = FindSensorContact(c.Name);
 			if (found == -1) 
             {
@@ -10378,11 +10377,11 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
                     double timeAcq = gt.TotalElapsedSeconds; // first.TimeAcquired;
                     EntryClass.mUserDataStore[stationKey].SetDouble(acquisitionKey, timeAcq);
 
-                    Console.WriteLine ("TacticalStation.Add() - Telemetry updated.");
+                   // Console.WriteLine ("TacticalStation.Add() - Telemetry updated.");
                 }
 
                 mSensorContacts.Add(c);
-                Console.WriteLine ("TacticalStation.Add() - New Contact Added COMPLETED.");
+                //Console.WriteLine ("TacticalStation.Add() - New Contact Added COMPLETED.");
             }
             else 
             {
@@ -10390,7 +10389,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
                 // one for this detected Entity already exists
 				mSensorContacts[found].Add(c.Telemetry);
 			
-		        Console.WriteLine("TacticalStation.Add(SensorContact) - FOUND EXISTING SensorContact.  SensorContact added to 'TacticalStation' struct referencing Entity at array index" + EntityArrayIndex + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
+		       // Console.WriteLine("TacticalStation.Add(SensorContact) - FOUND EXISTING SensorContact.  SensorContact added to 'TacticalStation' struct referencing Entity at array index" + EntityArrayIndex + "'. Total Contacts Count == " + mSensorContacts.Count.ToString());
             }
 		}
 		
@@ -10406,8 +10405,18 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 		{
             //Console.WriteLine ("TacticalStationStruct.Add() - Entered.");
 
-			if (mTargets == null) mTargets = new List<Target>();
-			
+			if (mTargets == null) 
+			{
+				mTargets = new List<Target>();
+
+				int stationIndex = this.EntityArrayIndex;
+				int componentIndex;
+				Memory<TacticalStation> tact = (Memory<TacticalStation>)EntryClass.bSim.Boids[stationIndex].GetUserStruct(typeof(TacticalStation), out componentIndex);
+				Span<TacticalStation> sp = tact.Span;
+				sp[0] = this;
+
+			}
+
 			int found = FindTarget(t.EntityArrayIndex);
 			
 
@@ -10429,12 +10438,12 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
                 //EntryClass.mUserDataStore[stationKey].SetBool(acquisitionStaleKey, false);
 
                 mTargets.Add(t);
-                Console.WriteLine ("TacticalStationStruct.Add() - Add of new 'Target' Completed.");
+                //Console.WriteLine ("TacticalStationStruct.Add() - Add of new 'Target' Completed.");
             }
             else
             {
 				mTargets[found] = t;
-                Console.WriteLine ("TacticalStationStruct.Add() - Updating an existing Target completed.");
+                //Console.WriteLine ("TacticalStationStruct.Add() - Updating an existing Target completed.");
                 
                 // 
                 
@@ -10663,7 +10672,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			System.Diagnostics.Debug.Assert (station.EntityArrayIndex == baseObj.Span[0].EntityArrayIndex);
 		#endif
 				
-				
+			return true;
 			if (!baseObj.IsEmpty)
 			{
 				string name = baseObj.Span[0].FullName;
@@ -12555,7 +12564,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 			long totalUsed = Utils.GetUsedMemory(false);
 			//Console.WriteLine("ComponentStore.ctor() - " + Utils.SizeSuffix(totalUsed) + " used.");
 
-			Console.WriteLine( "ComponentStore.ctor() - Type == '" + (typeof(T)).ToString() + " Starting capacity == " + Capacity.ToString());
+			//Console.WriteLine( "ComponentStore.ctor() - Type == '" + (typeof(T)).ToString() + " Starting capacity == " + Capacity.ToString());
         }
 
 		private uint mCapacity;
@@ -12886,7 +12895,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
         //       script destructors need to checkin / dispose all array arrayElements
         private void Expand()
         {
-			Console.WriteLine("ComponentStore.Expand() - Current Capacity == " + Capacity.ToString() + " for type '" + typeof(T).Name + "'" );
+			//Console.WriteLine("ComponentStore.Expand() - Current Capacity == " + Capacity.ToString() + " for type '" + typeof(T).Name + "'" );
             if (InUse == null)
             {
                 Components = new T[STARTING_SIZE];
@@ -12902,7 +12911,7 @@ According to a discussion on Reddit, Win/Loss and SPM are often better indicator
 	                mAvailableForCheckOut.Push(i);
 
 				uint abc = STARTING_SIZE;
-				Console.WriteLine("Expand() - " + typeof(T).Name + " " +  abc.ToString());
+				//Console.WriteLine("ComponentStore.Expand() - " + typeof(T).Name + " " +  abc.ToString());
                 return;
             }
 
@@ -21641,8 +21650,8 @@ public abstract class PlanedFrustum
             tp.OwnerID = nodeID;
             tp.Name = name;
             tp.Duration = durationInSeconds;
-            if (durationInSeconds % EntryClass.mStep != 0)
-                Console.WriteLine("IntervalTimers.Register() - '" + name + "' is not a multiple of " + EntryClass.mStep.ToString() + ". It is a good idea for the duration interval to be a multiple of the FIXED STEP SIZE.");
+          //  if (durationInSeconds % EntryClass.mStep != 0)
+          //      Console.WriteLine("IntervalTimers.Register() - '" + name + "' is not a multiple of " + EntryClass.mStep.ToString() + ". It is a good idea for the duration interval to be a multiple of the FIXED STEP SIZE.");
             tp.Elapsed = 0d;
             tp.Repeating = repeating;
             tp.RepeatCount = repeatCount;

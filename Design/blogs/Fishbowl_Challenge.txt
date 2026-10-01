@@ -131,3 +131,131 @@ https://syntystore.com/products/simple-house-interiors-cartoon-assets?srsltid=AU
 
 Future Fishbowl Challenge Competitions might expand to more than 1 character... e.g.: a bar/pub
 https://sketchfab.com/3d-models/irish-pub-pbr-diorama-65b12c6942ce49e895778928da47550f
+
+
+
+
+
+Hypnotr0n wrote:
+
+III. Determine the "threshold" values for various NPC qualities, by which an NPC becomes "interesting."
+
+Ha, so you suggest to find good tweaking variables to make NPCs more interesting, but you do not yet have a definition of what 'interesting' actually means, since that's the very first question you actually raise. : )
+
+Tbh, i think your post is overall too confusing. There is a lot of critique on state of the art but little proposal of improvement. Warping the discussion into some kind imaginary game jam also does not help us to answer that primary question, i think.
+
+Hypnotr0n wrote:
+
+Games can be made much more interesting if NPCs (Non-Player Characters) behaved in more "interesting" ways.
+
+
+Show more
+What would be some example of more interesting NPC behavior?
+
+Hypnotr0n wrote:
+
+3) Interesting" can be measured or tested by determining a) how long the average USER(S) will [want to] watch or observe a single NPC's BEHAVIOR in a simulation, without interacting directly with that NPC in any way AND b) where that NPC is restricted to a SINGLE SCENE or ENVIORNMENT [the EXHIBIT] that is no greater than 10x10 meters or 100 square meters (~1076 square feet for the Yanks).
+
+
+Show more
+Neither a nor b are helpful clues on the question. A is just basically 'Oh, my game became a success, so i was right about everything', and B is a baseless assumption about scale.
+
+Hypnotr0n wrote:
+
+NPC Behaviors in modern games are so EMBARASSINGLY and ATTROCIOUSLY bad, that I feel the Games Industry needs an INTERVENTION.
+
+
+Show more
+Baseless critiquue, without even providing an example or argument.
+
+I think we should work on that directly, not so much on engine choices or min specs of the imaginary game jam.
+And you should lead the way, since you've brought up the topic.
+
+Today at 10:26 AM
+
+Like
+
+Helpful
+
+Thanks
+|
+
+Quote
+
+Link
+
+Report
+|
+
+Mark Answer
+Hypnotr0n
+Hypnotr0n
+Author
+66
+
+JoeJ wrote:
+
+>Ha, so you suggest to find good tweaking variables to make NPCs more interesting, but you do not yet have a definition of what 'interesting' actually means, since that's the very first question you actually raise. : )
+
+>Tbh, i think your post is overall too confusing. There is a lot of critique on state of the art but little proposal of improvement. Warping the discussion int...
+
+
+
+Sid Meier famously once said, “A game is a series of interesting choices."
+I would have thought this quote would have immediately come to your mind when I used the word "interesting." Interesting is SUBJECTIVE of course. Some people might watch Joe's-Fish-Aquarium-Cam for 2 hours, some for 20 minutes, some for 2 seconds. And I'm asking all of us this question... let's see if we can even easily determine, what NPC Behaviors\Combinations of Behaviors, are the most important ones to focus on and really do justice to, so that we can bring NPCs "to life"... in one fell swoop, or little by little if need be (which way this goes could depend heavily on the tech used)
+
+And I'm hardly talking about finding some good "tweaking variables." I'm talking about bringing NPCs to life. I'm suggesting that bringing NPCs to life will dramatically increase the audience size. I'm suggesting that logging into a world and merely BEING in it, without playing it, MUST IMMEDIATELY BE DEEMED INTERESTING even WITHOUT ANY DIRECT USER INTERACTION. That test or measurement REALLY IS valid in my opinion.
+
+Unfortunately, right now NPC Behavior designs\implementations are riding in the unpressurized baggage compartment of a rickety old plane. Games AI needs to be moved into the first-class section aboard an A330! My gosh, do I really need to delve further into this?
+
+JoeJ wrote:
+
+>Neither a nor b are helpful clues on the question. A is just basically 'Oh, my game became a success, so i was right about everything', and B is a baseless assumption about scale.
+
+
+JoeJ, of course they are helpful. I've set the parameters of this 'challenge' to say "The simulation must be 'interesting' with NO DIRECT INTERACTION by the USER to the NPC in the EXHIBIT.
+I preceded this by asking YOU, "What is it about watching a dog cam or an aquarium cam, or birds nest cam that is INTERESTING and can keep people tuned in for hours at a time?" because I think there's something we can glean from those sorts of examples. Don't agree?
+
+Let's see what WE can come up with. NPC Behaviors are total crap right now across the board. Who are we kidding? Games are a joke to many non-gamers because, NPC Behaviors are a massive source of COGNITIVE DISSONANCE because even though some may visually appear remarkably photo-REAL, they act like completely DUMB, OBLIVIOUS and BRAINDEAD scarecrows and cannot do things that some random non-gamer, who is watching a "Let's Play" for the first time for a game that interests them, would assume an NPC they see on screen could do, but actually cannot.
+
+"I could while away the hours
+Conferrin' with the flowers,
+Consulting with the rain;
+And my head I'd be a scratchin'
+While my thoughts are busy hatchin'
+If I only had a brain."
+
+- The Scarecrow from the Wizard of Oz
+
+>Tbh, i think your post is overall too confusing. There is a lot of critique on state of the art but little proposal of improvement. Warping the discussion into some kind imaginary game jam also does not help us to answer >that primary >>question, i think.
+
+For proposed improvement, I wrote a list of behaviors that one could attempt to simulate but you just ignored that list apparently. I don't think of this as an imaginary game jam... I think of it as an on-going call-to-arms, like the DEMO SCENE, to get creatives and developers out there, to start "bringing NPCs to life" and let's see what kinds of things people can come up with to make a simple EXHIBIT, with ONE NPC, that can respond to external stimuli, and otherwise is confined to that EXHIBIT (I use the word exhibit intentionally to evoke imagery of a ZOO creature being viewed constantly for the amusement of an audience... a miniature Truman Show.
+
+JoeJ wrote:
+
+>Baseless critique, without even providing an example or argument.
+
+Pointing out the obvious deficiencies in how the Games Industry at large treats NPCs behaviors is not what I would consider a "baseless" critique.
+
+You are not a n00b JoeJ, but I find that I'm having to converse with you as if you were one. So i'll provide you with a most obvious example of industry wide stagnation in NPC Behaviors.
+
+JoeJ: "Hey Mr. Amazing 3D Animator! Tell me something. Why does your new fancy guard's 'idle' animation use this super cliche, and boring as all heck in 2026, 'huffing and puffing' animation combined perhaps with an akimbo hip 'weight-'shifting' animation? And why are they so exaggerated?"
+
+Mr. Amazing 3D Animator: "I would take offence to that but... umm... it's totally true. I mean yes, our guards also have a 'turn-head-left-and-right-from-time-to-time' animation too but. Anway, do you seriously not know the answer to this question? I thought you were an experienc... umm... nevermind. OK. So like... the team decided once again, that for this project, guards and NPCs in general, will not respond to general, external stimuli such as sound caused by other NPCs, or cats, rats, crickets, the wind, or thunder... or noticing the visual movement of other NPCs or cats and rats and crickets or things blown by the wind, or smells caused by other NPCs, or cats and rats and crickets or blown in from across town by the wind, or noticing the appearance, movement or change in shadows caused by NPCs, or cats and rats and crickets or things being blown around by the wind.... or noticing and responding to sudden changes in temperature caused by..."
+
+JoeJ: "OK i get it... changes in temperature caused by Freeze-Ray wielding cats and rats and crickets and Wind Monsters. Thanks for indulging me. Of course I knew all this already I just wanted to hear what you would say... and of course I know you exaggerate the 'idle' animations to cover up the fact that there's literally NOTHING ELSE for these 'guard' characters to do while they are waiting around for the player to show up so they can fulfill their only real purpose which is to be 'player-fired bullet magnets.'"
+
+Mr. Amazing 3D Animator: Indeed. You know my pain.
+
+JoeJ wrote:
+
+>I think we should work on that directly, not so much on engine choices or min specs of the imaginary game jam.
+>And you should lead the way, since you've brought up the topic.
+
+JoeJ, there's hopefully enough 'we' in this Industry to do more than work on the things you want us to work on. (and I wasn't really talking about engine choices or min specs... performance and memory use are only mentioned so we can compare folks' implementations to see how useful they are eg. # simultaneous behaviors per sections... for instance, maybe somebody's tech focuses on running MANY behaviors (say 32 in parallel) per NPC and per second").
+
+And I thought that thinking of this as a permanent running "game jam" would help set a "CALL TO ARMS" tone on this issue. The industry has FAILED to make progress in this area. Games AI really has barely progressed in the last 25 years. Call that a baseless critique if you will, but I stand by it.
+
+Regards,
+
+Michael Preston Joseph

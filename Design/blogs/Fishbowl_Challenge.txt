@@ -1,9 +1,5 @@
 https://gamedev.net/forums/topic/720502-games-character-ai-sucks-consider-this-an-intervention-fishbowl-challenge-2026/
 TITLE OF POST:  Games' Character AI Sucks.  Consider this an Intervention -> FISHBOWL CHALLENGE 2026!
-
-
-September 30, 2026 - the 1st Annual "FISHBOWL CHALLENGE." (Fishbowl Jam? Goldfish Jam? Goldfish Challenge? anyways...)
-
 (This is a FAKE ANNOUNCEMENT, but real game design questions and ideas are wrapped inside.
 If anyone wants to make the FISHBOWL CHALLENGE A REALITY, that would be awesome!)
 
@@ -53,7 +49,9 @@ COMBINING all of the above.
 
 [PLEASE HELP REFINE THIS LIST]
 
-Will a typical USER be inclined to watch for 5 seconds? 30 minutes? 24 hours? 1 week?! (anyone willing to coin a term for this such as the 'Turing Test' or 'Uncanny Valley?')
+Will a typical USER be inclined to watch for 5 seconds? 30 minutes? 24 hours? 1 week?!
+
+Anyone willing to coin a term for this (or the various thresholds - think the chatbot 'Turing Test' or robot 'Uncanny Valley?')
 
 Mission I. Determine the "what's" about watching people, dogs & cats, birds, etc., that keeps people's attentions.
 II. Determine which NPC behaviors or combinations of NPC behaviors are the most interesting so that work can be better prioritized.

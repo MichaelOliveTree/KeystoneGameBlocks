@@ -2,7 +2,8 @@ September 30, 2026 - the 1st Annual "FISHBOWL CHALLENGE." (Fishbowl Jam?  Goldfi
 
 -----------------------------------------------------
 
-(This is a FAKE ANNOUNCEMENT, but real game design questions and ideas are wrapped inside.)
+(This is a FAKE ANNOUNCEMENT, but real game design questions and ideas are wrapped inside.  
+If anyone wants to make the FISHBOWL CHALLENGE A REALITY, that would be awesome!)
 
 -----------------------------------------------------
 
@@ -15,7 +16,7 @@ Games can be made much more interesting if NPCs (Non-Player Characters) behaved 
 
 MISSION:
 -----------------------------------------------------
-NPC Behaviors in modern games are so EMBARASSINGLY and ATTROCIOUSLY bad, the Games Industry needs an INTERVENTION.  It simply does not seem to care much about advancing the quality of NPCs within their simulations.  Have we really come that much farther than the days of "Creatures", "Daikatana", the dog in "Fable", nVidia's 2002 "Dawn" demo and "The Sims?"  AI capabilities in games seem like they are always the first to get cut/postponed.  The industry seems to CONSTANTLY shut down/scale back the implementation of enhanced AI for NPCs in upcoming games due to "resource and time constraints."  
+NPC Behaviors in modern games are so EMBARASSINGLY and ATTROCIOUSLY bad, that I feel the Games Industry needs an INTERVENTION.  It simply does not seem to care much about advancing the quality of NPCs within their simulations.  Have we really come that much farther than the days of "Creatures", "Daikatana", the dog in "Fable", nVidia's 2002 "Dawn" demo and "The Sims?"  AI capabilities in games seem like they are always the first to get cut/postponed.  The industry seems to CONSTANTLY shut down/scale back the implementation of enhanced AI for NPCs in upcoming games due to "resource and time constraints."  
 
 We know that people will watch 
 
@@ -27,6 +28,18 @@ We know that people will watch
 
 24 hours a day, but they WILL NOT sit around and watch the rediculously low-quality human-immitations that are Non-Player Characters in modern video games as they shift side-to-side in their DREADED/TIRED/LAZY/WTF ITS 2026 ISN IT?/LAME/ARMS & LEGS AKIMBO 'IDLE' ANIMATION.
 
+Submitters should endeavor to create a life-like(TM) NPC that exists in the proposed enclosure/habitat/terrarium/exibit.
+
+- Anything goes, but for priming the grey-matter, let's look at what behaviors one can attempt to simulate?
+	- Autotomic(and similar) functions (eg. breathing, eye-blinking, hiccups, sneazing, yawning)
+	- Appropriate responses to stimulii (outside noises, arrival of newspaper, mail or parcel or food delivery, thunder, rain, lawn mower, YOU  NAME IT!)
+        - Emotional Range - emotions of various kinds performed in appropriate situations (receiving an unexpected letter of invitation to a FUNERAL of a close friend)
+	- Dialogue (answering a ringing phone and engaging in interesting coversations with daughter, salesman, robocaller, wrong number, etc)
+	- Navigation taken to new heights (dealing with a stubbed toe, walking around during a sudden power outage, inadvertant fall and determining the severity of any injury responding appropriately
+	- Daily Routine - ability to have a routine but still adjust to random events (can your EXHIBIT implementation be so amazing that people would watch it for 7 days straight?)
+
+
+ 
 Mission I.    Detemine the "whats" about watching people, dogs & cats, birds, etc, that keeps people's attentions. 
        II.    Determine which NPC behaviors or combinations of NPC behaviors are the most interesting so that work can be better prioritized.
       III.    Determine the "threshold" values for various NPC qualities, by which an NPC becomes "interesting."
@@ -41,11 +54,15 @@ Will a typical USER be inclined to watch for:
 24 hours?
 1 week?!
 
-    IV.  The EXHIBITS showcasing interesting NPC behaviors will serve as PATHFINDER technologies for the Interactive Digital Entertainment Creators community and will serve to re-ignite the imaginations of creators in the space.
+	IV.  Determine the amount of run-time  memory, disk storage and processing power is needed to reach the various thresholds.
+        	a) how is this impacted over time by NPCs that can "memorize" and "learn" on-the-fly? 
+			i - how important is on-the-fly learning and knowledge accumulation for creating an engaging EXHIBIT?
+ 
+        V.  The submissions showcasing interesting NPC behaviors will serve as PATHFINDER technologies for the Interactive Digital Entertainment Creators community and will serve to re-ignite the imaginations of creators in the space.
 
 
 
-EXHIBIT (aka "Scene") (no, not the Demo Scene  https://www.youtube.com/watch?v=e-qjLfnOrx8  )
+EXHIBITION-A (aka "Scene 1") 
 -----------------------------------------------------
 This FISHBOWL CHALLENGE can be as deep/involved/detailed/difficult as one dares to make it.  This is the whole point!
 
@@ -58,11 +75,8 @@ With this in mind, for "Exhibit A" I propose a house on the order of 10x10 meter
 EVALUATING THE SUBMISSIONS
 -----------------------------------------------------
  
-Determine the amount of run-time  memory, disk storage and processing power is needed to reach the various thresholds.
-	a) how is this impacted over time by NPCs that can "memorize" and "learn" on-the-fly? 
-		i- how important is on-the-fly learning and knowledge accumulation for creating an engaging EXHIBIT?
- 
 
+Hardware + Software
 - Memory Use
 - CPU / GPU Performance
 - Size of code / libraries
@@ -71,44 +85,35 @@ Determine the amount of run-time  memory, disk storage and processing power is n
 - Extensibility of the code and the NPC Behaviors
 - Scaleability
 
-- [Un]Predictability of the  NPC  (moving away from the dreaded ARCHETYPES (2D cardboard caricatures) because we can't create fully fledged characters very easily/cheaply)
+Fidelity of Simulation
+- Real-time descion-making and responses with NO scripted behaviors.
+- Believability (a chat-bot like test) [Un]Predictability of the  NPC  (moving away from the dreaded ARCHETYPES (2D cardboard caricatures) because we can't create fully fledged characters very easily/cheaply)
 - NPC Learning (Memorizing new information and ways of achieving goals)
 - # Simultaneous Behaviors that an NPC can run
 - Existance of Emergent Behaviors 
 	- I believe that emergent behaviors are more likely to arrise from simple/elegant systems (or systems with simple \ elegant rules) that can be combined in various ways to create more complex behaviors.
-- What behaviors are being simulated?
-	- Autotomic(and similar) functions (eg. breathing, eye-blinking, hiccups, sneazing, yawning)
-	- Appropriate responses to stimulii (answering a ringing phone and engaging in interesting coversations with daughter, salesman, robocaller, wrong number, etc)
-        - Emotional Range - emotions of various kinds performed in appropriate situations
-	- 
 
-Tools
+
+3D Engine & Tools
 -----------------------------------------------------
-Any tools you like so long as the end product can run on Windows, Linux or Mac and without the end user having to pay for or purchase any licenses, subscriptions or services to run the resulting software.
+Any 3D Engine and Tools you like so long as the end product can run on Windows, Linux or Mac and without the end user having to pay for or purchase any licenses, subscriptions or services to run the resulting software.
 
 
+This is all for now.  I hope anyone with good ideas can help refine this document and actually work to get (maybe GameDev.Net itself) someone to organize and run with this CHALLENGE.  All it would really need is a known place for people to submit their EXHIBITS or links to them, for all of the world to see.
 
-
+Happy Coding!
 -Michael Preston Joseph
 
 
+p.s. some links to sample scenes for EXHIBIT - A
 https://sketchfab.com/3d-models/rustic-mediterranean-interior-c285d4c17b0545269d89ffc82dac3e40
-
 https://sketchfab.com/3d-models/modular-vintage-living-room-game-ready-pbr-d83c3f837bae4c9aa52fafc476500386
-
 https://sketchfab.com/3d-models/loft-13-living-room-interior-cfc0e5806d14415d9e9adaa08a59ddcf
-
 https://sketchfab.com/3d-models/loft-japanese-11-free-interior-8a09c63a74f5446681bbdfcb16ae7dd1
-
 https://sketchfab.com/3d-models/the-upper-vestibule-e74928dc62fe457892e52dd97b6aa6e0
-
 https://sketchfab.com/3d-models/cartoon-interior-5560ed48c1594c66bd8bd725c3920174
-
-
 https://free3d.com/3d-model/modular-house-interior-pack-cartoon-assets-for-game-6425.html?dd_referrer=https%3A%2F%2Fwww.google.com%2F
-
 https://syntystore.com/products/simple-house-interiors-cartoon-assets?srsltid=AU7gw4WwwlWygK07DsvKLTKLy9Q892QVEW9rLoMtRjrPrWjztOr_OsU8
 
-
-Future Fishbowl Challenge Competitions can expand to more than 1 character... the bar/pub challenge.
+Future Fishbowl Challenge Competitions might expand to more than 1 character... eg: a bar/pub
 https://sketchfab.com/3d-models/irish-pub-pbr-diorama-65b12c6942ce49e895778928da47550f

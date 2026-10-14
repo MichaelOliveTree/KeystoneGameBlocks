@@ -90,3 +90,5 @@ SciFi Command Specific Features (See included project under folder \\Game01)
 - (30% COMPLETE) Procedural World Texture generation
 - (75% COMPLETE) - Starship Deckplan Designer allowing the PLAYER to design the interior layouts of their starship
 - (0% COMPLETE) - Procedurally generated planet-side Colonies and Outposts. 
+
+!['Sci-Fi Command' logo](scificommand_padded_logo.png)

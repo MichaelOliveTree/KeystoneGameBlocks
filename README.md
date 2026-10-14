@@ -33,6 +33,8 @@ Keystone Game Blocks(KGB) is a 3D Game Framework written in C#.  The primary goa
 - PERFORMANT is the third consideration because this framework is designed for AA games that focus on GAMEPLAY and not AAA games that often focus on GRAPHICS and AESTHETICS.
 - NEWORKING/MULTIPLAYER - the entire framework currently uses LOOPBACK messaging for virtually everything.  This means making real network enabled games will be as simple as changing the HOST to target a remote server instead of LOCALHOST.  This will also eventually allow for the EDITOR to support collaborative EDITING and UNDO/REDO options very easily.  Keystone Game Blocks can use either the Lidgren UDP Connection objects or a custom derived version of the base Lidgren Connection object, which I developed myself, that uses TCP instead of UDP, and does so in an agnostic way so that the calling application does need to care whether it's working with a UDP Lidren Connection or the custom TCP Connection object.
 
+!['Sci-Fi Command' is the space simulation I'm developing alongside Keystone Game Blocks](SciFiCommand_Screen001.png)
+
  KGB features typical game framework things, such as...
  
 * 3D Editor

@@ -1,0 +1,287 @@
+Standing on the shoulders of giants
+-----------------------------------
+
+Koster Quotes (either from his talk or quotes on a slide from his book):
+"The idea was, games are systems built to help us learn patterns."
+"Fun is a neurochemical reward to encourage us to keep trying."
+"In a sense we're being played. Our hind brain is playing us like a puppet to get us to do the hard work of learning how to survive."
+
+Quotes by various people from the slides
+"The most effective kind of education is that a child should play amongst lovely things." - Plato
+"Play is the child's most useful tool for preparing himself for the future and it's tasks." - Bruno Bettelheim
+"Play is the highest form of research." - Albert Einstein
+"Play gives children a chance to practice what they are learning." - Mr. Rogers
+"For a small child there is no division between playing and learning." - Penelope Leach
+"Play is by it's very nature educational." - Ralph Waldo Emerson
+"The child amidst his baubles is learning the action of light, motion, gravity, muscular force..." - Ralph Waldo Emerson
+"A child loves his play, not because it's easy, but because it's hard." - Dr. Benjamin Spock
+"Almost all creativity involves purposeful play." - Abraham Maslow
+"Play is the answer to how anything new comes about." - Jean Piaget
+
+
+Ok. I'm on board! Although, I think his early comment about being played like a puppet is a bit revealing as far as giving us a clue as to the position from which Raph Koster is coming from and the direction his talk will eventually veer.
+
+
+"Everything that is a system is something we can approach as a game. And since games are about teaching systems and we now intentionally create them and these systems literally modify the wiring in our brains, that means that we have an art form that rewires people's brains. We have the power. That means we have to be responsible."
+
+Alright, no argument there. This represents approximately the first 15 minutes of the talk.
+
+
+Tastey tastey fun
+----------------------
+So he's discussed the importance of play. He's affirmed that fun is a result of learning and play. Next begins the narrowing of the talk to "fun." For the rest of this discussion, he is not really concerned with the other reasons people play. Some "non fun" reasons for playing games he lists - they are comforting, meditative/relaxing, they're practice. If he doesn't really want to talk about flight simulators or card games or other games that don't result in a dopamine release cycle that is tightly controlled by the game designer I suppose this is ok.
+
+
+"Fun is actually the same thing as a cocaine hit. It's literally the release of dopamine."
+"Dopamine is really interesting because first of all it specifically enhances learning and memory... specifically it relates to predicting rewarding outcomes."
+"Curiosity itself is fun."
+
+
+"We are learning the science of why you like one game better than another."
+
+This statement winds up being the prelude to his talk about game grammar. And it's a bold and telling statement I find. And it sounds like it must be this really broad field of study, but it's not. It's a really narrow and focussed. And it stands to reason because actually doing what it sounds like on first reading would be impossibly hard. Not every problem has an analytical solution. All they're looking for are the ones that do and these have to be very specifc.
+
+
+Game Grammar
+--------------
+Sounds really innocuous right? What could be wrong about formalizing a language to help us describe and design games? Nothing. However that's not what "game grammar" is all about.
+
+Koster started by telling us that any system can be a game if it is approached with the right attitude. That brought to mind unlimited and grand possibilities of game design, but before you know it, the talk has narrowed into "fun" and "game grammar." The reason is we're not really talking about games per se. We're talking about people. And game grammar is a foolish attempt at figuring out formulas that allow you to specifically control dopamine cycles.
+
+How do I know this? Because vanished from his talk suddenly are all the other things we humans derive from learning and play. He disregards the real world applicable benefits (eg. physical and social skills, knowledge) and focusses solely on the fun (aka the dopamine release). Game grammar is about rooting out those building blocks which can assemble into new games in a way that allows you to precisely create and control a dopamine release cycle in the consumer. It is the fast food scientists' method of creating new food-like substances to sell.
+
+
+Koster the Nihilist Evangelist
+-------------------------------
+Throughout his talk there is a subtle suggestion that if you're not having "fun" you're not really playing a game, you're doing something else. Games are supposed to be fun. Games are entertainment. Art game design is not really "game design." Ok, that's an ok position to have but if this is the case, again, a responsible presenter would make this clear from the start. All those broad quotes from various reputeable individuals at the start of his talk are talking about real world applicable benefits to play and learning and ultimately all Koster is promoting is "fun."
+
+...basically the last 15 minutes of the video is his setup and pitch for why making frivolous fun games that don't really teach us anything is actually ok and therefore the research into figuring out how to manipulate these dopamine releases is ok. All those quotes from various individuals at the start of his talk are talking about applicable benefits to play and learning and ultimately all you're promoting is "fun."
+
+Should we treat life as a game? According to Mr. Koster sure why not, we're all dust in the end.
+--
+p.s. Yes i do have Koster-phobia.
+	
+Reply | Like
+3 likes
+*******************************************************************************************************************
+
+[User Banned] 	
+25 Oct 2012 at 8:45 pm PST
+profile image 	
+This user violated Gamasutra’s Comment Guidelines and has been banned.
+	
+Reply | Like
+*******************************************************************************************************************
+
+Raph Koster 	
+26 Oct 2012 at 7:50 am PST
+profile image 	
+Wow, this is an appalling reading of what I was saying! And I agree, if I were espousing those positions, you SHOULD have phobia! I can see how you got to your reading, though.
+
+Some quotes from the book and elsewhere:
+
+"It might be that games are just math. And that makes me really really unhappy."
+"No other medium defines itself solely around a single effect on the user [such as fun]."
+
+Above all, this talk is about reaching an *accommodation* with the fact that
+
+- fun is designed to be for learning
+- we're learning more about the mechanics of creating fun every day
+- and you can bypass the art and learning & hijack the mechanism
+- most people only care about fun, not the art or learning, which results in...
+- a lot of fun is shallow
+- a lot of fun is designed to manipulate.
+
+It's about saying "games are really powerful learning tools, but that's not how we tend to build them, we tend to build frivolous or exploitative stuff." And the accommodation I arrive at is "it increases player happiness, which is a worthwhile goal in itself."
+
+That was the journey that the book and its aftermath took me on, and that I tried to share in the talk. It is kind of the opposite of nihilism.
+
+But i can totally see how that ending and accommodation is one you can disagree with. I would be curious as to what your particular accommodation with those uncomfortable facts is.
+
+On some of the individual notes you made:
+
+Flight sims and card games cause dopamine release. In fact, the case I made was that many of the varieties of fun (social, visceral, etc) cause dopamine release *in addition to* to the specific reactions they trigger.
+
+But the statement about "the science of why you like one game better than another" was tied to Jason VandenBerghe's stuff on personality types, not dopamine release.
+
+Game grammar is not about controlling dopamine cycles. I suppose you could choose to use it that way, but I would suggest that says more about you than about me. The folks who work on game grammar aren't all out there trying to find ways to get you hooked. Game grammar is about learning, above all (see Dan Cook's Chemistry of Game Design article here on Gamasutra as an example). Game grammar is just as capable of diagramming soccer or Werewolf as it is of diagramming a social game of chess.
+	
+Reply | Like
+*******************************************************************************************************************
+
+Raph Koster 	
+26 Oct 2012 at 8:09 am PST
+profile image 	
+Christian, I read your article when it came out.
+
+I actually think that there is massive overlap between it and what Theory of Fun and game grammar say.
+
+My answers to the questions at the top of your article would be:
+
+Where does it come from? - dopamine release
+
+How can it be produced? - creating learning situations where players THINK they are mastering systemic relationships
+
+Is fun exclusively subjective? - it's subjective, but there are generalizations to be made
+
+Is it possible to create something fun for everyone? - no, because everyone has different cognitive skills and pattern libraries
+
+Is fun all about learning something new? - no, there is exercise of mastery, anticipatory curiosity, and a few other elements. You can keep elaborating on a pattern without learning all that much new. On top of that, there are many mechanics that hijack the neurochemistry to provide fun without the learning.
+
+Why do I still enjoy older games more than the most recent ones? - I can only guess but these are typical reasons: newer games present less systemic learning; newer games present complex systems for which you lack literacy; newer games aim at different personality types; you prefer the comfort of playing in systems you already understand.
+
+Are we losing our understanding of fun? - No, the opposite. We may be getting disappointed in it as we learn more about it.
+
+Is engagement the same thing as fun? - absolutely not. One can be engaged by any number of things, many of which are not enjoyable. Rubbernecking a car wreck is an example that jumps out at me right now.
+
+What is the future of video games? - completely out of scope. :)
+
+Could a unified theory of fun exist? - it could, but it is not likely to be simple.
+
+As far as the rest of the article, it has quite a lot of commonality with other work. Context, emotion, and mechanism sounds a lot like MDA theory. The whole structure sounds rather like a game atom. The entire second page basically describes a skill atom, albeit (IMHO) with extra parts that are superfluous or minor. (Don't get me wrong, if having these parts helps you, or anyone, in their work, go for it). You even mention the recursive quality that is at the heart of game grammar.
+
+Look, my work isn't prescriptive. I'm just sharing my learnings and thoughts on it all. I think we're all touching the same elephant, so if someone else's way of looking at things helps them, great. Hopefully what I have said just adds to the conversation.
+	
+Reply | Like
+*******************************************************************************************************************
+
+[User Banned] 	
+26 Oct 2012 at 10:15 am PST
+profile image 	
+This user violated Gamasutra’s Comment Guidelines and has been banned.
+
+Reply | Like
+*******************************************************************************************************************
+
+Michael Joseph 	
+18 Nov 2012 at 3:26 am PST | edit
+profile image 	
+Just on the subject of simulations vs other types of entertainment softare. Of course simulations are going to results in the release of dopamines, but the more pure a simulation, the less CONTROL the developer/designer has over that event. It is this CONTROL you and I are talking about. Arguably simulations result in a more natural release of dopamine, and highly directed games result in very precicely controlled releases of dopamine.
+
+As for the word fun? I'm pretty much sick of it. It's worse than a meaningless word in the hands of someone who is concerned with creating it. This type of reverse engineering of fun (triggering of dopamine releases) I think is something we are not ready for apparently because the only people trying to figure it out are the ones looking to exploit it for commercial gain. 
+*******************************************************************************************************************
+
+END OF GAMASUTRA.COM COMMENTS SECTION POSTS.  THERE MIGHT HAVE BEEN MORE, BUT THE ABOVE ONES ARE THE ONLY ONES I SAVED. UNFORTUNATELY ALL GAMASUTRA.COM COMMENTS ARE LOST SINCE THE SIGHT RE-BRANED TO GAMEDEVELOPER.COM
+
+
+
+BEGIN - THE FOLLOWING ARE NOTES THAT I MADE WHILE I WATCHED KOSTER'S RETROSPECTIVE VIDEO and PRIOR TO WRITING MY ABOVE COMMENTS
+-----------------------------------------------------------------------------------------------
+According to Koster:
+	Play = Learning = Fun = Neurochemical Reward = Pleasure
+
+
+This is remarkably illogical.  And to be clear, he's not saying that fun/pleasure is a RESULT, he's actually saying the result is the equivalence of the behavior.  In effect he suggests we can substitute learning or play or any other type of behavior that results in the fun "feel" because that is ultimately what matters.
+
+And what is really curious about this is that in the very first minute of his talk, he shows one slide that presents his 10 year old quote "Fun is just another word for learning" and in the next slide he credits Chris Crawford for correctly saying "fun is the emotional response to learning."  So Mr. Koster gets it right?  So why in this talk does he continuously regress to the notion that "fun" is basically the same thing as the behavior?  I don't believe it's just 
+
+
+
+
+
+~7 minutes in
+fun is learning
+
+fun is neurochemical
+
+therefore we can substitute learning for just the neurochemical that makes us "feel" the same way even though its a fraud
+
+one of the quotes ascribed to Maslow deals with "purposeful play"
+
+he mentions how it's "litterally like taking drugs" but this is obviously false.
+
+"brain gives us drugs" while playing
+
+"getting us high...."
+
+" were being played... playing us like a puppet"
+
+"I'm far from the first to say this..."
+
+actually yes you are, that's not what they said... they didnt talk about drugs or getting high.. it was not "kinda the known thing..."
+
+
+learning == fun == neurochemical reward  (WRONG!) bait & switch... YOU are playing us.  The brian isn't playing us.
+
+this is quite obvious 
+	- why arent drugs learning?
+
+Just because various experiences can provide some type of enjoyable experience doesn't mean the experiences are the same.
+
+
+Sure you can put all of "enjoyable" experiences on a spectrum, but that is a totally different thing from learning experiences and other types of experiences.  many fun experiences dont involve learning at all.   If this is what you were proving GREAT, but you're making an incorrect argument that they're all the same...
+
+"Everything in the world" is NOT the same thing!
+===============
+
+There is this implied theme he puts forward that all play and fun is the same... because the chemical rewars are the same.  This should be obviously false to anyone thinking about the matter.  All learning and thus all play is not of the same value.
+
+games are a matter of attitude?  what?  games are a "practice" for preparation of reality, it's not the real thing... least not if you still insist that play is seperate from real work.  Koster here makes no distinction between play and work.  He's talking only about the chemical responses involved in the two.
+
+How can real interactions be "play"  only if you start to blur in the sake of "fun" in the sake of the chemical reaction.
+
+Trash.  Fun is dopamine release blah blah blah.. oh my god.  Really?  This is psuedo science peddling.
+
+Stems from a defensive bias of defending frivolous pleasure
+
+Backtracking - Fun is Curiosity
+-------------------------------
+"Fun isn't maybe learning it's curiosity."
+
+This seemed to reverse course but actually I think it's consistant with what he's trying to tell us.  It's still reductionist thinking that narrows a creative work to the end "feeling."  All that matters is 
+
+THen 19:50 mark, fun isn't maybe learning it's curiosity?  ok.. so now he erases all he said before and gets to at least more truth in that all he mislead before is not about learing at all.  He always narrows down to this concept of all that matters it the "feeling."
+
+22:55 "it's undeniable at this point that there are congnitive differences that must affect predispositions towards specific genes"  huh?   These are not cognitive differences that AFFECT genetic dispositions.  These are genetic dispositions that may affect cognitive differences!  Not the same thing at all.
+
+I'm not sure what the point of this could be.  People are different.  And?
+
+
+26:00  he goes back to talk about "practice" which again here differentiates "play" from real work... regardless of what neurochemicals are released.
+	- so then he states something obvious that games are a model for practice (its not real consequential work).  But this tells us nothing.
+	
+all leads to a very muddled discussion.  now he talks about "what is a game" which is contrast to "what is fun."
+
+Backtracking - What are games?
+------------------------------
+28:00 what are games then?  uhh... ok.  so now we're back to where?  a whole nother topic?
+
+- and can game grammar be formulized?  why? we already know games are just NOT real models of experience.  This does not teach us how to make good games.  THis the flaw of trying to discover what a game is... because the search cant discover such a thing that is so obviously true.  Instead it tries to discover what Koster originally starts to talk about, what release the neurochemical "fun" drug in the brain.  VERY DIFFERENT CONCEPTS!
+
+31:45: ludonarrative dissonance - space between game and 
+
+Koster's Formula 
+-----------------
+32:46 - what a croc of crap.  look at that diagram.  here is a guy who is basically claiming he can make good games. ROFL. Honestly?!  Here is a guy looking for a formula to describe YOU. Think about this.  If he can design a game that is fun, then surely it's fun for everyone.  The formula says so!   Ok Koster, we're waiting for your great games.  Bring them on. LOL.
+	- followed by a bunch of insane ramblings
+	"If you know the ingrediants of good food, you can make good food!!!!"  LOL.  WHat? He neglects the incomputable combinatorial problem of ingrediants and the end product.  This is a fools quest.  He should look at Wolfram.  There is no problem about math.. the problem is the results of some computations are integrated and there is no analitcal solution.
+	
+	Indeed, Koster can never provide an analytical formula no matter how much he talks about math.  Saying its about math says nothing.
+	
+41:00  games are not art! woah?  lol. games dont require a literacy, they can use a scaffolding to teach us what to do, not to think. they dont require literacy! (wow, what a horrendous formula for creating great games)
+	
+Games don't require literacy?  We know that's not true.  Find a non gamer and see how well they do in any number of popular genre of games.  What is a person to believe when someone like Koster who's been in this industry for so long goes around making a bunch of incorrect statements?
+
+
+Games = Entertainment != Art
+----------------------------
+The message here is still consistant.  Make easy low barrier games, lie to players, make them experience fun.  The advice seems useless as far as helping to design better games.  Koster is from the school of thought that says 
+
+41:00: entertainment is accessible whereas art requires literacy! lol.
+  We must concluce that Koster's view of games are very very narrow!
+  
+  42:00 he promotes in effect, easy low barrier games.  How surprising.
+  
+  43:00 promotion of lying to players
+	
+	45:00 construction of formal systems - something he doesnt talk about at all previously until now... 
+	
+	52:00 Entertainment is somewhere between useless and thoughtful....  
+	
+	53:00 are game systems?  so... who knows...
+	
+	54:00 as if people cant see the different between colors.. language for a different color is not the same as not being able to see a different color
+
+	
+Recipes vs Games
+Any particular game has the potential to be many different things to different folks.  Character customization, play styles (Rambo vs Camper vs Stealth) 

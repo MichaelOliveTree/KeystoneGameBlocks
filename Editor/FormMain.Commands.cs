@@ -3272,6 +3272,8 @@ namespace KeyEdit
         /// <param name="buffer"></param>
         private void UserMessageReceived(int commandID, NetChannel channel, NetBuffer buffer)
         {
+			// TODO: rename Enumerations to InternalActionType 
+			//       and if >99999 that enum is UserActionType
             if (commandID > (int)KeyCommon.Messages.Enumerations.UserMessages)
             {
                 this.UserMessageReceivedGameSpecific(commandID, channel, buffer);

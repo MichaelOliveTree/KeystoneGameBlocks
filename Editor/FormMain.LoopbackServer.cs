@@ -1451,6 +1451,15 @@ namespace KeyEdit
         }
 
 
+        ///<summary>
+        /// Behaves as if this loopback server were actually a remote multiplayer server with many 
+        /// connected clients.  It looks for the specified user connection and sends the msg specified
+        /// in the parameters.
+        ///</summary>
+        ///<remarks> 
+        /// See FormMainBase.SendNetMessage() for the common client network message routine.
+        /// Internally it calls AppMain.mNetworkClient.SendMessage()
+        ///</remarks>
         public void ServerSendMessage(string user, KeyCommon.Messages.MessageBase msg)
         {
             // NOTE: If the message we're sending exceeds the client's receive buffer size, the client will gracefully disconnect.

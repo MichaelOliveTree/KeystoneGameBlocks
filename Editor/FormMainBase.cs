@@ -41,6 +41,12 @@ namespace KeyEdit
         
         public delegate void SendNetworkMessage(KeyCommon.Messages.MessageBase message);
 
+        ///<summary>
+        /// Method for sending messages to the server once a client has already connected via their mNetClient.
+        ///</summary>
+        ///<remarks> 
+        /// See FormMain.LoopbackServer.SendServerMessage() for the server-side network equivalent send message routine.
+        ///</remarks>
         public virtual void SendNetMessage(KeyCommon.Messages.MessageBase message)
         {
             message.SetFlag(KeyCommon.Messages.Flags.SourceIsClient);

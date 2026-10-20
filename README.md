@@ -35,7 +35,11 @@ Keystone Game Blocks(KGB) is a 3D Game Framework written in C#.  The primary goa
 
 !['Sci-Fi Command' is the space simulation I'm developing alongside Keystone Game Blocks](SciFiCommand_Screen001.png)
 
- KGB features typical game framework things, such as...
+The exterior model of the starship is the **USS Yorktown designed by Masao Okazaki** and used with his permission for development purposes. Masao runs the excellent fan website **Starfleet Museum** https://www.starfleet-museum.org/ that has a lot of very cool pre-TOS ship designs.
+
+
+
+ KGB features typical game framework type things, such as...
  
 * 3D Editor
 * Hybrid Scene Graph (Nodes not ECS) with Scene Management functions including

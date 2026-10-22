@@ -2,23 +2,15 @@ Goodbye Immersive Sims -> Hello Discovery Sims
 
 October 22, 2026
 
-(work-in-progress)
-
-
+(this full document is a work-in-progress and hosted at the following link on my GitHub page - https://github.com/MichaelOliveTree/KeystoneGameBlocks/blob/main/Design/blogs/Goodby_Immerisve_Sims_Hello_Discovery_Sims_Oct_22_2026.txt)
 
 Tim Cain (Co-Creator of Fallout video game series) on what is an immersive sim.
 
 https://www.youtube.com/watch?v=iSF4xuEGgWs&t=546s
 
-
-
-I'm totally not picking on Tim Cain.  In fact, early in his talk he describes the difficulty in defining "immersive simulations."  Still, people trying to define "immersive simulations" invariably wind up speaking a lot of words.  I think this is because the fundamental characteristic they are trying to describe and which is what actually draws audiences to these types of games, remains elusive.  That elusive but fundamental characteristic, I believe, is providing the player lots of POTENTIAL for LEARNING.  
-
-
+I'm totally not picking on Tim Cain.  In fact, early in his talk he describes the difficulty in defining "immersive simulations."  Still, people trying to define "immersive simulations" invariably wind up speaking a lot of words.  I think this is because the fundamental characteristic they are trying to describe and which is what actually draws audiences to these types of games, remains elusive.  That elusive but fundamental characteristic, I believe, is providing the player lots of POTENTIAL for LEARNING.
 
 In a typical FPS, there is not a lot of learning to be had outside of mastery of the controls, routes through a level and tactics for defeating various kinds of enemies.  Traditional FPS provide a relatively narrow area from which to learn things.  This is fine for the right time and place. But in general, the demographics for these sorts of games are also narrow.
-
-  
 
 Please do not think that I am nitpicking here or splitting hairs.  If one mistakenly gets it into their head that "fun" is the ultimate goal, then it can cost a lot of TIME, MONEY, and ENERGY to find out that too many resources have been misallocated during the development of a project that emphasized features and content that were not focused on delivering LEARNING EXPERIENCES for the player, but rather nebulous things like "fun, immersion, flow" which as previously stated are actually the results of LEARNING through play, and not anything concrete or well defined.
 
@@ -26,83 +18,56 @@ When I think about human LANGUAGE and the lack of significant formal treatises o
 
 TYPES OF KNOWLEDGE (work-in-progress)
 Game-World
-	- Knowledge
-		Mechanics
-		Rules
-		Game-systems
-		Items
-		
-		Story
-		Lore (Cultural)
-			Religious
-			Philosophical
-	
-		Historical
+- Knowledge
+Mechanics
+Rules
+Game-systems
+Items
+
+	Story
+	Lore (Cultural)
+		Religious
+		Philosophical
+
+	Historical
 
 Real World
-	- Knowledge
-		- Cultural
-		- Historical
-		- Scientific
-		- Social / Interpersonal 
-		- Self
+- Knowledge
+- Cultural
+- Historical
+- Scientific
+- Social / Interpersonal
+- Self
 
-	- Wisdom
+- Wisdom
 
-
-Most players do not explore large game worlds these days because there's nothing _worth_ LEARNING when doing so.
-
-
+Most players do not explore large game worlds these days because there's nothing worth LEARNING when doing so.
 
 Games don't do enough to reward learning.  "Achievement" (fool's gold) systems tend to reward mastery (to use a generous word) of very narrow aspects of gameplay (e.g. user controls), and not the learning of various systems modeled within the game.  The purpose of designing and including various "systems" is to provide the scaffolding for the player to LEARN certain types of things planned for by the designer.
 
-
-
 EXAMPLE SCENARIO:
 
-As a designer, perhaps one chooses to include a mini-game that appears as one of several minigame options before the REAL-TIME BATTLE starts, the player chooses the minigame whereby they are invited to fraternize with their soldiers and be challenged to a contest to drink more beers than one of their subordinates.  What if after the player's character (the General of the Armies of the North) "wins," his Leadership skill suffers a -2 penalty?  When he goes into battle, he discovers that his soldiers quickly lose confidence in him and are quickly routed from the battlefield.  In this mini-game, it is not strictly about learning the mechanics, it's learning of a "message" (in this case a piece of real-world wisdom about fraternization, leadership, setting a good example, etc.)  This type of mini-game I think is much more rewarding to MAKE for the developers and to PLAY for the users.  
+As a designer, perhaps one chooses to include a mini-game that appears as one of several minigame options before the REAL-TIME BATTLE starts, the player chooses the minigame whereby they are invited to fraternize with their soldiers and be challenged to a contest to drink more beers than one of their subordinates.  What if after the player's character (the General of the Armies of the North) "wins," his Leadership skill suffers a -2 penalty?  When he goes into battle, he discovers that his soldiers quickly lose confidence in him and are quickly routed from the battlefield.  In this mini-game, it is not strictly about learning the mechanics, it's learning of a "message" (in this case a piece of real-world wisdom about fraternization, leadership, setting a good example, etc.)  This type of mini-game I think is much more rewarding to MAKE for the developers and to PLAY for the users.
 
+WARNING: If anyone thinks developing a mini-game just to deliver a single simple message on leadership is a huge misallocation of resources, then perhaps they need to work on that "can't do attitude."  A mini-game system can be built that uses common scenes and characters, but with different challenges that are not too difficult to script, and which can ultimately deliver 25, 35, 50+ mini-games that deliver worthwhile, thought provoking insight, knowledge, wisdom and that also affect the game and the player's character, thus "amortizing" so-to-speak, the development cost of the entire system significantly.  But the mini-game system is just a simple example to get people's creative juices flowing.  
 
-	WARNING: If anyone thinks developing a mini-game just to deliver a single simple message on leadership is a huge misallocation of resources, then perhaps they need to work on that "can't do attitude."  A mini-game system can be built that uses common scenes and characters, but with different challenges that are not too difficult to script, and which can ultimately deliver 25, 35, 50+ mini-games that deliver worthwhile, thought provoking insight, knowledge, wisdom and that also affect the game and the player's character, thus "amortizing" so-to-speak, the development cost of the entire system significantly.  But the mini-game system is just a simple example to get people's creative juices flowing.  
+And just imagine the next time the player elects to play such a mini-game... an entire new dimension of thought will be opened for them as they consider more carefully potential consequence in how they interact with that challenge.  This is an example of how the HAND OF THE DESIGNER becomes explicit in the players' minds.  These sorts of things are what make a game feel expertly crafted, artisan-like, refined and special.
 
+The 'potential' part in "POTENTIAL for LEARNING" requires that the knowledge and wisdom chosen by the designer to be imparted on the user, be both AVAILABLE and OBTAINABLE through play but is not necessarily guaranteed to be discovered by every or any player.
 
-And just imagine the next time the player elects to play such a mini-game... an entire new dimension of thought will be opened for them as they consider more carefully potential consequence in how they interact with that challenge.  This is an example of how the HAND OF THE DESIGNER becomes explicit in the players' minds.  These sorts of things are what make a game feel expertly crafted, artisan-like, refined and special. 
+The real fun in designing these types of games now becomes thinking about how to keep the player constantly learning cool things(TM).  I personally would advise designers to try and put in as much real-world, practical knowledge and wisdom for the player to learn as possible.  The fun for the designer is in coming up with the myriad ways in which various revelations will get revealed to the player.
 
+[Discovery simulations], I think is a much more concrete way to describe and understand the draw of "immersive sims" and how to build them.  Thinking as a builder of discoveries, might help designers come up with solutions to the dreaded "grind" which is the boring, tedious, busy-work\chores that have to be done in many games for character "progression."  Questing mechanics such as "collecting x number of items" or "recovering 10 sacred orbs" are NOT the types of goals designers should be focused on.  In my mind, those things are just story elements (and games are SIMPLY NOT AN IDEAL MEDIUM for telling stories.  The strength of games is learning through play... through interactivity.  Nobody really remembers the details of Bioshock's, Thief's, System Shock, or Fallouts stories in the same way they remember the rich details of The Matrix, The 3-Body Problem, Hyperion, and many many many many other novels and film.
 
-
-The 'potential' part in "POTENTIAL for LEARNING" requires that the knowledge and wisdom chosen by the designer to be imparted on the user, be both AVAILABLE and OBTAINABLE through play but is not necessarily guaranteed to be discovered by every or any player. 
-
-
-
-The real fun in designing these types of games now becomes thinking about how to keep the player constantly learning cool things(TM).  I personally would advise designers to try and put in as much real-world, practical knowledge and wisdom for the player to learn as possible.  The fun for the designer is in coming up with the myriad ways in which various revelations will get revealed to the player. 
-
-[Discovery simulations], I think is a much more concrete way to describe and understand the draw of "immersive sims" and how to build them.  Thinking as a builder of discoveries, might help designers come up with solutions to the dreaded "grind" which is the boring, tedius, busy-work\chores that have to be done in many games for character "progression."  Questing mechanics such as "collecting x number of items" or "recovering 10 sacred orbs" are NOT the types of goals designers should be focussed on.  In my mind, those things are just story elements (and games are SIMPLY NOT AN IDEAL MEDIUM for telling stories.  The strength of games is learning through play... through interactivity.  Nobody really remembers the details of Bioshock's, Thiefs, System Shock, or Fallouts stories in the same way they remember the rich details of The Matrix, The 3-Body Problem, Hyperion, and many many many many other novels and film.  
-
-To be clear, I'm not saying story is un-important, it's just not the most important thing.  I think the industry has also gone completely overboard on the quest for every increasing graphics fidelity while character behaviors and imparting revelations have been ignored.   
-
-
+To be clear, I'm not saying story is un-important, it's just not the most important thing.  I think the industry has also gone completely overboard on the quest for every increasing graphics fidelity while character behaviors and imparting revelations have been ignored.
 
 In conclusion, if our language is not precise,  and if we cannot adequately define something or if the existing definitions seem hopelessly obtuse, complicated and inelegant, we should endeavor to reexamine our preconceptions and try again.  Goodbye "immersive sim."
 
-
 Regards,
 Michael Preston Joseph
-
-
 
 Interesting links:
 "What are some life lessons you learned while playing video games?"   <-- It's a start, but I'd like to see this list become 1,000,000x better.
 https://www.reddit.com/r/ItsAllAboutGames/comments/1g6qnt6/what_are_some_life_lessons_you_learned_while/
 
-
 https://gamedesignskills.com/game-design/best-game-designers/
- 
-
-
-	
-
-
-
-
-
-

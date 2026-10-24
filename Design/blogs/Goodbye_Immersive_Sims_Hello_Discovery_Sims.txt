@@ -1,0 +1,223 @@
+Goodbye Immersive Sims -> Hello Discovery Sims
+
+October 22, 2026
+
+(this document is a work-in-progress - https://github.com/MichaelOliveTree/KeystoneGameBlocks/blob/main/Design/blogs/Goodby_Immerisve_Sims_Hello_Discovery_Sims_Oct_22_2026.txt)
+
+Tim Cain (Co-Creator of Fallout video game series) on what is an immersive sim.
+
+https://www.youtube.com/watch?v=iSF4xuEGgWs&t=546s
+
+I'm totally not picking on Tim Cain. In fact, early in his talk he describes the difficulty in defining "immersive simulations." Still, people trying to define "immersive simulations" invariably wind up speaking a lot of words. I think this is because the fundamental characteristic they are trying to describe and which is what actually draws audiences to these types of games, remains elusive. That elusive but fundamental characteristic, I believe, is providing the player lots of POTENTIAL for LEARNING.
+
+In a typical FPS, there is not a lot of learning to be had outside of mastery of the controls, routes through a level and tactics for defeating various kinds of enemies. Traditional FPS provide a relatively narrow area from which to learn things. This is fine for the right time and place. But in general, the demographics for these sorts of games are also narrow.
+
+Please do not think that I am nitpicking here or splitting hairs. If one mistakenly gets it into their head that "fun" is the ultimate goal, then it can cost a lot of TIME, MONEY, and ENERGY to find out that too many resources have been misallocated during the development of a project that emphasized features and content that were not focused on delivering LEARNING EXPERIENCES for the player, but rather nebulous things like "fun, immersion, flow" which as previously stated are actually the results of LEARNING through play, and not anything concrete or well defined.
+
+When I think about human LANGUAGE and the lack of significant formal treatises on game design, it's no wonder to me that we constantly find ourselves going down the wrong path as an industry... chasing things like "fun" which is a bi-product of LEARNING and not the goal of playing games, which is to LEARN. Yes that's right... a game designer can be thought of as a type of TEACHER.
+
+CATEGORIES OF KNOWLEDGE that can be provided to the player during play (work-in-progress)
+**Game-World Knowledge
+Mechanics
+Rules
+Game-systems
+Items
+
+Story
+Lore (Cultural)
+Religious
+Philosophical
+Historical
+
+
+**Real World Knowledge
+- Cultural
+- Historical
+- Scientific
+- Social / Interpersonal
+- Self
+- Wisdom
+
+Most players do not explore large game worlds these days because there's nothing worth LEARNING when doing so.
+
+Games don't do enough to reward learning. "Achievement" (fool's gold) systems tend to reward mastery (to use a generous word) of very narrow aspects of gameplay (e.g. user controls), and not the learning of various systems modeled within the game. The purpose of designing and including various "systems" is to provide the scaffolding for the player to LEARN certain types of things planned for by the designer.
+
+
+
+EXAMPLE SCENARIO:
+
+As a designer, perhaps one chooses to include a mini-game that appears as one of several minigame options before the REAL-TIME BATTLE starts, the player chooses the minigame whereby they are invited to fraternize with their soldiers and be challenged to a contest to drink more beers than one of their subordinates. What if after the player's character (the General of the Armies of the North) "wins," his Leadership skill suffers a -2 penalty? When he goes into battle, he discovers that his soldiers quickly lose confidence in him and are quickly routed from the battlefield. In this mini-game, it is not strictly about learning the mechanics, it's learning of a "message" (in this case a piece of real-world wisdom about fraternization, leadership, setting a good example, etc.) This type of mini-game I think is much more rewarding to MAKE for the developers and to PLAY for the users.
+
+WARNING: If anyone thinks developing a mini-game just to deliver a single simple message on leadership is a huge misallocation of resources, then perhaps they need to work on that "can't do attitude." A mini-game system can be built that uses common scenes and characters, but with different challenges that are not too difficult to script, and which can ultimately deliver 25, 35, 50+ mini-games that deliver worthwhile, thought provoking insight, knowledge, wisdom and that also affect the game and the player's character, thus "amortizing" so-to-speak, the development cost of the entire system significantly. But the mini-game system is just a simple example to get people's creative juices flowing.
+
+And just imagine the next time the player elects to play such a mini-game... an entire new dimension of thought will be opened for them as they consider more carefully potential consequence in how they interact with that challenge. This is an example of how the HAND OF THE DESIGNER becomes explicit in the players' minds. These sorts of things are what make a game feel expertly crafted, artisan-like, refined and special.
+
+The 'potential' part in "POTENTIAL for LEARNING" requires that the knowledge and wisdom chosen by the designer to be imparted on the user, be both AVAILABLE and OBTAINABLE through play but is not necessarily guaranteed to be discovered by every or any player.
+
+The real fun in designing these types of games now becomes thinking about how to keep the player constantly learning cool things(TM). I personally would advise designers to try and put in as much real-world, practical knowledge and wisdom for the player to learn as possible. The fun for the designer is in coming up with the myriad ways in which various revelations will get revealed to the player.
+
+[Discovery simulations], I think is a much more concrete way to describe and understand the draw of "immersive sims" and how to build them. Thinking as a builder of discoveries, might help designers come up with solutions to the dreaded "grind" which is the boring, tedious, busy-work\chores that have to be done in many games for character "progression." Questing mechanics such as "collecting x number of items" or "recovering 10 sacred orbs" are NOT the types of goals designers should be focused on. In my mind, those things are just story elements (and games are SIMPLY NOT AN IDEAL MEDIUM for telling stories. The strength of games is learning through play... through interactivity. Nobody really remembers the details of Bioshock's, Thief's, System Shock, or Fallouts stories in the same way they remember the rich details of The Matrix, The 3-Body Problem, Hyperion, and many many many many other novels and film.
+
+To be clear, I'm not saying story is un-important, it's just not the most important thing. I think the industry has also gone completely overboard on the quest for every increasing graphics fidelity while character behaviors and imparting revelations have been ignored.
+
+In conclusion, if our language is not precise, and if we cannot adequately define something or if the existing definitions seem hopelessly obtuse, complicated and inelegant, we should endeavor to reexamine our preconceptions and try again. Goodbye "immersive sim."
+
+Regards,
+
+Michael Preston Joseph
+
+Interesting links:
+
+"What are some life lessons you learned while playing video games?" <-- It's a start, but I'd like to see this list become 1,000,000x better. https://www.reddit.com/r/ItsAllAboutGames/comments/1g6qnt6/what_are_some_life_lessons_you_learned_while/
+-----------------------------------------
+
+JoeJ
+JoeJ
+7,824
+
+I like your use of 'learning' to explain what 'fun' actually means i games. I always considerd the word 'fun' to be a placeholder for whatever experience a game tries to trigger for players, which is quite vague, and introducing learning helps to become more focused.
+
+I guess we can say 'learning to be successful' is more fun than being rich, for example.
+Though, not looking at it this way so far, i can not give a lot of examples about things i have learned in video games.
+Maybe, in Super Mario it took me some time to figure out i can pick up shells and blocks to use them as a shield, as a projectile, as a ladder or other tool, depending on situation. And yes, beside the acceleration based movement it is this pick up mechanic i love about the game.
+
+Another guy has introduced the term 'systemic games' to me, which as well applies to that shell example. So i concluded Super Mario is a systemic game. Now, adopting your terms, i could conclude it also is a educational game.
+But i doubt the original designer(s) had any of those game design goals in mind at all when they did it.
+Rather i assume they just added more features to the game over time, and only in retrospect we can describe its design as 'systemic', 'eductional', 'immersive sim' or whatever. This way we can make a science out of game design, and we can certainly improve our communication about the design process.
+But i remain skeptical. Maybe we end up chasing common design goals and ideals, leading us to make games too similar to each other again, and failing at delivering the fun. So we just turn in circles, and the Super Mario designer had an advantage from not knowing any design theory at all, but just doing what felt fun to him.
+
+Just saying - that's not meant as a counter argument against your message. But i'd like to move from generic goals towards actual implementation proposals. For that i'd ask at first: What enables a learning process for the player in a game?
+Obviously that's figuring out mechanics and rules to use them for an advantage. To make it non-obvious, we can add complexity and depth to a game. But that's source of flaws.
+For example, modern games often start with explainig ALL it's combat mechanics to me in very shrt time, durign the first level. I hate it. It stresses me out. I know i'll fail to remember anything, leading to frustration later. Rage quit and refund is my usual reaction, having spend much more time on downloading than trying the game.
+Your proposal of multiple minig games, each designed for a certain learning experience evetually, would have a similar probem imo. Those minigames would interrupt and compete the main game, and they would overwhelm me with quantity, i expect.
+Imo, it only works if you can implement all your ideas into the main game and it's world and mechanics. Pausing the main game for some lock picking mini game always sucks. Always, with no exceptions. To me at least.
+So i come back to what i always was thinking: We need a rich simulation going on in the world, giving the player many ways to interact, allowing for chains of causes and effects. This is hard to achieve and control, but we get all this 'learning, systemics and immersion' as an outcome, even if we have related design goals.
+But i'll keep the goals and terms in mind. Maybe it helps... : )
+
+----------------------------------
+Thanks for the reply JoeJ.
+
+1) I credit Chris Crawford for being one of the earliest videogame designers to realize and state that games (and play) are about learning. Here is Google AI overview on his views in this regard:
+
+Chris Crawford views learning as an inherent, natural part of how human minds and higher mammals engage with interactive systems. [1, 2]
+
+Key Principles of Chris Crawford on Learning and Games
+
+Active Engagement: The human mind is an active agent rather than a passive receptacle; learning happens through direct interaction, experimentation, and consequence rather than passive listening or reading.
+
+Play as Preparation: Just as young mammals (like kittens) learn crucial survival and social skills through play, human play functions as a serious evolutionary mechanism for testing rules, testing boundaries, and training for adult challenges.
+
+Not Strictly "Educational" Software: Crawford does not argue that every game needs to be a traditional educational or school-style teaching tool. Instead, he maintains that the process of learning—figuring out how a system works, adapting to rules, and understanding cause and effect—is fundamental to why people enjoy and play games in the first place.
+
+Cognitive Challenge: Well-designed games push players to exercise core cognitive abilities like spatial reasoning, logical deduction, systems thinking, and social/political navigation (such as in his classic game Balance of Power). [1, 2, 3, 4]
+
+You can explore his writings, essays, and interactive projects directly on his Interactive Storytelling Tools for Writers Website or read his foundational text via The Art of Computer Game Design Online Book
+
+
+Show more
+
+
+2) I know that a ton of designers do not use any formal process when designing their games. (See my post and the thread here on Design by Messaging - sadly i haven't had the time to complete my thoughts on that idea). But essentially it's all about coming up with the messages you want to tell the player throughout the game. Collectively, whatever messages and however many you choose to relay, SHOULD be
+
+cohesive, coherent and cogent.
+
+Think about all of the messages Jesus relays in the 4 Gospels to his Disciples and others. If you understand the Gospels, you will see they are all three of those things.
+
+Messages then will lead you to creative ways (including new mechanics!) on how to deliver them. It may lead you to solving problems like RPG grind because now you realize that the solution lies in giving the player new things to LEARN and not necessarily avoiding those types of questing mechanics entirely.
+
+EXAMPLE: On your quest to rid the current area of Goblins, you are AMBUSHED by a Goblin Raider and he has 6 more Goblins under his command.
+
+He says "Hello Human Scum! I know of you. You have the reputation of a fierce warrior. If you fight me one-on-one with these conditions. 1) no armor 2) no shield, 3) no spells or items 4) just the one sword) then I will instruct my men to stay out of it, and if you win, they will become your prisoners and you will gain all the normal experience you'd otherwise get. Otherwise, we will all just fight you now!"
+
+
+
+[Human: What should I do?]
+
+['Y' key - take him up on his offer, hopefully he is an Goblin of his word]
+
+['N' key - He cannot be trusted. I perceived his men snickering with duplicity in the background!]
+
+Player chooses 'Y' and removes his armors, lays down his shield and drops all of his items and spell book. Immediately all 7 Goblins attack you at once, and you are taken prisoner, destined to a life of servitude no doubt.
+
+
+
+
+
+So now, the GRINDING has taken on some new and interesting variations. PERCEPTION skill really is important! If only you had listened to it.
+
+That particular scenario might have variations in _what_ items you are asked to temporarily DROP if you choose 'Y.'
+
+But the key is, knowing the solution is to ask how to keep the player LEARNING new things, even without eliminating the need to raise stats through constant combat for instance. Why would anyone want to play TIC-TAC-TOE for hundreds of hours? Insane much?
+
+
+
+What other anti-GRIND / forever-LEARNING ideas to solve this particular repetitive trope can you think of?
+
+Regards,
+
+Michael Preston Joseph
+-----------------------------------
+JoeJ
+JoeJ
+7,824
+
+Hypnotr0n wrote:
+
+What other anti-GRIND / forever-LEARNING ideas to solve this particular repetitive trope can you think of?
+
+I'll rather stick at your example. I agree the choice makes the quest more interesting, but it also makes some things worse i want to avoid. The option and choice is implemented using multiple choice dialogue, and it is authored and predefined by a designer. So all i might evetually learn by playing through all the options is what the designer has laid out for me, but this knowledge is not generally applicable to the game as a whole. Assuming the choice is not a constant pattern applying to all combat. And even if that's the case, making the choice a general combat mechanic, i would not not feel discovery, but just conformation to design rules becoming obvious.
+
+So i'll try to transform your example. The Goblins are all heavy units, doing big damage and usually fighting against heavy enemies. If i come with a rocket launcher and heavy armor, they will attack me all 7 at once, and i might not even figure out who is the boss.
+But eventually, if i come only with a tiny pistol and no shield, it turns out the heavy goblins ignore me becasue i'm no treat to them. I climb up a tree and observe the goblins from above. I give a radio order to my faction to send the one heavy unit we have left. It will not make it, but it's enough the goblin boss orders his 6 heavy goblins to care about it. And while the boss is isolated, i can take him out in a 1vs1 fight.
+
+I like this better because it's not scripted content, but just the simulation of the game itself which enables the whole story. And i need no static text to tell it, maybe not even a quest. It also has more depth in gameplay than clicking Y or N.
+And there is learning experience too, because probably i needed many failed attempts to figure out enough about goblin behavior to find a plan that finally worked.
+
+Hypnotr0n wrote:
+
+But essentially it's all about coming up with the messages you want to tell the player throughout the game.
+
+I have to disagree, at least for the general case. I don't think the designers of the first Atari games had any messages to tell, and even today that's mostly the case it seems.
+I'm not sure what you mean with meassage, but mentioning Jesus maybe you think about ideology, for example criticizig society like happening in science fiction.
+That's ofc. possibe and can be done, but it's not an essential part of video game design.
+Luckily, because video games are mostly mass murder simulators, so most of our attempts to message about ideology or moral will end up silly or hypocritical.
+
+You know, i always wanted the video game medium to 'grow up'.
+But maybe we just can't. Maybe we need to be childish to remain innocent enough for delivering the fun of the kill. <: \
+
+
+----------------------------------
+
+Hmm. It does not seem to matter who responds to my posts... RmbRT, JoeJ, Frob... everyone seems to not think like a game developer around this "site." Dare I say, lots of experienced game developers around here seem to lack imagination and creative thinking skills.
+
+The Goblin example I gave is not set in stone. I did not spend hours and hours tweaking it... i came up with it as a SUPPLEMENTAL game-path to mitigate the repetitiveness of the existing questing encounters in many RPGs, in a bout 5 minutes. It does not even have to happen every encounter. There could be other types of varieties or none at all. It's SOFTWARE, not HARDWARE.
+
+RE: Learning... let's say when you are playing these encounters, you notice certain things about the Goblin's speech pattern or eyes that let you know if he's lying or not. Who knows! Why do you insist on shooting this idea down without first trying to 'improve' it to fit your 'standards.'
+
+Again, surely as a developer you realize it does NOT have to be implemented EXACTLY as I describe. You are a game developer right? This example was just a starting point to get people's imaginations FLOWING. If you think you can make it better, do so. If you don't want to try, that's fine too. But to me, it was just a starting point for something that can quickly be dismissed by the user as well... whatever buttons, whatever key combinations, who cares... change it.
+
+As for the scripting... what scripting? The encounters would be purely procedural. Think "Borderlands" weapons. T he encounters can take on all sorts of forms depending on the type of monsters and the load-out, and stats of the player. Maybe there are options if the player wants to, if their charisma and perception are high enough, to change the entire nature of the contest and trick the Goblin into a contest that heavily favors the player. Anyway.. it's a starting point. It's too bad you won't try to provide answers and instead just say "STATUS QUO IS FINE BY ME."
+
+You sound like you would have been completely against the Nemesis System which is a game mechanic developed by Monolith Productions and introduced in Middle-earth: Shadow of Mordor (2014) and Middle-earth: Shadow of War. [source google ai]
+
+People may not realize it, but The Nemesis System gives us a very tiny glimpse at what will be possible when we have "living NPCs" someday. Because the Nemesis System is fundamentally about making encounters feel more real by making the opponents feel more ALIVE.
+
+The video game industry will grow up but people who lack vision won't be leading it there.
+
+As for messaging and the first Atari games... you seem very much fearful to me of the language (you fear designers injecting politics, religion, etc into the games you love, and it's ridiculous because designers will or they won't regardless of whatever PROCESS they adopt for making games) and thus I don't believe you can actually hear or see the possibilities designing around messaging can have. Messaging is another way of saying "narrative" but I prefer "messaging" because too often "narrative" is interpreted to mean STORY by many people which is incorrect. I pointed this out in my Design By Messaging post. https://gamedev.net/forums/topic/718935-designing-around-messaging-a-process/
+
+So... Atari Games... well I will have you know that SPACE INVADERS has messaging even if you cannot see it.
+
+1) Invaders from space. The horror!
+
+2) RELENTLESS waves of them are MARCHING on us. CAN THEY BE STOPPED?
+
+3) Player as savior of the world. Help us player, you're our only hope!
+
+
+Just because people can create a game without consciously thinking about MESSAGING (narratives), does not mean anything. I personally thinking advising new developers to THINK in terms of messaging when designing their games is akin to showing them how to draw their own treasure map instead of just wandering around and blinding digging holes in the ground.
+
+Regards,
+
+Michael Preston Joseph
+

@@ -69,9 +69,8 @@ Michael Preston Joseph
 Interesting links:
 
 "What are some life lessons you learned while playing video games?" <-- It's a start, but I'd like to see this list become 1,000,000x better. https://www.reddit.com/r/ItsAllAboutGames/comments/1g6qnt6/what_are_some_life_lessons_you_learned_while/
------------------------------------------
+------------------------------------------------------------------------------------
 
-JoeJ
 JoeJ
 7,824
 
@@ -94,7 +93,9 @@ Imo, it only works if you can implement all your ideas into the main game and it
 So i come back to what i always was thinking: We need a rich simulation going on in the world, giving the player many ways to interact, allowing for chains of causes and effects. This is hard to achieve and control, but we get all this 'learning, systemics and immersion' as an outcome, even if we have related design goals.
 But i'll keep the goals and terms in mind. Maybe it helps... : )
 
-----------------------------------
+------------------------------------------------------------------------------------
+Hypnotr0n
+
 Thanks for the reply JoeJ.
 
 1) I credit Chris Crawford for being one of the earliest videogame designers to realize and state that games (and play) are about learning. Here is Google AI overview on his views in this regard:
@@ -156,8 +157,9 @@ What other anti-GRIND / forever-LEARNING ideas to solve this particular repetiti
 Regards,
 
 Michael Preston Joseph
------------------------------------
-JoeJ
+------------------------------------------------------------------------------------
+
+
 JoeJ
 7,824
 
@@ -186,7 +188,7 @@ You know, i always wanted the video game medium to 'grow up'.
 But maybe we just can't. Maybe we need to be childish to remain innocent enough for delivering the fun of the kill. <: \
 
 
-----------------------------------
+------------------------------------------------------------------------------------
 
 Hmm. It does not seem to matter who responds to my posts... RmbRT, JoeJ, Frob... everyone seems to not think like a game developer around this "site." Dare I say, lots of experienced game developers around here seem to lack imagination and creative thinking skills.
 
@@ -220,3 +222,177 @@ Just because people can create a game without consciously thinking about MESSAGI
 Regards,
 
 Michael Preston Joseph
+------------------------------------------------------------------------------------
+JoeJ
+7,824
+
+Hypnotr0n wrote:
+
+Why do you insist on shooting this idea down without first trying to 'improve' it to fit your 'standards.'
+
+But that's what i did. I took your example and modfied it so it fits my goals or standards, while realizing a learning process is indeed part of it, even my perspective differs from yours. Why do you react sour although i adopted your message about learning?
+
+Hypnotr0n wrote:
+
+Again, surely as a developer you realize it does NOT have to be implemented EXACTLY as I describe. You are a game developer right? This example was just a starting point to get people's imaginations FLOWING.
+
+
+Show more
+Disagree on that. My opinion and experience is: In case you can not come up with a good example to illustrate your new idea quickly, you can not come up with one by spending more work on it either.
+But i do not think your example is bad. In fact i like it, but i needed to adapt to my personal goals. I just hate dialogue driven decision making in general, and i'm no big fan of quests in open worlds either.
+But i'm open to the idea of aiming for a player learning process in game design, which makes sense beyond such personal prefernces.
+
+Hypnotr0n wrote:
+
+As for the scripting... what scripting? The encounters would be purely procedural.
+
+Aha, then i guess that's maybe the origin of our misunderstanding. I was thinking your given choice requires scripted dialogue of goblin and player.
+I see this could be done procedurally too. Maybe the Nemesis System would be a related example. Still difficult to make work if you have voice acting for procedural dialogue, though.
+
+Personally i really try to avoid dialgue for two reasons: I'm no voice actor, and i dislike the unavoidable minigame that comes with multiple choice dialogue. Even if a had the resources to hire voce actors, i would still try to minimize it. Just to explain myself.
+
+
+
+Hypnotr0n wrote:
+
+You sound like you would have been completely against the Nemesis System
+
+I have not played it, and only know about from YT videos about the topic.
+But i like it. I think this can work for all kinds of procedural dialoge, well enough for the procedural events i have in mind.
+But the audio is a problem, i would expect.
+
+(I did not read ahead, so arriving at Nemesis as well maybe confirms i'm qualified audience for your wisdom, ideally ; )
+
+Hypnotr0n wrote:
+
+The video game industry will grow up but people who lack vision won't be leading it there.
+
+Oh no, my friend. Disabilty to grow up will not be our downfall. Don't worry.
+
+Games are now cloned from Claude equipted thieves before they even come out, Epic is embracing the AI slop, and MS works on a next gen console for 1200-1800 $.
+
+That's our problem. That's our doomsday. That's what we need to worry about.
+
+Hypnotr0n wrote:
+
+As for messaging and the first Atari games... you seem very much fearful to me of the language (you fear designers injecting politics, religion, etc into the games you love
+
+
+Show more
+Nah - i do not fear messages in games, or games growing up, or games becoming true art one day eventually. I don't fear that at all. I could play that game too.
+
+What i meant is a radically different point: Early Atari games did not show any of those ambitions. It was the opposite. Surreal, abstract and senseless worlds, filled with strange pixel characters and ringing sounds far from any reality.
+No message, no meaning, no purpose - other than being fun to play.
+And that's what defines a video game, no matter what sugar or philosophy we might add to that on top.
+
+Hypnotr0n wrote:
+
+thus I don't believe you can actually hear or see the possibilities designing around messaging can have.
+
+Yeah. Actually the concept of messaging is too vague for me to adopt.
+It's like String Theory. They tweak complicated math to retrofit it to obseravtions about a universe they do ot understand.
+But it's not that they did not discover some usefull things on their way.
+So if it works for you, stick at it.
+
+Hypnotr0n wrote:
+
+Messaging is another way of saying "narrative" but I prefer "messaging" because too often "narrative" is interpreted to mean STORY by many people which is incorrect.
+
+
+Show more
+Yeah, one of those many cases where terms blur and overlap too much. So proposig better, more specific terms can help.
+But even if those proposals are good, we can not expect widespread adoption, being just one of billions.
+HAve more patience with us ; )
+
+Hypnotr0n wrote:
+
+So... Atari Games... well I will have you know that SPACE INVADERS has messaging even if you cannot see it.
+
+
+Show more
+You can retrofit the obvious to self confirm, but i can do the same to disagree. Which is possible because 'messaging' is a vague term as well, just like 'narrative'.
+Imo, the basic situation of Space Invadres does not qualify for a message. A message needs to be said to explain some intent. But there is no intent in Space Invaders at all. There is just survival, which is primal instinct but no conscious intent.
+
+Though, i see a little bit more about your personal association about the term messaging. But notice you already have some hard time with retrofitting. I never perceived the aliens to be horror, nor did i see a marching army, and the game did not make me a savior or martyr. The box art does all this, but the game without the print doesn't. The game is just patters of funny guys i can shoot off the screen, end it ends when i get shot first. Simple survival.
+
+To qualify for a message to me, i could list some example slogans: Love and peace; Sex, drugs & rock'n'roll; Fuck the system; Arbeit macht frei; etc.
+
+Your defintion of a massege rather seems: Express the obvious you see on screen and box in language, and call it a message.
+
+Which - not remembering details from your messaging post - is a far fetched use of the word 'messaging' imo.
+But pardon my ignorance, there surely is more to it. I'm just not looking for some philosophy about game design. I never thought about game design at all for the games i have made. And maybe i want to keep it at that, being worried about too much knowledge and specifications could harm my innocent improvision skills. Ignorance is a bliss.
+
+
+
+Hypnotr0n wrote:
+
+I personally thinking advising new developers to THINK in terms of messaging when designing their games is akin to showing them how to draw their own treasure map instead of just wandering around and blinding digging holes in the ground.
+
+
+Show more
+Haha - maybe. But if i'm brutaly honest, i think your quote isn't any more true than what i have just said about improvising (aka digging blindfolded). A bad tongue could just say it's both bullshit, eventually preseting a much better approach of game design. I would not wonder.
+
+I guess everybody has his own way to do it, and there is no right or wrong at all.
+
+------------------------------------------------------------------------------------
+Yesterday at 11:54 PM
+
+Hypnotr0n
+Author
+79
+
+Space Invaders has narratives as I showed you. The fact the designer(s) was not thinking in terms of a "Design by Messaging" PROCESS is irrelevant. If it was instead "Cubes vs Giant Ground Cannon" I could believe your theory that the game was merely some abstract, incomprehensible, amalgamation of game mechanics. But it's clearly not... it's a science fiction theme (a message) about a mass invasion of ETs (a message) that are marching (remember the motion of the aliens and the audio and what happened when they sped up?) against a sole defender.
+
+So messages (3 cohesive, coherent, cogent narratives) are there for that game without question. It is irrelevant that he wasn't consciously using a "D by M" PROCESS.
+
+2) "Dig Dug" and Q-Bert might be super abstract games that are an amalgamation of incoherent, mechanics, but those games aren't particularly memorable outside of their mechanics either. If your game lacks messaging (aka "c-c-c" narratives) it's not likely to be as memorable or as easy to describe to others as well.
+
+I think it's funny you feel the "D by M" PROCESS (which is ONLY about bringing together C-C-C narratives because they can help designers invent new mechanics, inform the aesthetics for the world and the characters in it, inform the writing of the overall story, and result in a game that feels lovingly crafted and holistic) is both VAGUE and at the same is "too much knowledge and specifications [that] could harm [your] innocent improvision skills."
+
+My advice to aspiring designers, give Design By Messaging a try. There is nothing restrictive about it at all. If your intent is to make something completely abstract, surreal and trippy, then it could work for that too... but even the abstract, sureal and trippy you will find, has some kind of underlying sanity to it.
+
+....Or everyone can listen to the people who want to convince you that designing successful games is like playing the lottery. Good grief. Well, there are hacks in every industry. Hack game developers think making successful games is literally just a numbers game. Or they think if you spend enough money and dazzle them with amazing aesthetics, you can succeed financially despite the uninspired, derivative gameplay. Then there are the real "students" of the art who know better.
+
+
+
+GOOGLE AI OVERVIEW BELOW
+
+People stopped making games exactly like Dig Dug, Centipede, and Qbert because the gaming industry’s business models, technology, and player expectations underwent a massive structural shift.*
+
+While the "Golden Age" arcade formula of the early 1980s was highly successful for its time, several technical, financial, and cultural factors caused the industry to evolve away from it.
+
+1. Shift from Arcade Coins to Home Consoles
+
+The "Quarter-Eater" design: Classic arcade games were intentionally designed to be brutal. They featured a steep, unforgiving difficulty curve meant to kill the player within 2–3 minutes so they would feed another quarter into the machine.
+
+The home market transformation: When gaming shifted permanently to home consoles and PCs, players paid full price upfront. This changed game design fundamentally; creators now needed to provide 20 to 100 hours of sustained value, narrative, and progression, rather than a repetitive, high-stress loop.
+
+2. The Evolution of Hardware Capabilities
+
+Technical limitations as design: Games like Centipede and Dig Dug were single-screen or limited-scroll games because 1980s hardware couldn't handle complex physics, massive worlds, or 3D graphics. Designers had to maximize engagement using simple shapes and single-mechanic loops.
+
+The demand for immersion: As processing power exploded, players demanded cinematic storytelling, expansive 3D environments, and complex mechanics. Simple abstract concepts (like a nose-less creature jumping on isometric cubes) were largely replaced by realistic or deeply stylized world-building.
+
+3. Financial and Market Realities
+
+Development costs: Modern "AAA" game budgets range from tens of millions to hundreds of millions of dollars. To recoup these costs, publishers rely on massive, broad-appeal genres (like open-world RPGs or multiplayer shooters) or recurring monetization models (like battle passes), which do not fit the arcade format.
+
+The rise of mobile and casual gaming: The mechanical spiritual successors to Qbert* or Dig Dug actually do exist, but they have migrated entirely to mobile phones. Games like Candy Crush, Crossy Road, or casual puzzle games utilize the same bite-sized, easy-to-learn but hard-to-master loop, repackaged for touchscreens and financed by microtransactions or ads.
+
+4. The Modern "Neo-Arcade" and Indie Scene
+
+While major publishers like Namco or Atari rarely make high-budget versions of these games, the genre isn't entirely dead. It has evolved into the indie game market and sub-genres like "bullet hells" or "roguelikes."
+
+Games like Vampire Survivors utilize the exact same single-screen, high-intensity survival mechanics as Centipede.
+
+Games like SteamWorld Dig took the core digging and mining loop of Dig Dug and expanded it into a deep, story-driven adventure.
+
+
+Show more
+
+
+Regards,
+
+Michael Preston Joseph
+
+

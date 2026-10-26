@@ -395,4 +395,65 @@ Regards,
 
 Michael Preston Joseph
 
+------------------------------------------------------------------------------------
 
+JoeJ
+7,824
+
+Hypnotr0n wrote:
+
+Space Invaders has narratives as I showed you. The fact the designer(s) was not thinking in terms of a "Design by Messaging" PROCESS is irrelevant.
+
+
+Show more
+That's what i mean with retrofitting. You fit your messaging design philosophy on top of classic games which did not use said philosophy in their design. Which you even admit yourself by stating the fact to be irrelevant.
+
+
+
+Hypnotr0n wrote:
+
+GOOGLE AI OVERVIEW BELOW
+
+I'm sure using chatbots is even more effective at self confirmation than retrofitting.
+
+Since you only look for agreement on your messaging philosophy rather than objective discussion of immersive sims, maybe AI is the better discussion partner for you than i am.
+
+Good luck with the resulting game designs.
+
+------------------------------------------------------------------------------------
+
+Hypnotr0n
+Author
+79
+
+I'll bite this last time.
+
+I'm not retrofitting anything. Retrofitting would be to claim a formal process like D by M was being used by the Space Invaders developers.
+
+My claim is that a formal process is actually superior to a "gut feeling" process which will INVARIABLY result in a game that has messaging in it anyways.
+
+What we have here is failure to communicate!
+
+
+This happens for a very simple and obvious reason... games are a medium of COMMUNICATING. The designer(s)/developers(s) are COMMUNICATING with an audience. The players are hopefully comprehending and LEARNING that which is being communicated. What is being communicated? MESSAGES -> [real life facts, history, philosophies, ideas, game world, lore, rules, mechanics, themes, whatever].
+
+There doesn't need to be a formal process. D by M is probably more accurately described as designing with ACKNOWLEDGEMENT AND AWARENESS of the reality of games/media being a form of COMMUNICATION, and as such, it can be extremely helpful to design your game [once you've decided on the technologies you want to feature] with the types of messaging you want to deliver.
+
+Darmok and Jalad at Tenagra.
+
+
+I'm compelled to paste below this bit from the Wikipedia page entry https://en.wikipedia.org/wiki/Darmok on the Tamarian language featured in this ST:TNG episode:
+
+In examining this structure as a language basis, Ian Bogost wrote in The Atlantic that the language had been criticized as unsuited to technical dialogue of an advanced space-faring race ("hand me the ¾-inch socket wrench"), or as metaphor or imagery.[8] In his analysis, "something much stranger" is depicted, since the language as depicted is described as "imagery", "metaphor", or "symbolic", and it seems to prevent any distinction between an object (or event) and its figurative representation.[8]
+
+Bogost suggests allegory as a better term, because in allegory, events are replaced by others instead of just referring to other events. Noting that 20th century philosopher Walter Benjamin criticized this use of allegory as flawed and harmful (it replaces real concerns by a fetishized kind of mythology), he then commented that the answer to these points was to be found elsewhere.[8] In Bogost's view, the Tamarian language portrayed is neither imagery nor allegory, although it can take these roles. Its deeper structure is an abstraction, a form of logic. There is no need to ask explicitly for a socket wrench, because the reference suggests what should be done, as well as how those involved should organize and execute the tasks involved. He suggests that the better term to describe this language is that it instantiates strategy and logic, and all concerned can then perceive how to follow it with a shared understanding. He comments that in this sense, the term "Sim City" would represent and evoke an entire process and strategy for creating the simulations within that game, and that:[8]
+
+"If we pretend that 'Shaka, when the walls fell' is a signifier, then its signified is not the fictional mythological character Shaka, nor the myth that contains whatever calamity caused the walls to fall, but the logic by which the situation itself came about. Tamarian language isn’t really language at all, but machinery." [8]
+
+The Tamarians' language has been compared to the modern use of Internet memes and image macros.[9]
+
+In the paper Darmok and Jalad on the Internet, Kristina Šekrst compares the Tamarian language to Lakoff's and Mark Johnson's theory of metaphors from Metaphors We Live By and Women, Fire, and Dangerous Things. It explores how the language illustrates the role of metaphor and metonymy in communication, which was a recent concept in cognitive linguistics. It also explains that metaphors are a challenge in natural language processing, and the lack of information about the language caused the universal translator to fail in much the same way as modern computational translators fail to translate metaphors without sufficient knowledge about the source language.[10]
+
+Regards,
+
+Michael Preston Joseph

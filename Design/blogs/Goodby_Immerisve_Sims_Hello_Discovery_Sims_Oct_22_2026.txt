@@ -433,13 +433,14 @@ I'm not retrofitting anything. Retrofitting would be to claim a formal process l
 My claim is that a formal process is actually superior to a "gut feeling" process which will INVARIABLY result in a game that has messaging in it anyways.
 
 What we have here is failure to communicate!
-
+https://www.youtube.com/watch?v=_WUyZXhLHMk [famous scene from "Cool Hand Luke" with Paul Newman)
 
 This happens for a very simple and obvious reason... games are a medium of COMMUNICATING. The designer(s)/developers(s) are COMMUNICATING with an audience. The players are hopefully comprehending and LEARNING that which is being communicated. What is being communicated? MESSAGES -> [real life facts, history, philosophies, ideas, game world, lore, rules, mechanics, themes, whatever].
 
 There doesn't need to be a formal process. D by M is probably more accurately described as designing with ACKNOWLEDGEMENT AND AWARENESS of the reality of games/media being a form of COMMUNICATION, and as such, it can be extremely helpful to design your game [once you've decided on the technologies you want to feature] with the types of messaging you want to deliver.
 
-Darmok and Jalad at Tenagra.
+armok and Jalad at Tenagra.  - This ep is appropriate to this convo on TWO fronts.  1) JoeJ & Me and 2) Design by Messaging where the developer communicates and the player learns... hopefully.  Highly recommend gamedevs watch this ep and read the full entry on wikipedia about the Tamarian language.
+https://www.youtube.com/watch?v=4Bb-Af3Dm8E
 
 
 I'm compelled to paste below this bit from the Wikipedia page entry https://en.wikipedia.org/wiki/Darmok on the Tamarian language featured in this ST:TNG episode:

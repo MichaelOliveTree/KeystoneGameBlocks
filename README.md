@@ -72,7 +72,11 @@ Thank you.
 
 Michael P. Joseph
 
-  
+OLD BLOG POST CACHED BY WAYBACK MACHINE.
+https://htmlpreview.github.io/?https://github.com/MichaelOliveTree/KeystoneGameBlocks/blob/main/Design/SciFiCommand/website1.0/Big%20Mike%27s%20Dev%20Blog%20_%20News%20and%20updates%20for%20a%20space%20simulation%20I%27m%20writing.html
+
+
+
 KGB TODO ITEMS:
 - Yes, the main plugin used for editing BehaviorTrees, Appearance (in Unity Appearance nodes are referred to as Renderers), Particle Systems, Animations, etc is ANNOYING TO USE AND EXTREMELY BARE BONES and NEEDS TLC.  I had cleaned this Plugin up A LOT but when my laptop was stolen, I lost 4 months of work and over half the code in the included \\stage\\ folder that needs to be integrated into the main branch, are rewrites of all the code that was lost, including those that resulted in a better experience when using that Plugin (KeyEntityEditPlugin).  But the problems with the plugin are all mostly very minor and just amount to things that "need to be done..." as opposed to any serious bug hunting efforts.
 
